@@ -2,109 +2,104 @@
 
 ## System Overview
 
-[Tóm tắt 2-3 câu về kiến trúc hệ thống]
+AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision (PPE & Zone Safety Agent).
+Hệ thống sử dụng Computer Vision (YOLO) để phát hiện người, đánh giá việc tuân thủ quy định về PPE và cảnh báo theo thời gian thực nếu có xâm nhập vào các khu vực nguy hiểm được định nghĩa bằng Polygon. Backend sử dụng FastAPI kết nối với PostgreSQL để lưu trữ và quản lý event.
 
 ## Architecture Diagram
 
 ```mermaid
-graph TB
-    subgraph Frontend
-        UI[React/Next.js UI]
+flowchart TB
+    BROWSER["Browser"]
+
+    subgraph DOCKER["Docker Compose"]
+        FRONTEND["Frontend Container<br/>React + Vite build"]
+        BACKEND["Backend Container<br/>FastAPI"]
+        DB[("PostgreSQL Container")]
     end
 
-    subgraph Backend[FastAPI Backend]
-        API[API Routes]
-        Agent[LangGraph Agent]
-        LLM[LLM Service]
-        Tools[Agent Tools]
+    subgraph HOST["Host machine / GPU environment"]
+        CVWORKER["Python CV Pipeline<br/>YOLO + OpenCV"]
+        MODELS[("Model Weights")]
+        VIDEOS[("Demo Videos")]
     end
 
-    subgraph Data[Data Layer]
-        DB[(Database)]
-        Vector[Vector Store]
+    BROWSER --> FRONTEND
+    FRONTEND -->|REST + WebSocket| BACKEND
+    BACKEND --> DB
+    BACKEND --> CVWORKER
+    CVWORKER --> MODELS
+    CVWORKER --> VIDEOS
+```
+
+## Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    actor User as Safety Officer
+    participant UI as React Frontend
+    participant API as FastAPI
+    participant CV as CV Pipeline
+    participant Rules as Rule Engine
+    participant DB as PostgreSQL
+    participant WS as WebSocket
+
+    User->>UI: Chọn video và nhấn Start
+    UI->>API: POST /analysis/start
+    API->>CV: Bắt đầu xử lý video
+
+    loop Mỗi frame
+        CV->>CV: Detect person và PPE
+        CV->>CV: Track person
+        CV->>CV: Check polygon zone
+        CV->>Rules: Detection state + machine state
+
+        alt Không vi phạm
+            Rules-->>CV: normal
+        else Vi phạm mới
+            Rules-->>API: Safety event
+            API->>DB: Lưu event
+            API->>WS: Push realtime alert
+            WS-->>UI: new_event
+            UI-->>User: Hiển thị cảnh báo
+        else Event đang active
+            Rules-->>CV: Không tạo event lặp
+        end
     end
 
-    UI -->|HTTP/REST| API
-    API --> Agent
-    Agent --> LLM
-    Agent --> Tools
-    Agent --> Vector
-    Tools --> DB
-    API --> DB
+    User->>UI: Acknowledge / False alarm
+    UI->>API: PATCH /events/{id}
+    API->>DB: Lưu quyết định người dùng
+    API-->>UI: Event đã cập nhật
 ```
 
 ## Components
 
-### 1. Frontend (React/Next.js)
-- **Purpose:** [mô tả]
-- **Key Features:** [danh sách]
-- **State Management:** [approach]
+### 1. Computer Vision Pipeline (Python)
+- **Person Detection:** YOLO pretrained
+- **PPE Detection:** YOLO pretrained / fine-tuned cho helmet & safety_vest
+- **Tracking:** ByteTrack (qua Ultralytics)
+- **Zone Logic:** OpenCV `pointPolygonTest`
+- **Privacy:** Làm mờ khuôn mặt bằng OpenCV
 
 ### 2. Backend (FastAPI)
-- **Purpose:** [mô tả]
-- **API Design:** RESTful
-- **Authentication:** [JWT/None]
+- **Mục đích:** API điều phối video, đánh giá rule engine, lưu trữ sự kiện, WebSocket đẩy cảnh báo.
+- **Rule Engine:** Viết bằng Python thuần kiểm tra các rule nghiệp vụ.
+- **WebSocket:** Cập nhật real-time tới frontend.
 
-### 3. AI Agent (LangGraph)
-- **Agent Type:** [ReAct / Plan-and-Execute / Custom]
-- **State:** [mô tả state schema]
-- **Nodes:** [danh sách nodes]
-- **Tools:** [danh sách tools]
-- **Flow:**
-
-```mermaid
-graph LR
-    START --> A[Node A]
-    A --> B{Decision}
-    B -->|Yes| C[Node C]
-    B -->|No| D[Node D]
-    C --> E[END]
-    D --> E
-```
+### 3. Frontend (React + TypeScript + Vite)
+- **Mục đích:** Live monitor, alert, event log, dashboard.
+- **Styling:** Tailwind CSS
+- **Charts:** Recharts
 
 ### 4. Database
-- **Type:** [PostgreSQL / SQLite]
-- **Tables:** [danh sách]
-- **Migrations:** Alembic
-
-### 5. Vector Store
-- **Type:** [ChromaDB / FAISS / Pinecone]
-- **Embeddings:** [model]
-- **Purpose:** [RAG / similarity search]
-
-## Data Flow
-
-1. User gửi request từ Frontend
-2. API route nhận và validate input
-3. Agent xử lý qua LangGraph pipeline
-4. LLM generate response
-5. Tools thực thi actions (nếu cần)
-6. Response trả về Frontend
-
-## Deployment Architecture
-
-```mermaid
-graph LR
-    subgraph Docker
-        FE[Frontend Container]
-        BE[Backend Container]
-        DB_C[Database Container]
-    end
-    FE --> BE --> DB_C
-```
-
-## Security
-
-- API keys stored in `.env` (never commit)
-- Input validation via Pydantic
-- Rate limiting on API endpoints
-- CORS configured for frontend domain
+- **Type:** PostgreSQL
+- **ORM:** SQLAlchemy + Alembic
 
 ## Design Decisions
 
 | Decision | Choice | Reason |
 |----------|--------|--------|
-| Framework | FastAPI | Async, auto-docs, type-safe |
-| Agent | LangGraph | Flexible state management |
-| Database | [choice] | [reason] |
-| Frontend | Next.js | [reason] |
+| Zone Logic | OpenCV | `pointPolygonTest` đủ dùng mà không cần model AI phức tạp |
+| Backend | FastAPI | Python stack, dễ tích hợp CV pipeline, hỗ trợ WebSocket tốt |
+| Frontend | React + Vite | Phù hợp quản lý state real-time, Vite nhẹ và nhanh |
+| Architecture | Modular Monolith | Một repo, các thành phần gọi nội bộ thay vì microservices ở giai đoạn đầu |

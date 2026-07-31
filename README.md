@@ -1,201 +1,103 @@
-# 🤖 AI20K Agent Template
+# AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision
 
-Template chính thức cho học viên **VinUni AI20K Build Phase** — cung cấp sẵn cấu trúc dự án, code mẫu, và hướng dẫn kỹ thuật chi tiết để xây dựng AI Agent đạt điểm cao (35+/50).
+> Tóm tắt 1 câu: Thiếu giám sát an toàn liên tục tại nhà máy → AI Agent phân tích camera theo thời gian thực (YOLO + OpenCV) cho Cán bộ an toàn và Quản lý khu vực.
 
-> 📖 **Technical Guidebook:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
+## Vấn đề (Problem)
 
-## 🎯 Template này dùng để làm gì?
+📍 Thực trạng: Nhà máy có khu vực nguy hiểm (máy dập, xe nâng, hóa chất) yêu cầu đội mũ/kính/găng đúng quy định và không xâm nhập vùng cấm; giám sát bằng người không xuể, vi phạm dễ bị bỏ sót.
+🎯 Vấn đề: Cần AI Agent phân tích luồng camera phát hiện thiếu PPE và người xâm nhập vùng cấm khi máy đang chạy, cảnh báo realtime, ghi nhận vi phạm và thống kê tuân thủ theo khu vực/ca.
+🔒 Ràng buộc: Cảnh báo nguy hiểm nghiêm trọng (người trong vùng nguy hiểm) escalate ngay tới người phụ trách (HITL); tôn trọng quyền riêng tư (làm mờ danh tính, chỉ lưu vi phạm); bảo mật dữ liệu hình ảnh; cân bằng độ chính xác/false alarm.
 
-Khi tham gia AI20K Build Phase, mỗi đội cần xây dựng một AI Agent hoàn chỉnh — từ kiến trúc, code, test, đến deploy. Thay vì bắt đầu từ con số không, template này cung cấp:
+## Giải pháp (Solution)
 
-- **Cấu trúc thư mục chuẩn** — đã được thiết kế theo best practices (separation of concerns)
-- **Code mẫu** cho các phần cốt lõi: LangGraph agent, FastAPI API, config, schemas
-- **Docker + CI/CD sẵn** — Dockerfile multi-stage, GitHub Actions workflow
-- **Hướng dẫn kỹ thuật 10 chương** — từ clone template đến nộp bài Demo Day
-- **Checklist 10 deliverables** — đảm bảo không bỏ sót yêu cầu BTC
-- **AI Usage Logging tự động** — Pre-configured hooks cho Claude Code, Cursor, Codex, Gemini CLI, Antigravity, và GitHub Copilot
+Sản phẩm giám sát an toàn tự động bằng Computer Vision:
+- Feature 1: **Phát hiện thiếu PPE & xâm nhập vùng cấm** bằng YOLO pretrained và OpenCV polygon zone.
+- Feature 2: **Cảnh báo realtime** thông qua FastAPI WebSocket cho Frontend React.
+- Feature 3: **Quản lý & Thống kê vi phạm** lưu trữ vào PostgreSQL, Dashboard theo khu vực và ca.
+- Feature 4: **Đảm bảo Privacy** tự động làm mờ khuôn mặt danh tính người vi phạm.
 
-## ⚡ Quick Start
+## Target User
 
-### Bước 1: Fork hoặc Clone
+- Primary: Cán bộ an toàn (Safety Officer) - Nhận cảnh báo realtime, đánh giá vi phạm, escalate.
+- Secondary: Quản lý khu vực (Zone Manager) - Theo dõi thống kê tuân thủ, dashboard.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Computer Vision | Python, Ultralytics YOLO, OpenCV, ByteTrack |
+| Backend | FastAPI + SQLAlchemy |
+| Frontend | React + TypeScript + Vite |
+| Database | PostgreSQL |
+| DevOps | Docker Compose |
+
+## Quick Start
 
 ```bash
-# Clone template
-git clone https://github.com/AI20K-Build-Cohort-2/starter-code-template.git team-YOUR_TEAM_NAME
-cd team-YOUR_TEAM_NAME
+# 1. Clone repo
+git clone https://github.com/AI20K-Build-Cohort-2/P-047.git
+cd P-047
 
-# Xóa git history cũ và khởi tạo lại
-rm -rf .git
-git init
-git add .
-git commit -m "feat: khởi tạo dự án từ template"
-```
-
-### Bước 2: Setup môi trường
-
-```bash
-# Tạo virtual environment
-python3.11 -m venv .venv
+# 2. Setup environment
+python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 
-# Cài dependencies
-pip install -e ".[dev]"
+# 3. Start Backend & Database
+docker-compose up -d db
+uvicorn backend.app.main:app --reload
 
-# Cấu hình API keys
-cp .env.example .env
-# Mở .env và thêm OPENAI_API_KEY của bạn
-# Đồng thời cập nhật AI_LOG_API_KEY bằng key riêng từ link mời của BTC
-# (giá trị trong .env.example chỉ là placeholder)
+# 4. Start Frontend
+cd frontend
+npm install
+npm run dev
 ```
 
-### Bước 3: Cài AI Logging Hooks
+## Project Structure
 
-```bash
-# Linux / macOS / Git Bash
-bash scripts/setup_hooks.sh
+### Cấu trúc hiện tại (Current Project Structure)
 
-# Windows PowerShell
-# powershell -ExecutionPolicy Bypass -File scripts\setup_hooks.ps1
-```
-
-Hooks tự động log mọi AI prompt khi dùng Claude Code, Cursor, Codex, Gemini CLI, Antigravity, hoặc GitHub Copilot. Không cần thao tác thủ công.
-
-### Bước 4: Chạy server
-
-```bash
-# Chạy FastAPI backend
-uvicorn src.main:app --reload --port 8000
-
-# Mở Swagger UI
-# http://localhost:8000/docs
-```
-
-### Bước 5: Đọc hướng dẫn
-
-📖 Mở **[Technical Guidebook](https://phoenix.note.transformerlabs.ai/technical-book)** và làm theo từng chương.
-
-## 📁 Cấu trúc dự án
+Cấu trúc hiện tại là boilerplate mặc định được cung cấp từ AI20K Build Phase Template. Cấu trúc này ban đầu được thiết kế cho các Agent LangGraph thông thường:
 
 ```
 ├── src/
-│   ├── agents/           # 🧠 LangGraph Agent
-│   │   ├── graph.py      #    State graph (nodes + edges)
-│   │   ├── state.py      #    State schema (TypedDict)
-│   │   ├── nodes/        #    Node functions
-│   │   └── tools/        #    Agent tools (@tool)
-│   ├── api/              # 🌐 FastAPI Backend
-│   │   └── routes.py     #    API endpoints
-│   ├── models/           # 📋 Pydantic schemas
-│   ├── services/         # 🔧 Business logic (LLM, etc.)
-│   ├── config.py         # ⚙️ Pydantic Settings
-│   └── main.py           # 🚀 App entry point
-├── tests/                # 🧪 pytest suite
-│   ├── test_agents/      #    Agent/graph tests
-│   └── test_api/         #    API endpoint tests
-├── scripts/              # 🔌 AI Logging Hooks
-│   ├── log_hook.py       #    Auto-log cho Claude/Cursor/Codex/Gemini/Copilot
-│   ├── log_antigravity.py#    Antigravity IDE prompt scanner
-│   ├── log_manual.py     #    Manual log cho ChatGPT / web tools
-│   ├── submit_log.py     #    Submit logs on git push
-│   └── setup_hooks.sh    #    One-time hook installer
-├── .claude/ .codex/ .cursor/ .gemini/  # Per-tool hook configs
-├── .agents/              # Antigravity rules + workflows
-├── .ai-log/              # 📊 AI usage logs (auto-generated)
-├── docs/
-│   ├── guide/            # 📖 Technical Guidebook (10 chapters)
-│   └── architecture_diagram.md
-├── eval/                 # 📊 Evaluation results
-├── presentation/         # 🎤 Demo Day slides
-├── .github/workflows/    # ⚡ CI/CD (GitHub Actions)
-├── .github/hooks/        # 🪝 Copilot hook config
-├── Dockerfile            # 🐳 Multi-stage build
-├── docker-compose.yml    # 🐙 Full stack orchestration
-└── README_boilerplate.md # 📝 README template cho đội của bạn
+│   ├── agents/          # LangGraph Agent (graph, nodes, tools)
+│   ├── api/             # FastAPI Backend
+│   └── ...
+├── tests/               # Unit/Integration tests
+├── scripts/             # AI Logging hooks
+├── docs/                # Documents & Guidebooks
+├── eval/                # Evaluation results
+└── presentation/        # Demo materials
 ```
 
-## 📚 Technical Guidebook — 10 Chương
+**Giải thích:**
+Đây là cấu trúc nguyên bản phù hợp cho bài toán Text-based AI Agent. Tuy nhiên, dự án Giám Sát An Toàn PPE phụ thuộc nhiều vào việc phân tích video thời gian thực bằng Computer Vision (YOLO/OpenCV) và yêu cầu một giao diện trực quan. Do đó, cấu trúc cũ không còn phù hợp và chưa tối ưu để tách biệt các luồng xử lý luồng hình ảnh (CV pipeline), frontend phức tạp (React) và API backend.
 
-| Chương | Nội dung | Thời gian |
-|---------|----------|-----------|
-| 1 | Lời mở đầu — Mục tiêu, cách sử dụng | 15 phút |
-| 2 | Khởi tạo dự án — Clone, setup, git workflow | 4 giờ |
-| 3 | Thiết kế kiến trúc — 3-tier, diagrams, ADR | 6 giờ |
-| 4 | **LangGraph Agent** — State, nodes, edges, tools, RAG | 8 giờ |
-| 5 | FastAPI — Routes, validation, error handling, streaming | 6 giờ |
-| 6 | Giao diện — Next.js + Streamlit quickstart | 6 giờ |
-| 7 | DevOps — Docker, CI/CD, deploy, logging | 6 giờ |
-| 8 | Kiểm thử — Unit test, integration test, RAGAS | 4 giờ |
-| 9 | Demo Day — 10 deliverables, checklist, tips | 2 giờ |
-| 10 | Tài nguyên — Khóa học, docs, BMAD method | tham khảo |
+### Cấu trúc tương lai (Future Project Structure)
 
-📖 **Đọc online:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
+Trong các phase tiếp theo, dự án sẽ được refactor sang kiến trúc Modular Monolith mới để hỗ trợ tốt nhất cho hệ thống Computer Vision realtime như thiết kế:
 
-## 📋 10 Deliverables cho Demo Day
-
-| # | Deliverable | File vị trí | Template có sẵn |
-|---|-------------|-------------|:---:|
-| 1 | Source Code | `src/` | ✅ |
-| 2 | README.md | `README_boilerplate.md` → copy thành `README.md` | ✅ |
-| 3 | Architecture Diagram | `docs/architecture_diagram.md` | ✅ |
-| 4 | AI Logs | LangSmith (3 env vars) + Auto AI Usage Logging | ✅ |
-| 5 | Live URL | Deploy lên Render/Vercel | ⚡ CI/CD sẵn |
-| 6 | Video Demo | `presentation/` | 📝 |
-| 7 | Pitch Deck | `presentation/` | 📝 |
-| 8 | Development Journal | `JOURNAL.md` | ✅ |
-| 9 | Worklog | `WORKLOG.md` | ✅ |
-| 10 | Evaluation Evidence | `eval/` | 📝 |
-
-## 🛠 Tech Stack
-
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| AI Agent | LangGraph + LangChain | Latest |
-| Backend | FastAPI + Uvicorn | 0.100+ |
-| LLM | OpenAI GPT-4o-mini | API |
-| Frontend | Next.js / Streamlit | 14+ / 1.30+ |
-| Database | SQLite (dev) / PostgreSQL (prod) | — |
-| DevOps | Docker + GitHub Actions | — |
-| Testing | pytest + pytest-asyncio | 8+ |
-
-## 📊 AI Usage Logging
-
-Template đã tích hợp sẵn auto-logging hooks cho 6 AI tools:
-
-| Tool | Cơ chế | Config |
-|------|--------|--------|
-| Claude Code | `.claude/settings.json` hooks | Tự động |
-| Cursor | `.cursor/hooks.json` | Tự động |
-| OpenAI Codex CLI | `.codex/hooks.json` | Tự động |
-| Gemini CLI | `.gemini/settings.json` | Tự động |
-| GitHub Copilot | `.github/hooks/hooks.json` | Tự động |
-| Antigravity IDE | Pre-push scan transcript | Tự động trên `git push` |
-
-Tất cả prompts và tool calls được log vào `.ai-log/session.jsonl` và tự động submit lên grading server mỗi khi `git push`.
-
-**ChatGPT / web tools khác** — log thủ công:
-```bash
-bash scripts/_pyrun.sh scripts/log_manual.py --tool chatgpt --prompt "What you asked"
+```
+├── backend/
+│   ├── app/             # FastAPI: REST, WebSocket, Event & Business Logic
+│   └── migrations/      # Database schema migrations (Alembic)
+├── vision/              # Python CV Pipeline: YOLO Person/PPE, OpenCV Zone Logic, ByteTrack
+├── frontend/            # React + TypeScript + Vite: Live monitor, Dashboard, Event Log
+├── data/                # Demo videos & Expected results dùng để test và mô phỏng
+├── contracts/           # Định nghĩa JSON schemas giao tiếp chuẩn giữa CV và Backend
+├── docs/                # Architecture, Rules và Limitations
+├── Dockerfile           # Multi-stage build cho hệ thống
+└── docker-compose.yml   # Full stack orchestration (Frontend, Backend, PostgreSQL)
 ```
 
-> ⚠️ Chạy `bash scripts/setup_hooks.sh` một lần sau khi clone để cài pre-push hook.
+**Giải thích:**
+Cấu trúc mới được chia thành các phân hệ chức năng rõ ràng (separation of concerns):
+1. **`vision/`**: Xử lý toàn bộ logic liên quan đến nhận diện hình ảnh/video đầu vào. Độc lập hoàn toàn với web framework, dễ dàng scale.
+2. **`backend/`**: API gateway nhận kết quả phân tích từ `vision`, lưu trữ trạng thái vào database, xử lý rule vi phạm và đẩy cảnh báo realtime qua WebSocket tới người dùng.
+3. **`frontend/`**: Ứng dụng client-side trực quan cho Cán bộ an toàn quản lý video live, xem cảnh báo vi phạm và dashboard báo cáo.
+4. **`contracts/`**: Đóng vai trò là chuẩn giao tiếp trung gian (JSON schemas) đảm bảo các module có thể kết nối với nhau một cách thống nhất và dễ dàng mở rộng.
 
-## 📖 Đọc Technical Guidebook
+## License
 
-**Online (khuyến nghị):** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
-
-Đăng nhập bằng GitHub (cùng account đã được BTC mời vào org `AI20K-Build-Cohort-2`)
-→ chọn tab **Technical Book** ở sidebar trái → đọc 10 chương + topic sections,
-có table of contents bên phải, hỗ trợ light/dark/cyberpunk theme.
-
-**Offline:** mọi chương đều ở thư mục `docs/guide/` trong template này — mở bằng
-bất kỳ markdown viewer/editor nào (VS Code, Obsidian, GitHub UI, …).
-
-## 🔗 Liên kết
-
-- 📖 **Technical Guidebook:** [phoenix.note.transformerlabs.ai/technical-book](https://phoenix.note.transformerlabs.ai/technical-book)
-- 🏫 **AI20K Program:** VinUni AI20K Build Phase
-- 👨‍🏫 **Mentor:** Đặng Hải Lộc
-
-## 📄 License
-
-MIT — Sử dụng tự do cho mục đích giáo dục.
+MIT
