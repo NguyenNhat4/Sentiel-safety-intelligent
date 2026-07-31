@@ -31,6 +31,8 @@ flowchart TB
     CVWORKER --> VIDEOS
 ```
 
+[For detail architecture diagram and docker compose diagram](./docs/architecture_diagram.md)
+
 ## Data Flow Diagram
 
 ```mermaid
