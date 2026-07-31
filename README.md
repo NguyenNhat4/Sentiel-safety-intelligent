@@ -78,17 +78,62 @@ Cấu trúc hiện tại là boilerplate mặc định được cung cấp từ 
 
 Trong các phase tiếp theo, dự án sẽ được refactor sang kiến trúc Modular Monolith mới để hỗ trợ tốt nhất cho hệ thống Computer Vision realtime như thiết kế:
 
-```
+```text
+P-047/
 ├── backend/
-│   ├── app/             # FastAPI: REST, WebSocket, Event & Business Logic
-│   └── migrations/      # Database schema migrations (Alembic)
-├── vision/              # Python CV Pipeline: YOLO Person/PPE, OpenCV Zone Logic, ByteTrack
-├── frontend/            # React + TypeScript + Vite: Live monitor, Dashboard, Event Log
-├── data/                # Demo videos & Expected results dùng để test và mô phỏng
-├── contracts/           # Định nghĩa JSON schemas giao tiếp chuẩn giữa CV và Backend
-├── docs/                # Architecture, Rules và Limitations
-├── Dockerfile           # Multi-stage build cho hệ thống
-└── docker-compose.yml   # Full stack orchestration (Frontend, Backend, PostgreSQL)
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   │   ├── analysis_service.py
+│   │   │   ├── event_service.py
+│   │   │   └── statistics_service.py
+│   │   └── main.py
+│   ├── migrations/
+│   └── tests/
+│
+├── vision/
+│   ├── detection/
+│   │   ├── person_detector.py
+│   │   └── ppe_detector.py
+│   ├── tracking/
+│   ├── association/
+│   ├── zones/
+│   ├── privacy/
+│   ├── rules/
+│   ├── pipeline.py
+│   └── tests/
+│
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── features/
+│   │   │   ├── monitor/
+│   │   │   ├── alerts/
+│   │   │   ├── events/
+│   │   │   └── dashboard/
+│   │   └── types/
+│   └── package.json
+│
+├── data/
+│   ├── demo/
+│   ├── edge-cases/
+│   └── expected-results.json
+│
+├── contracts/
+│   ├── detection.schema.json
+│   └── event.schema.json
+│
+├── docs/
+│   ├── architecture.md
+│   ├── rules.md
+│   └── limitations.md
+│
+├── docker-compose.yml
+└── README.md
 ```
 
 **Giải thích:**
