@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentinel — PPE & Zone Safety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#">
+      <span class="brand-mark">S</span>
+      <span>Sentinel<small>Safety intelligence</small></span>
+    </a>
+
+    <nav>
+      <button class="nav-item active" data-page="monitor"><span>◉</span> Live monitor</button>
+      <button class="nav-item" data-page="events"><span>▤</span> Nhật ký vi phạm <b>3</b></button>
+      <button class="nav-item" data-page="dashboard"><span>⌁</span> Dashboard</button>
+      <button class="nav-item" data-page="logjson"><span>{ }</span> Log JSON</button>
+    </nav>
+
+    <div class="system-card">
+      <div><span class="pulse"></span> Hệ thống hoạt động</div>
+      <p>Camera và AI engine đang trực tuyến.</p>
+      <div class="system-meta"><span>Độ trễ</span><strong>84 ms</strong></div>
+      <div class="system-meta"><span>Model</span><strong>YOLO PPE v1</strong></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">AT</div>
+      <div><strong>Anh Tuấn</strong><small>Cán bộ an toàn</small></div>
+      <button>•••</button>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">TRUNG TÂM GIÁM SÁT</p>
+        <h1 id="page-title">Live Monitor</h1>
+      </div>
+      <div class="header-actions">
+        <div class="clock"><span id="clock">15:20:48</span><small>29 tháng 07, 2026</small></div>
+        <button class="icon-btn">⌕</button>
+        <button class="icon-btn notification">♢<i></i></button>
+      </div>
+    </header>
+
+    <section class="page active" id="monitor">
+      <div class="toolbar">
+        <div class="camera-select">
+          <span class="camera-icon">●</span>
+          <div><small>CAMERA ĐANG XEM</small><strong>Zone A — Máy dập 01</strong></div>
+          <span>⌄</span>
+        </div>
+        <div class="machine-control">
+          <div><small>MACHINE A</small><strong id="machine-label">Đang hoạt động</strong></div>
+          <button class="switch on" id="machine-switch" aria-label="Chuyển trạng thái máy"><span></span></button>
+        </div>
+        <input id="media-input" type="file" accept="image/*,video/*" hidden />
+        <button class="secondary-btn" id="upload-btn">＋ Tải ảnh / video</button>
+        <button class="inference-btn" id="inference-btn">▶ Inference</button>
+        <button class="secondary-btn" id="zone-config-btn">⌗ Cấu hình vùng</button>
+      </div>
+
+      <div class="monitor-grid">
+        <article class="video-card">
+          <div class="video-head">
+            <span><i class="live-dot"></i> LIVE</span>
+            <p>CAM-01 · 1920 × 1080 · 24 FPS</p>
+            <button>⛶</button>
+          </div>
+          <div class="camera-scene" id="camera-scene">
+            <img id="uploaded-image" class="uploaded-media" alt="Ảnh phân tích đã tải lên" />
+            <video id="uploaded-video" class="uploaded-media" playsinline></video>
+            <div class="scene-glow"></div>
+            <div class="machine machine-left"><span></span><span></span></div>
+            <div class="machine machine-right"><span></span><span></span></div>
+            <div class="danger-zone"><b>KHU VỰC NGUY HIỂM</b></div>
+            <div class="person-box">
+              <div class="person">
+                <div class="head"><span class="blur"></span></div>
+                <div class="body"></div><div class="leg l"></div><div class="leg r"></div>
+              </div>
+              <span class="corner tl"></span><span class="corner tr"></span>
+              <span class="corner bl"></span><span class="corner br"></span>
+              <label>PERSON · 96%</label>
+              <em>NO HELMET</em>
+            </div>
+            <div class="privacy-tag">◉ PRIVACY MASK ON</div>
+            <time id="video-time">2026-07-29 15:20:48.084</time>
+            <div class="zone-editor" id="zone-editor">
+              <svg aria-hidden="true"><polygon id="zone-polygon" points=""></polygon></svg>
+              <div id="zone-points"></div>
+              <div class="zone-hint" id="zone-hint">Chọn 4 điểm để tạo vùng nguy hiểm · 0/4</div>
+            </div>
+          </div>
+          <footer>
+            <span><i></i> AI Detection</span>
+            <span>1 người</span><span>0 mũ bảo hộ</span>
+            <strong>● Zone A · Online</strong>
+          </footer>
+        </article>
+
+        <aside class="alert-panel">
+          <div class="alert-top">
+            <span class="critical-icon">!</span>
+            <div><small>CẢNH BÁO ĐANG HOẠT ĐỘNG</small><h2>Xâm nhập vùng cấm</h2></div>
+            <span class="severity">CRITICAL</span>
+          </div>
+          <p class="alert-summary">Phát hiện người trong vùng nguy hiểm khi máy đang hoạt động.</p>
+
+          <div class="rule-chain">
+            <div class="rule yes"><span>01</span><p><small>VỊ TRÍ</small><strong>Trong vùng nguy hiểm</strong></p><b>YES</b></div>
+            <div class="rule yes"><span>02</span><p><small>TRẠNG THÁI MÁY</small><strong>Machine A đang chạy</strong></p><b>ON</b></div>
+            <div class="rule no"><span>03</span><p><small>PPE</small><strong>Không phát hiện mũ</strong></p><b>MISS</b></div>
+          </div>
+
+          <div class="confidence">
+            <div><span>Độ tin cậy</span><strong>94%</strong></div>
+            <div class="confidence-bar"><span></span></div>
+            <small>Ngưỡng tự động: 85%</small>
+          </div>
+
+          <div class="escalation">
+            <div><span>⌁</span><p><small>ĐÃ GỬI ESCALATION</small><strong>Quản lý khu vực đã nhận cảnh báo</strong></p></div>
+            <div class="timer"><strong id="timer">00:18</strong><small>Chờ xác nhận</small></div>
+          </div>
+
+          <div class="alert-actions">
+            <button class="ack" id="ack-btn">✓ Xác nhận & xử lý</button>
+            <button class="false" id="false-btn">Đánh dấu báo sai</button>
+          </div>
+          <p class="event-id">EVENT ID <span>#EV-20260729-032</span></p>
+        </aside>
+      </div>
+
+      <div class="activity-strip">
+        <div><span class="activity-icon">⚠</span><p><small>SỰ KIỆN GẦN NHẤT</small><strong>Thiếu mũ bảo hộ · Zone A</strong></p></div>
+        <span>15:18:04</span><span class="medium-pill">MEDIUM</span>
+        <span>Đang chờ xác nhận</span><button data-go-events>Xem nhật ký →</button>
+      </div>
+    </section>
+
+    <section class="page" id="events">
+      <div class="stats-row">
+        <div class="mini-stat"><small>TỔNG SỰ KIỆN HÔM NAY</small><strong>20</strong><span>+12% so với hôm qua</span></div>
+        <div class="mini-stat red"><small>NGHIÊM TRỌNG</small><strong>04</strong><span>Cần ưu tiên xử lý</span></div>
+        <div class="mini-stat"><small>CHỜ XÁC NHẬN</small><strong>02</strong><span>1 sự kiện sắp quá hạn</span></div>
+        <div class="mini-stat green"><small>ĐÃ XỬ LÝ</small><strong>15</strong><span>75% tổng sự kiện</span></div>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar"><h2>Nhật ký vi phạm</h2><div><button>Hôm nay ⌄</button><button>☷ Bộ lọc</button><button>⇩ Xuất báo cáo</button></div></div>
+        <table>
+          <thead><tr><th>THỜI GIAN</th><th>KHU VỰC</th><th>VI PHẠM</th><th>MÁY</th><th>MỨC ĐỘ</th><th>TRẠNG THÁI</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><strong>15:20:48</strong><small>29/07/2026</small></td><td>Zone A<small>CAM-01</small></td><td><strong>Xâm nhập vùng cấm</strong><small>Confidence 94%</small></td><td><span class="on-pill">● ON</span></td><td><span class="critical-pill">CRITICAL</span></td><td><span class="pending-status">● Chờ xác nhận</span></td><td>›</td></tr>
+            <tr><td><strong>15:18:04</strong><small>29/07/2026</small></td><td>Zone A<small>CAM-01</small></td><td><strong>Thiếu mũ bảo hộ</strong><small>Confidence 89%</small></td><td><span class="on-pill">● ON</span></td><td><span class="medium-pill">MEDIUM</span></td><td><span class="pending-status">● Chờ xác nhận</span></td><td>›</td></tr>
+            <tr><td><strong>14:42:31</strong><small>29/07/2026</small></td><td>Zone A<small>CAM-01</small></td><td><strong>Xâm nhập vùng cấm</strong><small>Confidence 97%</small></td><td><span class="on-pill">● ON</span></td><td><span class="critical-pill">CRITICAL</span></td><td><span class="done-status">✓ Đã xử lý</span></td><td>›</td></tr>
+            <tr><td><strong>13:57:21</strong><small>29/07/2026</small></td><td>Zone A<small>CAM-01</small></td><td><strong>Confidence thấp</strong><small>Confidence 64%</small></td><td><span class="off-pill">● OFF</span></td><td><span class="review-pill">REVIEW</span></td><td><span class="false-status">× Báo sai</span></td><td>›</td></tr>
+            <tr><td><strong>11:08:17</strong><small>29/07/2026</small></td><td>Zone A<small>CAM-01</small></td><td><strong>Thiếu mũ bảo hộ</strong><small>Confidence 91%</small></td><td><span class="off-pill">● OFF</span></td><td><span class="medium-pill">MEDIUM</span></td><td><span class="done-status">✓ Đã xử lý</span></td><td>›</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="page" id="dashboard">
+      <div class="dashboard-head"><div><h2>Tổng quan an toàn</h2><p>Dữ liệu ca sáng · Zone A</p></div><button class="secondary-btn">29/07/2026 ⌄</button></div>
+      <div class="kpi-grid">
+        <div class="kpi"><span>↗</span><small>TỔNG SỰ KIỆN</small><strong>20</strong><p><b>+12%</b> so với hôm qua</p></div>
+        <div class="kpi danger"><span>!</span><small>SỰ KIỆN CRITICAL</small><strong>04</strong><p>20% tổng sự kiện</p></div>
+        <div class="kpi success"><span>✓</span><small>TUÂN THỦ PPE</small><strong>82%</strong><p><b>+4.2%</b> trong 7 ngày</p></div>
+        <div class="kpi"><span>⌁</span><small>THỜI GIAN XỬ LÝ TB</small><strong>38s</strong><p><b>-8s</b> nhanh hơn mục tiêu</p></div>
+      </div>
+      <div class="charts-grid">
+        <article class="chart-card">
+          <div class="card-title"><div><h3>Sự kiện theo khung giờ</h3><p>Tổng số vi phạm được phát hiện</p></div><span>● Critical &nbsp; ● Medium</span></div>
+          <div class="bar-chart">
+            <div><i style="height:25%"></i><b style="height:15%"></b><small>06:00</small></div>
+            <div><i style="height:45%"></i><b style="height:30%"></b><small>08:00</small></div>
+            <div><i style="height:35%"></i><b style="height:58%"></b><small>10:00</small></div>
+            <div><i style="height:78%"></i><b style="height:42%"></b><small>12:00</small></div>
+            <div><i style="height:48%"></i><b style="height:72%"></b><small>14:00</small></div>
+            <div><i style="height:62%"></i><b style="height:35%"></b><small>16:00</small></div>
+          </div>
+        </article>
+        <article class="chart-card compliance">
+          <div class="card-title"><div><h3>Tỷ lệ tuân thủ PPE</h3><p>7 ngày gần nhất</p></div><strong>82%</strong></div>
+          <div class="donut"><div><strong>82%</strong><small>TUÂN THỦ</small></div></div>
+          <div class="legend"><span><i></i> Đủ PPE <b>164</b></span><span><i></i> Vi phạm <b>36</b></span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="page" id="logjson">
+      <div class="json-page-head">
+        <div>
+          <h2>Detection Event Log</h2>
+          <p>Dữ liệu đầu ra từ pipeline nhận diện và rule engine.</p>
+        </div>
+        <div class="json-status"><i></i><span><small>STREAM STATUS</small><strong>Đang nhận dữ liệu</strong></span></div>
+      </div>
+
+      <article class="json-card">
+        <div class="json-toolbar">
+          <div><span class="json-dot red"></span><span class="json-dot amber"></span><span class="json-dot green"></span><strong>event_20260729_032.json</strong></div>
+          <button id="copy-json-btn">▣ Sao chép JSON</button>
+        </div>
+        <pre id="json-output"><code>{
+  <span class="json-key">"track_id"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"person_bbox"</span>: [<span class="json-number">120</span>, <span class="json-number">80</span>, <span class="json-number">350</span>, <span class="json-number">520</span>],
+  <span class="json-key">"foot_point"</span>: [<span class="json-number">235</span>, <span class="json-number">520</span>],
+  <span class="json-key">"ppe"</span>: {
+    <span class="json-key">"safety_vest"</span>: <span class="json-string">"missing"</span>,
+    <span class="json-key">"confidence"</span>: <span class="json-number">0.87</span>
+  },
+  <span class="json-key">"inside_danger_zone"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"machine_status"</span>: <span class="json-string">"running"</span>,
+  <span class="json-key">"violation"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"severity"</span>: <span class="json-string critical-text">"critical"</span>
+}</code></pre>
+        <footer class="json-meta">
+          <span><i></i> Event received</span>
+          <span>CAM-01 · Zone A</span>
+          <span>29/07/2026 · 15:20:48.084</span>
+          <strong>342 bytes</strong>
+        </footer>
+      </article>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"><span>✓</span><div><strong>Đã cập nhật sự kiện</strong><p id="toast-message">Sự kiện đã được xác nhận và lưu vào nhật ký.</p></div></div>
+  <script src="app.js"></script>
+</body>
+</html>
