@@ -1,12 +1,12 @@
 {
-  "version": "1.0",
+  "description": "Log Codex prompts and completed turns to .ai-log/session.jsonl.",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
-            "name": "log-prompt",
-            "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel)\"; bash \"$REPO_ROOT/scripts/_pyrun.sh\" \"$REPO_ROOT/scripts/log_hook.py\" --tool=codex",
             "timeout": 10
           }
         ]
@@ -16,8 +16,8 @@
       {
         "hooks": [
           {
-            "name": "log-stop",
-            "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel)\"; bash \"$REPO_ROOT/scripts/_pyrun.sh\" \"$REPO_ROOT/scripts/log_hook.py\" --tool=codex",
             "timeout": 10
           }
         ]
