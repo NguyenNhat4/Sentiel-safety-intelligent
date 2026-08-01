@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EventBase(BaseModel):
@@ -8,9 +9,9 @@ class EventBase(BaseModel):
     camera_id: str = "cam_01"
     event_type: str
     severity: str = "high"
-    snapshot_path: Optional[str] = None
+    snapshot_path: str | None = None
     privacy_blurred: bool = True
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 class EventCreate(EventBase):
@@ -18,15 +19,15 @@ class EventCreate(EventBase):
 
 
 class EventUpdate(BaseModel):
-    status: Optional[str] = Field(None, description="unacknowledged, acknowledged, false_alarm")
-    acknowledged_by: Optional[str] = None
+    status: str | None = Field(None, description="unacknowledged, acknowledged, false_alarm")
+    acknowledged_by: str | None = None
 
 
 class EventResponse(EventBase):
     id: int
     timestamp: datetime
     status: str
-    acknowledged_by: Optional[str] = None
-    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: str | None = None
+    acknowledged_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

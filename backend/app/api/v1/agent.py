@@ -1,6 +1,8 @@
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+
 from backend.app.services.llm_service import SafetyAgentService
 
 router = APIRouter(prefix="/agent", tags=["AI Safety Agent"])
@@ -9,12 +11,12 @@ agent_service = SafetyAgentService()
 
 class AgentQueryRequest(BaseModel):
     message: str = Field(..., description="Query or prompt for the AI Safety Agent")
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
 
 
 class AgentQueryResponse(BaseModel):
     response: str
-    recommendation: Optional[str] = None
+    recommendation: str | None = None
 
 
 @router.post("/chat", response_model=AgentQueryResponse)

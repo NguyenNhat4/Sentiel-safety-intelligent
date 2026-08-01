@@ -1,12 +1,13 @@
 import uuid
-from typing import Dict, Any, Optional
-from backend.app.schemas.analysis import StartAnalysisRequest, AnalysisStatusResponse
+from typing import Any
+
+from backend.app.schemas.analysis import AnalysisStatusResponse, StartAnalysisRequest
 
 
 class AnalysisService:
     def __init__(self):
         # In-memory session tracking for active analysis sessions
-        self._active_sessions: Dict[str, Dict[str, Any]] = {}
+        self._active_sessions: dict[str, dict[str, Any]] = {}
 
     def start_analysis(self, request: StartAnalysisRequest) -> AnalysisStatusResponse:
         session_id = str(uuid.uuid4())
@@ -23,13 +24,13 @@ class AnalysisService:
         self._active_sessions[session_id] = session_info
         return AnalysisStatusResponse(**session_info)
 
-    def stop_analysis(self, session_id: str) -> Optional[AnalysisStatusResponse]:
+    def stop_analysis(self, session_id: str) -> AnalysisStatusResponse | None:
         if session_id in self._active_sessions:
             self._active_sessions[session_id]["status"] = "stopped"
             return AnalysisStatusResponse(**self._active_sessions[session_id])
         return None
 
-    def get_status(self, session_id: str) -> Optional[AnalysisStatusResponse]:
+    def get_status(self, session_id: str) -> AnalysisStatusResponse | None:
         if session_id in self._active_sessions:
             return AnalysisStatusResponse(**self._active_sessions[session_id])
         return None

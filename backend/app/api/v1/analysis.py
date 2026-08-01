@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from backend.app.schemas.analysis import StartAnalysisRequest, AnalysisStatusResponse
+
+from backend.app.schemas.analysis import AnalysisStatusResponse, StartAnalysisRequest
 from backend.app.services.analysis_service import AnalysisService
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])

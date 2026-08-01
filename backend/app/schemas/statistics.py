@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import List, Dict
 
 
 class ZoneComplianceStats(BaseModel):
@@ -14,6 +13,6 @@ class StatisticsSummaryResponse(BaseModel):
     total_events: int
     unacknowledged_events: int
     overall_compliance_rate: float
-    violations_by_type: Dict[str, int]
-    violations_by_severity: Dict[str, int]
-    zone_stats: List[ZoneComplianceStats]
+    violations_by_type: dict[str, int]
+    violations_by_severity: dict[str, int]
+    zone_stats: list[ZoneComplianceStats]

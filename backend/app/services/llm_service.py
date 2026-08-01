@@ -1,4 +1,5 @@
-from typing import Optional, Dict, Any
+from typing import Any
+
 from backend.app.core.config import get_settings
 
 
@@ -9,6 +10,7 @@ def get_llm():
         return None
     try:
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=settings.model_name,
             api_key=settings.openai_api_key,
@@ -22,7 +24,7 @@ class SafetyAgentService:
     def __init__(self):
         self.llm = get_llm()
 
-    def generate_recommendation(self, event_details: Dict[str, Any]) -> str:
+    def generate_recommendation(self, event_details: dict[str, Any]) -> str:
         """Generate safety recommendations for an incident or violation."""
         event_type = event_details.get("event_type", "unknown")
         zone_id = event_details.get("zone_id", "unknown")
@@ -36,7 +38,7 @@ class SafetyAgentService:
                 )
                 response = self.llm.invoke(prompt)
                 return str(response.content)
-            except Exception as e:
+            except Exception:
                 pass
 
         # Rule-based fallback recommendation if LLM is unavailable/offline

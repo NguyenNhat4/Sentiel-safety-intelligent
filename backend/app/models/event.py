@@ -1,16 +1,18 @@
 import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON
 import enum
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String
+
 from backend.app.core.database import Base
 
 
-class EventType(str, enum.Enum):
+class EventType(enum.StrEnum):
     MISSING_PPE = "missing_ppe"
     ZONE_INTRUSION = "zone_intrusion"
     MISSING_PPE_AND_INTRUSION = "missing_ppe_and_intrusion"
 
 
-class SeverityLevel(str, enum.Enum):
+class SeverityLevel(enum.StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -18,7 +20,7 @@ class SeverityLevel(str, enum.Enum):
 
 
 def utc_now():
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
 class SafetyEvent(Base):

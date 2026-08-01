@@ -1,7 +1,7 @@
-from typing import List
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
 import logging
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ router = APIRouter(tags=["Realtime WebSocket"])
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()

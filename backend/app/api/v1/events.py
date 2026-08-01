@@ -1,20 +1,20 @@
-from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from backend.app.core.database import get_db
-from backend.app.schemas.event import EventCreate, EventUpdate, EventResponse
+from backend.app.schemas.event import EventCreate, EventResponse, EventUpdate
 from backend.app.services.event_service import EventService
 
 router = APIRouter(prefix="/events", tags=["Safety Events"])
 
 
-@router.get("", response_model=List[EventResponse])
+@router.get("", response_model=list[EventResponse])
 async def list_events(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    zone_id: Optional[str] = None,
-    status: Optional[str] = None,
-    event_type: Optional[str] = None,
+    zone_id: str | None = None,
+    status: str | None = None,
+    event_type: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Retrieve safety violation events with filtering."""

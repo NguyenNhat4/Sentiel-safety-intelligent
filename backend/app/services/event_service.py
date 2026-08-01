@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
+
 from backend.app.models.event import SafetyEvent
 from backend.app.schemas.event import EventCreate, EventUpdate
 
@@ -19,24 +20,24 @@ class EventService:
             privacy_blurred=event_in.privacy_blurred,
             details=event_in.details,
             status="unacknowledged",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self.db.add(db_event)
         self.db.commit()
         self.db.refresh(db_event)
         return db_event
 
-    def get_event(self, event_id: int) -> Optional[SafetyEvent]:
+    def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()
 
     def get_events(
         self,
         skip: int = 0,
         limit: int = 100,
-        zone_id: Optional[str] = None,
-        status: Optional[str] = None,
-        event_type: Optional[str] = None,
-    ) -> List[SafetyEvent]:
+        zone_id: str | None = None,
+        status: str | None = None,
+        event_type: str | None = None,
+    ) -> list[SafetyEvent]:
         query = self.db.query(SafetyEvent)
         if zone_id:
             query = query.filter(SafetyEvent.zone_id == zone_id)
@@ -46,7 +47,7 @@ class EventService:
             query = query.filter(SafetyEvent.event_type == event_type)
         return query.order_by(SafetyEvent.timestamp.desc()).offset(skip).limit(limit).all()
 
-    def update_event(self, event_id: int, event_in: EventUpdate) -> Optional[SafetyEvent]:
+    def update_event(self, event_id: int, event_in: EventUpdate) -> SafetyEvent | None:
         db_event = self.get_event(event_id)
         if not db_event:
             return None
@@ -54,7 +55,7 @@ class EventService:
         if event_in.status is not None:
             db_event.status = event_in.status
             if event_in.status in ["acknowledged", "false_alarm"]:
-                db_event.acknowledged_at = datetime.now(timezone.utc)
+                db_event.acknowledged_at = datetime.now(UTC)
         if event_in.acknowledged_by is not None:
             db_event.acknowledged_by = event_in.acknowledged_by
 
