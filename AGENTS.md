@@ -9,6 +9,7 @@
 - **Module Documentation**: Any created folder/module must have a `README.md` file explaining what it does. Before reading code files inside a module, read its `README.md` first.
 - **Scope Alignment**: We are in the MVP phase; scope is defined in [`docs/PRD.md`](docs/PRD.md). If a request is out of scope, ask questions for clarification.
 - **Module Tracking**: Major modules (such as `backend`, `frontend`, `vision`) will have `DECISIONS.md` and `PROGRESS.md` to record decisions and progress. Make sure to update them at the correct module directory.
+- **Dont read `src` folder when im not directly ask for it. **
 
 ---
 
