@@ -55,93 +55,17 @@ npm run dev
 
 ## Project Structure
 
-### Cấu trúc hiện tại (Current Project Structure)
+Chi tiết về cấu trúc thư mục dự án (bao gồm cấu trúc hiện tại và định hướng kiến trúc tương lai) đã được chuyển sang tài liệu riêng:
 
-Cấu trúc hiện tại là boilerplate mặc định được cung cấp từ AI20K Build Phase Template. Cấu trúc này ban đầu được thiết kế cho các Agent LangGraph thông thường:
+👉 **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)**
 
-```
-├── src/
-│   ├── agents/          # LangGraph Agent (graph, nodes, tools)
-│   ├── api/             # FastAPI Backend
-│   └── ...
-├── tests/               # Unit/Integration tests
-├── scripts/             # AI Logging hooks
-├── docs/                # Documents & Guidebooks
-├── eval/                # Evaluation results
-└── presentation/        # Demo materials
-```
+### Tóm tắt nhanh:
+- **`backend/`**: Modular Monolith FastAPI Backend (REST API, WebSocket, AI Safety Agent LLM, SQLAlchemy/PostgreSQL, Pytest).
+- **`vision/`**: Computer Vision Pipeline (YOLO detection, ByteTrack tracking, Polygon zone rule check, Privacy face blurring).
+- **`frontend/`**: React + TypeScript + Vite Dashboard UI cho cán bộ an toàn.
+- **`docs/`**: Tài liệu kiến trúc, PRD, cấu trúc dự án và hướng dẫn.
+- **`data/`**: Video stream mẫu và dữ liệu kiểm thử.
 
-**Giải thích:**
-Đây là cấu trúc nguyên bản phù hợp cho bài toán Text-based AI Agent. Tuy nhiên, dự án Giám Sát An Toàn PPE phụ thuộc nhiều vào việc phân tích video thời gian thực bằng Computer Vision (YOLO/OpenCV) và yêu cầu một giao diện trực quan. Do đó, cấu trúc cũ không còn phù hợp và chưa tối ưu để tách biệt các luồng xử lý luồng hình ảnh (CV pipeline), frontend phức tạp (React) và API backend.
-
-### Cấu trúc tương lai (Future Project Structure)
-
-Trong các phase tiếp theo, dự án sẽ được refactor sang kiến trúc Modular Monolith mới để hỗ trợ tốt nhất cho hệ thống Computer Vision realtime như thiết kế:
-
-```text
-P-047/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   │   ├── analysis_service.py
-│   │   │   ├── event_service.py
-│   │   │   └── statistics_service.py
-│   │   └── main.py
-│   ├── migrations/
-│   └── tests/
-│
-├── vision/
-│   ├── detection/
-│   │   ├── person_detector.py
-│   │   └── ppe_detector.py
-│   ├── tracking/
-│   ├── association/
-│   ├── zones/
-│   ├── privacy/
-│   ├── rules/
-│   ├── pipeline.py
-│   └── tests/
-│
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── features/
-│   │   │   ├── monitor/
-│   │   │   ├── alerts/
-│   │   │   ├── events/
-│   │   │   └── dashboard/
-│   │   └── types/
-│   └── package.json
-│
-├── data/
-│   ├── demo/
-│   ├── edge-cases/
-│   └── expected-results.json
-│
-├── contracts/
-│   ├── detection.schema.json
-│   └── event.schema.json
-│
-├── docs/
-│   ├── architecture.md
-│   ├── rules.md
-│   └── limitations.md
-│
-├── docker-compose.yml
-└── README.md
-```
-
-**Giải thích:**
-Cấu trúc mới được chia thành các phân hệ chức năng rõ ràng (separation of concerns):
-1. **`vision/`**: Xử lý toàn bộ logic liên quan đến nhận diện hình ảnh/video đầu vào. Độc lập hoàn toàn với web framework, dễ dàng scale.
-2. **`backend/`**: API gateway nhận kết quả phân tích từ `vision`, lưu trữ trạng thái vào database, xử lý rule vi phạm và đẩy cảnh báo realtime qua WebSocket tới người dùng.
-3. **`frontend/`**: Ứng dụng client-side trực quan cho Cán bộ an toàn quản lý video live, xem cảnh báo vi phạm và dashboard báo cáo.
-4. **`contracts/`**: Đóng vai trò là chuẩn giao tiếp trung gian (JSON schemas) đảm bảo các module có thể kết nối với nhau một cách thống nhất và dễ dàng mở rộng.
 
 ## License
 

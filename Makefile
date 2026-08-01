@@ -1,19 +1,18 @@
-.PHONY: run test lint format typecheck check clean
+.PHONY: run test lint format check clean
+
+VENV_BIN = .venv/bin
 
 run:
-	uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+	$(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
 test:
-	pytest tests/ -v
+	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ -v
 
 lint:
-	ruff check src/ tests/
+	$(VENV_BIN)/ruff check src/ backend/
 
 format:
-	ruff format src/ tests/
-
-typecheck:
-	mypy src/
+	$(VENV_BIN)/ruff format --check src/ backend/
 
 check: lint format test
 
