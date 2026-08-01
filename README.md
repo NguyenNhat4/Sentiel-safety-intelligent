@@ -57,38 +57,75 @@ npm run dev
 
 ### Cấu trúc hiện tại (Current Project Structure)
 
-Cấu trúc hiện tại là boilerplate mặc định được cung cấp từ AI20K Build Phase Template. Cấu trúc này ban đầu được thiết kế cho các Agent LangGraph thông thường:
-
-```
-├── src/
-│   ├── agents/          # LangGraph Agent (graph, nodes, tools)
-│   ├── api/             # FastAPI Backend
-│   └── ...
-├── tests/               # Unit/Integration tests
-├── scripts/             # AI Logging hooks
-├── docs/                # Documents & Guidebooks
-├── eval/                # Evaluation results
-└── presentation/        # Demo materials
+```text
+P-047/
+├── backend/             # Modular Monolith FastAPI Backend
+│   ├── app/
+│   │   ├── api/         # API Routers (v1 REST endpoints, WebSocket & AI Safety Agent)
+│   │   │   ├── v1/
+│   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
+│   │   │   │   ├── analysis.py    # Video stream analysis orchestration
+│   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── statistics.py  # Compliance & violation metrics
+│   │   │   │   └── websocket.py   # Realtime alert push (/ws/alerts)
+│   │   │   └── router.py
+│   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
+│   │   │   ├── config.py
+│   │   │   └── database.py
+│   │   ├── models/      # SQLAlchemy ORM Models (SafetyEvent)
+│   │   │   └── event.py
+│   │   ├── schemas/     # Pydantic validation schemas
+│   │   │   ├── analysis.py
+│   │   │   ├── event.py
+│   │   │   └── statistics.py
+│   │   ├── services/    # Core Services & AI Reasoning
+│   │   │   ├── analysis_service.py
+│   │   │   ├── event_service.py
+│   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   └── statistics_service.py
+│   │   └── main.py      # FastAPI App entrypoint
+│   ├── migrations/      # Alembic DB Migrations
+│   └── tests/           # Pytest API & Agent test suite
+│       ├── conftest.py
+│       ├── test_agent.py
+│       ├── test_analysis.py
+│       ├── test_events.py
+│       └── test_statistics.py
+├── vision/              # Computer Vision pipeline (YOLO & OpenCV)
+├── frontend/            # React + TypeScript + Vite Dashboard UI
+├── data/                # Sample video streams and test data
+├── docs/                # Project documentation
+├── docker-compose.yml
+└── README.md
 ```
 
 **Giải thích:**
-Đây là cấu trúc nguyên bản phù hợp cho bài toán Text-based AI Agent. Tuy nhiên, dự án Giám Sát An Toàn PPE phụ thuộc nhiều vào việc phân tích video thời gian thực bằng Computer Vision (YOLO/OpenCV) và yêu cầu một giao diện trực quan. Do đó, cấu trúc cũ không còn phù hợp và chưa tối ưu để tách biệt các luồng xử lý luồng hình ảnh (CV pipeline), frontend phức tạp (React) và API backend.
+Dự án đã được khởi tạo phân hệ **`backend/`** kế thừa các best-practice từ `src/` (như cấu hình Pydantic typed settings, tích hợp LangChain/OpenAI LLM Safety Agent cho bài toán tư vấn xử lý sự cố an toàn, tích hợp WebSocket realtime và bộ test suite toàn diện).
 
 ### Cấu trúc tương lai (Future Project Structure)
 
-Trong các phase tiếp theo, dự án sẽ được refactor sang kiến trúc Modular Monolith mới để hỗ trợ tốt nhất cho hệ thống Computer Vision realtime như thiết kế:
+Trong các phase tiếp theo, dự án hoàn thiện kiến trúc Modular Monolith để kết nối hoàn chỉnh giữa Computer Vision Pipeline (`vision/`), Web Backend (`backend/`), và Dashboard (`frontend/`):
 
 ```text
 P-047/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
+│   │   │   └── v1/
+│   │   │       ├── agent.py
+│   │   │       ├── analysis.py
+│   │   │       ├── events.py
+│   │   │       ├── statistics.py
+│   │   │       └── websocket.py
 │   │   ├── core/
+│   │   │   ├── config.py
+│   │   │   └── database.py
 │   │   ├── models/
 │   │   ├── schemas/
 │   │   ├── services/
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
+│   │   │   ├── llm_service.py
 │   │   │   └── statistics_service.py
 │   │   └── main.py
 │   ├── migrations/
@@ -137,11 +174,12 @@ P-047/
 ```
 
 **Giải thích:**
-Cấu trúc mới được chia thành các phân hệ chức năng rõ ràng (separation of concerns):
-1. **`vision/`**: Xử lý toàn bộ logic liên quan đến nhận diện hình ảnh/video đầu vào. Độc lập hoàn toàn với web framework, dễ dàng scale.
-2. **`backend/`**: API gateway nhận kết quả phân tích từ `vision`, lưu trữ trạng thái vào database, xử lý rule vi phạm và đẩy cảnh báo realtime qua WebSocket tới người dùng.
-3. **`frontend/`**: Ứng dụng client-side trực quan cho Cán bộ an toàn quản lý video live, xem cảnh báo vi phạm và dashboard báo cáo.
-4. **`contracts/`**: Đóng vai trò là chuẩn giao tiếp trung gian (JSON schemas) đảm bảo các module có thể kết nối với nhau một cách thống nhất và dễ dàng mở rộng.
+Cấu trúc tương lai đảm bảo sự phân tách trách nhiệm rõ ràng (separation of concerns):
+1. **`vision/`**: Luồng Computer Vision chạy độc lập để nhận diện người, trang bị PPE, kiểm tra vùng polygon nguy hiểm và làm mờ khuôn mặt.
+2. **`backend/`**: Gateway tích hợp REST API, WebSocket realtime, cơ sở dữ liệu PostgreSQL và AI Safety Agent (LLM) hỗ trợ phân tích/đề xuất xử lý sự cố.
+3. **`frontend/`**: Giao diện React SPA trực quan dành cho Cán bộ An toàn & Quản lý Khu vực.
+4. **`contracts/`**: Chuẩn hóa schema giao tiếp giữa Vision worker và Backend API.
+
 
 ## License
 
