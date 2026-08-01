@@ -1,37 +1,47 @@
-Always read README.md for understand project overview and current/desired project structure.
+# Agent Guidelines & Workflow Rules
 
-Everytime you done tasks that change project structure, such as creating new files, directories, or updating existing files, you must update README.md to reflect the current project structure.
+## Core Rules & Guidelines
 
-for architecture read ARCHITECTURE.md 
+- **Project Overview & Structure**: Always read `README.md` to understand the project overview and current/desired project structure.
+- **Updating README.md**: Every time you complete tasks that change the project structure (such as creating new files, directories, or updating existing files), you must update `README.md` to reflect the current project structure.
+- **Architecture**: For architecture, read `ARCHITECTURE.md`.
+- **Module Documentation**: Any created folder/module must have a `README.md` file explaining what it does. Before reading code files inside a module, read its `README.md` first.
+- **Scope Alignment**: We are in the MVP phase; scope is defined in `docs/PRD.md`. If a request is out of scope, ask questions for clarification.
+- **Module Tracking**: Major modules (such as `backend`, `frontend`, `vision`) will have `DECISIONS.md` and `PROGRESS.md` to record decisions and progress. Make sure to update them at the correct module directory.
 
-Any folder/ module that created should have README.md file explaining what it does. And before reading code file you should read README.md first. 
+---
 
+## Session Workflow
 
-We are in mvp phrase, scope are defined in docs/PRD.md, if request is out of scope, ask questions for clarification.
+### At Session Start (Clock In)
+1. Read `PROGRESS.md` for current state.
+2. Read `DECISIONS.md` for important decisions.
+3. Run `make check` to confirm repo is in consistent state.
+4. Continue from `PROGRESS.md` `Next Steps` section.
 
-At big module - such as backend, frontend, vision will have DECISIONS.md and PROGRESS.md to record decisions and progress. Make sure update it at the correct module.
+### Before Session End (Clock Out)
+1. Update `PROGRESS.md`.
+2. Run `make check` to confirm consistent state.
+3. Commit all completed work (if requested directly by user).
 
-## At session start (clock in)
-1. Read PROGRESS.md for current state
-2. Read DECISIONS.md for important decisions
-3. Run make check to confirm repo is in consistent state
-4. Continue from PROGRESS.md Next Steps  section
+---
 
-## Before session end (clock out)
-1. Update PROGRESS.md
-2. Run make check to confirm consistent state
-3. Commit all completed work ( if requested directly by user)
+## Template Examples
 
-example 
+### `DECISIONS.md` Example
 
+```markdown
 # Design Decisions
 
 ## 2024-01-15: Use Redis for user preferences caching
 - Reason: High read frequency (every API call), small data size
 - Rejected alternative: PostgreSQL materialized view (high change frequency makes maintenance cost not worthwhile)
 - Constraint: Cache TTL of 5 minutes, active invalidation on write
+```
 
+### `PROGRESS.md` Example
 
+```markdown
 # Project Progress
 
 ## Current State
@@ -55,3 +65,4 @@ example
 1. Fix pagination edge case bug
 2. Add "include deleted users" query parameter
 3. Update API documentation
+```
