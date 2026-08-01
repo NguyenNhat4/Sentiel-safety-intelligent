@@ -2,11 +2,12 @@
 
 ## Core Rules & Guidelines
 
-- **Project Overview & Structure**: Always read `README.md` to understand the project overview and current/desired project structure.
-- **Updating README.md**: Every time you complete tasks that change the project structure (such as creating new files, directories, or updating existing files), you must update `README.md` to reflect the current project structure.
-- **Architecture**: For architecture, read `ARCHITECTURE.md`.
+- **Documentation Navigation**: Refer to [`docs/README.md`](docs/README.md) as the master index to understand what documentation exists, what it contains, and when to read or update each file.
+- **Project Overview**: Read `README.md` to understand the high-level project overview and quick start guide.
+- **Project Structure**: Read [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) to understand current and future directory layouts. Every time you complete tasks that change project structure (creating new files/directories or updating existing layout), update `docs/PROJECT_STRUCTURE.md`.
+- **Architecture**: For architecture, read `ARCHITECTURE.md` and [`docs/architecture_diagram.md`](docs/architecture_diagram.md).
 - **Module Documentation**: Any created folder/module must have a `README.md` file explaining what it does. Before reading code files inside a module, read its `README.md` first.
-- **Scope Alignment**: We are in the MVP phase; scope is defined in `docs/PRD.md`. If a request is out of scope, ask questions for clarification.
+- **Scope Alignment**: We are in the MVP phase; scope is defined in [`docs/PRD.md`](docs/PRD.md). If a request is out of scope, ask questions for clarification.
 - **Module Tracking**: Major modules (such as `backend`, `frontend`, `vision`) will have `DECISIONS.md` and `PROGRESS.md` to record decisions and progress. Make sure to update them at the correct module directory.
 
 ---
