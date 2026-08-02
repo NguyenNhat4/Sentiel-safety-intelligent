@@ -12,7 +12,7 @@
 
 Sản phẩm giám sát an toàn tự động bằng Computer Vision:
 - Feature 1: **Phát hiện thiếu PPE & xâm nhập vùng cấm** bằng YOLO pretrained và OpenCV polygon zone.
-- Feature 2: **Cảnh báo realtime** thông qua FastAPI WebSocket cho Frontend React.
+- Feature 2: **Luồng xác minh gần realtime** qua FastAPI frame API và giao diện HTML/CSS/JavaScript.
 - Feature 3: **Quản lý & Thống kê vi phạm** lưu trữ vào PostgreSQL, Dashboard theo khu vực và ca.
 - Feature 4: **Đảm bảo Privacy** tự động làm mờ khuôn mặt danh tính người vi phạm.
 
@@ -25,9 +25,9 @@ Sản phẩm giám sát an toàn tự động bằng Computer Vision:
 
 | Layer | Technology |
 |-------|-----------|
-| Computer Vision | Python, Ultralytics YOLO, OpenCV, ByteTrack |
+| Computer Vision | Python, Ultralytics YOLO, OpenCV |
 | Backend | FastAPI + SQLAlchemy |
-| Frontend | React + TypeScript + Vite |
+| Frontend | HTML, CSS, JavaScript (served by FastAPI) |
 | Database | PostgreSQL |
 | DevOps | Docker Compose |
 
@@ -47,10 +47,8 @@ pip install -r requirements.txt
 docker-compose up -d db
 uvicorn backend.app.main:app --reload
 
-# 4. Start Frontend
-cd frontend
-npm install
-npm run dev
+# 4. Open the baseline UI
+# http://localhost:8000
 ```
 
 ## Project Structure
@@ -62,7 +60,7 @@ Chi tiết về cấu trúc thư mục dự án (bao gồm cấu trúc hiện t�
 ### Tóm tắt nhanh:
 - **`backend/`**: Modular Monolith FastAPI Backend (REST API, WebSocket, AI Safety Agent LLM, SQLAlchemy/PostgreSQL, Pytest).
 - **`vision/`**: Computer Vision Pipeline (YOLO detection, ByteTrack tracking, Polygon zone rule check, Privacy face blurring).
-- **`frontend/`**: React + TypeScript + Vite Dashboard UI cho cán bộ an toàn.
+- **`frontend/`**: Vanilla HTML/CSS/JavaScript baseline UI cho cán bộ an toàn.
 - **`docs/`**: Tài liệu kiến trúc, PRD, cấu trúc dự án và hướng dẫn.
 - **`data/`**: Video stream mẫu và dữ liệu kiểm thử.
 

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentinel — PPE & Zone Safety</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./baseline.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <span class="brand-mark">S</span>
+      <span>Sentinel<small>Safety intelligence</small></span>
+    </a>
+
+    <nav>
+      <button class="nav-item active"><span>◉</span> Live monitor</button>
+      <button class="nav-item muted-nav"><span>▤</span> Nhật ký vi phạm</button>
+      <button class="nav-item muted-nav"><span>⌁</span> Dashboard</button>
+      <button class="nav-item muted-nav"><span>{ }</span> Log JSON</button>
+    </nav>
+
+    <div class="system-card">
+      <div><span class="pulse"></span> Hệ thống hoạt động</div>
+      <p>Video và AI engine đã sẵn sàng.</p>
+      <div class="system-meta"><span>Rule</span><strong>Zone + Machine + Shirt</strong></div>
+      <div class="system-meta"><span>Model</span><strong>YOLO Person</strong></div>
+    </div>
+
+    <div class="profile">
+      <div class="avatar">AT</div>
+      <div><strong>Anh Tuấn</strong><small>Cán bộ an toàn</small></div>
+      <button>•••</button>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">TRUNG TÂM GIÁM SÁT</p>
+        <h1>Live Monitor</h1>
+      </div>
+      <div class="header-actions">
+        <div class="clock"><span id="clock">--:--:--</span><small>Safety shirt baseline</small></div>
+        <button class="icon-btn">⌕</button>
+        <button class="icon-btn notification">♢<i></i></button>
+      </div>
+    </header>
+
+    <section class="page active" id="monitor">
+      <div class="toolbar">
+        <div class="camera-select">
+          <span class="camera-icon">●</span>
+          <div><small>VIDEO ĐANG XEM</small><strong id="file-label">Chưa chọn video</strong></div>
+          <span>⌄</span>
+        </div>
+        <div class="machine-control">
+          <div><small>MACHINE A</small><strong id="machine-label">Đang hoạt động</strong></div>
+          <button class="switch on" id="machine-switch" aria-label="Chuyển trạng thái máy"><span></span></button>
+        </div>
+        <input id="video-input" type="file" accept="video/*" hidden />
+        <button class="secondary-btn" id="upload-btn">＋ Tải video</button>
+        <button class="secondary-btn" id="playback-btn" disabled>▶ Phát video</button>
+        <button class="secondary-btn" id="zone-btn" disabled>⌗ Cấu hình vùng</button>
+      </div>
+
+      <div class="monitor-grid">
+        <article class="video-card">
+          <div class="video-head">
+            <span><i class="live-dot"></i> VIDEO</span>
+            <p id="video-meta">CHỌN VIDEO ĐỂ BẮT ĐẦU</p>
+            <button id="reset-zone" title="Xóa vùng">↺</button>
+          </div>
+          <div class="camera-scene" id="media-stage">
+            <video id="video" class="uploaded-media active" preload="auto" playsinline muted></video>
+            <img id="video-preview" class="video-preview" alt="Khung hình đầu tiên của video" hidden />
+            <canvas id="overlay"></canvas>
+            <button id="delete-point" class="point-delete" title="Xóa điểm đã chọn" hidden>×</button>
+            <div class="scene-glow"></div>
+            <div class="machine machine-left"><span></span><span></span></div>
+            <div class="machine machine-right"><span></span><span></span></div>
+            <div class="danger-zone"><b>KHU VỰC NGUY HIỂM</b></div>
+            <div class="person-box">
+              <div class="person"><div class="head"><span class="blur"></span></div><div class="body"></div><div class="leg l"></div><div class="leg r"></div></div>
+              <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+              <label>PERSON · 96%</label><em>NO SAFETY SHIRT</em>
+            </div>
+            <div class="empty-state" id="empty-state"><strong>Tải video demo</strong><span>Sau đó chọn 4 điểm để tạo vùng nguy hiểm.</span></div>
+            <div class="zone-hint" id="zone-hint">Chưa cấu hình vùng</div>
+          </div>
+          <footer>
+            <span><i></i> AI Detection</span>
+            <span id="person-count">0 người</span>
+            <span>1 áo bảo hộ yêu cầu</span>
+            <strong id="result-label">● Chờ video</strong>
+          </footer>
+        </article>
+
+        <aside class="alert-panel" id="alert-panel">
+          <div class="alert-top">
+            <span class="critical-icon">!</span>
+            <div><small>KẾT QUẢ QUY TẮC</small><h2 id="alert-title">Chưa có vi phạm</h2></div>
+            <span class="severity" id="severity">NORMAL</span>
+          </div>
+          <p class="alert-summary" id="alert-summary">Người trong vùng nguy hiểm phải mặc áo bảo hộ khi máy đang hoạt động.</p>
+
+          <div class="rule-chain">
+            <div class="rule" id="rule-zone"><span>01</span><p><small>VỊ TRÍ</small><strong>Chưa phát hiện</strong></p><b>—</b></div>
+            <div class="rule yes" id="rule-machine"><span>02</span><p><small>TRẠNG THÁI MÁY</small><strong>Machine A đang chạy</strong></p><b>ON</b></div>
+            <div class="rule" id="rule-ppe"><span>03</span><p><small>PPE</small><strong>Chưa phát hiện</strong></p><b>—</b></div>
+          </div>
+
+          <div class="confidence">
+            <div><span>Trạng thái inference</span><strong id="confidence-label">READY</strong></div>
+            <div class="confidence-bar"><span id="confidence-bar"></span></div>
+            <small>Rule được hardcode cho baseline</small>
+          </div>
+
+          <img class="snapshot" id="snapshot" alt="Khung hình cần xác minh" />
+
+          <div class="escalation" id="review-box">
+            <div><span>⌁</span><p><small>HUMAN IN THE LOOP</small><strong id="review-message">Khung hình vi phạm sẽ hiện tại đây</strong></p></div>
+            <div class="timer"><strong id="timer">00:00</strong><small>Chờ xác nhận</small></div>
+          </div>
+
+          <div class="alert-actions" id="review-actions" hidden>
+            <button class="ack" data-review="acknowledged">✓ Vi phạm thực tế</button>
+            <button class="false" data-review="false_alarm">Bình thường / báo sai</button>
+          </div>
+          <p class="event-id" id="event-status">CHƯA CÓ SỰ KIỆN ĐƯỢC LƯU</p>
+        </aside>
+      </div>
+
+      <div class="activity-strip">
+        <div><span class="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
+        <span>ONE ZONE</span><span class="medium-pill">ONE PPE</span>
+        <span id="flow-status">Sẵn sàng</span>
+        <button id="activity-action">Bắt đầu bằng video →</button>
+      </div>
+    </section>
+  </main>
+
+  <canvas id="capture" hidden></canvas>
+  <div class="toast" id="toast"><span>✓</span><div><strong>Sentinel</strong><p id="toast-message"></p></div></div>
+  <script src="./app.js"></script>
+</body>
+</html>

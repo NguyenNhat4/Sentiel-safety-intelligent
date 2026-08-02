@@ -1,7 +1,60 @@
+import base64
+
+import cv2
+import numpy as np
+
+from backend.app.api.v1.analysis import frame_inference_service
+from backend.app.schemas.analysis import FrameInferenceRequest
+
+
+def jpeg_bytes(width=160, height=120):
+    frame = np.zeros((height, width, 3), dtype=np.uint8)
+    encoded, buffer = cv2.imencode(".jpg", frame)
+    assert encoded
+    return buffer.tobytes()
+
+
+def jpeg_data_url(width=160, height=120):
+    return f"data:image/jpeg;base64,{base64.b64encode(jpeg_bytes(width, height)).decode()}"
+
+
+def configure_inference_websocket(websocket, zone_points=None):
+    websocket.send_json(
+        {
+            "type": "configure",
+            "zone_points": zone_points
+            or [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.95},
+                {"x": 0.1, "y": 0.95},
+            ],
+            "machine_state": "running",
+        }
+    )
+    assert websocket.receive_json() == {"type": "configured"}
+
+
+def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=None):
+    websocket.send_json({"type": "frame_meta", "frame_id": frame_id, "video_time": video_time})
+    websocket.send_bytes(frame if frame is not None else jpeg_bytes())
+    return websocket.receive_json()
+
+
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_frontend_is_served(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Sentinel" in response.text
+
+    stylesheet = client.get("/styles.css")
+    assert stylesheet.status_code == 200
+    assert ".sidebar" in stylesheet.text
 
 
 def test_start_analysis(client):
@@ -29,3 +82,231 @@ def test_stop_analysis(client):
     stop_resp = client.post(f"/api/v1/analysis/stop/{session_id}")
     assert stop_resp.status_code == 200
     assert stop_resp.json()["status"] == "stopped"
+
+
+def test_frame_inference_returns_normal_without_people(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_detect_people", lambda frame: [])
+    response = client.post(
+        "/api/v1/analysis/frame",
+        json={
+            "image_data": jpeg_data_url(),
+            "zone_points": [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.9},
+                {"x": 0.1, "y": 0.9},
+            ],
+            "machine_state": "running",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["result"] == "normal"
+    assert response.json()["review_required"] is False
+    assert response.json()["people"] == []
+
+
+def test_frame_inference_violates_for_person_without_shirt(client, monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 10, 40, 90, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_has_safety_shirt",
+        lambda frame, x, y, width, height: False,
+    )
+    response = client.post(
+        "/api/v1/analysis/frame",
+        json={
+            "image_data": jpeg_data_url(),
+            "zone_points": [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.95},
+                {"x": 0.1, "y": 0.95},
+            ],
+            "machine_state": "running",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result"] == "violate"
+    assert body["review_required"] is True
+    assert body["people"][0]["inside_zone"] is True
+    assert body["people"][0]["safety_shirt"] is False
+    assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
+
+
+def test_frame_inference_requests_review_for_zone_entry_with_shirt(client, monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 10, 40, 90, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_has_safety_shirt",
+        lambda frame, x, y, width, height: True,
+    )
+    response = client.post(
+        "/api/v1/analysis/frame",
+        json={
+            "image_data": jpeg_data_url(),
+            "zone_points": [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.95},
+                {"x": 0.1, "y": 0.95},
+            ],
+            "machine_state": "running",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["result"] == "normal"
+    assert body["review_required"] is True
+    assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
+
+
+def test_frame_inference_rejects_invalid_image(client):
+    response = client.post(
+        "/api/v1/analysis/frame",
+        json={
+            "image_data": "not-base64",
+            "zone_points": [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.9},
+                {"x": 0.1, "y": 0.9},
+            ],
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_zone_entry_uses_foot_point_even_when_machine_is_stopped(monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 10, 40, 90, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_has_safety_shirt",
+        lambda frame, x, y, width, height: True,
+    )
+    result = frame_inference_service.infer(
+        FrameInferenceRequest(
+            image_data=jpeg_data_url(),
+            zone_points=[
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.95},
+                {"x": 0.1, "y": 0.95},
+            ],
+            machine_state="stopped",
+        )
+    )
+
+    assert result.people[0].foot_point == [60, 100]
+    assert result.people[0].inside_zone is True
+    assert result.review_required is True
+    assert result.result == "normal"
+
+
+def test_inference_websocket_returns_empty_people(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_detect_people", lambda frame: [])
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket)
+        body = send_inference_websocket_frame(websocket, frame_id=7, video_time=4.25)
+
+    assert body["type"] == "inference_result"
+    assert body["frame_id"] == 7
+    assert body["video_time"] == 4.25
+    assert body["people"] == []
+    assert body["review_required"] is False
+
+
+def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 60, 40, 50, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_has_safety_shirt",
+        lambda frame, x, y, width, height: True,
+    )
+    upper_zone = [
+        {"x": 0.1, "y": 0.05},
+        {"x": 0.9, "y": 0.05},
+        {"x": 0.9, "y": 0.5},
+        {"x": 0.1, "y": 0.5},
+    ]
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, upper_zone)
+        body = send_inference_websocket_frame(websocket)
+
+    assert body["people"][0]["bbox"] == [40, 60, 80, 110]
+    assert body["people"][0]["inside_zone"] is False
+    assert body["review_required"] is False
+
+
+def test_inference_websocket_requests_review_for_person_inside_zone(client, monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 10, 40, 90, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_has_safety_shirt",
+        lambda frame, x, y, width, height: True,
+    )
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket)
+        body = send_inference_websocket_frame(websocket)
+
+    assert body["people"][0]["bbox"] == [40, 10, 80, 100]
+    assert body["people"][0]["inside_zone"] is True
+    assert body["review_required"] is True
+    assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
+
+
+def test_inference_websocket_rejects_frame_before_configuration(client):
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        websocket.send_bytes(jpeg_bytes())
+        body = websocket.receive_json()
+
+    assert body["type"] == "error"
+    assert body["code"] == "not_configured"
+
+
+def test_inference_websocket_rejects_invalid_configuration(client):
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        websocket.send_json(
+            {
+                "type": "configure",
+                "zone_points": [
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.9, "y": 0.1},
+                    {"x": 0.9, "y": 0.9},
+                ],
+                "machine_state": "running",
+            }
+        )
+        body = websocket.receive_json()
+
+    assert body["type"] == "error"
+    assert body["code"] == "validation_error"
+
+
+def test_inference_websocket_rejects_invalid_jpeg(client):
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket)
+        body = send_inference_websocket_frame(websocket, frame=b"not-a-jpeg")
+
+    assert body["type"] == "error"
+    assert body["code"] == "invalid_frame"

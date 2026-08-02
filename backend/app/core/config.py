@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "production", "test"] = "development"
     app_port: int = Field(default=8000, ge=1, le=65535)
     app_host: str = "0.0.0.0"
-    debug: bool = True
+    app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
 

@@ -28,8 +28,10 @@ env/
 .DS_Store
 Thumbs.db
 
-# Data (never commit large data)
-data/
+# Data (never commit large runtime data)
+data/*
+!data/.gitignore
+!data/snapshots/
 *.db
 *.sqlite3
 
@@ -58,3 +60,5 @@ out/
 # AI logs — tracked structure, ignored content
 .ai-log/*.jsonl
 .ai-log/archive/
+# Local model weights downloaded by the inference baseline
+*.pt

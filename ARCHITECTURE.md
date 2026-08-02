@@ -12,7 +12,7 @@ flowchart TB
     BROWSER["Browser"]
 
     subgraph DOCKER["Docker Compose"]
-        FRONTEND["Frontend Container<br/>React + Vite build"]
+        FRONTEND["Static Frontend<br/>HTML + CSS + JavaScript"]
         BACKEND["Backend Container<br/>FastAPI"]
         DB[("PostgreSQL Container")]
     end
@@ -38,7 +38,7 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     actor User as Safety Officer
-    participant UI as React Frontend
+    participant UI as Browser Frontend
     participant API as FastAPI
     participant CV as CV Pipeline
     participant Rules as Rule Engine
@@ -78,7 +78,7 @@ sequenceDiagram
 
 ### 1. Computer Vision Pipeline (Python)
 - **Person Detection:** YOLO pretrained
-- **PPE Detection:** YOLO pretrained / fine-tuned cho helmet & safety_vest
+- **PPE Detection baseline:** HSV torso heuristic cho safety_vest; thay bằng model PPE đã huấn luyện sau khi flow được xác nhận
 - **Tracking:** ByteTrack (qua Ultralytics)
 - **Zone Logic:** OpenCV `pointPolygonTest`
 - **Privacy:** Làm mờ khuôn mặt bằng OpenCV
@@ -88,10 +88,9 @@ sequenceDiagram
 - **Rule Engine:** Viết bằng Python thuần kiểm tra các rule nghiệp vụ.
 - **WebSocket:** Cập nhật real-time tới frontend.
 
-### 3. Frontend (React + TypeScript + Vite)
+### 3. Frontend (HTML + CSS + JavaScript)
 - **Mục đích:** Live monitor, alert, event log, dashboard.
-- **Styling:** Tailwind CSS
-- **Charts:** Recharts
+- **Baseline:** FastAPI serves static assets; after four-point configuration, the browser sends binary JPEG samples over `/api/v1/ws/inference` and draws returned detections on Canvas. Only one frame is processed at a time.
 
 ### 4. Database
 - **Type:** PostgreSQL
@@ -103,5 +102,5 @@ sequenceDiagram
 |----------|--------|--------|
 | Zone Logic | OpenCV | `pointPolygonTest` đủ dùng mà không cần model AI phức tạp |
 | Backend | FastAPI | Python stack, dễ tích hợp CV pipeline, hỗ trợ WebSocket tốt |
-| Frontend | React + Vite | Phù hợp quản lý state real-time, Vite nhẹ và nhanh |
+| Frontend baseline | Vanilla HTML/CSS/JS | Giữ luồng demo đơn giản, không cần build step |
 | Architecture | Modular Monolith | Một repo, các thành phần gọi nội bộ thay vì microservices ở giai đoạn đầu |

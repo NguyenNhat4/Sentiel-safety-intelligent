@@ -41,7 +41,14 @@ P-047/
 │       ├── test_events.py
 │       └── test_statistics.py
 ├── vision/              # Computer Vision pipeline (YOLO & OpenCV)
-├── frontend/            # React + TypeScript + Vite Dashboard UI
+├── frontend/            # Static HTML/CSS/JavaScript baseline UI
+│   ├── index.html       # Upload, four-point zone, inference and review flow
+│   ├── styles.css       # Sentinel visual stylesheet brought from src/ui
+│   ├── baseline.css     # Functional video and Canvas overrides
+│   ├── app.js           # Video sampling, Canvas overlay and API integration
+│   ├── README.md
+│   ├── DECISIONS.md
+│   └── PROGRESS.md
 ├── data/                # Sample video streams and test data
 ├── docs/                # Project documentation
 ├── docker-compose.yml
@@ -128,5 +135,5 @@ P-047/
 Cấu trúc tương lai đảm bảo sự phân tách trách nhiệm rõ ràng (separation of concerns):
 1. **`vision/`**: Luồng Computer Vision chạy độc lập để nhận diện người, trang bị PPE, kiểm tra vùng polygon nguy hiểm và làm mờ khuôn mặt.
 2. **`backend/`**: Gateway tích hợp REST API, WebSocket realtime, cơ sở dữ liệu PostgreSQL và AI Safety Agent (LLM) hỗ trợ phân tích/đề xuất xử lý sự cố.
-3. **`frontend/`**: Giao diện React SPA trực quan dành cho Cán bộ An toàn & Quản lý Khu vực.
+3. **`frontend/`**: Baseline HTML/CSS/JavaScript cho luồng upload, cấu hình vùng, inference và xác minh sự kiện; có thể nâng cấp thành SPA sau MVP.
 4. **`contracts/`**: Chuẩn hóa schema giao tiếp giữa Vision worker và Backend API.

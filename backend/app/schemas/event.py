@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,7 +15,13 @@ class EventBase(BaseModel):
 
 
 class EventCreate(EventBase):
-    pass
+    status: Literal["unacknowledged", "acknowledged", "false_alarm"] = "unacknowledged"
+    acknowledged_by: str | None = None
+    snapshot_data: str | None = Field(
+        None,
+        exclude=True,
+        description="Base64 JPEG data URL captured at the violation timestamp",
+    )
 
 
 class EventUpdate(BaseModel):

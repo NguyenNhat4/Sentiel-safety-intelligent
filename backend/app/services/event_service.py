@@ -1,4 +1,8 @@
+import base64
+import binascii
+import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -11,21 +15,41 @@ class EventService:
         self.db = db
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
+        reviewed = event_in.status in {"acknowledged", "false_alarm"}
+        snapshot_path = event_in.snapshot_path
+        if event_in.snapshot_data:
+            snapshot_path = self._save_snapshot(event_in.snapshot_data)
         db_event = SafetyEvent(
             zone_id=event_in.zone_id,
             camera_id=event_in.camera_id,
             event_type=event_in.event_type,
             severity=event_in.severity,
-            snapshot_path=event_in.snapshot_path,
+            snapshot_path=snapshot_path,
             privacy_blurred=event_in.privacy_blurred,
             details=event_in.details,
-            status="unacknowledged",
+            status=event_in.status,
+            acknowledged_by=event_in.acknowledged_by,
+            acknowledged_at=datetime.now(UTC) if reviewed else None,
             timestamp=datetime.now(UTC),
         )
         self.db.add(db_event)
         self.db.commit()
         self.db.refresh(db_event)
         return db_event
+
+    @staticmethod
+    def _save_snapshot(snapshot_data: str) -> str:
+        encoded = snapshot_data.split(",", 1)[-1]
+        try:
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("snapshot_data must be a valid base64 image") from exc
+
+        snapshot_dir = Path(__file__).resolve().parents[3] / "data" / "snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"event-{uuid.uuid4().hex}.jpg"
+        (snapshot_dir / filename).write_bytes(image_bytes)
+        return f"/snapshots/{filename}"
 
     def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()

@@ -2,7 +2,7 @@
 
 ## Current State
 - Latest status: Backend repo structure & core services fully set up and verified.
-- Test status: 7/7 passing in `backend/tests/` (100% passing).
+- Test status: WebSocket live smoke test and static checks pass; pytest execution currently stalls in the shared `TestClient` fixture on Python 3.14.
 - Lint & Format: Passing.
 
 ## Completed
@@ -14,14 +14,18 @@
 - [x] Built AI Safety Agent endpoint & recommendation service (`/agent/chat`, `llm_service.py`)
 - [x] Created test suite for backend API endpoints
 - [x] Updated project `README.md` structure and created `backend/README.md`, `DECISIONS.md`, `PROGRESS.md`
+- [x] Added frame inference API, YOLO person detection, safety-shirt baseline rule, and reviewed event persistence
+- [x] Added binary WebSocket frame inference with correlated bounding-box and zone-entry results
 
 ## In Progress
-- [ ] Integration with `vision/` pipeline output stream for automatic event creation
+- [ ] Replace the baseline safety-shirt color heuristic with trained PPE model weights
 
 ## Known Issues
-- None
+- Safety-shirt classification is a color heuristic intended only for a controlled demo.
+- Baseline review snapshots are not face-blurred yet; the event records `privacy_blurred=false`.
+- The backend pytest suite collects successfully but currently stalls before completing its first `TestClient`-based test in this environment.
 
 ## Next Steps
-1. Connect `vision/` pipeline outputs to backend `/events` POST endpoint & WebSocket broadcaster
+1. Replace the safety-shirt heuristic with a trained PPE model while preserving the frame API contract
 2. Implement Alembic initial migration scripts for PostgreSQL production schema
 3. Add authentication/authorization middleware for Safety Officers

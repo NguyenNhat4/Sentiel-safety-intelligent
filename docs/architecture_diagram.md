@@ -31,6 +31,7 @@ flowchart LR
         ANALYSIS["Analysis Service"]
         EVENT_API["Event Service"]
         WS["WebSocket Alert Gateway"]
+        INFERENCE_WS["WebSocket Frame Inference<br/>Binary JPEG → JSON boxes"]
         AUTH["JWT Auth + Roles"]
         STATS["Statistics Service"]
     end
@@ -40,7 +41,7 @@ flowchart LR
         SNAPSHOT[("Blurred Event Snapshots")]
     end
 
-    subgraph UI["React Web Application"]
+    subgraph UI["Browser Web Application"]
         LOGIN["Login"]
         LIVE["Live Monitor"]
         ALERT["Active Alert"]
@@ -50,6 +51,10 @@ flowchart LR
     end
 
     VID --> READER
+    LIVE -->|4-point config + sampled JPEG| INFERENCE_WS
+    INFERENCE_WS --> PERSON
+    ZONE -->|Bounding boxes + inside_zone| INFERENCE_WS
+    INFERENCE_WS --> LIVE
     READER --> PERSON
     READER --> PPE
 
@@ -94,7 +99,7 @@ flowchart TB
     BROWSER["Browser"]
 
     subgraph DOCKER["Docker Compose"]
-        FRONTEND["Frontend Container<br/>React + Vite build"]
+        FRONTEND["Static Frontend<br/>HTML + CSS + JavaScript"]
         BACKEND["Backend Container<br/>FastAPI"]
         DB[("PostgreSQL Container")]
     end

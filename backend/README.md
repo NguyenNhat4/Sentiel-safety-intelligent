@@ -13,7 +13,7 @@ backend/
 │   │       ├── analysis.py    # Video stream analysis orchestration
 │   │       ├── events.py      # Safety violation event CRUD & acknowledgment
 │   │       ├── statistics.py  # Safety compliance & violation metrics
-│   │       └── websocket.py   # WebSocket alert streaming (/ws/alerts)
+│   │       └── websocket.py   # Alert and binary frame inference WebSockets
 │   │   └── router.py          # API v1 aggregator
 │   ├── core/
 │   │   ├── config.py          # Pydantic Settings, CORS & env configuration

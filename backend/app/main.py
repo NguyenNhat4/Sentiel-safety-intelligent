@@ -1,8 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
@@ -43,7 +46,21 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
+frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+snapshot_dir = Path(__file__).resolve().parents[2] / "data" / "snapshots"
+snapshot_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/snapshots", StaticFiles(directory=snapshot_dir), name="event-snapshots")
+
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
     return {"status": "ok", "env": settings.app_env, "service": settings.app_name}
+
+
+@app.get("/", include_in_schema=False)
+async def frontend_index():
+    return FileResponse(frontend_dir / "index.html")
+
+
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=frontend_dir), name="frontend-assets")
