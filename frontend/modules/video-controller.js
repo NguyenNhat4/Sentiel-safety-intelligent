@@ -47,6 +47,7 @@ export function createVideoController({inferenceClient}) {
     dom.capture.width = dom.video.videoWidth;
     dom.capture.height = dom.video.videoHeight;
     dom.stage.classList.add("ready");
+    dom.playbackButton.disabled = false;
     dom.emptyState.hidden = true;
     dom.videoMeta.textContent = `${dom.video.videoWidth} × ${dom.video.videoHeight} · ${formatTime(dom.video.duration)}`;
     setZoneEditing(true);
