@@ -17,7 +17,7 @@ Tài liệu này đóng vai trò là **Master Index** hướng dẫn vị trí, 
 | **[`docs/PRD.md`](PRD.md)** | **Product Requirements** | Yêu cầu sản phẩm MVP, phạm vi tính năng, core flow và tiêu chí thành công | Khi bắt đầu phát triển tính năng mới để đảm bảo đúng scope MVP | Khi có sự thay đổi hoặc làm rõ về yêu cầu/phạm vi MVP |
 | **[`docs/project-problem-statement.md`](project-problem-statement.md)** | **Problem Statement** | Mô tả thực trạng, bài toán chi tiết, ràng buộc an toàn & bảo mật, và yêu cầu đầu ra | Khi cần nắm rõ ngữ cảnh bài toán nhà máy, ràng buộc privacy và tiêu chuẩn báo cáo | Khi bài toán hoặc các ràng buộc nghiệp vụ an toàn thay đổi |
 | **`docs/guide/`** | **Technical Guides** | Bộ hướng dẫn chi tiết về setup, devops, testing, anti-patterns, v.v. | Khi cần tham khảo bài viết kỹ thuật chuyên sâu về từng chủ đề cụ thể | Khi đóng góp hoặc cập nhật hướng dẫn kỹ thuật |
-| **`PROGRESS.md` & `DECISIONS.md`** *(trong từng module)* | **Module Tracking** | Ghi chép quyết định thiết kế và tiến độ công việc theo từng phân hệ (`backend/`, `frontend/`, `vision/`) | Khi "Clock In" (bắt đầu session) để xem công việc đang làm dở | Khi đưa ra quyết định thiết kế quan trọng hoặc trước khi "Clock Out" |
+| **[`PROGRESS.md`](../PROGRESS.md) & [`DECISIONS.md`](../DECISIONS.md)** *(root only)* | **Central Project Tracking** | Trạng thái và quyết định của mọi phân hệ, phân loại bằng nhãn `[Backend]`, `[Frontend]`, `[Vision]`, `[Cross-cutting]` | Khi "Clock In" để xem trạng thái toàn dự án | Khi hoàn thành công việc hoặc đưa ra quyết định thiết kế; không tạo bản tracking trong module |
 
 ---
 

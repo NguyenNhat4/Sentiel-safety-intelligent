@@ -32,10 +32,10 @@ backend/
 │   └── main.py                # FastAPI Application entrypoint & lifespan
 ├── migrations/                # Alembic database migrations
 ├── tests/                     # Pytest suite for backend endpoints & services
-├── DECISIONS.md               # Technical & Architectural decisions log for backend
-├── PROGRESS.md                # Task progress, state & next steps for backend
 └── README.md                  # This documentation file
 ```
+
+Project-wide decisions and progress live only in root [`DECISIONS.md`](../DECISIONS.md) and [`PROGRESS.md`](../PROGRESS.md).
 
 ## Setup & Running
 ```bash

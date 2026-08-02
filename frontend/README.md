@@ -2,6 +2,8 @@
 
 This module is the single-page HTML/CSS/JavaScript safety-monitoring client. FastAPI serves it at `/`, so there is no frontend build step. It owns video playback, four-point zone configuration, sampled-frame delivery, Canvas overlays, and the Safety Officer review interaction. Person detection and polygon evaluation remain backend responsibilities.
 
+Project-wide decisions and progress live only in root [`DECISIONS.md`](../DECISIONS.md) and [`PROGRESS.md`](../PROGRESS.md).
+
 ## Run
 
 ```bash

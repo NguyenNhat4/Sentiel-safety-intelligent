@@ -60,12 +60,12 @@ P-047/
 │   │   ├── overlay-renderer.js
 │   │   ├── review-controller.js
 │   │   └── ui.js
-│   ├── README.md
-│   ├── DECISIONS.md
-│   └── PROGRESS.md
+│   └── README.md
 ├── data/                # Sample video streams, test data and reviewed snapshots
 │   └── snapshots/
 ├── docs/                # Project documentation
+├── DECISIONS.md         # Single project-wide design decision log
+├── PROGRESS.md          # Single project-wide progress tracker
 ├── docker-compose.yml
 └── README.md
 ```
@@ -135,9 +135,7 @@ P-047/
 │   │   ├── overlay-renderer.js # Polygon, bounding boxes and foot-point drawing
 │   │   ├── review-controller.js # Human review and REST event persistence
 │   │   └── ui.js               # Status, rules, toast, timer and formatting
-│   ├── README.md
-│   ├── DECISIONS.md
-│   └── PROGRESS.md
+│   └── README.md
 │
 ├── data/
 │   ├── demo/
@@ -154,6 +152,8 @@ P-047/
 │   ├── rules.md
 │   └── limitations.md
 │
+├── DECISIONS.md
+├── PROGRESS.md
 ├── docker-compose.yml
 └── README.md
 ```
@@ -164,6 +164,7 @@ Cấu trúc tương lai đảm bảo sự phân tách trách nhiệm rõ ràng (
 2. **`backend/`**: Gateway tích hợp REST API, WebSocket realtime, cơ sở dữ liệu PostgreSQL và AI Safety Agent (LLM) hỗ trợ phân tích/đề xuất xử lý sự cố.
 3. **`frontend/`**: Tiếp tục dùng HTML/CSS/JavaScript native trong baseline, nhưng tách `app.js` thành ES modules theo trách nhiệm. `app.js` chỉ composition/wiring; transport không truy cập DOM, renderer không gọi network, controller review không điều khiển video trực tiếp. Có thể đánh giá SPA framework sau khi baseline và contract ổn định.
 4. **`contracts/`**: Chuẩn hóa schema giao tiếp giữa Vision worker và Backend API.
+5. **Central tracking**: Root `DECISIONS.md` và `PROGRESS.md` là hai nguồn tracking duy nhất; module không tạo bản riêng.
 
 ### Frontend refactor boundaries
 
