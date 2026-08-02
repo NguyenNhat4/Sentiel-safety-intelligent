@@ -46,17 +46,14 @@ class FrameInferenceService:
             )
 
         person_inside_zone = any(person.inside_zone for person in people)
-        review_required = person_inside_zone
-        violation = (
-            any(person.inside_zone and not person.safety_shirt for person in people)
-            and request.machine_state == "running"
-        )
+        review_required = person_inside_zone and request.machine_state == "running"
+        violation = review_required
 
         return FrameInferenceResponse(
             result="violate" if violation else "normal",
             review_required=review_required,
             people=people,
-            snapshot_data=request.image_data if person_inside_zone else None,
+            snapshot_data=request.image_data if review_required else None,
             rule={
                 "person_inside_zone": person_inside_zone,
                 "machine_state": request.machine_state,

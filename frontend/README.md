@@ -19,8 +19,9 @@ Open `http://localhost:8000` and hard-refresh after changing frontend assets. Th
 3. Play with exactly four points opens `/api/v1/ws/inference` and sends the zone configuration.
 4. While playing, the browser samples at most one frame every 0.5 seconds, encodes it as JPEG, and sends it as WebSocket binary data.
 5. The backend returns person bounding boxes, foot points, and `inside_zone` results. The frontend draws them in the original video coordinate space.
-6. Playback continues for no detections or people outside the zone. It pauses at the analyzed `video_time` only when at least one returned foot point is inside the polygon.
+6. Playback continues for no detections, people outside the zone, or zone entry while the machine is stopped. It pauses at the analyzed `video_time` only when at least one returned foot point is inside the polygon while the machine is running.
 7. The candidate remains in browser memory as `pendingViolation` until the Safety Officer confirms a violation or marks it as a false alarm.
+8. An actual violation is persisted with its snapshot and the review panel is reset. The monitor remains visible; the operator opens “Nhật ký vi phạm” manually to see `acknowledged` events.
 
 Only one frame may be in flight. If inference is slower than the 0.5-second sampling interval, intermediate video frames are skipped rather than queued. This keeps results recent and prevents stale-frame backlog.
 
@@ -34,13 +35,14 @@ flowchart TD
     CONFIG --> SAMPLE[Capture latest frame every 0.5 seconds]
     SAMPLE --> SEND[Send frame_meta then binary JPEG]
     SEND --> WAIT[Wait for correlated result]
-    WAIT --> DETECT{Person foot point inside zone?}
+    WAIT --> DETECT{Machine running and foot point inside?}
     DETECT -->|No| SAMPLE
     DETECT -->|Yes| PAUSE[Pause at analyzed video_time]
     PAUSE --> REVIEW{Safety Officer review}
     REVIEW -->|Actual violation| SAVE[POST acknowledged event]
     REVIEW -->|False alarm| FEEDBACK[POST false-alarm feedback]
-    SAVE --> RESUME[Enable playback resume]
+    SAVE --> MONITOR[Close review and remain on monitor]
+    MONITOR -->|Operator clicks log| LOG[Load confirmed violation log]
     FEEDBACK --> RESUME
 ```
 
@@ -123,6 +125,8 @@ The candidate detection is not written to the database before review. On confirm
 
 The backend returns `201 Created` and the generated event ID. Event review currently identifies the officer as the baseline string `Safety Officer`; production should derive this identity from authentication.
 
+After an acknowledged save, the review state closes while the monitor stays visible. When the operator clicks “Nhật ký vi phạm”, `event-log-controller.js` requests `GET /api/v1/events?status=acknowledged&limit=50` and resolves each relative `snapshot_path` against the connected backend origin. False alarms remain excluded from this official warning view.
+
 ## Key Files
 
 - `index.html`: monitor and review markup.
@@ -130,6 +134,7 @@ The backend returns `201 Created` and the generated event ID. Event review curre
 - `modules/`: native ES modules for video, zones, inference, rendering, review, state, and UI.
 - `styles.css`: Sentinel visual system.
 - `baseline.css`: functional video, Canvas, point-editing, and review states.
+- `event-log.css`: confirmed-event history and snapshot card layout.
 
 ## Baseline Module Structure
 
@@ -153,6 +158,7 @@ frontend/
     ├── frame-sampler.js
     ├── overlay-renderer.js
     ├── review-controller.js
+    ├── event-log-controller.js
     └── ui.js
 ```
 

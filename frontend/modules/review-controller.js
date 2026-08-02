@@ -2,7 +2,7 @@ import {getApiBase} from "./config.js";
 import {dom} from "./dom.js";
 import {drawOverlay} from "./overlay-renderer.js";
 import {state} from "./state.js";
-import {showToast, updateRule} from "./ui.js";
+import {resetAlert, showToast, updateRule} from "./ui.js";
 
 export function createReviewController({onZoneEntry}) {
   function handleInferenceResult(result) {
@@ -11,9 +11,9 @@ export function createReviewController({onZoneEntry}) {
     state.latestPeople = result.people;
     renderResult(result);
     drawOverlay();
-    const personInsideZone = result.people.some(person => person.inside_zone);
-    if (!personInsideZone) state.violationLatched = false;
-    if (personInsideZone && !state.violationLatched) {
+    const reviewRequired = result.review_required === true;
+    if (!reviewRequired) state.violationLatched = false;
+    if (reviewRequired && !state.violationLatched) {
       state.violationLatched = true;
       state.pendingViolation = {...result, videoTime: result.video_time};
       onZoneEntry(result.video_time);
@@ -31,16 +31,9 @@ export function createReviewController({onZoneEntry}) {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(buildEventPayload(status))
       });
-      if (!response.ok) throw new Error("Không thể lưu kết quả xác minh");
-      const saved = await response.json();
-      const actual = status === "acknowledged";
-      dom.eventStatus.textContent = `Đã lưu EVENT #${saved.id} · ${actual ? "vi phạm thực tế" : "báo sai"}`;
-      dom.reviewActions.hidden = true;
-      dom.playbackButton.disabled = false;
-      state.reviewStartedAt = null;
-      dom.reviewMessage.textContent = "Đã lưu kết quả xác minh";
-      dom.flowStatus.textContent = "Đã lưu sự kiện";
-      state.pendingViolation = null;
+      if (!response.ok) throw new Error(await readErrorMessage(response));
+      await response.json();
+      closeReview();
       showToast("Kết quả xác minh và khung hình đã được lưu.");
     } catch (error) {
       showToast(error.message);
@@ -50,6 +43,15 @@ export function createReviewController({onZoneEntry}) {
   });
 
   return {handleInferenceResult};
+}
+
+async function readErrorMessage(response) {
+  try {
+    const body = await response.json();
+    return body.detail || `Không thể lưu kết quả xác minh (HTTP ${response.status})`;
+  } catch {
+    return `Không thể lưu kết quả xác minh (HTTP ${response.status})`;
+  }
 }
 
 function renderResult(result) {
@@ -70,9 +72,8 @@ function renderResult(result) {
 
 function showReview(snapshotData) {
   dom.alertPanel.classList.add("violation");
-  const violation = state.pendingViolation.result === "violate";
-  dom.alertTitle.textContent = violation ? "Thiếu áo trong vùng cấm" : "Phát hiện người trong vùng";
-  dom.severity.textContent = violation ? "VIOLATE" : "REVIEW";
+  dom.alertTitle.textContent = "Người vào vùng cấm khi máy đang chạy";
+  dom.severity.textContent = "VIOLATE";
   dom.alertSummary.textContent = "Video đã dừng tại frame phát hiện người trong vùng. Hãy xác nhận vi phạm thực tế hoặc bình thường / báo sai.";
   dom.snapshot.src = snapshotData;
   dom.snapshot.classList.add("visible");
@@ -81,7 +82,7 @@ function showReview(snapshotData) {
   dom.reviewMessage.textContent = "Khung hình đang chờ cán bộ an toàn xác minh";
   dom.eventStatus.textContent = "Đang chờ xác minh · chưa lưu";
   dom.flowStatus.textContent = "Chờ xác minh";
-  dom.confidenceLabel.textContent = violation ? "VIOLATE" : "REVIEW";
+  dom.confidenceLabel.textContent = "VIOLATE";
   dom.confidenceBar.style.width = "100%";
 }
 
@@ -89,7 +90,7 @@ function buildEventPayload(status) {
   const pending = state.pendingViolation;
   return {
     zone_id: "zone_01", camera_id: "uploaded_video",
-    event_type: pending.result === "violate" ? "missing_ppe_and_intrusion" : "zone_entry_review",
+    event_type: "zone_intrusion_while_machine_running",
     severity: "high", status, acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data, privacy_blurred: false,
     details: {
@@ -104,4 +105,15 @@ function buildEventPayload(status) {
 
 function setReviewButtonsDisabled(disabled) {
   dom.reviewActions.querySelectorAll("button").forEach(button => { button.disabled = disabled; });
+}
+
+function closeReview() {
+  state.pendingViolation = null;
+  state.reviewStartedAt = null;
+  dom.reviewActions.hidden = true;
+  dom.snapshot.classList.remove("visible");
+  dom.snapshot.removeAttribute("src");
+  dom.playbackButton.disabled = false;
+  dom.flowStatus.textContent = "Đã đóng xác minh";
+  resetAlert();
 }

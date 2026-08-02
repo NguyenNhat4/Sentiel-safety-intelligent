@@ -10,6 +10,10 @@ from backend.app.models.event import SafetyEvent
 from backend.app.schemas.event import EventCreate, EventUpdate
 
 
+class EventPersistenceError(RuntimeError):
+    pass
+
+
 class EventService:
     def __init__(self, db: Session):
         self.db = db
@@ -33,8 +37,14 @@ class EventService:
             timestamp=datetime.now(UTC),
         )
         self.db.add(db_event)
-        self.db.commit()
-        self.db.refresh(db_event)
+        try:
+            self.db.commit()
+            self.db.refresh(db_event)
+        except Exception as exc:
+            self.db.rollback()
+            if event_in.snapshot_data and snapshot_path:
+                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+            raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
 
     @staticmethod
@@ -50,6 +60,10 @@ class EventService:
         filename = f"event-{uuid.uuid4().hex}.jpg"
         (snapshot_dir / filename).write_bytes(image_bytes)
         return f"/snapshots/{filename}"
+
+    @staticmethod
+    def _snapshot_file(snapshot_path: str) -> Path:
+        return Path(__file__).resolve().parents[3] / "data" / "snapshots" / Path(snapshot_path).name
 
     def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()

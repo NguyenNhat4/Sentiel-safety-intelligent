@@ -46,6 +46,7 @@ P-047/
 │   ├── index.html       # Upload, four-point zone, inference and review flow
 │   ├── styles.css       # Sentinel visual stylesheet brought from src/ui
 │   ├── baseline.css     # Functional video and Canvas overrides
+│   ├── event-log.css    # Confirmed-violation history cards and responsive layout
 │   ├── app.js           # 29-line ES module composition root
 │   ├── modules/
 │   │   ├── README.md
@@ -59,6 +60,7 @@ P-047/
 │   │   ├── frame-sampler.js
 │   │   ├── overlay-renderer.js
 │   │   ├── review-controller.js
+│   │   ├── event-log-controller.js
 │   │   └── ui.js
 │   └── README.md
 ├── data/                # Sample video streams, test data and reviewed snapshots
@@ -121,6 +123,7 @@ P-047/
 │   ├── index.html              # Monitor markup; loads app.js as an ES module
 │   ├── styles.css              # Sentinel visual system
 │   ├── baseline.css            # Functional video and Canvas states
+│   ├── event-log.css           # Confirmed-event history view
 │   ├── app.js                  # Small composition root and event wiring
 │   ├── modules/
 │   │   ├── README.md           # Module boundaries and dependency rules
@@ -134,6 +137,7 @@ P-047/
 │   │   ├── frame-sampler.js    # 2 FPS gate and binary JPEG capture delivery
 │   │   ├── overlay-renderer.js # Polygon, bounding boxes and foot-point drawing
 │   │   ├── review-controller.js # Human review and REST event persistence
+│   │   ├── event-log-controller.js # Confirmed events and snapshot history
 │   │   └── ui.js               # Status, rules, toast, timer and formatting
 │   └── README.md
 │
@@ -181,6 +185,7 @@ Refactor tương lai giữ nguyên UI và wire contract hiện tại; đây là 
 | `frame-sampler.js` | Sampling interval and Canvas-to-JPEG delivery | Socket lifecycle or review decisions |
 | `overlay-renderer.js` | Pure rendering from zone and detection inputs | Socket or REST calls |
 | `review-controller.js` | Pending candidate, officer decision and `/events` request | Frame sampling |
+| `event-log-controller.js` | Confirmed-event navigation, loading, and snapshot cards | Inference or review decisions |
 | `ui.js` | Labels, alerts, toast and timer | Session/network ownership |
 
 Target each implementation file to remain near or below 150 lines. Shared state is passed explicitly or imported from `state.js`; modules do not create duplicate mutable state. Native browser modules keep the baseline build-free.

@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./baseline.css" />
+  <link rel="stylesheet" href="./event-log.css" />
 </head>
 <body>
   <aside class="sidebar">
@@ -18,8 +19,8 @@
     </a>
 
     <nav>
-      <button class="nav-item active"><span>◉</span> Live monitor</button>
-      <button class="nav-item muted-nav"><span>▤</span> Nhật ký vi phạm</button>
+      <button class="nav-item active" id="monitor-nav"><span>◉</span> Live monitor</button>
+      <button class="nav-item" id="violation-log-nav"><span>▤</span> Nhật ký vi phạm</button>
       <button class="nav-item muted-nav"><span>⌁</span> Dashboard</button>
       <button class="nav-item muted-nav"><span>{ }</span> Log JSON</button>
     </nav>
@@ -141,6 +142,19 @@
         <span id="flow-status">Sẵn sàng</span>
         <button id="activity-action">Bắt đầu bằng video →</button>
       </div>
+    </section>
+
+    <section class="page" id="violation-log">
+      <div class="log-toolbar">
+        <div>
+          <p class="eyebrow">SAFETY RECORDS</p>
+          <h2>Nhật ký vi phạm</h2>
+          <p>Chỉ hiển thị cảnh báo đã được Cán bộ an toàn xác nhận.</p>
+        </div>
+        <button class="secondary-btn" id="refresh-events">↻ Làm mới</button>
+      </div>
+      <div class="log-status" id="event-log-status">Đang chờ dữ liệu</div>
+      <div class="event-log-list" id="event-log-list"></div>
     </section>
   </main>
 

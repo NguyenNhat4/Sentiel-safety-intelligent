@@ -12,6 +12,7 @@ These native ES modules split the baseline monitor by responsibility without add
 - `frame-sampler.js`: 0.5-second sampling gate and Canvas-to-JPEG delivery.
 - `overlay-renderer.js`: zone, bounding-box, and foot-point Canvas rendering.
 - `review-controller.js`: inference presentation, human review, and event persistence.
+- `event-log-controller.js`: acknowledged-event loading, navigation, and snapshot cards.
 - `ui.js`: shared labels, rules, toast, timer, and formatting helpers.
 
 `app.js` is the composition root. Transport code must not manipulate the DOM, renderers must not call the network, and controllers share mutable session data only through `state.js`.

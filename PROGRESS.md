@@ -20,14 +20,19 @@ This is the single progress tracker for the repository. Completed work is groupe
 ### Frontend
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
-- [x] Pause playback only when a returned person foot point is inside the configured polygon.
+- [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
 - [x] Added actual-violation and false-alarm review actions with REST event persistence.
+- [x] After acknowledged save, close the review state and keep the monitor visible; load confirmed snapshots when the operator opens “Nhật ký vi phạm”.
+- [x] Added development localhost CORS support for frontend/backend ports.
+- [x] Use local SQLite for baseline event persistence and clean up snapshots when a database transaction fails.
 - [x] Refactored the 686-line `app.js` into build-free ES modules with a 29-line composition root.
 - [x] Restored Play-button activation immediately after video metadata loads.
 
 ### Documentation
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
+- [x] Added new-developer setup, API documentation, testing, and manual smoke-test instructions to the root README.
+- [x] Clarified the WebSocket inference input sequence, output fields, decision rule, and common outcomes in the backend README.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
@@ -41,4 +46,3 @@ This is the single progress tracker for the repository. Completed work is groupe
 1. Replace the safety-shirt heuristic while preserving the inference response contract.
 2. Blur faces before any confirmed snapshot is persisted.
 3. Implement the PostgreSQL Alembic migration and authenticated Safety Officer identity.
-4. Add event history only after the baseline monitoring flow is validated.

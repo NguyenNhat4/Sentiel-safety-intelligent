@@ -8,6 +8,11 @@ export function getApiBase() {
   return apiBase;
 }
 
+export function resolveBackendUrl(path) {
+  if (!path) return null;
+  return new URL(path, `${new URL(apiBase).origin}/`).toString();
+}
+
 export function setApiBaseFromSocket(socketUrl) {
   const backendUrl = new URL(socketUrl);
   backendUrl.protocol = backendUrl.protocol === "wss:" ? "https:" : "http:";

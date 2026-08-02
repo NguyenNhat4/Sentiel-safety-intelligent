@@ -138,7 +138,7 @@ def test_frame_inference_violates_for_person_without_shirt(client, monkeypatch):
     assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
 
 
-def test_frame_inference_requests_review_for_zone_entry_with_shirt(client, monkeypatch):
+def test_frame_inference_violates_for_zone_entry_with_shirt(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",
@@ -164,7 +164,7 @@ def test_frame_inference_requests_review_for_zone_entry_with_shirt(client, monke
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["result"] == "normal"
+    assert body["result"] == "violate"
     assert body["review_required"] is True
     assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
 
@@ -185,7 +185,7 @@ def test_frame_inference_rejects_invalid_image(client):
     assert response.status_code == 400
 
 
-def test_zone_entry_uses_foot_point_even_when_machine_is_stopped(monkeypatch):
+def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",
@@ -211,8 +211,9 @@ def test_zone_entry_uses_foot_point_even_when_machine_is_stopped(monkeypatch):
 
     assert result.people[0].foot_point == [60, 100]
     assert result.people[0].inside_zone is True
-    assert result.review_required is True
+    assert result.review_required is False
     assert result.result == "normal"
+    assert result.snapshot_data is None
 
 
 def test_inference_websocket_returns_empty_people(client, monkeypatch):
