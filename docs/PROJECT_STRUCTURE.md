@@ -16,7 +16,7 @@ P-047/
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
-│   │   │   │   └── websocket.py   # Realtime alert push (/ws/alerts)
+│   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
 │   │   │   └── router.py
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
@@ -30,6 +30,7 @@ P-047/
 │   │   ├── services/    # Core Services & AI Reasoning
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
+│   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
 │   │   │   └── statistics_service.py
 │   │   └── main.py      # FastAPI App entrypoint
@@ -45,11 +46,25 @@ P-047/
 │   ├── index.html       # Upload, four-point zone, inference and review flow
 │   ├── styles.css       # Sentinel visual stylesheet brought from src/ui
 │   ├── baseline.css     # Functional video and Canvas overrides
-│   ├── app.js           # Video sampling, Canvas overlay and API integration
+│   ├── app.js           # 29-line ES module composition root
+│   ├── modules/
+│   │   ├── README.md
+│   │   ├── config.js
+│   │   ├── dom.js
+│   │   ├── state.js
+│   │   ├── video-controller.js
+│   │   ├── video-preview.js
+│   │   ├── zone-controller.js
+│   │   ├── inference-client.js
+│   │   ├── frame-sampler.js
+│   │   ├── overlay-renderer.js
+│   │   ├── review-controller.js
+│   │   └── ui.js
 │   ├── README.md
 │   ├── DECISIONS.md
 │   └── PROGRESS.md
-├── data/                # Sample video streams and test data
+├── data/                # Sample video streams, test data and reviewed snapshots
+│   └── snapshots/
 ├── docs/                # Project documentation
 ├── docker-compose.yml
 └── README.md
@@ -83,6 +98,7 @@ P-047/
 │   │   ├── services/
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
+│   │   │   ├── frame_inference_service.py
 │   │   │   ├── llm_service.py
 │   │   │   └── statistics_service.py
 │   │   └── main.py
@@ -102,20 +118,31 @@ P-047/
 │   └── tests/
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── features/
-│   │   │   ├── monitor/
-│   │   │   ├── alerts/
-│   │   │   ├── events/
-│   │   │   └── dashboard/
-│   │   └── types/
-│   └── package.json
+│   ├── index.html              # Monitor markup; loads app.js as an ES module
+│   ├── styles.css              # Sentinel visual system
+│   ├── baseline.css            # Functional video and Canvas states
+│   ├── app.js                  # Small composition root and event wiring
+│   ├── modules/
+│   │   ├── README.md           # Module boundaries and dependency rules
+│   │   ├── config.js           # Sampling interval and backend URL resolution
+│   │   ├── dom.js              # Cached DOM element references
+│   │   ├── state.js            # Single mutable baseline session state
+│   │   ├── video-controller.js # Upload, preview, play, stop and frame capture
+│   │   ├── video-preview.js    # Preview-frame selection and paused snapshot
+│   │   ├── zone-controller.js  # Four-point selection, drag, delete and reset
+│   │   ├── inference-client.js # WebSocket protocol, fallback and backpressure
+│   │   ├── frame-sampler.js    # 2 FPS gate and binary JPEG capture delivery
+│   │   ├── overlay-renderer.js # Polygon, bounding boxes and foot-point drawing
+│   │   ├── review-controller.js # Human review and REST event persistence
+│   │   └── ui.js               # Status, rules, toast, timer and formatting
+│   ├── README.md
+│   ├── DECISIONS.md
+│   └── PROGRESS.md
 │
 ├── data/
 │   ├── demo/
 │   ├── edge-cases/
+│   ├── snapshots/
 │   └── expected-results.json
 │
 ├── contracts/
@@ -135,5 +162,24 @@ P-047/
 Cấu trúc tương lai đảm bảo sự phân tách trách nhiệm rõ ràng (separation of concerns):
 1. **`vision/`**: Luồng Computer Vision chạy độc lập để nhận diện người, trang bị PPE, kiểm tra vùng polygon nguy hiểm và làm mờ khuôn mặt.
 2. **`backend/`**: Gateway tích hợp REST API, WebSocket realtime, cơ sở dữ liệu PostgreSQL và AI Safety Agent (LLM) hỗ trợ phân tích/đề xuất xử lý sự cố.
-3. **`frontend/`**: Baseline HTML/CSS/JavaScript cho luồng upload, cấu hình vùng, inference và xác minh sự kiện; có thể nâng cấp thành SPA sau MVP.
+3. **`frontend/`**: Tiếp tục dùng HTML/CSS/JavaScript native trong baseline, nhưng tách `app.js` thành ES modules theo trách nhiệm. `app.js` chỉ composition/wiring; transport không truy cập DOM, renderer không gọi network, controller review không điều khiển video trực tiếp. Có thể đánh giá SPA framework sau khi baseline và contract ổn định.
 4. **`contracts/`**: Chuẩn hóa schema giao tiếp giữa Vision worker và Backend API.
+
+### Frontend refactor boundaries
+
+Refactor tương lai giữ nguyên UI và wire contract hiện tại; đây là thay đổi cấu trúc, không thay đổi hành vi.
+
+| Module | Owns | Must not own |
+|---|---|---|
+| `app.js` | Khởi tạo module và nối callbacks | WebSocket protocol, Canvas drawing, business rules |
+| `state.js` | Zone, playback, detections and pending-review state | DOM access, socket ownership or side effects |
+| `video-controller.js` | Video/file lifecycle and Canvas frame capture | Backend message parsing |
+| `video-preview.js` | Preview-frame selection and paused snapshots | Playback or socket ownership |
+| `zone-controller.js` | Exactly-four-point editing and normalized coordinates | Person detection or event saving |
+| `inference-client.js` | Configure/meta/binary protocol and one-frame backpressure | Review UI or Canvas drawing |
+| `frame-sampler.js` | Sampling interval and Canvas-to-JPEG delivery | Socket lifecycle or review decisions |
+| `overlay-renderer.js` | Pure rendering from zone and detection inputs | Socket or REST calls |
+| `review-controller.js` | Pending candidate, officer decision and `/events` request | Frame sampling |
+| `ui.js` | Labels, alerts, toast and timer | Session/network ownership |
+
+Target each implementation file to remain near or below 150 lines. Shared state is passed explicitly or imported from `state.js`; modules do not create duplicate mutable state. Native browser modules keep the baseline build-free.

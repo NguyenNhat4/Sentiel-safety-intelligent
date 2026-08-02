@@ -15,3 +15,8 @@
 - **Choice:** Play opens `/api/v1/ws/inference`, sends four-point configuration once, then sends at most one JPEG frame every 0.5 seconds with only one frame in flight.
 - **Constraint:** A socket failure pauses monitored playback; the operator explicitly presses Play to reconnect.
 - **Development fallback:** The client tries the page origin first and then `<hostname>:8000`, allowing the static page to run from a local file or development server while FastAPI runs on its documented port.
+
+## 2026-08-02: Build-free ES module frontend
+- **Reason:** The working baseline `app.js` reached 686 lines and mixed video, zone, transport, rendering, review, and UI responsibilities.
+- **Choice:** Keep Vanilla JavaScript and split the monitor into native ES modules, with `app.js` as the composition root and explicit controller callbacks.
+- **Constraint:** Preserve the existing DOM, WebSocket/REST contracts, 2 FPS backpressure, foot-point rule, and operator-review behavior without introducing a build step.

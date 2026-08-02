@@ -16,6 +16,7 @@
 - [x] Updated project `README.md` structure and created `backend/README.md`, `DECISIONS.md`, `PROGRESS.md`
 - [x] Added frame inference API, YOLO person detection, safety-shirt baseline rule, and reviewed event persistence
 - [x] Added binary WebSocket frame inference with correlated bounding-box and zone-entry results
+- [x] Documented the inference protocol and recommended confirmed-warning persistence lifecycle
 
 ## In Progress
 - [ ] Replace the baseline safety-shirt color heuristic with trained PPE model weights

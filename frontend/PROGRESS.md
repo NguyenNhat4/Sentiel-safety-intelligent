@@ -14,6 +14,8 @@
 - [x] Restricted automatic playback pauses to detections with a person inside the configured zone.
 - [x] Replaced per-frame HTTP requests with a configured binary WebSocket running at up to 2 FPS with one frame in flight.
 - [x] Added same-origin/port-8000 WebSocket fallback and visualized each detection foot point used for polygon entry.
+- [x] Documented the frontend/backend WebSocket protocol and reviewed-event submission flow.
+- [x] Refactored the 686-line `app.js` into build-free ES modules with a 29-line composition root.
 
 ## Next Steps
 1. Replace the demo safety-shirt heuristic with trained PPE detection.
