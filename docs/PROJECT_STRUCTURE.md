@@ -67,7 +67,10 @@ P-047/
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md
-│   └── USER_STORIES.md
+│   ├── USER_STORIES_LIST.md
+│   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
+│   └── backlog/         # Incomplete and backlog user stories
+│       └── US-07.md ... US-13.md
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── docker-compose.yml
@@ -154,7 +157,10 @@ P-047/
 ├── specs/
 │   ├── README.md
 │   ├── PRD.md
-│   └── USER_STORIES.md
+│   ├── USER_STORIES_LIST.md
+│   ├── US-01.md ... US-06.md
+│   └── backlog/
+│       └── US-07.md ... US-13.md
 │
 ├── DECISIONS.md
 ├── PROGRESS.md

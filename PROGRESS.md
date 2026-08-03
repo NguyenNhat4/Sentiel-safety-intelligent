@@ -38,6 +38,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Clarified the WebSocket inference input sequence, output fields, decision rule, and common outcomes in the backend README.
 - [x] Added a PRD-aligned user story backlog separating completed, partial, and remaining MVP work with acceptance criteria.
 - [x] Created detailed spec files for completed user stories (US-01 to US-06) covering what, why, how, diagrams, and API contracts.
+- [x] Created `specs/backlog/` directory containing user story backlog items (US-07 to US-13) for incomplete and partially completed user stories.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
