@@ -58,3 +58,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Choice:** Replace the build-free ES modules with React 19, TypeScript, and Vite organized into `api`, shared `components`, feature modules, and contract `types`.
 - **Compatibility:** Preserve the Sentinel UI, four-point zone behavior, 2 FPS one-frame backpressure, REST payloads, and binary WebSocket protocol.
 - **Deployment:** Use Vite during development; FastAPI serves `frontend/dist` in production. Docker builds the frontend in a Node stage and keeps one Python runtime service.
+
+## 2026-08-03: [Cross-cutting] Separate MVP closure from the five-week advanced delivery
+- **Reason:** The MVP defined by `specs/PRD.md` must be completed in the current week, while the following five weeks are reserved for the advanced outputs in `docs/project-problem-statement.md`.
+- **Choice:** Keep MVP closure and regression in US-01 to US-13 plus US-16 to US-19; plan advanced HITL/escalation and US-20 to US-26 across the subsequent five weeks.
+- **Constraint:** Camera factory integration, PLC control, automatic machine stop, and concurrent multi-stream scale require a separate scope decision.
+- **Documentation:** Every incomplete story has a canonical `specs/backlog/US-XX.md` whose story content must remain identical to the corresponding section in `specs/USER_STORIES_LIST.md`.

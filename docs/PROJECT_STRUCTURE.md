@@ -69,8 +69,9 @@ P-047/
 │   ├── PRD.md
 │   ├── USER_STORIES_LIST.md
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
-│   └── backlog/         # Incomplete and backlog user stories
-│       └── US-07.md ... US-19.md
+│   └── backlog/         # Incomplete MVP and five-week advanced user stories
+│       ├── README.md
+│       └── US-07.md ... US-26.md
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── docker-compose.yml
@@ -160,7 +161,8 @@ P-047/
 │   ├── USER_STORIES_LIST.md
 │   ├── US-01.md ... US-06.md
 │   └── backlog/
-│       └── US-07.md ... US-19.md
+│       ├── README.md
+│       └── US-07.md ... US-26.md
 │
 ├── DECISIONS.md
 ├── PROGRESS.md
