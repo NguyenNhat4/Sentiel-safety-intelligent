@@ -33,6 +33,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
 - [x] Added new-developer setup, API documentation, testing, and manual smoke-test instructions to the root README.
 - [x] Clarified the WebSocket inference input sequence, output fields, decision rule, and common outcomes in the backend README.
+- [x] Added a PRD-aligned user story backlog separating completed, partial, and remaining MVP work with acceptance criteria.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.

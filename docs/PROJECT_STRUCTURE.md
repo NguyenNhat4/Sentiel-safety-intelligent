@@ -65,7 +65,11 @@ P-047/
 │   └── README.md
 ├── data/                # Sample video streams, test data and reviewed snapshots
 │   └── snapshots/
-├── docs/                # Project documentation
+├── docs/                # Architecture, technical guides and documentation index
+├── specs/               # Product requirements and PRD-aligned user story backlog
+│   ├── README.md
+│   ├── PRD.md
+│   └── USER_STORIES.md
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── docker-compose.yml
@@ -155,6 +159,10 @@ P-047/
 │   ├── architecture.md
 │   ├── rules.md
 │   └── limitations.md
+├── specs/
+│   ├── README.md
+│   ├── PRD.md
+│   └── USER_STORIES.md
 │
 ├── DECISIONS.md
 ├── PROGRESS.md

@@ -7,7 +7,7 @@
 - **Project Structure**: Read [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) to understand current and future directory layouts. Every time you complete tasks that change project structure (creating new files/directories or updating existing layout), update `docs/PROJECT_STRUCTURE.md`.
 - **Architecture**: For architecture, read `ARCHITECTURE.md` and [`docs/architecture_diagram.md`](docs/architecture_diagram.md).
 - **Module Documentation**: Any created folder/module must have a `README.md` file explaining what it does. Before reading code files inside a module, read its `README.md` first.
-- **Scope Alignment**: We are in the MVP phase; scope is defined in [`docs/PRD.md`](docs/PRD.md). If a request is out of scope, ask questions for clarification.
+- **Scope Alignment**: We are in the MVP phase; scope is defined in [`specs/PRD.md`](specs/PRD.md). If a request is out of scope, ask questions for clarification.
 - **Central Tracking**: The repository has exactly one root [`DECISIONS.md`](DECISIONS.md) and one root [`PROGRESS.md`](PROGRESS.md). Record every module's decisions and progress there using an owning-area label such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`. Do not create module-level `DECISIONS.md` or `PROGRESS.md` files.
 - **Dont read `src` folder when im not directly ask for it. **
 
@@ -18,7 +18,7 @@
 ### At Session Start (Clock In)
 1. Read root `PROGRESS.md` for the project-wide current state.
 2. Read root `DECISIONS.md` for important decisions across all modules.
-3. Run `make check` to confirm repo is in consistent state.
+3. Run `make check` to confirm repo is in consistent state. Skip this step if you only update documents.
 4. Continue from `PROGRESS.md` `Next Steps` section.
 
 ### Before Session End (Clock Out)
