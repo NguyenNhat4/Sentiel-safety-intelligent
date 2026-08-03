@@ -12,7 +12,7 @@ flowchart TB
     BROWSER["Browser"]
 
     subgraph DOCKER["Docker Compose"]
-        FRONTEND["Frontend Container<br/>React + Vite build"]
+        FRONTEND["React SPA build<br/>FastAPI static serving"]
         BACKEND["Backend Container<br/>FastAPI"]
         DB[("PostgreSQL Container")]
     end
@@ -38,7 +38,7 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     actor User as Safety Officer
-    participant UI as React Frontend
+    participant UI as Browser Frontend
     participant API as FastAPI
     participant CV as CV Pipeline
     participant Rules as Rule Engine
@@ -78,7 +78,7 @@ sequenceDiagram
 
 ### 1. Computer Vision Pipeline (Python)
 - **Person Detection:** YOLO pretrained
-- **PPE Detection:** YOLO pretrained / fine-tuned cho helmet & safety_vest
+- **PPE Detection baseline:** HSV torso heuristic cho safety_vest; thay bằng model PPE đã huấn luyện sau khi flow được xác nhận
 - **Tracking:** ByteTrack (qua Ultralytics)
 - **Zone Logic:** OpenCV `pointPolygonTest`
 - **Privacy:** Làm mờ khuôn mặt bằng OpenCV
@@ -90,8 +90,7 @@ sequenceDiagram
 
 ### 3. Frontend (React + TypeScript + Vite)
 - **Mục đích:** Live monitor, alert, event log, dashboard.
-- **Styling:** Tailwind CSS
-- **Charts:** Recharts
+- **Baseline:** React owns typed UI state and FastAPI serves the Vite production build. After four-point configuration, the browser sends binary JPEG samples over `/api/v1/ws/inference` and draws returned detections on Canvas. Only one frame is processed at a time.
 
 ### 4. Database
 - **Type:** PostgreSQL
@@ -103,5 +102,5 @@ sequenceDiagram
 |----------|--------|--------|
 | Zone Logic | OpenCV | `pointPolygonTest` đủ dùng mà không cần model AI phức tạp |
 | Backend | FastAPI | Python stack, dễ tích hợp CV pipeline, hỗ trợ WebSocket tốt |
-| Frontend | React + Vite | Phù hợp quản lý state real-time, Vite nhẹ và nhanh |
+| Frontend | React + TypeScript + Vite | Typed feature boundaries while preserving the validated baseline flow |
 | Architecture | Modular Monolith | Một repo, các thành phần gọi nội bộ thay vì microservices ở giai đoạn đầu |

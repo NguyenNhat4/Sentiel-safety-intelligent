@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,3 +20,42 @@ class AnalysisStatusResponse(BaseModel):
     active_violations_count: int = 0
     current_timestamp: str | None = None
     metadata: dict[str, Any] | None = None
+
+
+class ZonePoint(BaseModel):
+    x: float = Field(..., ge=0.0, le=1.0)
+    y: float = Field(..., ge=0.0, le=1.0)
+
+
+class FrameInferenceRequest(BaseModel):
+    image_data: str = Field(..., description="Base64 JPEG data URL")
+    zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
+    machine_state: Literal["running", "stopped"] = "running"
+
+
+class PersonDetection(BaseModel):
+    bbox: list[int]
+    confidence: float
+    foot_point: list[int]
+    inside_zone: bool
+    safety_shirt: bool
+
+
+class FrameInferenceResponse(BaseModel):
+    result: Literal["normal", "violate"]
+    review_required: bool
+    people: list[PersonDetection]
+    snapshot_data: str | None = None
+    rule: dict[str, Any]
+
+
+class InferenceWebSocketConfigure(BaseModel):
+    type: Literal["configure"]
+    zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
+    machine_state: Literal["running", "stopped"] = "running"
+
+
+class InferenceWebSocketFrameMeta(BaseModel):
+    type: Literal["frame_meta"]
+    frame_id: int = Field(..., ge=0)
+    video_time: float = Field(..., ge=0.0)

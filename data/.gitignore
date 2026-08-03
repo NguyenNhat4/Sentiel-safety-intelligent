@@ -1,0 +1,4 @@
+*
+!.gitignore
+!snapshots/
+!snapshots/README.md

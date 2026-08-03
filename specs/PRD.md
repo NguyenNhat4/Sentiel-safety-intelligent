@@ -32,7 +32,7 @@ Xây dựng prototype dùng Computer Vision để:
 
 * Một vùng nguy hiểm.
 
-* Hai loại PPE: áo phản quang, nón.
+* Một loại PPE trong baseline: áo phản quang.
 
 * Một trạng thái máy ON/OFF.
 
@@ -53,7 +53,7 @@ Xây dựng prototype dùng Computer Vision để:
 → Video demo upload  
 → phát hiện người
 
-→ phát hiện PPE ( mũ, áo )  
+→ phát hiện PPE (áo phản quang)
 → theo dõi người  
 → áp dụng rule  
 → tạo cảnh báo  

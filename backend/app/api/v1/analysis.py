@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
-from backend.app.schemas.analysis import AnalysisStatusResponse, StartAnalysisRequest
+from backend.app.schemas.analysis import (
+    AnalysisStatusResponse,
+    FrameInferenceRequest,
+    FrameInferenceResponse,
+    StartAnalysisRequest,
+)
 from backend.app.services.analysis_service import AnalysisService
+from backend.app.services.frame_inference_service import InvalidFrameError, frame_inference_service
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 analysis_service = AnalysisService()
@@ -29,3 +35,12 @@ async def get_analysis_status(session_id: str):
     if not status:
         raise HTTPException(status_code=404, detail="Analysis session not found")
     return status
+
+
+@router.post("/frame", response_model=FrameInferenceResponse)
+async def infer_frame(request: FrameInferenceRequest):
+    """Evaluate one browser video frame against the predefined safety rule."""
+    try:
+        return frame_inference_service.infer(request)
+    except InvalidFrameError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

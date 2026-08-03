@@ -37,3 +37,21 @@ def test_update_event_status(client):
     assert patch_resp.status_code == 200
     assert patch_resp.json()["status"] == "acknowledged"
     assert patch_resp.json()["acknowledged_by"] == "Safety Officer A"
+
+
+def test_create_event_with_completed_review(client):
+    response = client.post(
+        "/api/v1/events",
+        json={
+            "zone_id": "zone_01",
+            "event_type": "missing_ppe_and_intrusion",
+            "status": "false_alarm",
+            "acknowledged_by": "Safety Officer",
+            "details": {"review_result": "normal"},
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "false_alarm"
+    assert body["acknowledged_by"] == "Safety Officer"
+    assert body["acknowledged_at"] is not None
