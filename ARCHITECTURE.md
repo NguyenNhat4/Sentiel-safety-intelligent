@@ -12,7 +12,7 @@ flowchart TB
     BROWSER["Browser"]
 
     subgraph DOCKER["Docker Compose"]
-        FRONTEND["Static Frontend<br/>HTML + CSS + JavaScript"]
+        FRONTEND["React SPA build<br/>FastAPI static serving"]
         BACKEND["Backend Container<br/>FastAPI"]
         DB[("PostgreSQL Container")]
     end
@@ -88,9 +88,9 @@ sequenceDiagram
 - **Rule Engine:** Viết bằng Python thuần kiểm tra các rule nghiệp vụ.
 - **WebSocket:** Cập nhật real-time tới frontend.
 
-### 3. Frontend (HTML + CSS + JavaScript)
+### 3. Frontend (React + TypeScript + Vite)
 - **Mục đích:** Live monitor, alert, event log, dashboard.
-- **Baseline:** FastAPI serves static assets; after four-point configuration, the browser sends binary JPEG samples over `/api/v1/ws/inference` and draws returned detections on Canvas. Only one frame is processed at a time.
+- **Baseline:** React owns typed UI state and FastAPI serves the Vite production build. After four-point configuration, the browser sends binary JPEG samples over `/api/v1/ws/inference` and draws returned detections on Canvas. Only one frame is processed at a time.
 
 ### 4. Database
 - **Type:** PostgreSQL
@@ -102,5 +102,5 @@ sequenceDiagram
 |----------|--------|--------|
 | Zone Logic | OpenCV | `pointPolygonTest` đủ dùng mà không cần model AI phức tạp |
 | Backend | FastAPI | Python stack, dễ tích hợp CV pipeline, hỗ trợ WebSocket tốt |
-| Frontend baseline | Vanilla HTML/CSS/JS | Giữ luồng demo đơn giản, không cần build step |
+| Frontend | React + TypeScript + Vite | Typed feature boundaries while preserving the validated baseline flow |
 | Architecture | Modular Monolith | Một repo, các thành phần gọi nội bộ thay vì microservices ở giai đoạn đầu |

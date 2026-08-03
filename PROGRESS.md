@@ -4,9 +4,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ## Current State
 - The baseline upload → four-point zone → binary WebSocket inference → foot-point zone review → event save flow is implemented.
-- FastAPI serves the build-free frontend at `/` and provides REST plus WebSocket APIs.
-- Frontend logic is split into native ES modules with a 29-line composition root.
-- Static checks, formatting, WebSocket live smoke tests, ES module linking, and headless-browser loading pass.
+- FastAPI serves the React production build at `/` and provides REST plus WebSocket APIs.
+- Frontend uses React 19, TypeScript, Vite, typed feature boundaries, and a tested transport layer.
+- Python static checks and frontend lint, type-check, unit/component tests, and production build pass.
 
 ## Completed
 
@@ -27,6 +27,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Use local SQLite for baseline event persistence and clean up snapshots when a database transaction fails.
 - [x] Refactored the 686-line `app.js` into build-free ES modules with a 29-line composition root.
 - [x] Restored Play-button activation immediately after video metadata loads.
+- [x] Refactored the validated Sentinel flow from Vanilla ES modules to React 19 + TypeScript + Vite.
+- [x] Added typed REST/WebSocket contracts, transport backpressure tests, Canvas tests, and React component tests.
+- [x] Integrated the Vite production build with FastAPI and the single-service multi-stage Docker image.
 
 ### Documentation
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.

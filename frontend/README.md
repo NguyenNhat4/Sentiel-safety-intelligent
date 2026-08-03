@@ -1,165 +1,71 @@
-# Frontend Baseline
+# Sentinel React Frontend
 
-This module is the single-page HTML/CSS/JavaScript safety-monitoring client. FastAPI serves it at `/`, so there is no frontend build step. It owns video playback, four-point zone configuration, sampled-frame delivery, Canvas overlays, and the Safety Officer review interaction. Person detection and polygon evaluation remain backend responsibilities.
+React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns local video playback, normalized four-point zone editing, sampled binary WebSocket inference, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Detection and polygon evaluation remain backend responsibilities.
 
 Project-wide decisions and progress live only in root [`DECISIONS.md`](../DECISIONS.md) and [`PROGRESS.md`](../PROGRESS.md).
 
-## Run
+## Development
+
+Run FastAPI in one terminal and Vite in another:
 
 ```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+make frontend-install
+.venv/bin/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+make frontend-dev
 ```
 
-Open `http://localhost:8000` and hard-refresh after changing frontend assets. The WebSocket client tries the page origin first and `<hostname>:8000` second, which also supports a local static development server.
+Open <http://localhost:5173>. Vite proxies `/api` and `/snapshots` to port 8000, including the inference WebSocket. Set `VITE_BACKEND_URL` only when the backend is hosted at another origin.
+
+For the integrated production-style runtime:
+
+```bash
+make run
+```
+
+`make run` builds `frontend/dist` and FastAPI serves it at <http://localhost:8000>. The Docker image uses the same single-service model with a Node build stage and a Python runtime stage.
+
+## Checks
+
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run type-check
+npm --prefix frontend run test
+npm --prefix frontend run build
+```
+
+The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coordinates, review payloads, navigation, machine state, and review actions.
 
 ## Runtime Flow
 
-1. The operator selects a local video. The browser keeps the video local and displays a preview.
-2. Four clicks on the overlay Canvas create a normalized polygon. With fewer than four points, Play is preview-only and no inference connection is opened.
-3. Play with exactly four points opens `/api/v1/ws/inference` and sends the zone configuration.
-4. While playing, the browser samples at most one frame every 0.5 seconds, encodes it as JPEG, and sends it as WebSocket binary data.
-5. The backend returns person bounding boxes, foot points, and `inside_zone` results. The frontend draws them in the original video coordinate space.
-6. Playback continues for no detections, people outside the zone, or zone entry while the machine is stopped. It pauses at the analyzed `video_time` only when at least one returned foot point is inside the polygon while the machine is running.
-7. The candidate remains in browser memory as `pendingViolation` until the Safety Officer confirms a violation or marks it as a false alarm.
-8. An actual violation is persisted with its snapshot and the review panel is reset. The monitor remains visible; the operator opens “Nhật ký vi phạm” manually to see `acknowledged` events.
+1. Select a local video; it remains in the browser.
+2. Select exactly four normalized zone points. Points can be dragged, deleted, or reset while paused.
+3. Play with four points to open `/api/v1/ws/inference` and send configuration.
+4. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
+5. Draw returned person boxes and foot points in source-video coordinates.
+6. Pause only when `review_required=true`, which means a foot point is inside the zone while the machine is running.
+7. Keep the candidate in memory until the Safety Officer confirms it or marks it as a false alarm.
+8. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.
 
-Only one frame may be in flight. If inference is slower than the 0.5-second sampling interval, intermediate video frames are skipped rather than queued. This keeps results recent and prevents stale-frame backlog.
-
-```mermaid
-flowchart TD
-    UPLOAD[Select local video] --> ZONE[Draw four normalized zone points]
-    ZONE --> READY{Exactly four points?}
-    READY -->|No| PREVIEW[Preview playback only]
-    READY -->|Yes + Play| CONNECT[Open inference WebSocket]
-    CONNECT --> CONFIG[Send configure message]
-    CONFIG --> SAMPLE[Capture latest frame every 0.5 seconds]
-    SAMPLE --> SEND[Send frame_meta then binary JPEG]
-    SEND --> WAIT[Wait for correlated result]
-    WAIT --> DETECT{Machine running and foot point inside?}
-    DETECT -->|No| SAMPLE
-    DETECT -->|Yes| PAUSE[Pause at analyzed video_time]
-    PAUSE --> REVIEW{Safety Officer review}
-    REVIEW -->|Actual violation| SAVE[POST acknowledged event]
-    REVIEW -->|False alarm| FEEDBACK[POST false-alarm feedback]
-    SAVE --> MONITOR[Close review and remain on monitor]
-    MONITOR -->|Operator clicks log| LOG[Load confirmed violation log]
-    FEEDBACK --> RESUME
-```
-
-## WebSocket Protocol
-
-The connection uses text JSON for control/result messages and binary JPEG for image frames.
-
-### 1. Configure the connection
-
-```json
-{
-  "type": "configure",
-  "zone_points": [
-    {"x": 0.12, "y": 0.20},
-    {"x": 0.84, "y": 0.20},
-    {"x": 0.88, "y": 0.92},
-    {"x": 0.10, "y": 0.92}
-  ],
-  "machine_state": "running"
-}
-```
-
-Coordinates are normalized from `0` to `1`, so the zone is independent of displayed video size. The backend acknowledges valid configuration with:
-
-```json
-{"type": "configured"}
-```
-
-### 2. Send one sampled frame
-
-Send metadata first:
-
-```json
-{
-  "type": "frame_meta",
-  "frame_id": 42,
-  "video_time": 12.5
-}
-```
-
-Immediately send the corresponding JPEG as the next binary WebSocket message. The client does not send another frame until it receives a result or error.
-
-### 3. Receive detections
-
-```json
-{
-  "type": "inference_result",
-  "frame_id": 42,
-  "video_time": 12.5,
-  "result": "normal",
-  "review_required": true,
-  "people": [
-    {
-      "bbox": [320, 110, 470, 610],
-      "confidence": 0.91,
-      "foot_point": [395, 610],
-      "inside_zone": true,
-      "safety_shirt": true
-    }
-  ],
-  "snapshot_data": "data:image/jpeg;base64,...",
-  "rule": {
-    "person_inside_zone": true,
-    "machine_state": "running",
-    "safety_shirt_required": true
-  }
-}
-```
-
-`bbox` and `foot_point` use original video pixels. Boxes and foot markers are green outside the zone and red inside it. `frame_id` rejects stale results; `video_time` lets the UI pause on the analyzed frame instead of the later playback position.
-
-Errors are JSON messages with `type`, `code`, and `message`. A connection or protocol failure pauses monitored playback; pressing Play starts a new connection.
-
-## Safety Officer Review and Save
-
-The candidate detection is not written to the database before review. On confirmation, the frontend calls `POST /api/v1/events` with the inference result, snapshot, video timestamp, people, and zone points. The current baseline sends:
-
-- `status: "acknowledged"` for an actual violation;
-- `status: "false_alarm"` for a rejected detection.
-
-The backend returns `201 Created` and the generated event ID. Event review currently identifies the officer as the baseline string `Safety Officer`; production should derive this identity from authentication.
-
-After an acknowledged save, the review state closes while the monitor stays visible. When the operator clicks “Nhật ký vi phạm”, `event-log-controller.js` requests `GET /api/v1/events?status=acknowledged&limit=50` and resolves each relative `snapshot_path` against the connected backend origin. False alarms remain excluded from this official warning view.
-
-## Key Files
-
-- `index.html`: monitor and review markup.
-- `app.js`: small composition root that wires controllers and callbacks.
-- `modules/`: native ES modules for video, zones, inference, rendering, review, state, and UI.
-- `styles.css`: Sentinel visual system.
-- `baseline.css`: functional video, Canvas, point-editing, and review states.
-- `event-log.css`: confirmed-event history and snapshot card layout.
-
-## Baseline Module Structure
-
-The baseline keeps the same UI, API contracts, and build-free Vanilla JavaScript runtime while splitting responsibilities into native ES modules:
+## Source Boundaries
 
 ```text
 frontend/
 ├── index.html
+├── package.json
+├── vite.config.ts
 ├── styles.css
 ├── baseline.css
-├── app.js                    # Composition and event wiring only
-└── modules/
-    ├── README.md
-    ├── config.js
-    ├── dom.js
-    ├── state.js
-    ├── video-controller.js
-    ├── video-preview.js
-    ├── zone-controller.js
-    ├── inference-client.js
-    ├── frame-sampler.js
-    ├── overlay-renderer.js
-    ├── review-controller.js
-    ├── event-log-controller.js
-    └── ui.js
+├── event-log.css
+└── src/
+    ├── api/          # REST and WebSocket transport only
+    ├── components/   # Shared application shell
+    ├── features/
+    │   ├── monitor/  # Video, zone, Canvas and inference orchestration
+    │   ├── alerts/   # Rule result and Human-in-the-Loop review UI
+    │   ├── events/   # Acknowledged violation history
+    │   └── dashboard/# Reserved MVP dashboard boundary
+    ├── styles/       # React CSS entrypoint
+    └── types/        # Typed backend contracts
 ```
 
-`index.html` loads `app.js` with `type="module"`. Implementation files stay near 150 lines or below, with `app.js` serving as the 29-line composition root. The refactor preserves the WebSocket and REST messages exactly.
+Transport code does not render UI. Canvas utilities do not call the network. Feature state crosses boundaries only through typed props and callbacks.

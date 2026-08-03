@@ -27,7 +27,7 @@ Sản phẩm giám sát an toàn tự động bằng Computer Vision:
 |-------|-----------|
 | Computer Vision | Python, Ultralytics YOLO, OpenCV |
 | Backend | FastAPI + SQLAlchemy |
-| Frontend | HTML, CSS, JavaScript (served by FastAPI) |
+| Frontend | React 19, TypeScript, Vite (production build served by FastAPI) |
 | Database | SQLite for the local baseline; PostgreSQL for production |
 | DevOps | Docker Compose |
 
@@ -45,6 +45,7 @@ cd P-047
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+npm --prefix frontend ci
 
 # Local baseline configuration uses data/safety_events.db
 cp .env.example .env
@@ -117,8 +118,11 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 # One focused backend test
 PYTHONPATH=. .venv/bin/pytest backend/tests/test_analysis.py::test_zone_entry_does_not_request_review_when_machine_is_stopped -v
 
-# Frontend JavaScript syntax
-for file in frontend/app.js frontend/modules/*.js; do node --check "$file"; done
+# Frontend checks
+npm --prefix frontend run lint
+npm --prefix frontend run type-check
+npm --prefix frontend run test
+npm --prefix frontend run build
 ```
 
 Tests use an isolated in-memory SQLite database. They do not write events into the local development database.
@@ -141,7 +145,7 @@ Chi tiết về cấu trúc thư mục dự án (bao gồm cấu trúc hiện t�
 ### Tóm tắt nhanh:
 - **`backend/`**: Modular Monolith FastAPI Backend (REST API, WebSocket, AI Safety Agent LLM, SQLAlchemy/PostgreSQL, Pytest).
 - **`vision/`**: Computer Vision Pipeline (YOLO detection, ByteTrack tracking, Polygon zone rule check, Privacy face blurring).
-- **`frontend/`**: Vanilla HTML/CSS/JavaScript baseline UI cho cán bộ an toàn.
+- **`frontend/`**: React + TypeScript + Vite SPA cho cán bộ an toàn; FastAPI phục vụ production build.
 - **`docs/`**: Tài liệu kiến trúc, PRD, cấu trúc dự án và hướng dẫn.
 - **`data/`**: Video stream mẫu và dữ liệu kiểm thử.
 

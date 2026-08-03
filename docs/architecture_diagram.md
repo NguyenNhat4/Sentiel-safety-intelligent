@@ -99,7 +99,7 @@ flowchart TB
     BROWSER["Browser"]
 
     subgraph DOCKER["Docker Compose"]
-        FRONTEND["Static Frontend<br/>HTML + CSS + JavaScript"]
+        FRONTEND["React SPA build<br/>FastAPI static serving"]
         BACKEND["Backend Container<br/>FastAPI"]
         DB[("PostgreSQL Container")]
     end

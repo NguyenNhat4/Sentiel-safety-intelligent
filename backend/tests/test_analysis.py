@@ -1,4 +1,5 @@
 import base64
+import re
 
 import cv2
 import numpy as np
@@ -52,9 +53,11 @@ def test_frontend_is_served(client):
     assert response.status_code == 200
     assert "Sentinel" in response.text
 
-    stylesheet = client.get("/styles.css")
-    assert stylesheet.status_code == 200
-    assert ".sidebar" in stylesheet.text
+    asset_path = re.search(r'(?:src|href)="(/assets/[^"]+\.js)"', response.text)
+    assert asset_path is not None
+    script = client.get(asset_path.group(1))
+    assert script.status_code == 200
+    assert "Sentinel" in script.text
 
 
 def test_start_analysis(client):
