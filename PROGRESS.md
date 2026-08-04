@@ -42,7 +42,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added a PRD-aligned user story backlog separating completed, partial, and remaining MVP work with acceptance criteria.
 - [x] Created detailed spec files for completed user stories (US-01 to US-06) covering what, why, how, diagrams, and API contracts.
 - [x] Created `specs/backlog/` with synchronized story files for incomplete and partially completed stories from US-07 to US-26.
-- [x] Extended the product story list and synchronized backlog with operational readiness (US-27) and full-product UAT/traceability evidence (US-28).
+- [x] Realigned US-07–US-26 with the problem statement: expanded PPE to helmet/glasses/gloves, moved authentication and image analysis into MVP, corrected deployment dependencies, and synchronized the five-week plan and backlog specs.
 - [x] Separated MVP closure in the current week from the subsequent five-week advanced delivery plan, with acceptance criteria, implementation tasks, dependencies, milestones, and release gates.
 - [x] Integrated `uv` environment management with `make setup` (`uv sync` + `npm ci` + `.env`), created technical setup guide `docs/guide/setup/uv-setup.md`, and updated root `README.md` onboarding.
 
