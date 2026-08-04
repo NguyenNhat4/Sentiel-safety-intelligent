@@ -67,7 +67,7 @@ P-047/
 │   ├── README.md
 │   ├── ppe_yolov8n.pt
 │   └── yolo11n.pt
-├── docs/                # Architecture, technical guides and documentation index
+├── docs/                # Architecture, technical guides (uv setup guide: docs/guide/setup/uv-setup.md) and documentation index
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md

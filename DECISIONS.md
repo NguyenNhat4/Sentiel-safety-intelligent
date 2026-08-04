@@ -70,3 +70,8 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Choice:** Move `.pt` weights into a dedicated `models/` folder, documented with `models/README.md`.
 - **Backend update:** Update `backend/app/core/config.py` default model paths to `models/yolo11n.pt` and `models/ppe_yolov8n.pt`, with fallback checks in `FrameInferenceService`.
 
+## 2026-08-04: [Cross-cutting] Unified developer onboarding via `make setup` and `uv`
+- **Reason:** New team members need a fast, single-command setup for Python virtual environments, package management, and frontend dependencies.
+- **Choice:** Added `make setup` target combining `uv sync`, `npm --prefix frontend ci`, and `.env` initialization. Created technical guide `docs/guide/setup/uv-setup.md` and updated developer onboarding docs.
+
+

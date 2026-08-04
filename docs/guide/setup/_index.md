@@ -9,3 +9,4 @@ Phần này hướng dẫn bạn khởi tạo dự án AI Agent từ template AI
 ## Trang trong mục này
 
 - [Quick Start](quick-start.md) — Hướng dẫn 4 bước clone, setup env, verify và git setup
+- [Working with uv](uv-setup.md) — Hướng dẫn quản lý virtual environment và dependencies bằng `uv` (`make setup`)

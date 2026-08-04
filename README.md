@@ -33,6 +33,8 @@ Sản phẩm giám sát an toàn tự động bằng Computer Vision:
 
 ## New Developer Onboarding
 
+> 📖 **Chi tiết hướng dẫn `uv`**: Xem [docs/guide/setup/uv-setup.md](docs/guide/setup/uv-setup.md) để biết cách quản lý môi trường và gói Python.
+
 Use Python 3.11–3.13 for local development. Python 3.14 currently causes the shared FastAPI `TestClient` suite to stall after collection.
 
 ### 1. Install the project
@@ -41,14 +43,8 @@ Use Python 3.11–3.13 for local development. Python 3.14 currently causes the s
 git clone https://github.com/AI20K-Build-Cohort-2/P-047.git
 cd P-047
 
-# Create the environment with a supported Python version, for example Python 3.12
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-npm --prefix frontend ci
-
-# Local baseline configuration uses data/safety_events.db
-cp .env.example .env
+# Setup Python environment (uv sync), frontend dependencies (npm ci), and .env in one step:
+make setup
 ```
 
 YOLO downloads/loads its configured model when inference is first used, so the first analyzed frame can be slower than later frames.

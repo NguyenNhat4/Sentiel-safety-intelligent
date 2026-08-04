@@ -68,6 +68,7 @@ class FrameInferenceService:
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
         if self._person_model is None:
             from pathlib import Path
+
             from ultralytics import YOLO
 
             model_path = Path(self._person_model_path)
