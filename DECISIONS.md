@@ -74,4 +74,38 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** New team members need a fast, single-command setup for Python virtual environments, package management, and frontend dependencies.
 - **Choice:** Added `make setup` target combining `uv sync`, `npm --prefix frontend ci`, and `.env` initialization. Created technical guide `docs/guide/setup/uv-setup.md` and updated developer onboarding docs.
 
+## 2026-08-06: [Cross-cutting] Capability-owned target repository structure
+- **Reason:** The original future layout grouped backend code mainly by technical layer, which would blur ownership as authentication, rule authoring, event lifecycle, organization, escalation, analytics, and reporting grow.
+- **Choice:** Keep a modular monolith, split backend business code into capability-owned modules, keep `vision/` framework- and persistence-independent behind one facade, and make contracts, CODEOWNERS, module READMEs, mirrored tests, and dependency checks explicit architectural boundaries.
+- **Constraint:** A new top-level directory or module-boundary change requires a root decision entry. Cross-module work uses public services/contracts rather than importing another module's repository or model. Generated contracts are not edited manually.
+- **Migration:** Adopt the structure incrementally per user story; preserve current REST/WebSocket behavior until a versioned migration is documented and tested.
 
+## 2026-08-06: [Cross-cutting] Shared API and database design contracts
+- **Reason:** Frontend, backend, vision, QA, analytics, and operations need one reviewable vocabulary for resources, lifecycle, ownership, privacy, and compatibility across MVP closure and the five-week advanced plan.
+- **Choice:** Use task-routed chapters under `docs/API_CONTRACT/` as the human-readable REST/WebSocket design contract and capability-routed chapters under `docs/DATABASE_SCHEMA/` as the logical data/ERD contract. Each directory has a `README.md` reading map; current versus planned routes remain explicit.
+- **Source-of-truth constraint:** Runtime REST truth remains module-owned Pydantic/FastAPI definitions; WebSocket and backend–vision truth remains versioned JSON Schema under `contracts/`; Alembic migrations remain database history. Generated artifacts are never edited manually.
+- **Privacy constraint:** Raw video/images are not persisted; snapshot records require verified redaction and immutable event/audit context.
+- **Governance:** Everything under `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` is read-only for agents and contributors. A conflict requires stopping the implementation and requesting an explicit contract decision; the contract must not be edited as part of ordinary feature work.
+
+## 2026-08-06: [Cross-cutting] One compact target-structure guide
+- **Reason:** The 327-line baseline plus a 253-line interpretation guide duplicated context and made human/AI routing harder than the current MVP needs.
+- **Choice:** Keep `docs/FUTURE_PROJECT_STRUCTURE.md` under 150 lines as the single source for the minimal target tree, ownership, dependency rules, module template, migration path, and pre-change checklist; remove the separate guide.
+- **Current-code alignment:** Treat `backend/`, `frontend/`, and `vision/` as production owners. Treat the existing `src/` LangGraph scaffold as legacy and migrate or remove it incrementally rather than adding new production code there.
+- **Constraint:** Create capability folders only when a story has real behavior; new top-level directories or changed boundaries still require an explicit root decision.
+
+## 2026-08-06: [Cross-cutting] Executable definitions replace separate contract docs
+- **Supersedes:** The documentation/governance parts of “Shared API and database design contracts”; that entry remains as history.
+- **Reason:** The separate `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` trees were removed to reduce duplicated and stale context.
+- **Choice:** FastAPI routes, Pydantic schemas, frontend wire types, SQLAlchemy models, Alembic migrations, and their tests are the current contract sources of truth. `backend/README.md` explains the non-OpenAPI WebSocket flow.
+- **Constraint:** Breaking changes still require explicit authorization, a root decision entry, and focused compatibility tests or a migration path.
+
+## 2026-08-06: [Cross-cutting] One canonical architecture document
+- **Reason:** Root `ARCHITECTURE.md` and `docs/architecture_diagram.md` duplicated diagrams, mixed implemented and planned behavior, and drifted from the approved capability ownership.
+- **Choice:** Keep the single root `ARCHITECTURE.md` required by the target structure; merge into it only the useful system and runtime views, explicitly separate current state from target state, and remove the duplicate diagram file.
+- **Constraints:** The modular-monolith ownership and dependency direction in `docs/FUTURE_PROJECT_STRUCTURE.md` remain authoritative. Executable definitions remain runtime contract truth; architecture prose cannot silently change them.
+- **Safety consequences:** Vision emits observations, deterministic backend rules own severity/event lifecycle, LLM output is advisory, and unredacted evidence must never be persisted.
+
+## 2026-08-06: [Cross-cutting] Root README is the only documentation index
+- **Reason:** Layered catalogs and cross-document links create competing navigation paths and make documentation depend on file placement outside its own scope.
+- **Choice:** Only the root repository README indexes documentation. All other documents are standalone and do not link to one another; the agent workflow file is the sole exception because it must load mandatory context.
+- **Constraint:** Moving or adding documentation requires updating the root index. The approved read-only structure baseline is not rewritten solely to remove its existing historical links.
