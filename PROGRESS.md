@@ -17,6 +17,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added binary WebSocket inference with configuration, correlation metadata, one-frame processing, validation, and structured errors.
 - [x] Documented frontend/backend interaction and the recommended confirmed-warning persistence lifecycle.
 
+### Vision
+- [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
+
 ### Frontend
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.

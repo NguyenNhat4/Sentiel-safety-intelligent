@@ -64,3 +64,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Choice:** Keep MVP closure and regression in US-01 to US-13 plus US-16 to US-19; plan advanced HITL/escalation and US-20 to US-26 across the subsequent five weeks.
 - **Constraint:** Camera factory integration, PLC control, automatic machine stop, and concurrent multi-stream scale require a separate scope decision.
 - **Documentation:** Every incomplete story has a canonical `specs/backlog/US-XX.md` whose story content must remain identical to the corresponding section in `specs/USER_STORIES_LIST.md`.
+
+## 2026-08-04: [Vision] Dedicated `models/` directory for ML model weights
+- **Reason:** Model files (`.pt`) located at the repository root cluttered the project root directory.
+- **Choice:** Move `.pt` weights into a dedicated `models/` folder, documented with `models/README.md`.
+- **Backend update:** Update `backend/app/core/config.py` default model paths to `models/yolo11n.pt` and `models/ppe_yolov8n.pt`, with fallback checks in `FrameInferenceService`.
+

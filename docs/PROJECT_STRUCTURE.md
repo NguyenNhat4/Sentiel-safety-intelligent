@@ -63,6 +63,10 @@ P-047/
 │   └── vite.config.ts
 ├── data/                # Sample video streams, test data and reviewed snapshots
 │   └── snapshots/
+├── models/              # Machine learning model weights (YOLO & PPE weights)
+│   ├── README.md
+│   ├── ppe_yolov8n.pt
+│   └── yolo11n.pt
 ├── docs/                # Architecture, technical guides and documentation index
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
