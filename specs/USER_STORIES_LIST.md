@@ -1,7 +1,6 @@
 # User Story Backlog & Kế hoạch giao toàn bộ dự án
 
-Tài liệu này chuyển phạm vi MVP trong [`PRD.md`](PRD.md) và yêu cầu đầu ra trong
-[`project-problem-statement.md`](../docs/project-problem-statement.md) thành hai giai đoạn delivery:
+Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toán thành hai giai đoạn delivery:
 
 1. **Tuần hiện tại:** đóng và nghiệm thu MVP theo PRD.
 2. **5 tuần tiếp theo:** hoàn thành yêu cầu nâng cao và các khoảng trống cần thiết để giao toàn bộ project problem statement.
@@ -56,20 +55,25 @@ Tài liệu này chuyển phạm vi MVP trong [`PRD.md`](PRD.md) và yêu cầu 
 
 Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
-### US-07 — Phát hiện áo phản quang bằng model PPE
+### US-07 — Phát hiện thiếu PPE bắt buộc bằng model
 
-> Với vai trò cán bộ an toàn, tôi muốn hệ thống nhận biết người có mặc áo phản quang hay không, để phát hiện vi phạm PPE đáng tin cậy.
+> Với vai trò cán bộ an toàn, tôi muốn hệ thống nhận biết từng người có thiếu mũ, kính hoặc găng bảo hộ hay không, để phát hiện đúng các vi phạm PPE trong problem statement.
 
 - Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
 - Phụ thuộc: US-03
 - Acceptance criteria:
-  - Model PPE đã huấn luyện được nạp từ cấu hình; heuristic màu không còn là kết quả chính.
-  - Kết quả có/không có áo và confidence được trả về mà không phá vỡ inference contract.
-  - Confidence threshold có thể cấu hình; có test mapping class, threshold, không phát hiện PPE và nhiều người.
+  - Model PPE đã huấn luyện được nạp từ cấu hình và nhận biết tối thiểu ba nhóm bắt buộc: mũ, kính và găng bảo hộ; heuristic màu/áo phản quang không còn là kết quả PPE chính.
+  - Kết quả PPE được gắn đúng theo từng person/track, nêu rõ hạng mục có/thiếu và confidence mà không phá vỡ inference contract.
+  - Giao diện có công tắc ON/OFF riêng cho yêu cầu mũ, kính và găng cùng nút **Lưu cấu hình**; trước lần lưu đầu tiên, cả ba yêu cầu mặc định OFF.
+  - Cấu hình được lưu bền vững tại backend theo cặp camera–khu vực, tự khôi phục sau khi tải lại hoặc khởi động lại hệ thống và dùng chung giữa người dùng, trình duyệt và thiết bị. Trong MVP chỉ hỗ trợ một cặp camera–khu vực cố định.
+  - Model vẫn phát hiện và trả kết quả cho cả ba nhóm PPE bất kể trạng thái công tắc. Hệ thống chỉ tạo cảnh báo thiếu một loại PPE khi yêu cầu tương ứng đang ON; trạng thái OFF không tạo cảnh báo cho loại đó.
+  - Confidence threshold có thể cấu hình; có test class mapping, threshold, thiếu một/nhiều PPE, không phát hiện PPE, nhiều người, giá trị mặc định, lưu/khôi phục cấu hình và luật cảnh báo ON/OFF.
 - Task:
-  1. Chốt weights, class mapping, giấy phép model và bộ dữ liệu demo có ground truth.
+  1. Chốt weights, class mapping cho mũ/kính/găng, giấy phép model và bộ dữ liệu demo có ground truth theo từng người.
   2. Tạo adapter PPE model và cấu hình weights/device/threshold.
-  3. Tích hợp kết quả theo person/track vào REST và WebSocket; chạy integration test và benchmark.
+  3. Tạo persistence và API đọc/lưu cấu hình yêu cầu PPE cho cặp camera–khu vực cố định, với giá trị mặc định OFF.
+  4. Thêm ba công tắc và nút **Lưu cấu hình** trên giao diện; tải cấu hình dùng chung từ backend khi khởi tạo.
+  5. Tích hợp kết quả PPE theo person/track vào REST và WebSocket, áp dụng cấu hình vào luật cảnh báo; chạy integration test và benchmark cho từng nhóm PPE.
 
 ### US-08 — Theo dõi người và chống tạo event trùng
 
@@ -161,6 +165,22 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
   2. Instrument timestamp/correlation ID xuyên frontend–backend–vision.
   3. Chạy baseline/final, đối chiếu review data và xuất báo cáo.
 
+### US-24 — Phân tích ảnh mô phỏng
+
+> Với vai trò cán bộ an toàn, tôi muốn tải một ảnh mô phỏng để phân tích theo cùng rule PPE và vùng nguy hiểm, để kiểm tra nhanh tình huống không cần phát video.
+
+- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Phụ thuộc: US-07, US-11, US-12
+- Acceptance criteria:
+  - Chấp nhận định dạng ảnh/giới hạn dung lượng được cấu hình và từ chối input không hợp lệ.
+  - Kết quả dùng cùng detection/rule contract với video và hiển thị bounding box, PPE có/thiếu, confidence và severity.
+  - Chỉ lưu event khi người dùng xác nhận; snapshot lưu trữ phải được làm mờ.
+  - Có test ảnh không người, một/nhiều người, thiếu mũ/kính/găng, zone violation và file lỗi.
+- Task:
+  1. Tái sử dụng frame inference pipeline cho image endpoint.
+  2. Xây upload/result/review UI và contract validation.
+  3. Kiểm thử privacy, event lifecycle và parity với video.
+
 ### US-16 — Lưu memory và audit của phiên giám sát
 
 > Với vai trò cán bộ an toàn, tôi muốn hệ thống ghi nhớ rule, cảnh báo và quyết định review trong phiên, để truy vết vì sao một sự kiện được tạo.
@@ -171,10 +191,11 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
   - Mỗi event liên kết rule version, machine state, zone, confidence, severity và quyết định HITL tại thời điểm tạo.
   - Reload trang vẫn truy xuất được audit data; không lưu raw video liên tục.
   - Chỉ snapshot vi phạm/review được lưu; event detail giải thích được quyết định.
+  - Có thể sinh bản tóm tắt sự việc bằng ngôn ngữ tự nhiên từ decision context đã lưu; nội dung sinh phải bám dữ liệu nguồn, có fallback deterministic và không thay thế audit data có cấu trúc.
 - Task:
   1. Chốt audit schema và retention mặc định.
   2. Lưu immutable decision context cùng event.
-  3. Hoàn thiện event-detail API/UI và test truy xuất.
+  3. Hoàn thiện event-detail API/UI, bản tóm tắt sự việc tùy chọn và test truy xuất/fallback.
 
 ### US-17 — Bảo mật dữ liệu MVP
 
@@ -191,12 +212,28 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
   2. Harden validation, file access, CORS, headers và logging.
   3. Chạy dependency/static scan và xử lý phát hiện high/critical.
 
+### US-20 — Đăng nhập và phân quyền hai vai trò
+
+> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò cán bộ an toàn hoặc quản lý khu vực, để chỉ truy cập đúng chức năng và dữ liệu được phép.
+
+- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Phụ thuộc: US-17
+- Acceptance criteria:
+  - Có login/logout, password hashing, session/token expiry và tài khoản seed an toàn cho môi trường demo.
+  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực được xem dashboard/báo cáo theo phạm vi.
+  - Backend thực thi authorization cho API và WebSocket; ẩn nút trên UI không được xem là đủ bảo mật.
+  - Audit event lưu actor; có test matrix cho allowed, forbidden và unauthenticated.
+- Task:
+  1. Chốt permission matrix và authentication flow.
+  2. Tạo user/role schema, migration, auth API/middleware và WebSocket authorization.
+  3. Xây login/session UI, route guard, audit actor và security tests.
+
 ### US-18 — Triển khai bản web MVP có thể tái lập
 
 > Với vai trò người đánh giá sản phẩm, tôi muốn mở một bản web MVP ổn định, để chạy trọn luồng PRD mà không phải cấu hình thủ công từng dịch vụ.
 
 - Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
-- Phụ thuộc: US-07 đến US-17
+- Phụ thuộc: US-07 đến US-13, US-16, US-17, US-20, US-24
 - Acceptance criteria:
   - Docker build tạo artifact chạy FastAPI, React production build, model config và database demo.
   - Có health check, startup validation, migration và hướng dẫn deploy/rollback/backup tối thiểu.
@@ -211,9 +248,9 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 > Với vai trò Product Owner, tôi muốn bộ kiểm thử và tài liệu bàn giao bao phủ core flow, để xác nhận MVP hoàn thành trong tuần hiện tại.
 
 - Ưu tiên / trạng thái: **P0 / Chưa làm đầy đủ**
-- Phụ thuộc: US-01 đến US-13, US-16 đến US-18
+- Phụ thuộc: US-01 đến US-13, US-16 đến US-18, US-20, US-24
 - Acceptance criteria:
-  - UAT bao phủ happy path, no-PPE, zone-entry khi máy ON/OFF, false alarm, dedup, privacy failure và reconnect.
+  - UAT bao phủ đăng nhập/phân quyền, video/ảnh, thiếu mũ/kính/găng, zone-entry khi máy ON/OFF, false alarm, dedup, privacy failure và reconnect.
   - `make check`, migration test, production build và deploy smoke test đạt trên cùng release commit.
   - PRD traceability matrix, metric evidence, known limitations, runbook demo và rollback được bàn giao.
   - Không còn defect P0; defect P1 phải có quyết định chấp thuận bằng văn bản.
@@ -224,11 +261,11 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 ### Cổng nghiệm thu MVP cuối tuần hiện tại
 
-- Core flow chạy trọn vẹn: mô tả/confirm rule → vẽ vùng → phát video → person/PPE/track → áp trạng thái máy/vùng → HITL → snapshot blur → event/audit → dashboard.
+- Core flow chạy trọn vẹn sau đăng nhập đúng vai trò: tải video hoặc ảnh → mô tả/confirm rule → vẽ vùng → person + mũ/kính/găng + track → áp trạng thái máy/vùng → HITL → snapshot blur → event/audit → dashboard.
 - Một vi phạm liên tục chỉ tạo một event; false alarm được lưu để đo; không lưu snapshot chưa làm mờ.
 - Precision, recall, false-alarm rate và latency có báo cáo tái lập.
 - `make check`, production build, migration, deploy smoke test và UAT đạt trên cùng release commit.
-- US-19 được Product Owner nghiệm thu; đây là điểm bắt đầu kế hoạch nâng cao 5 tuần.
+- US-20 và US-24 đạt acceptance criteria trong MVP; US-19 được Product Owner nghiệm thu và là điểm bắt đầu kế hoạch nâng cao 5 tuần.
 
 ## 4. User story nâng cao trong 5 tuần tiếp theo
 
@@ -243,10 +280,11 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
   - Critical alert được ưu tiên trên UI và gửi qua ít nhất một kênh ngoài hệ thống đến người phụ trách khu vực.
   - Escalation có delivery status, retry có giới hạn, acknowledge và audit; không gửi trùng cho cùng event.
   - Khi kênh ngoài lỗi, cảnh báo trong ứng dụng vẫn hoạt động và hiển thị lỗi cho người vận hành.
+  - Cảnh báo có thể kèm diễn giải sự việc ngắn bằng ngôn ngữ tự nhiên từ event context; diễn giải là enhancement, có fallback deterministic và không quyết định severity/routing.
 - Task:
   1. Định nghĩa severity matrix, routing theo khu vực và escalation state machine.
   2. Xây notification adapter, retry/idempotency và cấu hình người nhận.
-  3. Tích hợp UI/queue, delivery audit và test success/failure/duplicate.
+  3. Tích hợp UI/queue, delivery audit, diễn giải tùy chọn và test success/failure/duplicate/fallback.
 
 ### US-15 — Chuyển trường hợp mơ hồ cho con người
 
@@ -262,22 +300,6 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
   1. Chốt threshold policy từ kết quả US-13.
   2. Tích hợp triage vào rule engine và event lifecycle.
   3. Cập nhật review UI, audit và boundary test.
-
-### US-20 — Đăng nhập và phân quyền hai vai trò
-
-> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò cán bộ an toàn hoặc quản lý khu vực, để chỉ truy cập đúng chức năng và dữ liệu được phép.
-
-- Ưu tiên / trạng thái: **P0 nâng cao / Chưa làm**
-- Phụ thuộc: US-17
-- Acceptance criteria:
-  - Có login/logout, password hashing, session/token expiry và tài khoản seed an toàn cho môi trường demo.
-  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực được xem dashboard/báo cáo theo phạm vi.
-  - Backend thực thi authorization cho API và WebSocket; ẩn nút trên UI không được xem là đủ bảo mật.
-  - Audit event lưu actor; có test matrix cho allowed, forbidden và unauthenticated.
-- Task:
-  1. Chốt permission matrix và authentication flow.
-  2. Tạo user/role schema, migration, auth API/middleware và WebSocket authorization.
-  3. Xây login/session UI, route guard, audit actor và security tests.
 
 ### US-21 — Quản lý khu vực và ca làm việc
 
@@ -320,28 +342,13 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 - Acceptance criteria:
   - Cho phép cấu hình lịch ngày/tuần, timezone, phạm vi khu vực/ca và danh sách người nhận.
   - Báo cáo chứa KPI, xu hướng, sự cố critical, false alarm và link về dashboard; không đính kèm ảnh chưa làm mờ.
+  - Có thể sinh phần diễn giải xu hướng và sự cố bằng ngôn ngữ tự nhiên từ KPI/event đã tổng hợp; nội dung phải truy vết được về dữ liệu nguồn, có fallback deterministic và không tự suy đoán metric.
   - Job chạy idempotent, có retry, delivery status và lịch sử tải lại.
   - Template có HTML/PDF hoặc CSV theo lựa chọn đã chốt; test scheduler không phụ thuộc thời gian thực.
 - Task:
   1. Chốt report template, schedule schema và retention.
-  2. Xây aggregation snapshot, scheduler/worker và renderer.
+  2. Xây aggregation snapshot, scheduler/worker, renderer và phần diễn giải tùy chọn.
   3. Tích hợp delivery adapter, lịch sử báo cáo, UI cấu hình và test timezone/retry.
-
-### US-24 — Phân tích ảnh mô phỏng
-
-> Với vai trò cán bộ an toàn, tôi muốn tải một ảnh mô phỏng để phân tích theo cùng rule PPE và vùng nguy hiểm, để kiểm tra nhanh tình huống không cần phát video.
-
-- Ưu tiên / trạng thái: **P1 hoàn thiện đầu ra / Chưa làm**
-- Phụ thuộc: US-07, US-11, US-12
-- Acceptance criteria:
-  - Chấp nhận định dạng ảnh/giới hạn dung lượng được cấu hình và từ chối input không hợp lệ.
-  - Kết quả dùng cùng detection/rule contract với video và hiển thị bounding box, confidence, severity.
-  - Chỉ lưu event khi người dùng xác nhận; snapshot lưu trữ phải được làm mờ.
-  - Có test ảnh không người, một/nhiều người, no-PPE, zone violation và file lỗi.
-- Task:
-  1. Tái sử dụng frame inference pipeline cho image endpoint.
-  2. Xây upload/result/review UI và contract validation.
-  3. Kiểm thử privacy, event lifecycle và parity với video.
 
 ### US-25 — Triển khai cloud và khả năng vận hành
 
@@ -379,55 +386,20 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 | Tuần | Mục tiêu | Story / task chính | Exit criteria |
 |---|---|---|---|
-| **Tuần 1 — Identity và context vận hành** | Có hai vai trò và dữ liệu khu vực/ca làm nền | US-20, US-21; thiết kế routing US-14 | Login/RBAC đạt test matrix; event mới gắn đúng zone/shift/actor; người phụ trách escalation cấu hình được |
-| **Tuần 2 — HITL và đầu vào đầy đủ** | Xử lý detection mơ hồ và ảnh mô phỏng | US-15, US-24; baseline notification adapter US-14 | Threshold triage đạt boundary test; ảnh/video dùng cùng rule/privacy/event lifecycle; escalation gửi được trên môi trường test |
+| **Tuần 1 — Context vận hành** | Bổ sung dữ liệu khu vực/ca trên nền đăng nhập và RBAC đã đạt cổng MVP | US-21; thiết kế routing US-14 | Event mới gắn đúng zone/shift/actor; người phụ trách escalation cấu hình được; regression RBAC đạt |
+| **Tuần 2 — HITL theo confidence** | Xử lý detection mơ hồ và chuẩn bị escalation | US-15; baseline notification adapter US-14 | Threshold triage đạt boundary test; escalation gửi được trên môi trường test; video/ảnh tiếp tục đạt regression parity |
 | **Tuần 3 — Escalation tự động** | Critical incident đến đúng người và truy vết được | Hoàn tất US-14; chuẩn bị aggregation US-22 | Critical event gửi đúng người, retry/idempotent, acknowledge và audit đầy đủ; lỗi kênh ngoài không làm mất in-app alert |
 | **Tuần 4 — Phân tích quản trị và báo cáo** | Quản lý theo dõi tuân thủ theo khu vực/ca | US-22, US-23 | Dashboard đối soát đúng fixture; báo cáo định kỳ chạy đúng timezone, idempotent và không lộ ảnh chưa làm mờ |
 | **Tuần 5 — Cloud release và bàn giao** | Vận hành, đo, UAT và nghiệm thu toàn dự án | US-25, US-26; full regression và sửa defect | Cloud release đạt smoke/security/performance; backup/restore/rollback diễn tập; advanced UAT và traceability được ký nghiệm thu |
 
 ### Milestone
 
-- **A1 — Cuối tuần 1:** Identity, authorization và zone/shift context được khóa.
-- **A2 — Cuối tuần 2:** Confidence-based HITL và image analysis feature-complete.
+- **A1 — Cuối tuần 1:** Zone/shift context và routing owner được khóa trên nền authorization của MVP.
+- **A2 — Cuối tuần 2:** Confidence-based HITL và notification adapter baseline hoàn tất.
 - **A3 — Cuối tuần 3:** Auto-escalation production-ready trong phạm vi một notification provider.
 - **A4 — Cuối tuần 4:** Dashboard và periodic report feature-complete.
 - **A5 — Cuối tuần 5:** Cloud release, evidence, runbook và nghiệm thu toàn dự án hoàn tất.
 
-## 6. User story bổ sung cho vận hành và nghiệm thu toàn bộ sản phẩm
-
-Các story dưới đây được tách riêng khỏi feature backlog vì chúng là điều kiện để vận hành và nghiệm thu sản phẩm theo problem statement. Deployment, security và kiểm thử vẫn phải là Definition of Done của từng story, không được dồn toàn bộ trách nhiệm vào một story duy nhất.
-
-### US-27 — Health check, log, backup và rollback
-
-> Với vai trò người vận hành hệ thống, tôi muốn hệ thống có health check, log, backup và rollback, để có thể phục hồi khi xảy ra lỗi.
-
-- Ưu tiên / trạng thái: **P1 / Chưa làm**
-- Phụ thuộc: US-26
-- Acceptance criteria:
-  - Có health/readiness check, structured log và correlation ID để xác định lỗi theo request/session.
-  - Có backup/restore cho database và snapshot đã làm mờ, kèm retention được tài liệu hóa.
-  - Có quy trình rollback release và smoke test sau rollback; không ghi secret, ảnh thô hoặc danh tính chưa làm mờ vào log.
-- Task:
-  1. Chốt SLO, retention, chiến lược backup/restore và quy trình rollback.
-  2. Bổ sung health/readiness, structured logging, correlation ID và cảnh báo vận hành.
-  3. Diễn tập backup/restore/rollback và ghi evidence có thể chạy lại.
-
-### US-28 — UAT, traceability và evidence
-
-> Với vai trò Product Owner, tôi muốn có UAT, traceability và evidence, để nghiệm thu toàn bộ sản phẩm theo problem statement.
-
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
-- Phụ thuộc: US-01 đến US-27
-- Acceptance criteria:
-  - UAT bao phủ authentication/RBAC, cấu hình khu vực/ca, video/ảnh, PPE, vùng cấm, HITL, privacy, dashboard, escalation và báo cáo.
-  - Traceability matrix liên kết từng yêu cầu problem statement với user story, test và evidence tương ứng.
-  - Có metric quality/latency, security checklist, known limitations, runbook demo và rollback evidence.
-  - Không còn defect P0; defect P1 có owner, deadline và quyết định chấp thuận bằng văn bản.
-- Task:
-  1. Viết UAT script và traceability matrix cho toàn bộ 28 story.
-  2. Chạy regression, security/performance test, deploy smoke test và lưu evidence theo release commit.
-  3. Chốt release candidate, demo rehearsal, biên bản nghiệm thu và danh sách known limitations.
-
-## 7. Ngoài phạm vi cam kết 5 tuần
+## 6. Ngoài phạm vi cam kết 5 tuần
 
 Camera nhà máy thật, tích hợp PLC, tự động dừng máy và scale nhiều stream đồng thời cần discovery, đánh giá an toàn hiện trường và thay đổi scope riêng. Chúng không được ngầm đưa vào release 5 tuần.

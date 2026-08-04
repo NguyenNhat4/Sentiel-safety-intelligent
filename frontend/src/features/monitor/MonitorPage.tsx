@@ -1,4 +1,5 @@
 import {AlertPanel} from "../alerts/AlertPanel";
+import {PpeRequirementsPanel} from "../rules/PpeRequirementsPanel";
 import {useMonitor} from "./use-monitor";
 
 export function MonitorPage() {
@@ -29,6 +30,8 @@ export function MonitorPage() {
           {state.selectingZone ? "✓ Xong cấu hình" : "⌗ Cấu hình vùng"}
         </button>
       </div>
+
+      <PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />
 
       <div className="monitor-grid">
         <article className="video-card">

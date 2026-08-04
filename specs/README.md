@@ -1,12 +1,10 @@
-# Product Specifications
+# Product specifications
 
-Thư mục `specs/` là nguồn chính cho phạm vi sản phẩm và backlog MVP của P-047.
+Thư mục này sở hữu phạm vi sản phẩm, acceptance criteria và kế hoạch delivery của P-047.
 
-## Nội dung
+- Product requirements xác định core flow, tiêu chí thành công và giới hạn MVP.
+- User-story backlog xác định thứ tự, phụ thuộc, trạng thái và task triển khai.
+- Story specs giữ chi tiết hành vi và tiêu chí kiểm thử gần từng story.
+- Các story chưa hoàn thành phải đồng bộ nội dung chuẩn với backlog tổng.
 
-- [`PRD.md`](PRD.md): Bài toán, phạm vi prototype, core flow, tiêu chí thành công và giới hạn sản phẩm.
-- [`USER_STORIES_LIST.md`](USER_STORIES_LIST.md): Danh sách toàn bộ User Story và task triển khai; tách kế hoạch đóng MVP trong tuần hiện tại khỏi kế hoạch nâng cao 5 tuần theo problem statement.
-- `US-01.md` ... `US-06.md`: Các tài liệu chi tiết (spec) cho các User Story đã hoàn thành (bao gồm Diagram, API Contract, và làm rõ: "Cái gì", "Tại sao", "Như thế nào").
-- [`backlog/`](backlog/): Thư mục chứa spec đồng bộ nguyên văn cho các User Story chưa hoàn thành hoặc hoàn thành một phần từ US-07 đến US-28. `USER_STORIES_LIST.md` là backlog tổng.
-
-Đọc `PRD.md` trước khi triển khai tính năng mới. Cập nhật `USER_STORIES_LIST.md` và các spec tương ứng khi trạng thái hoặc acceptance criteria của một story thay đổi.
+Tài liệu trong thư mục phải tự đứng độc lập và không đóng vai trò chỉ mục cho nhau.

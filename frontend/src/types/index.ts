@@ -12,12 +12,26 @@ export interface PersonDetection {
   foot_point?: [number, number];
   inside_zone: boolean;
   safety_shirt: boolean;
+  ppe: {
+    helmet: PpeObservation;
+    safety_glasses: PpeObservation;
+    gloves: PpeObservation;
+  };
+  missing_required_ppe: Array<"helmet" | "safety_glasses" | "gloves">;
+}
+
+export interface PpeObservation {
+  status: "present" | "missing" | "unknown";
+  confidence: number | null;
 }
 
 export interface InferenceRule {
   person_inside_zone: boolean;
   machine_state: MachineState;
   safety_shirt_required: boolean;
+  camera_id: string;
+  zone_id: string;
+  ppe_alert: boolean;
 }
 
 export interface InferenceResult {
@@ -58,4 +72,17 @@ export interface EventPayload {
   snapshot_data?: string;
   privacy_blurred: boolean;
   details: Record<string, unknown>;
+}
+
+export interface PpeRequirementUpdate {
+  helmet_required: boolean;
+  safety_glasses_required: boolean;
+  gloves_required: boolean;
+}
+
+export interface PpeRequirement extends PpeRequirementUpdate {
+  camera_id: string;
+  zone_id: string;
+  is_configured: boolean;
+  updated_at: string | null;
 }
