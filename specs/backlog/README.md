@@ -13,3 +13,4 @@ Thư mục này chứa spec triển khai chi tiết cho các user story chưa ho
 
 - Đóng MVP trong tuần hiện tại: `US-07` đến `US-13` và `US-16` đến `US-19`.
 - Nâng cao trong 5 tuần sau MVP: `US-14`, `US-15` và `US-20` đến `US-26`.
+- Vận hành và nghiệm thu toàn bộ sản phẩm: `US-27` và `US-28`.

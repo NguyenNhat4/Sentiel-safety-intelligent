@@ -393,6 +393,41 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 - **A4 — Cuối tuần 4:** Dashboard và periodic report feature-complete.
 - **A5 — Cuối tuần 5:** Cloud release, evidence, runbook và nghiệm thu toàn dự án hoàn tất.
 
-## 6. Ngoài phạm vi cam kết 5 tuần
+## 6. User story bổ sung cho vận hành và nghiệm thu toàn bộ sản phẩm
+
+Các story dưới đây được tách riêng khỏi feature backlog vì chúng là điều kiện để vận hành và nghiệm thu sản phẩm theo problem statement. Deployment, security và kiểm thử vẫn phải là Definition of Done của từng story, không được dồn toàn bộ trách nhiệm vào một story duy nhất.
+
+### US-27 — Health check, log, backup và rollback
+
+> Với vai trò người vận hành hệ thống, tôi muốn hệ thống có health check, log, backup và rollback, để có thể phục hồi khi xảy ra lỗi.
+
+- Ưu tiên / trạng thái: **P1 / Chưa làm**
+- Phụ thuộc: US-26
+- Acceptance criteria:
+  - Có health/readiness check, structured log và correlation ID để xác định lỗi theo request/session.
+  - Có backup/restore cho database và snapshot đã làm mờ, kèm retention được tài liệu hóa.
+  - Có quy trình rollback release và smoke test sau rollback; không ghi secret, ảnh thô hoặc danh tính chưa làm mờ vào log.
+- Task:
+  1. Chốt SLO, retention, chiến lược backup/restore và quy trình rollback.
+  2. Bổ sung health/readiness, structured logging, correlation ID và cảnh báo vận hành.
+  3. Diễn tập backup/restore/rollback và ghi evidence có thể chạy lại.
+
+### US-28 — UAT, traceability và evidence
+
+> Với vai trò Product Owner, tôi muốn có UAT, traceability và evidence, để nghiệm thu toàn bộ sản phẩm theo problem statement.
+
+- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Phụ thuộc: US-01 đến US-27
+- Acceptance criteria:
+  - UAT bao phủ authentication/RBAC, cấu hình khu vực/ca, video/ảnh, PPE, vùng cấm, HITL, privacy, dashboard, escalation và báo cáo.
+  - Traceability matrix liên kết từng yêu cầu problem statement với user story, test và evidence tương ứng.
+  - Có metric quality/latency, security checklist, known limitations, runbook demo và rollback evidence.
+  - Không còn defect P0; defect P1 có owner, deadline và quyết định chấp thuận bằng văn bản.
+- Task:
+  1. Viết UAT script và traceability matrix cho toàn bộ 28 story.
+  2. Chạy regression, security/performance test, deploy smoke test và lưu evidence theo release commit.
+  3. Chốt release candidate, demo rehearsal, biên bản nghiệm thu và danh sách known limitations.
+
+## 7. Ngoài phạm vi cam kết 5 tuần
 
 Camera nhà máy thật, tích hợp PLC, tự động dừng máy và scale nhiều stream đồng thời cần discovery, đánh giá an toàn hiện trường và thay đổi scope riêng. Chúng không được ngầm đưa vào release 5 tuần.
