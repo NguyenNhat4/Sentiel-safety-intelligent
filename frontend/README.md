@@ -69,3 +69,7 @@ frontend/
 ```
 
 Transport code does not render UI. Canvas utilities do not call the network. Feature state crosses boundaries only through typed props and callbacks.
+
+## Login mock and backend handoff
+
+The current frontend entry point is the login screen for Safety Manager, Area Manager, and Simulation Operator. Its temporary authentication transport and the backend contracts needed to connect it are documented in [API_MOCKS.md](API_MOCKS.md).

@@ -18,6 +18,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Documented frontend/backend interaction and the recommended confirmed-warning persistence lifecycle.
 
 ### Frontend
+- [x] Added a standalone mock login entry point for Safety Manager, Area Manager, and Simulation Operator, with documented backend authentication contracts.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
 - [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.

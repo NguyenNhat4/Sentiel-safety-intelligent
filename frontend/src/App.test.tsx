@@ -2,42 +2,29 @@ import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {afterEach, describe, expect, it, vi} from "vitest";
 import App from "./App";
 
-describe("Sentinel React application", () => {
+describe("Sentinel login", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("navigates between monitor and acknowledged event history", async () => {
-    vi.spyOn(window, "fetch").mockResolvedValue(new Response("[]", {status: 200, headers: {"Content-Type": "application/json"}}));
+  it("shows three role entry points", () => {
     render(<App />);
-    expect(screen.getByRole("heading", {name: "Live Monitor"})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
-    await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
-    expect(screen.getByText("Tải video demo")).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Quản lý an toàn/})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Quản lý khu vực/})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Mô phỏng streaming/})).toBeInTheDocument();
   });
 
-  it("updates the machine rule through React state", () => {
+  it("logs in with a mock safety-manager account", async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", {name: "Chuyển trạng thái máy"}));
-    expect(screen.getByText("Machine A đã dừng")).toBeInTheDocument();
-    expect(screen.getByText("OFF")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Email công việc"), {target: {value: "antoan@sentinel.local"}});
+    fireEvent.change(screen.getByLabelText("Mật khẩu"), {target: {value: "Sentinel123!"}});
+    fireEvent.click(screen.getByRole("button", {name: "Đăng nhập"}));
+    await waitFor(() => expect(screen.getByText("Chào Nguyễn Anh Tuấn")).toBeInTheDocument());
   });
 
-  it("marks the monitor ready after exactly four zone points", () => {
-    const {container} = render(<App />);
-    const video = container.querySelector("video") as HTMLVideoElement;
-    Object.defineProperties(video, {
-      videoWidth: {value: 1280}, videoHeight: {value: 720}, duration: {value: 20}
-    });
-    fireEvent.loadedMetadata(video);
-    const canvas = container.querySelector(".camera-scene canvas") as HTMLCanvasElement;
-    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
-      left: 0, top: 0, width: 1000, height: 500, right: 1000, bottom: 500, x: 0, y: 0, toJSON: () => ({})
-    });
-    [[100, 100], [900, 100], [900, 400], [100, 400]].forEach(([clientX, clientY]) => {
-      fireEvent.pointerDown(canvas, {clientX, clientY, pointerId: 1});
-      fireEvent.pointerUp(canvas, {pointerId: 1});
-    });
-    expect(screen.getByText("Vùng đã sẵn sàng · Kéo điểm để điều chỉnh")).toBeInTheDocument();
-    expect(screen.getByText("Sẵn sàng inference realtime · nhấn Phát video")).toBeInTheDocument();
+  it("shows an error for invalid mock credentials", async () => {
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("Email công việc"), {target: {value: "wrong@example.com"}});
+    fireEvent.change(screen.getByLabelText("Mật khẩu"), {target: {value: "wrong-password"}});
+    fireEvent.click(screen.getByRole("button", {name: "Đăng nhập"}));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Email hoặc mật khẩu không chính xác."));
   });
 });

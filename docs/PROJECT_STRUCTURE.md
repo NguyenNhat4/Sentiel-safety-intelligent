@@ -47,6 +47,7 @@ P-047/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
+│   │   │   ├── auth/    # Login experience and role entry-point selection
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result and Human-in-the-Loop review
 │   │   │   ├── events/  # Acknowledged violation history
@@ -59,6 +60,7 @@ P-047/
 │   ├── styles.css       # Sentinel visual system
 │   ├── baseline.css     # Video and Canvas overrides
 │   ├── event-log.css    # Violation history styles
+│   ├── API_MOCKS.md     # Temporary frontend API mocks and integration contracts
 │   ├── package.json
 │   └── vite.config.ts
 ├── data/                # Sample video streams, test data and reviewed snapshots

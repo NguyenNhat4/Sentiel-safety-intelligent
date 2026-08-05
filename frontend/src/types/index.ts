@@ -1,5 +1,10 @@
 export type MachineState = "running" | "stopped";
 export type ReviewStatus = "acknowledged" | "false_alarm";
+export type UserRole = "safety_manager" | "area_manager" | "simulation_operator";
+
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; }
+export interface LoginRequest { email: string; password: string; }
+export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
 
 export interface ZonePoint {
   x: number;
