@@ -12,12 +12,12 @@ describe("Sentinel login", () => {
     expect(screen.getByRole("button", {name: /Mô phỏng streaming/})).toBeInTheDocument();
   });
 
-  it("logs in with a mock safety-manager account", async () => {
+  it("opens the existing live-monitor baseline after a safety-manager login", async () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText("Email công việc"), {target: {value: "antoan@sentinel.local"}});
     fireEvent.change(screen.getByLabelText("Mật khẩu"), {target: {value: "Sentinel123!"}});
     fireEvent.click(screen.getByRole("button", {name: "Đăng nhập"}));
-    await waitFor(() => expect(screen.getByText("Chào Nguyễn Anh Tuấn")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", {name: "Live Monitor"})).toBeInTheDocument());
   });
 
   it("shows an error for invalid mock credentials", async () => {
