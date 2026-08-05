@@ -48,9 +48,16 @@
 4. Thực hiện Merge vào `develop`.
 5. Đổi trạng thái trên Sheet thành **Hoàn thành**. Di chuyển file `US-XX.md` vào thư mục `done` trên Github.
 
-### 🔴 Bước 5: Merge vào Main (Release)
+
+###  5. Sau khi merge `develop`, member phụ trách phải thông báo "US-XX đã merge develop" trên kênh chung.
+
+### 6. Các thành viên khác cập nhật code mới nhất và chạy nhanh bằng quy trình chuẩn:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   make run
+### 🔴 Bước 7: Merge vào Main (Release)
 - Quá trình này thường do Tech Lead hoặc cả team cùng xác nhận.
 - Khi nhánh `develop` đã tích hợp xong nhiều US và **được chạy thử/kiểm tra xác nhận là hoạt động trơn tru (chạy được)**, không có bug nghiêm trọng.
 - Tiến hành tạo PR merge từ `develop` vào `main` để chốt phiên bản.
 
----
