@@ -1,6 +1,6 @@
 # Cấu Trúc Dự Án Hiện Tại (Current Project Structure)
 
-Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự án **P-047: AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision**. Định hướng cấu trúc tương lai được lưu riêng tại [`FUTURE_PROJECT_STRUCTURE.md`](FUTURE_PROJECT_STRUCTURE.md) và không được phép chỉnh sửa.
+Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự án **P-047: AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision**. Baseline cấu trúc đích được chốt riêng tại [`FUTURE_PROJECT_STRUCTURE.md`](FUTURE_PROJECT_STRUCTURE.md); mọi thay đổi boundary của baseline phải có quyết định mới trong root `DECISIONS.md`.
 
 ---
 

@@ -74,4 +74,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** New team members need a fast, single-command setup for Python virtual environments, package management, and frontend dependencies.
 - **Choice:** Added `make setup` target combining `uv sync`, `npm --prefix frontend ci`, and `.env` initialization. Created technical guide `docs/guide/setup/uv-setup.md` and updated developer onboarding docs.
 
+## 2026-08-06: [Cross-cutting] Capability-owned target repository structure
+- **Reason:** The original future layout grouped backend code mainly by technical layer, which would blur ownership as authentication, rule authoring, event lifecycle, organization, escalation, analytics, and reporting grow.
+- **Choice:** Keep a modular monolith, split backend business code into capability-owned modules, keep `vision/` framework- and persistence-independent behind one facade, and make contracts, CODEOWNERS, module READMEs, mirrored tests, and dependency checks explicit architectural boundaries.
+- **Constraint:** A new top-level directory or module-boundary change requires a root decision entry. Cross-module work uses public services/contracts rather than importing another module's repository or model. Generated contracts are not edited manually.
+- **Migration:** Adopt the structure incrementally per user story; preserve current REST/WebSocket behavior until a versioned migration is documented and tested.
 
