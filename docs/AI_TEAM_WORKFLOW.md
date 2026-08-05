@@ -46,7 +46,7 @@
 2. Tạo Pull Request (PR) merge từ `feature/US-XX` vào `develop`.
 3. Nhờ một thành viên khác approve PR (xác nhận CI/CD pass nếu có, hoặc chỉ cần xác nhận code nhìn ổn thỏa).
 4. Thực hiện Merge vào `develop`.
-5. Đổi trạng thái trên Sheet thành **Hoàn thành**. Di chuyển file `US-XX.md` vào thư mục `done` trên Github.
+5. Đổi trạng thái trên Sheet thành **Hoàn thành**. Di chuyển file `US-XX.md` vào thư mục `done`.
 
 
 ###  5. Sau khi merge `develop`, member phụ trách phải thông báo "US-XX đã merge develop" trên kênh chung.
@@ -55,9 +55,10 @@
    ```bash
    git checkout develop
    git pull origin develop
-   make run
-### 🔴 Bước 7: Merge vào Main (Release)
-- Quá trình này thường do Tech Lead hoặc cả team cùng xác nhận.
+   make run```
+
+### 7: Merge vào Main (Release)
+- Cả team cùng xác nhận.
 - Khi nhánh `develop` đã tích hợp xong nhiều US và **được chạy thử/kiểm tra xác nhận là hoạt động trơn tru (chạy được)**, không có bug nghiêm trọng.
 - Tiến hành tạo PR merge từ `develop` vào `main` để chốt phiên bản.
 
