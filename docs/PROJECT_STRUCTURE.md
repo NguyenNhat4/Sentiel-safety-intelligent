@@ -95,7 +95,8 @@ P-047/
 │   ├── PRD.md
 │   ├── USER_STORIES_LIST.md
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
-│   ├── US-07/           # Detailed implementation package for US-07
+│   ├── done/            # Completed implementation specifications
+│   │   ├── README.md
 │   │   └── US-07-SPEC.md
 │   └── backlog/         # Remaining MVP and advanced user stories
 │       └── README.md

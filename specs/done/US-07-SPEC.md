@@ -2,7 +2,7 @@
 
 ## Trạng thái đặc tả
 
-- Giai đoạn: **IMPLEMENT — configuration và observation slice hoàn tất; explicit-missing/benchmark gate đang bị chặn**
+- Giai đoạn: **DONE — cấu hình, observation và UI PPE hoàn tất; production model gate được ghi nhận riêng**
 - Primary owner: `backend services`
 - Phạm vi phát hành: đóng MVP
 - Người dùng chính: cán bộ an toàn
@@ -135,7 +135,31 @@ Mỗi person/track bổ sung observation PPE có cấu trúc ổn định:
 - `track_id` tuân theo US-08; trước khi tracking hoàn chỉnh, association vẫn phải đúng trong phạm vi frame.
 - `missing_required_ppe` là kết quả rule backend, không phải output trực tiếp của vision.
 - REST frame inference và WebSocket inference trả cùng semantics PPE cốt lõi.
-- Các field baseline như `safety_shirt` chỉ được loại bỏ qua một migration contract riêng; US-07 không được xóa field đó.
+- `rule` echo lại `camera_id`, `zone_id`, `ppe_requirements` và `ppe_alert`, để client biết chính xác ba requirement đã được dùng cho frame.
+- Field baseline `safety_shirt` được giữ trong wire contract tương thích, nhưng UI không còn dùng để đánh giá hoặc hiển thị PPE.
+
+Ví dụ rule trả về khi chỉ yêu cầu mũ:
+
+```json
+{
+  "camera_id": "uploaded_video",
+  "zone_id": "zone_01",
+  "ppe_requirements": {
+    "helmet_required": true,
+    "safety_glasses_required": false,
+    "gloves_required": false
+  },
+  "ppe_alert": false
+}
+```
+
+### Hiển thị PPE trên box người
+
+- Chỉ loại PPE đang được bật requirement mới xuất hiện trên box người.
+- `present` hiển thị badge xanh, ví dụ **✓ MŨ**.
+- `missing` hiển thị badge đỏ, ví dụ **✕ MŨ**.
+- `unknown` hiển thị badge trung tính, ví dụ **? MŨ**; trạng thái này không bị trình bày như thiếu PPE.
+- Overlay dùng nhãn `PERSON · <confidence>` và không còn hiển thị nhãn legacy `SHIRT`.
 
 ## Tech stack
 
@@ -269,12 +293,13 @@ def should_alert(*, required: bool, status: PpeStatus, confidence: float | None,
 3. Mỗi người có kết quả present/missing/unknown và confidence cho mũ, kính, găng mà không lẫn người.
 4. Chỉ tổ hợp ON + missing đạt threshold tạo cảnh báo cho loại PPE tương ứng.
 5. REST và WebSocket giữ tương thích với consumer hiện tại và trả semantics PPE nhất quán.
-6. Các test vision, domain, persistence, API, frontend và integration nêu trên đều vượt qua.
-7. Benchmark và giấy phép weights/dataset được ghi nhận trước khi đánh dấu US-07 hoàn thành.
+6. Mỗi frame trả lại `rule.ppe_requirements` đang active; badge trên box chỉ phản ánh PPE được require.
+7. UI không quyết định hoặc hiển thị PPE dựa trên heuristic `safety_shirt`.
+8. Các test vision, domain, persistence, API, frontend và integration nêu trên đều vượt qua.
 
 ## Open questions và implementation gates
 
-Các điểm sau phải được chốt trong Phase 2 trước khi implementation bắt đầu:
+Các điểm sau là production gate sau khi MVP implementation đã hoàn tất:
 
 1. Weights/version/checksum, giấy phép sử dụng và class names thực tế của model PPE.
 2. Class mapping chính xác để phân biệt `present`, `missing` và `unknown` cho từng loại PPE.
