@@ -86,3 +86,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Source-of-truth constraint:** Runtime REST truth remains module-owned Pydantic/FastAPI definitions; WebSocket and backend–vision truth remains versioned JSON Schema under `contracts/`; Alembic migrations remain database history. Generated artifacts are never edited manually.
 - **Privacy constraint:** Raw video/images are not persisted; snapshot records require verified redaction and immutable event/audit context.
 - **Governance:** Everything under `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` is read-only for agents and contributors. A conflict requires stopping the implementation and requesting an explicit contract decision; the contract must not be edited as part of ordinary feature work.
+
+## 2026-08-06: [Cross-cutting] One compact target-structure guide
+- **Reason:** The 327-line baseline plus a 253-line interpretation guide duplicated context and made human/AI routing harder than the current MVP needs.
+- **Choice:** Keep `docs/FUTURE_PROJECT_STRUCTURE.md` under 150 lines as the single source for the minimal target tree, ownership, dependency rules, module template, migration path, and pre-change checklist; remove the separate guide.
+- **Current-code alignment:** Treat `backend/`, `frontend/`, and `vision/` as production owners. Treat the existing `src/` LangGraph scaffold as legacy and migrate or remove it incrementally rather than adding new production code there.
+- **Constraint:** Create capability folders only when a story has real behavior; new top-level directories or changed boundaries still require an explicit root decision.

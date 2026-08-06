@@ -1,327 +1,125 @@
-# Cấu Trúc Dự Án Tương Lai — Bản Chốt
+# Cấu trúc dự án đích
 
-> **Trạng thái:** baseline kiến trúc đã chốt ngày 2026-08-06. Đây là cấu trúc đích, không phải mô tả filesystem hiện tại. Cấu trúc đang tồn tại được duy trì tại [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md).
->
-> Sau khi chốt, thay đổi ranh giới module hoặc thêm thư mục cấp cao chỉ được thực hiện khi có quyết định mới trong root [`DECISIONS.md`](../DECISIONS.md), đồng thời cập nhật tài liệu này và `PROJECT_STRUCTURE.md` khi filesystem thực tế thay đổi.
+> Bản chốt ngày 2026-08-06 cho người và AI cùng làm việc. Đây là hướng tiến hóa từ
+> [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md), không phải yêu cầu tạo toàn bộ cây ngay.
+> Mọi thay đổi boundary phải có quyết định mới trong [`DECISIONS.md`](../DECISIONS.md).
 
-## 1. Mục tiêu thiết kế
+## 1. Nguyên tắc
 
-Cấu trúc này là guardrail cho cả người và AI:
+1. Giữ một modular monolith: `backend/`, `frontend/` và `vision/` là ba owner production chính.
+2. Mỗi task có một primary owner; chỉ tạo folder/file khi có behavior thật.
+3. Module giao tiếp qua public API/service/schema, không import nội bộ của nhau.
+4. `README.md` tại mỗi module ghi scope, entrypoint, dependency và lệnh test cho cả người lẫn AI.
+5. Không dùng `common`, `utils`, `helpers` làm nơi chứa code chưa xác định owner.
+6. Di chuyển dần code được task chạm tới; không refactor toàn repo hoặc scaffold cây rỗng.
+7. `src/` là scaffold LangGraph cũ, không phải nơi thêm production code mới.
 
-1. Mỗi business capability có đúng một nơi sở hữu code, dữ liệu và use case.
-2. File transport, nghiệp vụ, persistence và UI không làm thay trách nhiệm của nhau.
-3. Người review biết owner và test cần gọi mà không phải đọc toàn repo.
-4. Module có thể được thay thế bên trong mà không làm vỡ module khác nếu public contract không đổi.
-5. Vẫn giữ **modular monolith** trong MVP và giai đoạn nâng cao 5 tuần; không tách microservice sớm.
-
-## 2. Cấu trúc đích
+## 2. Cây thư mục đích tối thiểu
 
 ```text
 P-047/
-├── .github/
-│   └── CODEOWNERS                    # Bắt buộc reviewer theo vùng sở hữu
-│
-├── backend/
+├── backend/                         # FastAPI, nghiệp vụ và persistence
 │   ├── README.md
 │   ├── app/
-│   │   ├── README.md
-│   │   ├── api/                      # HTTP/WS composition; không chứa nghiệp vụ
-│   │   │   ├── README.md
-│   │   │   ├── dependencies.py       # Auth/session/request dependencies
-│   │   │   └── router.py             # Gắn router của các module và version prefix
-│   │   ├── core/                     # Hạ tầng dùng toàn backend, không chứa use case
-│   │   │   ├── README.md
-│   │   │   ├── config.py
-│   │   │   ├── database.py
-│   │   │   ├── errors.py
-│   │   │   ├── logging.py
-│   │   │   └── security.py
-│   │   ├── modules/                  # Business capabilities của modular monolith
-│   │   │   ├── README.md
-│   │   │   ├── auth/                 # Login, token/session, RBAC, actor audit
-│   │   │   ├── monitoring/           # Phiên video/ảnh, frame flow, machine/zone input
-│   │   │   ├── rules/                # Rule version, validate, preview, decision policy
-│   │   │   ├── events/               # Event lifecycle, review, dedup, audit, snapshot policy
-│   │   │   ├── organization/         # Khu vực, ca, assignment, timezone
-│   │   │   ├── analytics/            # Query/dashboard metric nghiệp vụ
-│   │   │   ├── escalation/           # Severity routing, delivery, retry, acknowledge
-│   │   │   └── reporting/            # Lịch, report snapshot, render và lịch sử gửi
-│   │   ├── integrations/             # Adapter tới hệ thống/engine bên ngoài domain
-│   │   │   ├── README.md
-│   │   │   ├── vision/               # Gọi public facade của vision và map contract
-│   │   │   ├── llm/                  # Structured output + deterministic fallback
-│   │   │   ├── notifications/        # Email/chat provider adapter
-│   │   │   └── storage/              # Snapshot/object storage adapter
-│   │   ├── jobs/                     # Entry point cho report/escalation background jobs
-│   │   │   └── README.md
-│   │   └── main.py                   # Composition root FastAPI; chỉ wiring/lifespan
-│   ├── migrations/                   # Alembic; migration đã apply không được sửa lại
-│   │   └── README.md
-│   └── tests/
-│       ├── README.md
-│       ├── unit/                      # Mirror module sở hữu behavior
-│       ├── integration/               # API + DB + adapter boundary
-│       └── contract/                  # OpenAPI/WS/vision contract compatibility
-│
-├── vision/
-│   ├── README.md
-│   ├── api.py                         # Public facade duy nhất backend được gọi
-│   ├── types.py                       # Observation types nội bộ, map sang contracts/
-│   ├── pipeline.py                    # Chỉ điều phối các bước CV
-│   ├── person/                        # Person detection adapter
-│   │   └── README.md
-│   ├── ppe/                           # Helmet/glasses/gloves detection + class mapping
-│   │   └── README.md
-│   ├── tracking/                      # Track lifecycle/ByteTrack adapter
-│   │   └── README.md
-│   ├── association/                   # Gắn PPE observation vào person/track
-│   │   └── README.md
-│   ├── zones/                         # Geometry, foot point, polygon observation
-│   │   └── README.md
-│   ├── privacy/                       # Blur/redact in-memory; không persistence
-│   │   └── README.md
-│   └── tests/                         # Unit + pipeline integration bằng fixture
-│       └── README.md
-│
-├── frontend/
+│   │   ├── api/                     # Router HTTP/WS và dependency transport
+│   │   ├── core/                    # Config, database, security, logging
+│   │   ├── modules/                 # Capability chỉ được tạo khi story cần
+│   │   │   ├── monitoring/          # Phiên phân tích, frame/machine/zone input
+│   │   │   ├── events/              # Event, review, dedup, snapshot policy
+│   │   │   ├── rules/               # Rule và decision policy
+│   │   │   ├── auth/                # Identity và RBAC
+│   │   │   ├── organization/        # Zone, shift và assignment
+│   │   │   ├── analytics/           # Dashboard/statistics query
+│   │   │   ├── escalation/          # Routing, retry và acknowledge
+│   │   │   └── reporting/           # Schedule, render và delivery history
+│   │   ├── integrations/            # Vision, LLM, storage, notification adapters
+│   │   └── main.py                  # Composition root; chỉ wiring/lifespan
+│   ├── migrations/                  # Alembic history
+│   └── tests/                       # Unit, integration và contract tests
+├── frontend/                        # React + TypeScript + Vite
 │   ├── README.md
 │   ├── src/
-│   │   ├── app/                       # Router, providers, shell và composition
-│   │   │   └── README.md
-│   │   ├── api/                       # HTTP/WS client và generated contract types
-│   │   │   ├── README.md
-│   │   │   └── generated/             # Sinh từ OpenAPI/schema; không sửa tay
-│   │   ├── features/
-│   │   │   ├── README.md
-│   │   │   ├── auth/
-│   │   │   ├── monitor/
-│   │   │   ├── rules/
-│   │   │   ├── alerts/
-│   │   │   ├── events/
-│   │   │   ├── organization/
-│   │   │   ├── dashboard/
-│   │   │   ├── escalations/
-│   │   │   └── reports/
-│   │   ├── shared/                    # UI primitive/hook thuần, không business state
-│   │   │   ├── README.md
-│   │   │   ├── components/
-│   │   │   ├── hooks/
-│   │   │   └── lib/
+│   │   ├── api/                     # REST/WS clients và wire types
+│   │   ├── components/              # UI dùng lại, không chứa feature state
+│   │   ├── features/                # monitor, alerts, events, dashboard; thêm theo story
 │   │   ├── styles/
+│   │   ├── App.tsx
 │   │   └── main.tsx
-│   ├── tests/                         # Integration/component shared setup
-│   │   └── README.md
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── contracts/
-│   ├── README.md                      # Nguồn, version và cách generate/validate
-│   ├── schemas/
-│   │   ├── vision-observation.schema.json
-│   │   ├── inference-message.schema.json
-│   │   ├── safety-rule.schema.json
-│   │   └── safety-event.schema.json
-│   ├── generated/
-│   │   └── openapi.json               # Artifact sinh từ FastAPI
-│   └── fixtures/                      # Ví dụ tương thích cho contract tests
-│
-├── models/
-│   ├── README.md                      # License, nguồn, version, input/output
-│   ├── registry.yaml                  # Logical name → artifact/checksum/class map
-│   ├── checksums.sha256
-│   ├── model-cards/
-│   └── weights/                       # Artifact model; không chứa Python logic
-│
-├── data/
-│   ├── README.md                      # Data policy và nguồn dữ liệu
-│   ├── demo/                          # Dữ liệu mô phỏng được phép dùng
-│   ├── edge-cases/
-│   ├── ground-truth/                  # Nhãn version hóa cho đánh giá
-│   └── snapshots/                     # Runtime, chỉ ảnh đã blur; mặc định gitignored
-│
-├── evaluation/
+│   └── tests/                       # Chỉ tạo khi test không thuộc một feature
+├── vision/                          # CV thuần, độc lập FastAPI và database
 │   ├── README.md
-│   ├── evaluate_detection.py          # Precision/recall theo ground truth
-│   ├── evaluate_events.py             # Dedup/false-alarm metrics
-│   ├── evaluate_latency.py            # End-to-end p50/p95
-│   └── reports/                       # Kết quả tái lập theo release
-│
-├── tests/
-│   ├── README.md
-│   └── e2e/                           # Luồng xuyên frontend-backend-vision
-│
-├── infra/
-│   ├── README.md
-│   ├── docker/                        # Dockerfiles và container entrypoints
-│   ├── cloud/                         # IaC/config cloud sau khi target được chốt
-│   └── observability/                 # Dashboard/alert/logging config
-│
-├── docs/
-│   ├── README.md                      # Master documentation index
-│   ├── PROJECT_STRUCTURE.md           # Filesystem hiện tại
-│   ├── FUTURE_PROJECT_STRUCTURE.md    # Baseline đích này
-│   ├── project-problem-statement.md
-│   ├── architecture_diagram.md
-│   ├── guide/
-│   ├── runbooks/                      # Deploy, rollback, backup, incident response
-│   └── reports/                       # Traceability/UAT/security/benchmark summaries
-│
-├── specs/
-│   ├── README.md
-│   ├── PRD.md
-│   ├── USER_STORIES_LIST.md
-│   ├── US-01.md ... US-06.md
-│   └── backlog/
-│       ├── README.md
-│       └── US-07.md ... US-26.md
-│
-├── ARCHITECTURE.md                    # Kiến trúc hệ thống ở mức tổng quan
-├── DECISIONS.md                       # Decision log duy nhất toàn repo
-├── PROGRESS.md                        # Progress tracker duy nhất toàn repo
-├── AGENTS.md                          # Workflow/guardrail cho AI và contributor
-├── Makefile                           # Entry point chuẩn cho setup/check/run
-├── pyproject.toml
-├── docker-compose.yml
+│   ├── api.py                       # Facade duy nhất backend gọi
+│   ├── pipeline.py                  # Điều phối detection/tracking/privacy
+│   └── tests/
+├── models/                          # Weights, nguồn, version và checksum
+├── data/                            # Demo data và snapshot runtime đã redact
+├── docs/                            # Kiến trúc, contract và hướng dẫn
+├── specs/                           # PRD, story và acceptance criteria
+├── tests/                           # Chỉ E2E xuyên nhiều owner
+├── scripts/                         # Automation có entrypoint rõ ràng
+├── AGENTS.md                        # Quy tắc cộng tác người + AI
+├── ARCHITECTURE.md
+├── DECISIONS.md                     # Decision log duy nhất
+├── PROGRESS.md                      # Progress tracker duy nhất
+├── Makefile                         # setup/run/check entrypoint
 └── README.md
 ```
 
-Các thư mục feature/module trong cây trên đều phải có `README.md` khi được tạo thực tế, dù cây rút gọn không lặp lại dòng này cho từng feature.
+Tên capability là boundary đã chốt, nhưng folder chỉ xuất hiện khi story đầu tiên cần nó.
+Không tạo thêm top-level directory nếu chưa có quyết định kiến trúc.
 
-## 3. Ranh giới sở hữu backend
+## 3. Quyền sở hữu và phụ thuộc
 
-Mỗi thư mục `backend/app/modules/<capability>/` dùng cùng một template. Chỉ tạo file khi có behavior thật, không tạo placeholder rỗng:
-
-```text
-<capability>/
-├── README.md       # Purpose, owner, public API, data, dependencies, related stories
-├── router.py       # HTTP/WS parsing, status code, dependency injection
-├── schemas.py      # Request/response DTO; không chứa ORM model
-├── service.py      # Use case/application orchestration
-├── domain.py       # Entity/value/policy/state transition thuần
-├── repository.py  # Query/persistence của chính module
-├── models.py       # SQLAlchemy model do module sở hữu
-└── errors.py       # Lỗi có nghĩa nghiệp vụ của module
-```
-
-Không bắt buộc một module nhỏ phải có đủ tất cả file. Khi một file bắt đầu chứa hai nhóm use case độc lập, tách thành package theo use case thay vì thêm hậu tố kiểu `helpers2.py` hoặc `utils_new.py`.
-
-| Module | Sở hữu | Không sở hữu | Story chính |
-|---|---|---|---|
-| `auth` | Danh tính, credential, token/session, role/permission | UI login, zone assignment, notification routing | US-20 |
-| `monitoring` | Monitoring session, image/video input, machine state, frame orchestration | Thuật toán YOLO, event state machine | US-01–04, US-24 |
-| `rules` | Rule schema/version, preview/confirm, deterministic evaluation, confidence triage | Detection, event persistence, LLM provider code | US-11, US-15 |
-| `events` | Event/dedup/review state machine, immutable audit context, snapshot persistence policy | Pixel processing, dashboard aggregation | US-05, US-06, US-08, US-09, US-12, US-16 |
-| `organization` | Zone, shift, assignment, timezone, soft delete | Polygon math, RBAC engine | US-21 |
-| `analytics` | Dashboard/statistics query và metric definitions | Offline model benchmark, periodic delivery | US-10, US-22 |
-| `escalation` | Severity routing, delivery state, retry/idempotency, acknowledge | Provider SDK, event decision | US-14 |
-| `reporting` | Schedule, aggregation snapshot, render, delivery history | Dashboard UI, notification provider SDK | US-23 |
-
-Các yêu cầu vận hành US-17–US-19 và US-25–US-26 là cross-cutting; code vẫn phải nằm trong module/adapter sở hữu cụ thể, còn evidence nằm tại `docs/reports/` và cấu hình vận hành tại `infra/`.
-
-## 4. Dependency direction bắt buộc
-
-```text
-Frontend feature
-    ↓ REST / WebSocket contract
-Backend API/router
-    ↓
-Backend module service → module domain/repository
-    ↓ port/interface
-Backend integration adapter
-    ↓
-Vision facade / LLM / notification / storage
-```
-
-Quy tắc:
-
-1. `vision/` không import `backend/`, không biết FastAPI, database, user, severity hay event lifecycle.
-2. `vision/` chỉ trả **observation**: người, PPE, track, geometry, confidence và ảnh đã redact khi được yêu cầu. Quyết định “có tạo/escalate event không” thuộc `rules` + `events`.
-3. Module backend không import `models.py` hoặc `repository.py` của module khác. Tương tác qua public service/port và contract đã công bố trong README của module.
-4. `router.py` không query database và không gọi YOLO trực tiếp; `repository.py` không quyết định nghiệp vụ; `models.py` không serialize HTTP response.
-5. `integrations/` chỉ chuyển đổi protocol/provider. Fallback LLM phải gọi cùng contract với provider thật và không được quyết định severity.
-6. Frontend feature không import nội bộ của feature khác. Dữ liệu chéo đi qua app composition hoặc public export đã ghi trong feature README.
-7. `shared/`, `core/`, `utils` không được dùng làm nơi chứa code chưa xác định owner. Chỉ đưa abstraction vào vùng dùng chung sau khi có ít nhất hai consumer thật và tên thể hiện đúng trách nhiệm.
-
-## 5. Contract và nguồn sự thật
-
-| Boundary | Nguồn sự thật | Derived artifact |
+| Vùng | Sở hữu | Không sở hữu |
 |---|---|---|
-| REST API | Pydantic schema + FastAPI route trong module sở hữu | `contracts/generated/openapi.json`, frontend generated types |
-| WebSocket | JSON Schema trong `contracts/schemas/inference-message.schema.json` | Python/TypeScript validator hoặc type sinh tự động |
-| Backend ↔ Vision | `vision-observation.schema.json` và fixture version hóa | Adapter types ở hai phía |
-| Safety rule | `safety-rule.schema.json` + rule domain validation | LLM structured-output schema, UI form types |
-| Safety event | Event domain/state machine | API schema và audit/event fixture |
+| `backend/api` | Parse request, auth dependency, response mapping | SQL query, YOLO, business decision |
+| `backend/core` | Hạ tầng dùng toàn backend | Use case hoặc provider-specific logic |
+| `backend/modules` | Use case, domain rule và dữ liệu của capability | Nội bộ capability khác |
+| `backend/integrations` | Chuyển đổi protocol/provider | Severity, event state hoặc permission |
+| `frontend/api` | HTTP/WS transport và wire types | Render UI hoặc feature state |
+| `frontend/features` | UI và browser state của capability | Enforcement phía server |
+| `vision` | Detection, tracking, geometry, redaction | HTTP, DB, user, event lifecycle |
 
-- Generated artifact không được sửa tay.
-- Thay đổi breaking phải tăng contract version, có compatibility test và migration path.
-- Không duy trì hai type viết tay cho cùng một wire contract.
-- Correlation ID và timestamp phải đi xuyên frontend → backend → vision → event để đo latency và audit.
+Luồng phụ thuộc:
 
-## 6. Ownership và luồng cộng tác
+```text
+frontend feature → frontend api → backend api → module service/repository
+                                             → integration → vision facade/provider
+```
 
-`CODEOWNERS` là cơ chế review tự động; README của module là tài liệu ownership cho người và AI. README module tối thiểu phải ghi:
+- Backend module không import model/repository của module khác; gọi public service hoặc port.
+- Frontend feature không import file nội bộ của feature khác; phối hợp tại `App` hoặc public export.
+- Vision chỉ trả observation (person, PPE, track, geometry, confidence, ảnh redact).
+  `rules` và `events` mới quyết định cảnh báo, lưu hoặc escalation.
+- Wire contract hiện hành nằm trong Pydantic/FastAPI và `docs/API_CONTRACT/`;
+  data contract nằm trong SQLAlchemy/Alembic và `docs/DATABASE_SCHEMA/`.
 
-- `Purpose` và phạm vi không sở hữu.
-- Maintainer/team và reviewer bắt buộc.
-- Public entrypoints/contracts.
-- Dữ liệu/table/artifact module sở hữu.
-- Dependency được phép.
-- Lệnh test tập trung.
-- User stories và tài liệu liên quan.
+## 4. Mẫu module vừa đủ
 
-Khi một thay đổi chạm nhiều module:
+Một backend capability bắt đầu bằng `README.md`, `router.py`, `schemas.py` và `service.py`.
+Chỉ thêm `domain.py`, `repository.py`, `models.py` hoặc `errors.py` khi responsibility xuất hiện.
+Test gần owner: backend tại `backend/tests/`, frontend cạnh feature hoặc `frontend/tests/`,
+vision tại `vision/tests/`; root `tests/` chỉ dành cho E2E.
 
-1. Chọn một **primary owning module** theo use case.
-2. Thay đổi module khác qua contract/public entrypoint; không sửa trực tiếp nội bộ để “đi đường tắt”.
-3. Nếu cần đổi contract, owner hai phía review; cập nhật fixture/contract test trước hoặc cùng patch.
-4. Nếu không xác định được owner duy nhất, dừng triển khai và ghi quyết định boundary vào root `DECISIONS.md`.
+README module tối thiểu ghi: purpose/non-goals, maintainer/reviewer, public entrypoint,
+dữ liệu sở hữu, dependency được phép, story liên quan và lệnh test tập trung.
 
-## 7. Guardrail cho AI và reviewer
+## 5. Lộ trình từ cấu trúc hiện tại
 
-Trước khi tạo hoặc sửa code:
+1. Giữ runtime hiện tại ổn định; coi `backend/app/api|services|schemas|models` là layout chuyển tiếp.
+2. Khi sửa một story, chuyển đúng phần liên quan vào capability owner; giữ API/WS tương thích.
+3. Đưa CV ra `vision/api.py` khi thay PPE/blur; backend không gọi implementation sâu.
+4. Di chuyển hoặc xóa `src/` khi chức năng LangGraph cũ đã được xác nhận là trùng/thừa;
+   không thêm dependency production mới vào đó.
+5. Chỉ tách contract artifact, jobs hoặc hạ tầng thành nhánh riêng khi có hai consumer thật.
 
-1. Đọc `PROGRESS.md`, `DECISIONS.md`, story liên quan và README của module owner.
-2. Ghi rõ mapping: story → owning module → public contract → test layer.
-3. Không tạo top-level directory mới, module mới hoặc “common/shared/utils” mới nếu chưa có quyết định kiến trúc.
-4. File mới phải có một lý do thay đổi duy nhất. Tên file phải mô tả responsibility, không dùng `misc.py`, `helpers.py`, `common.ts` chung chung.
-5. Một file production vượt 300 dòng phải được tách theo responsibility hoặc có lý do ngoại lệ trong `DECISIONS.md`. Không áp dụng cho generated code, migration và fixture.
-6. Folder/module mới phải có README và phải cập nhật `PROJECT_STRUCTURE.md` trong cùng thay đổi.
-7. Không tạo thêm `DECISIONS.md` hoặc `PROGRESS.md` ở module.
+## 6. Checklist trước khi sửa code
 
-Các rule nên được tự động hóa dần trong `make check`:
+1. Story và primary owner là gì?
+2. README, contract và source mẫu nào cần đọc?
+3. Public boundary nào bị ảnh hưởng?
+4. Test gần owner nào chứng minh thay đổi?
+5. Có đang tạo placeholder, import nội bộ, hoặc refactor ngoài scope không?
+6. Nếu filesystem đổi, đã cập nhật `PROJECT_STRUCTURE.md` chưa?
 
-- Python import-boundary check: cấm `vision → backend` và cấm module truy cập repository/model của module khác.
-- ESLint boundary check: cấm feature frontend import nội bộ feature khác.
-- Contract drift check: OpenAPI/schema/generated types phải đồng bộ.
-- Privacy test: không persistence raw snapshot; `privacy_blurred=true` chỉ khi redact thành công.
-- CODEOWNERS check: file/module mới phải map được tới owner/reviewer.
-
-## 8. Data, model và privacy
-
-1. `models/` chỉ chứa artifact, model card, license, class mapping và checksum; logic load/inference thuộc `vision/`.
-2. `data/demo`, `edge-cases`, `ground-truth` chỉ dùng dữ liệu mô phỏng hoặc dữ liệu được phép rõ ràng.
-3. Raw video không được lưu liên tục. `data/snapshots/` là runtime storage và chỉ nhận ảnh đã blur/redact thành công.
-4. Snapshot gốc phải được xử lý in-memory và hủy; lỗi privacy làm fail việc lưu ảnh/event theo policy US-12.
-5. Dataset/model/report cần version, nguồn, threshold và hardware context để US-13 có thể tái lập.
-
-## 9. Phạm vi kiến trúc đã chốt
-
-Cấu trúc hỗ trợ toàn bộ US-01–US-26 nhưng không ngầm mở rộng sản phẩm. Trong phạm vi hiện tại:
-
-- Một modular monolith deployable; background jobs có thể là process riêng nhưng dùng chung codebase/database contract.
-- Video/ảnh mô phỏng, một luồng demo tại một thời điểm cho MVP.
-- PostgreSQL production, SQLite local/test khi SQLAlchemy behavior tương thích.
-- Camera nhà máy thật, PLC, tự động dừng máy và scale nhiều stream vẫn ngoài phạm vi; cần discovery và quyết định kiến trúc mới.
-
-## 10. Trình tự chuyển đổi an toàn
-
-Không big-bang refactor. Mỗi story đang triển khai sẽ di chuyển phần code mà story đó chạm tới:
-
-1. Thiết lập contract tests và public facade `vision/api.py`.
-2. Tách business rule/event lifecycle khỏi frame inference service.
-3. Chuyển backend sang capability modules theo story ưu tiên MVP.
-4. Sinh frontend types từ contract rồi mới mở rộng feature auth/rules/dashboard.
-5. Bổ sung organization, escalation, reporting và jobs theo kế hoạch nâng cao.
-6. Thêm boundary checks vào `make check`; xóa đường import cũ chỉ sau khi regression đạt.
-
-Mỗi bước phải giữ API/WS behavior hiện hành hoặc có versioned migration được ghi rõ.
+Nếu không xác định được một owner hoặc cần top-level/module mới, dừng và xin quyết định.

@@ -68,7 +68,7 @@ PostgreSQL / blurred object storage
 | Database | SQLite local/test; PostgreSQL production |
 | Deployment | Docker Compose; cloud là giai đoạn nâng cao |
 
-Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md), [Architecture Diagram](docs/architecture_diagram.md) và [Future Structure Guide](docs/FUTURE_PROJECT_STRUCTURE_GUIDE.md).
+Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md), [Architecture Diagram](docs/architecture_diagram.md) và [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md).
 
 ## Bản đồ tài liệu
 
@@ -93,7 +93,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Xem luồng runtime chi tiết | [docs/architecture_diagram.md](docs/architecture_diagram.md) |
 | Biết filesystem hiện đang có | [Current Project Structure](docs/PROJECT_STRUCTURE.md) |
 | Biết cấu trúc đích đã phê duyệt | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
-| Chọn đúng module owner và dependency | [Future Structure Guide](docs/FUTURE_PROJECT_STRUCTURE_GUIDE.md) |
+| Chọn đúng module owner và dependency | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
 
 ### Contract chung của team
 

@@ -75,8 +75,7 @@ P-047/
 │   │   ├── README.md                 # Database contract reading index
 │   │   └── 01-foundations-and-ownership.md ... 05-constraints-and-operations.md
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
-│   ├── FUTURE_PROJECT_STRUCTURE.md  # Future project structure baseline (read-only)
-│   └── FUTURE_PROJECT_STRUCTURE_GUIDE.md # Interpretation guide for the future tree
+│   └── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md
@@ -85,6 +84,12 @@ P-047/
 │   └── backlog/         # Incomplete MVP and five-week advanced user stories
 │       ├── README.md
 │       └── US-07.md ... US-26.md
+├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
+│   ├── agents/          # Example graph, state, nodes and tools
+│   ├── api/             # Legacy chat/status routes
+│   ├── models/          # Legacy chat schemas
+│   ├── services/        # Legacy LLM factory
+│   └── ui/              # Legacy static UI
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── docker-compose.yml
@@ -92,6 +97,4 @@ P-047/
 ```
 
 ### Giải thích
-Dự án đã được khởi tạo phân hệ **`backend/`** kế thừa các best-practice từ `src/` (như cấu hình Pydantic typed settings, tích hợp LangChain/OpenAI LLM Safety Agent cho bài toán tư vấn xử lý sự cố an toàn, tích hợp WebSocket realtime và bộ test suite toàn diện).
-
-`docs/FUTURE_PROJECT_STRUCTURE_GUIDE.md` giải thích trách nhiệm và cách định tuyến code theo baseline tương lai; file này không thay đổi cấu trúc đích đã chốt.
+`backend/` là runtime FastAPI hiện hành. `src/` là scaffold LangGraph cũ còn tồn tại trong filesystem nhưng không còn là đích cho production code mới. Ownership, dependency, cách đặt code và lộ trình migration được chốt trong một file duy nhất: `docs/FUTURE_PROJECT_STRUCTURE.md`.
