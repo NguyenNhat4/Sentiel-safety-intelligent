@@ -18,7 +18,7 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 flowchart LR
     UI["React SPA\nmonitor · review · dashboard"]
     API["FastAPI transport\nREST · WebSocket · auth"]
-    DOMAIN["Capability modules\nmonitoring · rules · events · auth\norganization · analytics · escalation · reporting"]
+    DOMAIN["Backend service layer\nmonitoring · rules · events · auth\nanalytics · escalation · reporting"]
     VISION["Vision facade\nperson/PPE · tracking · zone · redaction"]
     DB[("PostgreSQL\nevent · audit · config")]
     STORE[("Encrypted object storage\nredacted snapshots/reports")]
@@ -42,14 +42,15 @@ Giữ **modular monolith** để giao nhanh và triển khai đơn giản. `fron
 |---|---|---|
 | Frontend | Capture frame, UI state, overlay, review và dashboard | Tự quyết severity hoặc authorization |
 | Backend API | Parse/authenticate/map REST và WebSocket | Chứa SQL, CV hoặc rule nghiệp vụ |
-| Backend modules | Rule, event lifecycle, dedup, RBAC, analytics, escalation/report | Import repository/model nội bộ module khác |
+| Backend services | Use case, rule, transaction, dedup, RBAC, analytics và reporting | HTTP rendering hoặc provider SDK details |
 | Integrations | Adapter vision, storage, LLM và notification | Quyết định event state hoặc permission |
 | Vision | Detection, association, tracking, geometry, confidence, redaction | Biết HTTP, database, user hoặc event lifecycle |
 
 Luồng phụ thuộc bắt buộc:
 
 ```text
-frontend feature → frontend api → backend api → capability service/repository
+frontend feature → frontend api → backend api → backend service
+                                             → model/schema/core
                                              → integration → vision facade/provider
 ```
 

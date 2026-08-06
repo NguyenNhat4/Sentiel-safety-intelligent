@@ -24,6 +24,15 @@ The baseline uses two transports with separate responsibilities:
 - WebSocket `/api/v1/ws/inference` carries zone configuration, sampled JPEG frames, and inference results.
 - REST `/api/v1/events` persists a reviewed outcome and its snapshot.
 
+US-07 adds a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
+
+```http
+GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
+PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
+```
+
+GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter now returns per-person PPE observations through `vision.api`; only an explicit `missing` observation meeting the rules threshold can create a PPE alert.
+
 ```mermaid
 sequenceDiagram
     actor Officer as Safety Officer

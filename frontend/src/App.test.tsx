@@ -6,7 +6,17 @@ describe("Sentinel React application", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("navigates between monitor and acknowledged event history", async () => {
-    vi.spyOn(window, "fetch").mockResolvedValue(new Response("[]", {status: 200, headers: {"Content-Type": "application/json"}}));
+    vi.spyOn(window, "fetch").mockImplementation(async input => {
+      const url = String(input);
+      const body = url.includes("/ppe-requirements/")
+        ? JSON.stringify({
+          camera_id: "uploaded_video", zone_id: "zone_01",
+          helmet_required: false, safety_glasses_required: false, gloves_required: false,
+          is_configured: false, updated_at: null
+        })
+        : "[]";
+      return new Response(body, {status: 200, headers: {"Content-Type": "application/json"}});
+    });
     render(<App />);
     expect(screen.getByRole("heading", {name: "Live Monitor"})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));

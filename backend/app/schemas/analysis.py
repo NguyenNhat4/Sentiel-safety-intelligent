@@ -31,6 +31,19 @@ class FrameInferenceRequest(BaseModel):
     image_data: str = Field(..., description="Base64 JPEG data URL")
     zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
+    camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
+    zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+
+
+class PpeObservation(BaseModel):
+    status: Literal["present", "missing", "unknown"]
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class PersonPpeObservations(BaseModel):
+    helmet: PpeObservation
+    safety_glasses: PpeObservation
+    gloves: PpeObservation
 
 
 class PersonDetection(BaseModel):
@@ -39,6 +52,8 @@ class PersonDetection(BaseModel):
     foot_point: list[int]
     inside_zone: bool
     safety_shirt: bool
+    ppe: PersonPpeObservations
+    missing_required_ppe: list[Literal["helmet", "safety_glasses", "gloves"]] = Field(default_factory=list)
 
 
 class FrameInferenceResponse(BaseModel):
@@ -53,6 +68,8 @@ class InferenceWebSocketConfigure(BaseModel):
     type: Literal["configure"]
     zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
+    camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
+    zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
 
 
 class InferenceWebSocketFrameMeta(BaseModel):

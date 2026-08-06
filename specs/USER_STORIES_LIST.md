@@ -64,11 +64,16 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 - Acceptance criteria:
   - Model PPE đã huấn luyện được nạp từ cấu hình và nhận biết tối thiểu ba nhóm bắt buộc: mũ, kính và găng bảo hộ; heuristic màu/áo phản quang không còn là kết quả PPE chính.
   - Kết quả PPE được gắn đúng theo từng person/track, nêu rõ hạng mục có/thiếu và confidence mà không phá vỡ inference contract.
-  - Danh sách PPE bắt buộc và confidence threshold có thể cấu hình; có test class mapping, threshold, thiếu một/nhiều PPE, không phát hiện PPE và nhiều người.
+  - Giao diện có công tắc ON/OFF riêng cho yêu cầu mũ, kính và găng cùng nút **Lưu cấu hình**; trước lần lưu đầu tiên, cả ba yêu cầu mặc định OFF.
+  - Cấu hình được lưu bền vững tại backend theo cặp camera–khu vực, tự khôi phục sau khi tải lại hoặc khởi động lại hệ thống và dùng chung giữa người dùng, trình duyệt và thiết bị. Trong MVP chỉ hỗ trợ một cặp camera–khu vực cố định.
+  - Model vẫn phát hiện và trả kết quả cho cả ba nhóm PPE bất kể trạng thái công tắc. Hệ thống chỉ tạo cảnh báo thiếu một loại PPE khi yêu cầu tương ứng đang ON; trạng thái OFF không tạo cảnh báo cho loại đó.
+  - Confidence threshold có thể cấu hình; có test class mapping, threshold, thiếu một/nhiều PPE, không phát hiện PPE, nhiều người, giá trị mặc định, lưu/khôi phục cấu hình và luật cảnh báo ON/OFF.
 - Task:
   1. Chốt weights, class mapping cho mũ/kính/găng, giấy phép model và bộ dữ liệu demo có ground truth theo từng người.
   2. Tạo adapter PPE model và cấu hình weights/device/threshold.
-  3. Tích hợp kết quả PPE theo person/track vào REST và WebSocket; chạy integration test và benchmark cho từng nhóm PPE.
+  3. Tạo persistence và API đọc/lưu cấu hình yêu cầu PPE cho cặp camera–khu vực cố định, với giá trị mặc định OFF.
+  4. Thêm ba công tắc và nút **Lưu cấu hình** trên giao diện; tải cấu hình dùng chung từ backend khi khởi tạo.
+  5. Tích hợp kết quả PPE theo person/track vào REST và WebSocket, áp dụng cấu hình vào luật cảnh báo; chạy integration test và benchmark cho từng nhóm PPE.
 
 ### US-08 — Theo dõi người và chống tạo event trùng
 

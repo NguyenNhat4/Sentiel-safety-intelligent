@@ -41,7 +41,10 @@ describe("InferenceClient", () => {
     const result: InferenceResult = {
       type: "inference_result", frame_id: 7, video_time: 2.5,
       result: "normal", review_required: false, people: [],
-      rule: {person_inside_zone: false, machine_state: "running", safety_shirt_required: true}
+      rule: {
+        person_inside_zone: false, machine_state: "running", safety_shirt_required: true,
+        camera_id: "uploaded_video", zone_id: "zone_01", ppe_alert: false,
+      }
     };
     sockets[0].message(result);
     expect(onResult).toHaveBeenCalledWith(result);
