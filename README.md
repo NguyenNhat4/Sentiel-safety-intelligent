@@ -79,7 +79,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
-| Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/US-07/US-07-SPEC.md) |
+| Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |

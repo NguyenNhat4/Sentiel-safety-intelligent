@@ -12,6 +12,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Inference `rule` now echoes the persisted PPE requirement booleans used for that frame, making configured helmet/glasses/gloves state observable in REST and WebSocket responses.
 - Required PPE state is rendered on each detected-person box: present is green, explicit missing is red, and unknown is labeled neutrally.
 - Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
+- Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
 
 ## Completed
 
