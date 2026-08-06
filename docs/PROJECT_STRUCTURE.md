@@ -1,6 +1,6 @@
 # Cấu Trúc Dự Án Hiện Tại (Current Project Structure)
 
-Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự án **P-047: AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision**. Baseline cấu trúc đích được chốt riêng tại [`FUTURE_PROJECT_STRUCTURE.md`](FUTURE_PROJECT_STRUCTURE.md); mọi thay đổi boundary của baseline phải có quyết định mới trong root `DECISIONS.md`.
+Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự án **P-047: AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision**. Cấu trúc đích được quản lý riêng; mọi thay đổi boundary phải có quyết định kiến trúc mới.
 
 ---
 
@@ -67,7 +67,7 @@ P-047/
 │   ├── README.md
 │   ├── ppe_yolov8n.pt
 │   └── yolo11n.pt
-├── docs/                # Architecture, technical guides (uv setup guide: docs/guide/setup/uv-setup.md) and documentation index
+├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   └── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
@@ -87,6 +87,7 @@ P-047/
 │   └── ui/              # Legacy static UI
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
+├── ARCHITECTURE.md      # Canonical system architecture and diagrams
 ├── docker-compose.yml
 └── README.md
 ```

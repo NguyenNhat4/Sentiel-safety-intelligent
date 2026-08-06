@@ -98,3 +98,14 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** The separate `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` trees were removed to reduce duplicated and stale context.
 - **Choice:** FastAPI routes, Pydantic schemas, frontend wire types, SQLAlchemy models, Alembic migrations, and their tests are the current contract sources of truth. `backend/README.md` explains the non-OpenAPI WebSocket flow.
 - **Constraint:** Breaking changes still require explicit authorization, a root decision entry, and focused compatibility tests or a migration path.
+
+## 2026-08-06: [Cross-cutting] One canonical architecture document
+- **Reason:** Root `ARCHITECTURE.md` and `docs/architecture_diagram.md` duplicated diagrams, mixed implemented and planned behavior, and drifted from the approved capability ownership.
+- **Choice:** Keep the single root `ARCHITECTURE.md` required by the target structure; merge into it only the useful system and runtime views, explicitly separate current state from target state, and remove the duplicate diagram file.
+- **Constraints:** The modular-monolith ownership and dependency direction in `docs/FUTURE_PROJECT_STRUCTURE.md` remain authoritative. Executable definitions remain runtime contract truth; architecture prose cannot silently change them.
+- **Safety consequences:** Vision emits observations, deterministic backend rules own severity/event lifecycle, LLM output is advisory, and unredacted evidence must never be persisted.
+
+## 2026-08-06: [Cross-cutting] Root README is the only documentation index
+- **Reason:** Layered catalogs and cross-document links create competing navigation paths and make documentation depend on file placement outside its own scope.
+- **Choice:** Only the root repository README indexes documentation. All other documents are standalone and do not link to one another; the agent workflow file is the sole exception because it must load mandatory context.
+- **Constraint:** Moving or adding documentation requires updating the root index. The approved read-only structure baseline is not rewritten solely to remove its existing historical links.

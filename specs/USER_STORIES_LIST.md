@@ -1,7 +1,6 @@
 # User Story Backlog & Kế hoạch giao toàn bộ dự án
 
-Tài liệu này chuyển phạm vi MVP trong [`PRD.md`](PRD.md) và yêu cầu đầu ra trong
-[`project-problem-statement.md`](../docs/project-problem-statement.md) thành hai giai đoạn delivery:
+Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toán thành hai giai đoạn delivery:
 
 1. **Tuần hiện tại:** đóng và nghiệm thu MVP theo PRD.
 2. **5 tuần tiếp theo:** hoàn thành yêu cầu nâng cao và các khoảng trống cần thiết để giao toàn bộ project problem statement.

@@ -68,7 +68,7 @@ PostgreSQL / blurred object storage
 | Database | SQLite local/test; PostgreSQL production |
 | Deployment | Docker Compose; cloud là giai đoạn nâng cao |
 
-Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md), [Architecture Diagram](docs/architecture_diagram.md) và [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md).
+Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md) và [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md).
 
 ## Bản đồ tài liệu
 
@@ -82,15 +82,12 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow của AI/contributor | [AGENTS.md](AGENTS.md) |
-| Xem catalog tài liệu chi tiết | [docs/README.md](docs/README.md) |
-| Xem index của product specifications | [specs/README.md](specs/README.md) |
 
 ### Kiến trúc và vị trí code
 
 | Khi cần | Đọc tài liệu |
 |---|---|
 | Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Xem luồng runtime chi tiết | [docs/architecture_diagram.md](docs/architecture_diagram.md) |
 | Biết filesystem hiện đang có | [Current Project Structure](docs/PROJECT_STRUCTURE.md) |
 | Biết cấu trúc đích đã phê duyệt | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
 | Chọn đúng module owner và dependency | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
@@ -110,7 +107,6 @@ Các executable definition trên là nguồn sự thật hiện hành. Thay đ�
 |---|---|
 | Cài đặt môi trường Python bằng `uv` | [uv Setup Guide](docs/guide/setup/uv-setup.md) |
 | Quy trình phối hợp AI | [AI Team Workflow](docs/AI_TEAM_WORKFLOW.md) |
-| Các hướng dẫn kỹ thuật khác | [Documentation Catalog](docs/README.md) |
 
 ## Quick start
 

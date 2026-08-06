@@ -2,12 +2,11 @@
 
 Thư mục này chứa spec triển khai chi tiết cho các user story chưa hoàn thành hoặc hoàn thành một phần.
 
-## Nguồn và quy ước
+## Quy ước
 
-- [`../PRD.md`](../PRD.md) quyết định phạm vi MVP.
-- [`../USER_STORIES_LIST.md`](../USER_STORIES_LIST.md) là backlog tổng và kế hoạch delivery chuẩn.
-- Mỗi file `US-XX.md` phải giữ nguyên phần user story, trạng thái, phụ thuộc, acceptance criteria và task so với mục `US-XX` tương ứng trong `USER_STORIES_LIST.md`.
-- Khi story hoàn thành, cập nhật đồng thời backlog tổng, file story và root [`PROGRESS.md`](../../PROGRESS.md).
+- Phạm vi MVP và backlog tổng là nguồn chuẩn của các story chi tiết.
+- Mỗi story phải giữ nguyên phần user story, trạng thái, phụ thuộc, acceptance criteria và task so với backlog tổng.
+- Khi story hoàn thành, cập nhật đồng thời backlog tổng, story chi tiết và tiến độ dự án.
 
 ## Phân nhóm
 
