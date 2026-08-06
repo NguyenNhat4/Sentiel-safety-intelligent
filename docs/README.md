@@ -1,6 +1,6 @@
-# Master Documentation Index (`docs/README.md`)
+# Documentation Catalog (`docs/README.md`)
 
-Tài liệu này đóng vai trò là **Master Index** hướng dẫn vị trí, nội dung và thời điểm cần đọc hoặc cập nhật từng tài liệu trong dự án **P-047**.
+[`README.md`](../README.md) tại root là điểm bắt đầu và master index của repository. Tài liệu này là catalog chi tiết cấp hai, giải thích vị trí, nội dung và thời điểm cần đọc từng tài liệu trong dự án **P-047**.
 
 ---
 
@@ -8,7 +8,8 @@ Tài liệu này đóng vai trò là **Master Index** hướng dẫn vị trí, 
 
 | Tài liệu | Loại / Mục đích | Nội dung chính | Khi nào cần đọc? (When to read) | Khi nào cần cập nhật? (When to update) |
 |---|---|---|---|---|
-| **[`docs/README.md`](README.md)** | **Master Index** | Chỉ mục toàn bộ tài liệu dự án, vị trí và thời điểm sử dụng | Khi bắt đầu làm việc hoặc tìm kiếm thông tin tài liệu liên quan | Khi tạo mới, xóa hoặc tái cấu trúc các file tài liệu |
+| **[`README.md`](../README.md)** | **Repository Introduction & Master Index** | Giới thiệu dự án, trạng thái, quick start và điều hướng tới toàn bộ nhóm tài liệu | Điểm bắt đầu cho thành viên mới hoặc khi chưa biết cần đọc tài liệu nào | Khi tổng quan, trạng thái cấp cao, quick start hoặc cấu trúc điều hướng thay đổi |
+| **[`docs/README.md`](README.md)** | **Detailed Documentation Catalog** | Catalog chi tiết vị trí và thời điểm sử dụng tài liệu | Khi cần tra cứu sâu sau khi đi từ master index | Khi tạo mới, xóa hoặc tái cấu trúc các file tài liệu |
 | **[`AGENTS.md`](../AGENTS.md)** | **Agent Workflow Rules** | Quy tắc làm việc của Agent, quy trình Clock In/Clock Out, kiểm thử và theo dõi tiến độ | Trước khi khởi chạy session mới hoặc thực hiện quy trình phát triển | Khi thay đổi quy trình làm việc, tiêu chuẩn kiểm thử hoặc lệnh `make check` |
 | **[`README.md`](../README.md)** | **Project Overview** | Tổng quan dự án, vấn đề, giải pháp, tech stack và hướng dẫn chạy nhanh (Quick Start) | Khi cần cái nhìn tổng quan ban đầu về dự án hoặc cách chạy ứng dụng | Khi thay đổi hướng dẫn cài đặt, tech stack chính, hoặc lệnh khởi chạy |
 | **[`docs/PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md)** | **Current Project Structure** | Sơ đồ filesystem hiện tại và trách nhiệm của các phân hệ đang tồn tại | Khi cần tìm vị trí lưu file hoặc hiểu layout đang chạy | **Mỗi khi tạo/xóa/di chuyển file hoặc tái cấu trúc folder trong dự án** |
@@ -31,7 +32,7 @@ Tài liệu này đóng vai trò là **Master Index** hướng dẫn vị trí, 
 ## 🎯 Nguyên Tắc Độc Lập Tài Liệu (Decoupling Principles)
 
 1. **Phân tách trách nhiệm**:
-   - `README.md` (root): Chỉ chứa thông tin tổng quan dự án, bài toán & Quick Start.
+   - `README.md` (root): Giới thiệu dự án, trạng thái cấp cao, Quick Start và master index điều hướng.
    - `docs/PROJECT_STRUCTURE.md`: Lưu trữ cấu trúc thư mục chi tiết. Không nhồi nhét cấu trúc chi tiết vào `README.md`.
    - `AGENTS.md`: Định nghĩa quy định và trỏ tới `docs/README.md` làm bản đồ tài liệu duy nhất.
 2. **Cập nhật đúng nơi**: Khi thay đổi cấu trúc dự án, cập nhật trực tiếp tại `docs/PROJECT_STRUCTURE.md` thay vì `README.md`.

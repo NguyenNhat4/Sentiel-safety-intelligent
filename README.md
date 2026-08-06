@@ -1,150 +1,176 @@
-# AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision
+# P-047 — AI Agent Giám Sát An Toàn PPE và Khu Vực Nguy Hiểm
 
-> Tóm tắt 1 câu: Thiếu giám sát an toàn liên tục tại nhà máy → AI Agent phân tích camera theo thời gian thực (YOLO + OpenCV) cho Cán bộ an toàn và Quản lý khu vực.
+P-047 là ứng dụng web dùng Computer Vision để hỗ trợ giám sát an toàn trong nhà máy. Hệ thống phân tích video hoặc ảnh mô phỏng, phát hiện người, kiểm tra PPE, xác định xâm nhập vùng nguy hiểm theo trạng thái máy, đưa cảnh báo cho con người xác minh và lưu bằng chứng đã bảo vệ danh tính.
 
-## Vấn đề (Problem)
+README này là **điểm bắt đầu và master index của repository**. Nếu chưa biết đọc tài liệu nào, bắt đầu từ phần [Bản đồ tài liệu](#bản-đồ-tài-liệu).
 
-📍 Thực trạng: Nhà máy có khu vực nguy hiểm (máy dập, xe nâng, hóa chất) yêu cầu đội mũ/kính/găng đúng quy định và không xâm nhập vùng cấm; giám sát bằng người không xuể, vi phạm dễ bị bỏ sót.
-🎯 Vấn đề: Cần AI Agent phân tích luồng camera phát hiện thiếu PPE và người xâm nhập vùng cấm khi máy đang chạy, cảnh báo realtime, ghi nhận vi phạm và thống kê tuân thủ theo khu vực/ca.
-🔒 Ràng buộc: Cảnh báo nguy hiểm nghiêm trọng (người trong vùng nguy hiểm) escalate ngay tới người phụ trách (HITL); tôn trọng quyền riêng tư (làm mờ danh tính, chỉ lưu vi phạm); bảo mật dữ liệu hình ảnh; cân bằng độ chính xác/false alarm.
+## Bài toán
 
-## Giải pháp (Solution)
+Nhân sự an toàn khó theo dõi liên tục nhiều khu vực có máy dập, xe nâng hoặc hóa chất. Vi phạm PPE và xâm nhập vùng cấm có thể bị bỏ sót hoặc cảnh báo chậm.
 
-Sản phẩm giám sát an toàn tự động bằng Computer Vision:
-- Feature 1: **Phát hiện thiếu PPE & xâm nhập vùng cấm** bằng YOLO pretrained và OpenCV polygon zone.
-- Feature 2: **Luồng xác minh gần realtime** qua FastAPI frame API và giao diện HTML/CSS/JavaScript.
-- Feature 3: **Quản lý & Thống kê vi phạm** lưu trữ vào PostgreSQL, Dashboard theo khu vực và ca.
-- Feature 4: **Đảm bảo Privacy** tự động làm mờ khuôn mặt danh tính người vi phạm.
+Hệ thống hướng tới:
 
-## Target User
+- Phát hiện người và PPE bắt buộc: mũ, kính và găng bảo hộ.
+- Xác định người đi vào polygon vùng nguy hiểm.
+- Chỉ đánh giá xâm nhập là critical khi máy đang chạy.
+- Hiển thị cảnh báo gần realtime và chuyển trường hợp mơ hồ cho con người.
+- Chống tạo nhiều event cho cùng một vi phạm liên tục.
+- Lưu quyết định review, audit context và snapshot đã làm mờ danh tính.
+- Thống kê tuân thủ theo thời gian, khu vực và ca làm việc.
+- Escalate sự cố nghiêm trọng và tạo báo cáo định kỳ trong giai đoạn nâng cao.
 
-- Primary: Cán bộ an toàn (Safety Officer) - Nhận cảnh báo realtime, đánh giá vi phạm, escalate.
-- Secondary: Quản lý khu vực (Zone Manager) - Theo dõi thống kê tuân thủ, dashboard.
+## Người dùng
 
-## Tech Stack
+| Vai trò | Nhu cầu chính |
+|---|---|
+| Cán bộ an toàn (`safety_officer`) | Theo dõi, nhận cảnh báo, review, xác nhận vi phạm hoặc false alarm |
+| Quản lý khu vực (`zone_manager`) | Quản lý khu vực/ca, xem dashboard, escalation và báo cáo |
 
-| Layer | Technology |
-|-------|-----------|
-| Computer Vision | Python, Ultralytics YOLO, OpenCV |
-| Backend | FastAPI + SQLAlchemy |
-| Frontend | React 19, TypeScript, Vite (production build served by FastAPI) |
-| Database | SQLite for the local baseline; PostgreSQL for production |
-| DevOps | Docker Compose |
+## Phạm vi và giới hạn
 
-## New Developer Onboarding
+Dự án đang phát triển theo hai giai đoạn:
 
-> 📖 **Chi tiết hướng dẫn `uv`**: Xem [docs/guide/setup/uv-setup.md](docs/guide/setup/uv-setup.md) để biết cách quản lý môi trường và gói Python.
+1. Đóng MVP với video/ảnh mô phỏng, PPE, vùng nguy hiểm, HITL, privacy, event log, authentication và dashboard cơ bản.
+2. Giao bản nâng cao trong 5 tuần với khu vực/ca, confidence triage, escalation, dashboard quản trị, báo cáo và cloud operations.
 
-Use Python 3.11–3.13 for local development. Python 3.14 currently causes the shared FastAPI `TestClient` suite to stall after collection.
+Camera nhà máy thật, PLC, tự động dừng máy và xử lý đồng thời nhiều stream không thuộc phạm vi đã cam kết. Xem [Problem Statement](docs/project-problem-statement.md), [PRD](specs/PRD.md) và [User Story Backlog](specs/USER_STORIES_LIST.md) để biết phạm vi chính xác.
 
-### 1. Install the project
+## Trạng thái hiện tại
+
+Baseline đang hoạt động gồm:
+
+- React 19 + TypeScript + Vite cho giao diện monitor.
+- FastAPI phục vụ REST, WebSocket và production frontend build.
+- Upload video local, vẽ vùng bốn điểm và trạng thái máy chạy/dừng.
+- YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
+- HITL review, lưu event đã xác nhận, nhật ký snapshot và thống kê baseline.
+- SQLite cho local/test; PostgreSQL là database production đích.
+
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face blur trước persistence, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+
+## Kiến trúc tóm tắt
+
+```text
+React frontend
+    ↓ REST / WebSocket contract
+FastAPI modular monolith
+    ↓ public facade
+Vision pipeline (YOLO + tracking + zone + privacy)
+    ↓
+PostgreSQL / blurred object storage
+```
+
+| Thành phần | Công nghệ |
+|---|---|
+| Vision | Python, Ultralytics YOLO, OpenCV; ByteTrack theo cấu trúc đích |
+| Backend | FastAPI, SQLAlchemy, Alembic |
+| Frontend | React 19, TypeScript, Vite |
+| Database | SQLite local/test; PostgreSQL production |
+| Deployment | Docker Compose; cloud là giai đoạn nâng cao |
+
+Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md), [Architecture Diagram](docs/architecture_diagram.md) và [Future Structure Guide](docs/FUTURE_PROJECT_STRUCTURE_GUIDE.md).
+
+## Bản đồ tài liệu
+
+### Bắt đầu công việc
+
+| Khi cần | Đọc tài liệu |
+|---|---|
+| Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
+| Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
+| Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
+| Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
+| Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
+| Tuân thủ workflow của AI/contributor | [AGENTS.md](AGENTS.md) |
+| Xem catalog tài liệu chi tiết | [docs/README.md](docs/README.md) |
+| Xem index của product specifications | [specs/README.md](specs/README.md) |
+
+### Kiến trúc và vị trí code
+
+| Khi cần | Đọc tài liệu |
+|---|---|
+| Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Xem luồng runtime chi tiết | [docs/architecture_diagram.md](docs/architecture_diagram.md) |
+| Biết filesystem hiện đang có | [Current Project Structure](docs/PROJECT_STRUCTURE.md) |
+| Biết cấu trúc đích đã phê duyệt | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
+| Chọn đúng module owner và dependency | [Future Structure Guide](docs/FUTURE_PROJECT_STRUCTURE_GUIDE.md) |
+
+### Contract chung của team
+
+| Khi cần | Điểm vào |
+|---|---|
+| Endpoint, payload, WebSocket, auth, lỗi hoặc compatibility | [API Contract Index](docs/API_CONTRACT/README.md) |
+| ERD, bảng, ownership, constraint, index hoặc migration | [Database Schema Index](docs/DATABASE_SCHEMA/README.md) |
+
+Hai thư mục contract trên là **read-only**. Chỉ đọc `README.md` và chương được chỉ dẫn cho task. Nếu implementation xung đột contract, dừng phần xung đột và xin quyết định; không tự sửa contract.
+
+### Hướng dẫn phát triển
+
+| Khi cần | Đọc tài liệu |
+|---|---|
+| Cài đặt môi trường Python bằng `uv` | [uv Setup Guide](docs/guide/setup/uv-setup.md) |
+| Quy trình phối hợp AI | [AI Team Workflow](docs/AI_TEAM_WORKFLOW.md) |
+| Các hướng dẫn kỹ thuật khác | [Documentation Catalog](docs/README.md) |
+
+## Quick start
+
+Yêu cầu Python 3.11–3.13. Python 3.14 hiện có thể làm bộ test FastAPI `TestClient` bị treo.
 
 ```bash
 git clone https://github.com/AI20K-Build-Cohort-2/P-047.git
 cd P-047
-
-# Setup Python environment (uv sync), frontend dependencies (npm ci), and .env in one step:
 make setup
-```
-
-YOLO downloads/loads its configured model when inference is first used, so the first analyzed frame can be slower than later frames.
-
-### 2. Run the application
-
-```bash
 make run
 ```
 
-The FastAPI process serves both layers:
+Sau khi chạy:
 
 - Monitor UI: <http://localhost:8000/>
-- Swagger REST documentation: <http://localhost:8000/docs>
-- ReDoc REST documentation: <http://localhost:8000/redoc>
-- Raw OpenAPI schema: <http://localhost:8000/openapi.json>
+- Swagger: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+- OpenAPI JSON: <http://localhost:8000/openapi.json>
 - Health check: <http://localhost:8000/health>
+- WebSocket inference: `ws://localhost:8000/api/v1/ws/inference`
 
-You should see these important REST routes in Swagger:
+WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API. Contract WebSocket nằm trong [API Contract Index](docs/API_CONTRACT/README.md).
 
-- `POST /api/v1/analysis/frame`
-- `GET /api/v1/events`
-- `POST /api/v1/events`
-- `GET /api/v1/events/{event_id}`
-- `GET /api/v1/statistics/summary`
-
-The realtime inference endpoint is:
-
-```text
-ws://localhost:8000/api/v1/ws/inference
-```
-
-It will **not appear in Swagger** because OpenAPI describes HTTP APIs and does not describe WebSocket routes. Its configure/frame/result protocol is documented in [`backend/README.md`](backend/README.md#frame-inference-contract).
-
-If the REST routes are missing from Swagger, verify that the correct application is running:
-
-```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/openapi.json
-```
-
-Stop any old server on port 8000, run `make run` from the repository root, and hard-refresh `/docs`.
-
-### 3. Run tests and checks
-
-Run all repository checks before submitting a change:
+## Kiểm tra repository
 
 ```bash
 make check
 ```
 
-Run individual groups while developing:
+Có thể chạy từng nhóm:
 
 ```bash
-# Lint Python
 make lint
-
-# Verify Python formatting
 make format
-
-# All Python tests
 make test
-
-# Backend tests only
-PYTHONPATH=. .venv/bin/pytest backend/tests -v
-
-# One focused backend test
-PYTHONPATH=. .venv/bin/pytest backend/tests/test_analysis.py::test_zone_entry_does_not_request_review_when_machine_is_stopped -v
-
-# Frontend checks
 npm --prefix frontend run lint
 npm --prefix frontend run type-check
 npm --prefix frontend run test
 npm --prefix frontend run build
 ```
 
-Tests use an isolated in-memory SQLite database. They do not write events into the local development database.
+## Luồng smoke test baseline
 
-### 4. Baseline manual smoke test
+1. Mở <http://localhost:8000/> và upload video mô phỏng.
+2. Vẽ đúng bốn điểm của vùng nguy hiểm.
+3. Chuyển máy sang trạng thái chạy và phát video.
+4. Xác nhận bounding box người và foot point được hiển thị.
+5. Xác nhận video chỉ dừng để review khi foot point vào vùng trong lúc máy chạy.
+6. Chọn **Vi phạm thực tế**, mở **Nhật ký vi phạm** và kiểm tra event đã lưu.
 
-1. Open <http://localhost:8000/> and upload a video.
-2. Draw exactly four zone points.
-3. Set the machine to running and press Play.
-4. Confirm that person bounding boxes are rendered.
-5. Confirm that playback pauses only when a person's foot point enters the zone while the machine is running.
-6. Choose **Vi phạm thực tế**, then manually open **Nhật ký vi phạm** and confirm the event snapshot appears.
+## Quy tắc đóng góp quan trọng
 
-## Project Structure
+- Chọn đúng một primary owning module cho mỗi task.
+- Đọc README của module trước khi đọc hoặc sửa implementation bên trong.
+- Không đọc `src/` nếu người dùng không yêu cầu trực tiếp.
+- Không tạo top-level directory hoặc module boundary mới khi chưa có quyết định kiến trúc.
+- Cập nhật `docs/PROJECT_STRUCTURE.md` khi filesystem thay đổi.
+- Chỉ commit khi người dùng yêu cầu trực tiếp.
 
-Chi tiết về cấu trúc thư mục dự án (bao gồm cấu trúc hiện tại và định hướng kiến trúc tương lai) đã được chuyển sang tài liệu riêng:
-
-👉 **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)**
-
-### Tóm tắt nhanh:
-- **`backend/`**: Modular Monolith FastAPI Backend (REST API, WebSocket, AI Safety Agent LLM, SQLAlchemy/PostgreSQL, Pytest).
-- **`vision/`**: Computer Vision Pipeline (YOLO detection, ByteTrack tracking, Polygon zone rule check, Privacy face blurring).
-- **`frontend/`**: React + TypeScript + Vite SPA cho cán bộ an toàn; FastAPI phục vụ production build.
-- **`docs/`**: Tài liệu kiến trúc, PRD, cấu trúc dự án và hướng dẫn.
-- **`data/`**: Video stream mẫu và dữ liệu kiểm thử.
-
+Quy định đầy đủ và có tính bắt buộc nằm trong [AGENTS.md](AGENTS.md).
 
 ## License
 
