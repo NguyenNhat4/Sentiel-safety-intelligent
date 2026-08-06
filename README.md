@@ -95,14 +95,14 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Biết cấu trúc đích đã phê duyệt | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
 | Chọn đúng module owner và dependency | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md) |
 
-### Contract chung của team
+### Contract đang chạy
 
 | Khi cần | Điểm vào |
 |---|---|
-| Endpoint, payload, WebSocket, auth, lỗi hoặc compatibility | [API Contract Index](docs/API_CONTRACT/README.md) |
-| ERD, bảng, ownership, constraint, index hoặc migration | [Database Schema Index](docs/DATABASE_SCHEMA/README.md) |
+| REST/WebSocket endpoint và payload | FastAPI routes/Pydantic schemas trong `backend/app/`, wire types trong `frontend/src/types/`, và [backend README](backend/README.md) |
+| Bảng, constraint, query và migration | SQLAlchemy models trong `backend/app/models/`, Alembic trong `backend/migrations/`, và test backend liên quan |
 
-Hai thư mục contract trên là **read-only**. Chỉ đọc `README.md` và chương được chỉ dẫn cho task. Nếu implementation xung đột contract, dừng phần xung đột và xin quyết định; không tự sửa contract.
+Các executable definition trên là nguồn sự thật hiện hành. Thay đổi breaking phải được người dùng cho phép, ghi vào `DECISIONS.md` và có test tương thích hoặc migration phù hợp.
 
 ### Hướng dẫn phát triển
 
@@ -132,7 +132,7 @@ Sau khi chạy:
 - Health check: <http://localhost:8000/health>
 - WebSocket inference: `ws://localhost:8000/api/v1/ws/inference`
 
-WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API. Contract WebSocket nằm trong [API Contract Index](docs/API_CONTRACT/README.md).
+WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API. Message sequence và field semantics của WebSocket được mô tả trong [backend README](backend/README.md#frame-inference-contract) và kiểm chứng bởi test transport hai phía.
 
 ## Kiểm tra repository
 

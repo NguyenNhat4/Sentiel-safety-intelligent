@@ -91,8 +91,8 @@ frontend feature → frontend api → backend api → module service/repository
 - Frontend feature không import file nội bộ của feature khác; phối hợp tại `App` hoặc public export.
 - Vision chỉ trả observation (person, PPE, track, geometry, confidence, ảnh redact).
   `rules` và `events` mới quyết định cảnh báo, lưu hoặc escalation.
-- Wire contract hiện hành nằm trong Pydantic/FastAPI và `docs/API_CONTRACT/`;
-  data contract nằm trong SQLAlchemy/Alembic và `docs/DATABASE_SCHEMA/`.
+- Wire contract hiện hành nằm trong FastAPI/Pydantic, frontend wire types và test transport;
+  data contract nằm trong SQLAlchemy models, Alembic migrations và test persistence.
 
 ## 4. Mẫu module vừa đủ
 

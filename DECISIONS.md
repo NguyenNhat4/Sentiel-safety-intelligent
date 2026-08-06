@@ -92,3 +92,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Choice:** Keep `docs/FUTURE_PROJECT_STRUCTURE.md` under 150 lines as the single source for the minimal target tree, ownership, dependency rules, module template, migration path, and pre-change checklist; remove the separate guide.
 - **Current-code alignment:** Treat `backend/`, `frontend/`, and `vision/` as production owners. Treat the existing `src/` LangGraph scaffold as legacy and migrate or remove it incrementally rather than adding new production code there.
 - **Constraint:** Create capability folders only when a story has real behavior; new top-level directories or changed boundaries still require an explicit root decision.
+
+## 2026-08-06: [Cross-cutting] Executable definitions replace separate contract docs
+- **Supersedes:** The documentation/governance parts of “Shared API and database design contracts”; that entry remains as history.
+- **Reason:** The separate `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` trees were removed to reduce duplicated and stale context.
+- **Choice:** FastAPI routes, Pydantic schemas, frontend wire types, SQLAlchemy models, Alembic migrations, and their tests are the current contract sources of truth. `backend/README.md` explains the non-OpenAPI WebSocket flow.
+- **Constraint:** Breaking changes still require explicit authorization, a root decision entry, and focused compatibility tests or a migration path.
