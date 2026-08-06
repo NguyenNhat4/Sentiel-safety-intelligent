@@ -1,10 +1,18 @@
-.PHONY: run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build
+.PHONY: setup py-setup env-setup run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
 else
 VENV_BIN = .venv/bin
 endif
+
+setup: py-setup frontend-install env-setup
+
+py-setup:
+	uv sync
+
+env-setup:
+	@if [ ! -f .env ]; then cp .env.example .env && echo "Created .env from .env.example"; fi
 
 run: frontend-build
 	$(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000

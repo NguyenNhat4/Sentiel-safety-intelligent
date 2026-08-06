@@ -1,106 +1,102 @@
-# Architecture Document
+# Kiến trúc hệ thống P-047
 
-## System Overview
+Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô tả hướng đích; runtime hiện tại
+được ghi rõ để không nhầm phần đã chạy với phần còn phải triển khai.
 
-AI Agent Giám Sát An Toàn PPE & Khu Vực Nguy Hiểm Bằng Computer Vision (PPE & Zone Safety Agent).
-Hệ thống sử dụng Computer Vision (YOLO) để phát hiện người, đánh giá việc tuân thủ quy định về PPE và cảnh báo theo thời gian thực nếu có xâm nhập vào các khu vực nguy hiểm được định nghĩa bằng Polygon. Backend sử dụng FastAPI kết nối với PostgreSQL để lưu trữ và quản lý event.
+## Mục tiêu và ràng buộc
 
-## Architecture Diagram
+- Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ/kính/găng và xâm nhập vùng nguy hiểm.
+- Xâm nhập vùng chỉ là critical khi máy chạy; kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
+- Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
+- Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
+- Hai vai trò được backend phân quyền: `safety_officer` và `zone_manager`.
+- MVP là một stream mô phỏng; camera thật, PLC, tự dừng máy và multi-stream nằm ngoài phạm vi.
+
+## Kiến trúc đích
 
 ```mermaid
-flowchart TB
-    BROWSER["Browser"]
+flowchart LR
+    UI["React SPA\nmonitor · review · dashboard"]
+    API["FastAPI transport\nREST · WebSocket · auth"]
+    DOMAIN["Capability modules\nmonitoring · rules · events · auth\norganization · analytics · escalation · reporting"]
+    VISION["Vision facade\nperson/PPE · tracking · zone · redaction"]
+    DB[("PostgreSQL\nevent · audit · config")]
+    STORE[("Encrypted object storage\nredacted snapshots/reports")]
+    OUT["Notification provider"]
 
-    subgraph DOCKER["Docker Compose"]
-        FRONTEND["React SPA build<br/>FastAPI static serving"]
-        BACKEND["Backend Container<br/>FastAPI"]
-        DB[("PostgreSQL Container")]
-    end
-
-    subgraph HOST["Host machine / GPU environment"]
-        CVWORKER["Python CV Pipeline<br/>YOLO + OpenCV"]
-        MODELS[("Model Weights")]
-        VIDEOS[("Demo Videos")]
-    end
-
-    BROWSER --> FRONTEND
-    FRONTEND -->|REST + WebSocket| BACKEND
-    BACKEND --> DB
-    BACKEND --> CVWORKER
-    CVWORKER --> MODELS
-    CVWORKER --> VIDEOS
+    UI -->|typed REST / binary-JPEG WS| API
+    API --> DOMAIN
+    DOMAIN -->|observation request| VISION
+    VISION -->|observation + redacted image| DOMAIN
+    DOMAIN --> DB
+    DOMAIN --> STORE
+    DOMAIN -->|critical, idempotent| OUT
 ```
 
-[For detail architecture diagram and docker compose diagram](./docs/architecture_diagram.md)
+Giữ **modular monolith** để giao nhanh và triển khai đơn giản. `frontend/`, `backend/` và
+`vision/` là ba owner production; chỉ tách service khi có nhu cầu scale hoặc vận hành đã đo được.
 
-## Data Flow Diagram
+## Boundary và dependency
+
+| Owner | Trách nhiệm | Không được làm |
+|---|---|---|
+| Frontend | Capture frame, UI state, overlay, review và dashboard | Tự quyết severity hoặc authorization |
+| Backend API | Parse/authenticate/map REST và WebSocket | Chứa SQL, CV hoặc rule nghiệp vụ |
+| Backend modules | Rule, event lifecycle, dedup, RBAC, analytics, escalation/report | Import repository/model nội bộ module khác |
+| Integrations | Adapter vision, storage, LLM và notification | Quyết định event state hoặc permission |
+| Vision | Detection, association, tracking, geometry, confidence, redaction | Biết HTTP, database, user hoặc event lifecycle |
+
+Luồng phụ thuộc bắt buộc:
+
+```text
+frontend feature → frontend api → backend api → capability service/repository
+                                             → integration → vision facade/provider
+```
+
+Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
+tests) là nguồn sự thật. Thay đổi breaking phải được phê duyệt và có migration hoặc
+compatibility test.
+
+## Luồng quyết định an toàn
 
 ```mermaid
 sequenceDiagram
-    actor User as Safety Officer
-    participant UI as Browser Frontend
+    participant UI as Browser
     participant API as FastAPI
-    participant CV as CV Pipeline
-    participant Rules as Rule Engine
-    participant DB as PostgreSQL
-    participant WS as WebSocket
-
-    User->>UI: Chọn video và nhấn Start
-    UI->>API: POST /analysis/start
-    API->>CV: Bắt đầu xử lý video
-
-    loop Mỗi frame
-        CV->>CV: Detect person và PPE
-        CV->>CV: Track person
-        CV->>CV: Check polygon zone
-        CV->>Rules: Detection state + machine state
-
-        alt Không vi phạm
-            Rules-->>CV: normal
-        else Vi phạm mới
-            Rules-->>API: Safety event
-            API->>DB: Lưu event
-            API->>WS: Push realtime alert
-            WS-->>UI: new_event
-            UI-->>User: Hiển thị cảnh báo
-        else Event đang active
-            Rules-->>CV: Không tạo event lặp
-        end
+    participant CV as Vision
+    participant R as Rules / Events
+    participant P as Persistence
+    UI->>API: config + frame JPEG / image
+    API->>CV: analyze(frame, zone)
+    CV-->>API: observations, track, confidence, redacted image
+    API->>R: observations + machine/rule/session context
+    R->>R: triage confidence + dedup + severity
+    alt normal hoặc dưới ngưỡng
+        R-->>UI: result, không tạo event
+    else mơ hồ hoặc vi phạm
+        R-->>UI: pending HITL alert
+        UI->>API: confirm / false_alarm / acknowledge
+        API->>P: atomic event + audit + redacted snapshot
     end
-
-    User->>UI: Acknowledge / False alarm
-    UI->>API: PATCH /events/{id}
-    API->>DB: Lưu quyết định người dùng
-    API-->>UI: Event đã cập nhật
 ```
 
-## Components
+Các bất biến an toàn:
 
-### 1. Computer Vision Pipeline (Python)
-- **Person Detection:** YOLO pretrained
-- **PPE Detection baseline:** HSV torso heuristic cho safety_vest; thay bằng model PPE đã huấn luyện sau khi flow được xác nhận
-- **Tracking:** ByteTrack (qua Ultralytics)
-- **Zone Logic:** OpenCV `pointPolygonTest`
-- **Privacy:** Làm mờ khuôn mặt bằng OpenCV
+1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
+2. Zone entry khi máy chạy luôn critical; lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
+3. Dedup theo session + track + rule + occurrence; retry dùng idempotency key.
+4. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
+5. Audit giữ rule version, machine/zone/shift, confidence, actor và transition; không giữ raw stream.
 
-### 2. Backend (FastAPI)
-- **Mục đích:** API điều phối video, đánh giá rule engine, lưu trữ sự kiện, WebSocket đẩy cảnh báo.
-- **Rule Engine:** Viết bằng Python thuần kiểm tra các rule nghiệp vụ.
-- **WebSocket:** Cập nhật real-time tới frontend.
+## Trạng thái triển khai
 
-### 3. Frontend (React + TypeScript + Vite)
-- **Mục đích:** Live monitor, alert, event log, dashboard.
-- **Baseline:** React owns typed UI state and FastAPI serves the Vite production build. After four-point configuration, the browser sends binary JPEG samples over `/api/v1/ws/inference` and draws returned detections on Canvas. Only one frame is processed at a time.
+Hiện đã có React → FastAPI qua REST/WebSocket, person detection, polygon/machine rule,
+review và SQLite event history. PostgreSQL, PPE production model, tracking/dedup hoàn chỉnh,
+privacy gate, RBAC và các capability nâng cao vẫn là đích cần triển khai.
 
-### 4. Database
-- **Type:** PostgreSQL
-- **ORM:** SQLAlchemy + Alembic
+Thứ tự tiến hóa theo backlog:
 
-## Design Decisions
-
-| Decision | Choice | Reason |
-|----------|--------|--------|
-| Zone Logic | OpenCV | `pointPolygonTest` đủ dùng mà không cần model AI phức tạp |
-| Backend | FastAPI | Python stack, dễ tích hợp CV pipeline, hỗ trợ WebSocket tốt |
-| Frontend | React + TypeScript + Vite | Typed feature boundaries while preserving the validated baseline flow |
-| Architecture | Modular Monolith | Một repo, các thành phần gọi nội bộ thay vì microservices ở giai đoạn đầu |
+1. **Đóng MVP:** PPE + tracking/dedup + event state + privacy + auth/RBAC + image parity + metrics.
+2. **Bổ sung context:** zone/shift và confidence-based HITL.
+3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
+4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.

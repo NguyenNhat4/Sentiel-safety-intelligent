@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns local video playback, normalized four-point zone editing, sampled binary WebSocket inference, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Detection and polygon evaluation remain backend responsibilities.
 
-Project-wide decisions and progress live only in root [`DECISIONS.md`](../DECISIONS.md) and [`PROGRESS.md`](../PROGRESS.md).
+Project-wide decisions and progress are maintained centrally at repository root.
 
 ## Development
 

@@ -18,7 +18,11 @@ class InvalidFrameError(ValueError):
 class FrameInferenceService:
     """Small baseline detector for the browser video review flow."""
 
-    def __init__(self, person_model_path: str = "yolo11n.pt") -> None:
+    def __init__(self, person_model_path: str | None = None) -> None:
+        if person_model_path is None:
+            from backend.app.core.config import get_settings
+
+            person_model_path = get_settings().person_model_path
         self._person_model_path = person_model_path
         self._person_model = None
 
@@ -63,9 +67,15 @@ class FrameInferenceService:
 
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
         if self._person_model is None:
+            from pathlib import Path
+
             from ultralytics import YOLO
 
-            self._person_model = YOLO(self._person_model_path)
+            model_path = Path(self._person_model_path)
+            if not model_path.exists() and Path(model_path.name).exists():
+                model_path = Path(model_path.name)
+
+            self._person_model = YOLO(str(model_path))
 
         results = self._person_model.predict(frame, classes=[0], conf=0.35, verbose=False)
         people = []
