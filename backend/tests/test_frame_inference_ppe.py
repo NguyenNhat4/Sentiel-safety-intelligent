@@ -52,6 +52,7 @@ def test_required_explicitly_missing_ppe_requests_review():
 
     assert result.people[0].ppe.helmet.status == "missing"
     assert result.people[0].missing_required_ppe == ["helmet"]
+    assert result.rule["ppe_requirements"]["helmet_required"] is True
     assert result.review_required is True
     assert result.result == "violate"
 

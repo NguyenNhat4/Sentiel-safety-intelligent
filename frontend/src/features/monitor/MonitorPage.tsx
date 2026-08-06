@@ -53,7 +53,7 @@ export function MonitorPage() {
             <div className="person-box">
               <div className="person"><div className="head"><span className="blur" /></div><div className="body" /><div className="leg l" /><div className="leg r" /></div>
               <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
-              <label>PERSON · 96%</label><em>NO SAFETY SHIRT</em>
+              <label>PERSON · 96%</label><em>PPE CHECK</em>
             </div>
             {!state.stageReady && <div className="empty-state"><strong>Tải video demo</strong><span>Sau đó chọn 4 điểm để tạo vùng nguy hiểm.</span></div>}
             <div className="zone-hint">{state.stageReady ? zoneHint : "Chưa cấu hình vùng"}</div>
@@ -61,7 +61,7 @@ export function MonitorPage() {
           <footer>
             <span><i /> AI Detection</span>
             <span>{state.peopleCount} người</span>
-            <span>1 áo bảo hộ yêu cầu</span>
+            <span>{state.ppeRequirementCount} PPE bắt buộc</span>
             <strong className={state.view.violation ? "result-violate" : "result-normal"}>{state.view.violation ? "● VIOLATE" : state.stageReady ? "● NORMAL" : "● Chờ video"}</strong>
           </footer>
         </article>
@@ -72,7 +72,7 @@ export function MonitorPage() {
 
       <div className="activity-strip">
         <div><span className="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
-        <span>ONE ZONE</span><span className="medium-pill">ONE PPE</span>
+        <span>ONE ZONE</span><span className="medium-pill">PPE RULES</span>
         <span>{state.flowStatus}</span>
         <button onClick={actions.openFilePicker}>Bắt đầu bằng video →</button>
       </div>

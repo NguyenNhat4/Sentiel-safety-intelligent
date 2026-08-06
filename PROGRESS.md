@@ -9,6 +9,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Python static checks and frontend lint, type-check, unit/component tests, and production build pass.
 - US-07 now has shared default-OFF PPE requirement persistence, typed GET/PUT APIs, an explicit-save frontend panel, and per-person PPE observation plumbing for the fixed `uploaded_video` / `zone_01` pair.
 - Backend US-07 follows the approved flat layered layout (`api`, `models`, `schemas`, `services`, `integrations`); the temporary `backend/app/modules` tree has been removed.
+- Inference `rule` now echoes the persisted PPE requirement booleans used for that frame, making configured helmet/glasses/gloves state observable in REST and WebSocket responses.
+- Required PPE state is rendered on each detected-person box: present is green, explicit missing is red, and unknown is labeled neutrally.
+- Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
 
 ## Completed
 

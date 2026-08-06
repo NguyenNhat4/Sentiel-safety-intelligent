@@ -2,12 +2,24 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import type {ChangeEvent, PointerEvent as ReactPointerEvent, RefObject} from "react";
 import {InferenceClient} from "../../api/inference-client";
 import {saveReviewedEvent} from "../../api/events";
-import type {EventPayload, InferenceResult, PersonDetection, ReviewStatus, ZonePoint} from "../../types";
+import type {
+  EventPayload,
+  InferenceResult,
+  PersonDetection,
+  PpeRequirementUpdate,
+  ReviewStatus,
+  ZonePoint,
+} from "../../types";
 import {drawOverlay, findPointAt, normalizedPointerPosition} from "./canvas";
 
 const SAMPLE_INTERVAL_SECONDS = 0.5;
 const JPEG_QUALITY = 0.82;
 const PREVIEW_CANDIDATES = [0.05, 0.5, 1, 2, 3, 4, 5, 7, 10];
+const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
+  helmet_required: false,
+  safety_glasses_required: false,
+  gloves_required: false,
+};
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
 
@@ -29,7 +41,7 @@ const initialView = (machineRunning = true): MonitorView => ({
   violation: false,
   alertTitle: "Chưa có vi phạm",
   severity: "NORMAL",
-  alertSummary: "Người trong vùng nguy hiểm phải mặc áo bảo hộ khi máy đang hoạt động.",
+  alertSummary: "Cảnh báo PPE chỉ áp dụng cho các loại đã được cấu hình bắt buộc.",
   reviewMessage: "Khung hình vi phạm sẽ hiện tại đây",
   eventStatus: "CHƯA CÓ SỰ KIỆN ĐƯỢC LƯU",
   confidenceLabel: "READY",
@@ -61,6 +73,9 @@ export function useMonitor() {
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const zonePointsRef = useRef<ZonePoint[]>([]);
   const [latestPeople, setLatestPeople] = useState<PersonDetection[]>([]);
+  const [activePpeRequirements, setActivePpeRequirements] = useState<PpeRequirementUpdate>(
+    DEFAULT_PPE_REQUIREMENTS,
+  );
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const draggingPoint = useRef<number | null>(null);
   const [selectingZone, setSelectingZone] = useState(false);
@@ -139,8 +154,8 @@ export function useMonitor() {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
+    setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
-    const missingShirt = result.people.some(person => person.inside_zone && !person.safety_shirt);
     const violation = result.result === "violate";
     setView(current => ({
       ...current,
@@ -149,7 +164,7 @@ export function useMonitor() {
       severity: violation ? "VIOLATE" : "NORMAL",
       alertSummary: violation ? current.alertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
       zoneRule: {yes: inside, text: inside ? "Trong vùng nguy hiểm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
-      ppeRule: {yes: !missingShirt, text: missingShirt ? "Không có áo bảo hộ" : "Có áo / không yêu cầu", badge: missingShirt ? "MISS" : "OK"}
+      ppeRule: buildPpeRule(result),
     }));
     if (!result.review_required) session.current.violationLatched = false;
     if (!result.review_required || session.current.violationLatched) return;
@@ -185,8 +200,8 @@ export function useMonitor() {
 
   useEffect(() => {
     const canvas = overlayRef.current;
-    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, selectedPoint);
-  }, [latestPeople, selectedPoint, zonePoints]);
+    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, selectedPoint, activePpeRequirements);
+  }, [activePpeRequirements, latestPeople, selectedPoint, zonePoints]);
 
   useEffect(() => {
     if (!toast) return;
@@ -456,7 +471,8 @@ export function useMonitor() {
     state: {
       zonePoints, selectingZone, machineRunning, pendingViolation, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
-      zoneDisabled, flowStatus, toast, selectedPointPosition, timer, peopleCount: latestPeople.length
+      zoneDisabled, flowStatus, toast, selectedPointPosition, timer, peopleCount: latestPeople.length,
+      ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
@@ -465,6 +481,29 @@ export function useMonitor() {
       handlePointerUp, deleteSelectedPoint, review
     }
   };
+}
+
+export function buildPpeRule(result: InferenceResult): RuleView {
+  const requirements = result.rule.ppe_requirements;
+  const requiredLabels = [
+    requirements.helmet_required ? "mũ" : null,
+    requirements.safety_glasses_required ? "kính" : null,
+    requirements.gloves_required ? "găng" : null,
+  ].filter((label): label is string => label !== null);
+  if (!requiredLabels.length) return {yes: null, text: "Không yêu cầu PPE", badge: "OFF"};
+
+  const missing = [...new Set(result.people.flatMap(person => person.missing_required_ppe))];
+  const ppeLabel: Record<string, string> = {helmet: "mũ", safety_glasses: "kính", gloves: "găng"};
+  if (missing.length) return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
+
+  const hasUnknown = result.people.some(person =>
+    requiredLabels.some(label => {
+      const item = label === "mũ" ? "helmet" : label === "kính" ? "safety_glasses" : "gloves";
+      return person.ppe[item].status === "unknown";
+    }),
+  );
+  if (hasUnknown) return {yes: null, text: `Đang kiểm tra ${requiredLabels.join(", ")}`, badge: "CHECK"};
+  return {yes: true, text: `Đủ PPE: ${requiredLabels.join(", ")}`, badge: "OK"};
 }
 
 export function buildEventPayload(

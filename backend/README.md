@@ -143,7 +143,15 @@ The backend returns one correlated JSON result for each accepted JPEG:
   "rule": {
     "person_inside_zone": true,
     "machine_state": "running",
-    "safety_shirt_required": true
+    "safety_shirt_required": true,
+    "camera_id": "uploaded_video",
+    "zone_id": "zone_01",
+    "ppe_requirements": {
+      "helmet_required": true,
+      "safety_glasses_required": false,
+      "gloves_required": false
+    },
+    "ppe_alert": false
   }
 }
 ```
@@ -160,7 +168,7 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `review_required` | `true` only when the machine is running and at least one foot point is inside. The frontend pauses only for this value. |
 | `result` | `violate` when `review_required=true`; otherwise `normal`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
-| `rule` | Decision inputs included for debugging and audit context. |
+| `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
 
 The current decision is:
 
