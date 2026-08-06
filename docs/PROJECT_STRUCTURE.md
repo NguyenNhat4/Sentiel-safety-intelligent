@@ -68,6 +68,12 @@ P-047/
 │   ├── ppe_yolov8n.pt
 │   └── yolo11n.pt
 ├── docs/                # Architecture, technical guides (uv setup guide: docs/guide/setup/uv-setup.md) and documentation index
+│   ├── API_CONTRACT/                 # Task-routed shared REST/WebSocket contract chapters
+│   │   ├── README.md                 # API contract reading index
+│   │   └── 01-foundations.md ... 05-quality-and-traceability.md
+│   ├── DATABASE_SCHEMA/              # Capability-routed logical data contract chapters
+│   │   ├── README.md                 # Database contract reading index
+│   │   └── 01-foundations-and-ownership.md ... 05-constraints-and-operations.md
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future project structure baseline (read-only)
 │   └── FUTURE_PROJECT_STRUCTURE_GUIDE.md # Interpretation guide for the future tree

@@ -80,3 +80,9 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Constraint:** A new top-level directory or module-boundary change requires a root decision entry. Cross-module work uses public services/contracts rather than importing another module's repository or model. Generated contracts are not edited manually.
 - **Migration:** Adopt the structure incrementally per user story; preserve current REST/WebSocket behavior until a versioned migration is documented and tested.
 
+## 2026-08-06: [Cross-cutting] Shared API and database design contracts
+- **Reason:** Frontend, backend, vision, QA, analytics, and operations need one reviewable vocabulary for resources, lifecycle, ownership, privacy, and compatibility across MVP closure and the five-week advanced plan.
+- **Choice:** Use task-routed chapters under `docs/API_CONTRACT/` as the human-readable REST/WebSocket design contract and capability-routed chapters under `docs/DATABASE_SCHEMA/` as the logical data/ERD contract. Each directory has a `README.md` reading map; current versus planned routes remain explicit.
+- **Source-of-truth constraint:** Runtime REST truth remains module-owned Pydantic/FastAPI definitions; WebSocket and backend–vision truth remains versioned JSON Schema under `contracts/`; Alembic migrations remain database history. Generated artifacts are never edited manually.
+- **Privacy constraint:** Raw video/images are not persisted; snapshot records require verified redaction and immutable event/audit context.
+- **Governance:** Everything under `docs/API_CONTRACT/` and `docs/DATABASE_SCHEMA/` is read-only for agents and contributors. A conflict requires stopping the implementation and requesting an explicit contract decision; the contract must not be edited as part of ordinary feature work.
