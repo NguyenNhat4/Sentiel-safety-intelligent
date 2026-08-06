@@ -1,63 +1,8 @@
 import {useEffect, useState} from "react";
 import type {ReactNode} from "react";
-
-export type Page = "monitor" | "events";
-
-interface AppShellProps {
-  page: Page;
-  onNavigate: (page: Page) => void;
-  children: ReactNode;
+import type {AuthenticatedUser} from "../types";
+export type Page = "monitor" | "streaming" | "events";
+interface AppShellProps { page: Page; onNavigate: (page: Page) => void; user: AuthenticatedUser; onLogout: () => void; children: ReactNode; }
+export function AppShell({page, onNavigate, user, onLogout, children}: AppShellProps) { const clock = useClock(); const title = page === "monitor" ? "Live Monitor" : page === "streaming" ? "Mô phỏng streaming" : "Nhật ký vi phạm"; const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map((part) => part[0]).join("").toUpperCase(); return <><aside className="sidebar"><a className="brand" href="/"><span className="brand-mark">S</span><span>Sentinel<small>Safety intelligence</small></span></a><nav><button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button><button className={`nav-item ${page === "streaming" ? "active" : ""}`} onClick={() => onNavigate("streaming")}><span>▶</span> Mô phỏng streaming</button><button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button><button className="nav-item muted-nav" disabled><span>⌁</span> Dashboard</button><button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button></nav><div className="system-card"><div><span className="pulse" /> Hệ thống hoạt động</div><p>Video và AI engine đã sẵn sàng.</p><div className="system-meta"><span>Rule</span><strong>Zone + Machine + Shirt</strong></div><div className="system-meta"><span>Model</span><strong>YOLO Person</strong></div></div><div className="profile"><div className="avatar">{initials}</div><div><strong>{user.full_name}</strong><small>{user.role_label}</small></div><button aria-label="Đăng xuất" onClick={onLogout}>Đăng xuất</button></div></aside><main><header><div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div><div className="header-actions"><div className="clock"><span>{clock}</span><small>Safety shirt baseline</small></div><button className="icon-btn">⌕</button><button className="icon-btn notification">♢<i /></button></div></header>{children}</main></>;
 }
-
-export function AppShell({page, onNavigate, children}: AppShellProps) {
-  const clock = useClock();
-  return (
-    <>
-      <aside className="sidebar">
-        <a className="brand" href="/">
-          <span className="brand-mark">S</span>
-          <span>Sentinel<small>Safety intelligence</small></span>
-        </a>
-        <nav>
-          <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>
-          <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>
-          <button className="nav-item muted-nav" disabled><span>⌁</span> Dashboard</button>
-          <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
-        </nav>
-        <div className="system-card">
-          <div><span className="pulse" /> Hệ thống hoạt động</div>
-          <p>Video và AI engine đã sẵn sàng.</p>
-          <div className="system-meta"><span>Rule</span><strong>Zone + Machine + Shirt</strong></div>
-          <div className="system-meta"><span>Model</span><strong>YOLO Person</strong></div>
-        </div>
-        <div className="profile">
-          <div className="avatar">AT</div>
-          <div><strong>Anh Tuấn</strong><small>Cán bộ an toàn</small></div>
-          <button>•••</button>
-        </div>
-      </aside>
-      <main>
-        <header>
-          <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{page === "monitor" ? "Live Monitor" : "Nhật ký vi phạm"}</h1></div>
-          <div className="header-actions">
-            <div className="clock"><span>{clock}</span><small>Safety shirt baseline</small></div>
-            <button className="icon-btn">⌕</button>
-            <button className="icon-btn notification">♢<i /></button>
-          </div>
-        </header>
-        {children}
-      </main>
-    </>
-  );
-}
-
-function useClock(): string {
-  const [clock, setClock] = useState("--:--:--");
-  useEffect(() => {
-    const update = () => setClock(new Date().toLocaleTimeString("vi-VN", {hour12: false}));
-    update();
-    const interval = window.setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, []);
-  return clock;
-}
+function useClock(): string { const [clock, setClock] = useState("--:--:--"); useEffect(() => { const update = () => setClock(new Date().toLocaleTimeString("vi-VN", {hour12: false})); update(); const interval = window.setInterval(update, 1000); return () => clearInterval(interval); }, []); return clock; }

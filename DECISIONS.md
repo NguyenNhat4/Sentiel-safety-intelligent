@@ -64,3 +64,13 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Choice:** Keep MVP closure and regression in US-01 to US-13 plus US-16 to US-19; plan advanced HITL/escalation and US-20 to US-26 across the subsequent five weeks.
 - **Constraint:** Camera factory integration, PLC control, automatic machine stop, and concurrent multi-stream scale require a separate scope decision.
 - **Documentation:** Every incomplete story has a canonical `specs/backlog/US-XX.md` whose story content must remain identical to the corresponding section in `specs/USER_STORIES_LIST.md`.
+
+## 2026-08-05: [Frontend] Browser-only streaming simulation before camera integration
+- **Reason:** Operators need a clear way to rehearse the streaming workflow without requiring an RTSP/WebRTC backend or sending local video outside the browser.
+- **Choice:** The Streaming page uses a browser object URL, local preview, and simulated lifecycle status; Live Monitor remains the only page that sends sampled JPEG frames to the inference WebSocket.
+- **Constraint:** The streaming UI must clearly state that no stream session, video file, telemetry, or database record is created until a backend stream contract is implemented.
+
+## 2026-08-05: [Backend] Persisted opaque sessions for MVP authentication
+- **Reason:** The role-aware frontend needs real login, session lookup, and logout without introducing a new JWT dependency or storing raw access tokens in the database.
+- **Choice:** Store PBKDF2 password hashes in `users` and SHA-256 token digests in `user_sessions`; issue an opaque Bearer token and revoke the session on logout.
+- **Constraint:** Demo users are seeded only outside production. Authentication failures use controlled `401`, `403`, and `503` responses, while request validation remains FastAPI `422`.

@@ -48,6 +48,7 @@ P-047/
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── auth/    # Login experience and role entry-point selection
+│   │   │   ├── streaming/ # Browser-only video streaming simulation
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result and Human-in-the-Loop review
 │   │   │   ├── events/  # Acknowledged violation history
@@ -194,3 +195,7 @@ React refactor giữ nguyên UI và wire contract đã xác nhận; đây là th
 | `types/` | REST/WebSocket contract types | Mutable runtime state |
 
 React state owns renderable state; refs own video, Canvas, WebSocket and per-frame mutable values. The refactor preserves the validated UI behavior and existing backend wire contracts.
+
+### Authentication additions
+
+`backend/app/api/v1/auth.py` owns login, current-session lookup, and logout endpoints. `backend/app/models/user.py` owns the `users` and `user_sessions` tables; `backend/app/services/auth_service.py` owns password verification, token digesting, session lifecycle, and controlled authentication exceptions. Contracts live in `backend/app/schemas/auth.py` and are consumed by `frontend/API_MOCKS.md`.

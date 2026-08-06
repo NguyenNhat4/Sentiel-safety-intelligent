@@ -15,6 +15,14 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 
 REST routes are interactive at <http://localhost:8000/docs>. The inference WebSocket at `ws://localhost:8000/api/v1/ws/inference` is intentionally absent from Swagger because WebSocket operations are not part of the generated OpenAPI schema.
 
+## Authentication
+
+`POST /api/v1/auth/login`, `GET /api/v1/auth/me`, and `POST /api/v1/auth/logout` provide the frontend authentication contract. Development and test environments seed the three documented demo accounts with password `Sentinel123!`; production never seeds demo accounts.
+
+- Login returns an opaque Bearer token and user identity/role.
+- Sessions are stored as token digests in `user_sessions`; raw tokens are never persisted.
+- Missing, malformed, revoked, or expired tokens return `401`; inactive accounts return `403`; request validation returns FastAPI `422`; database failures return `503`.
+
 Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. If database persistence fails after writing a snapshot, the backend rolls back the transaction and removes that unreferenced snapshot.
 
 ## Frontend–Backend Interaction

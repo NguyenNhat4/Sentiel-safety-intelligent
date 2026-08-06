@@ -13,3 +13,6 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   if (!account || account.password !== credentials.password) throw new Error("Email hoặc mật khẩu không chính xác.");
   return {access_token: `mock-token-${account.role}`, token_type: "bearer", user: {id: account.role, full_name: account.full_name, email: credentials.email.trim().toLowerCase(), role: account.role, role_label: account.role_label}};
 }
+
+/** Temporary local logout. A real implementation will revoke/clear the stored session. */
+export async function logout(): Promise<void> { await Promise.resolve(); }

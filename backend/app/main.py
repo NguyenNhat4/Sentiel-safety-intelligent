@@ -9,7 +9,8 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
-from backend.app.core.database import Base, engine
+from backend.app.core.database import Base, SessionLocal, engine
+from backend.app.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -20,6 +21,12 @@ async def lifespan(app: FastAPI):
     # Auto-create tables in development if DB is reachable
     try:
         Base.metadata.create_all(bind=engine)
+        if settings.app_env != "production":
+            db = SessionLocal()
+            try:
+                AuthService(db).seed_demo_users()
+            finally:
+                db.close()
         logger.info("Database tables verified/created successfully.")
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")

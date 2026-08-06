@@ -11,6 +11,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 ## Completed
 
 ### Backend
+- [x] Added database-backed authentication endpoints for login, current-session lookup, and logout, with seeded development users and persisted token digests.
 - [x] Established the FastAPI modular monolith, typed settings, SQLAlchemy database layer, REST APIs, and test scaffolding.
 - [x] Added safety-event lifecycle, reviewed snapshot persistence, statistics, and Safety Agent endpoints.
 - [x] Added YOLO person detection, foot-point polygon evaluation, safety-shirt baseline rule, and REST frame inference.
@@ -18,7 +19,8 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Documented frontend/backend interaction and the recommended confirmed-warning persistence lifecycle.
 
 ### Frontend
-- [x] Added a standalone mock login entry point for Safety Manager, Area Manager, and Simulation Operator, with documented backend authentication contracts.
+- [x] Added mock login/logout entry points for Safety Manager, Area Manager, and Simulation Operator, with documented backend authentication contracts.
+- [x] Added a browser-only Streaming simulation page with local-video preview and Start/Pause/Stop controls; no video is uploaded or persisted in this MVP screen.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
 - [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
@@ -46,6 +48,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 
 ## Known Issues
+- The current local `.venv` has an incomplete Pydantic installation (`pydantic_core` is missing), so backend pytest cannot start until dependencies are reinstalled.
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
 - Review snapshots are not face-blurred yet and currently record `privacy_blurred=false`.
 - The pytest suite collects successfully but stalls in the shared `TestClient` flow on the current Python 3.14 environment; focused non-`TestClient` checks and live smoke tests pass.

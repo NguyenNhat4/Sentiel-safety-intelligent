@@ -73,3 +73,7 @@ Transport code does not render UI. Canvas utilities do not call the network. Fea
 ## Login mock and backend handoff
 
 The current frontend entry point is the login screen for Safety Manager, Area Manager, and Simulation Operator. Its temporary authentication transport and the backend contracts needed to connect it are documented in [API_MOCKS.md](API_MOCKS.md).
+
+## Streaming simulation
+
+The **Mô phỏng streaming** page is frontend-only: it previews a local video and simulates Start, Pause, and Stop. It does not upload a video, create a database record, or open a WebSocket. The current behavior and proposed backend handoff fields are documented in [API_MOCKS.md](API_MOCKS.md#browser-only-streaming-simulation).
