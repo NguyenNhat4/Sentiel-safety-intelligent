@@ -31,6 +31,7 @@ export interface InferenceRule {
   safety_shirt_required: boolean;
   camera_id: string;
   zone_id: string;
+  ppe_requirements: PpeRequirementUpdate;
   ppe_alert: boolean;
 }
 

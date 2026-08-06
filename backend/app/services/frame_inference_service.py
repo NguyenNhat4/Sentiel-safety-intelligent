@@ -92,6 +92,11 @@ class FrameInferenceService:
                 "safety_shirt_required": True,
                 "camera_id": request.camera_id,
                 "zone_id": request.zone_id,
+                "ppe_requirements": {
+                    "helmet_required": requirements.helmet_required,
+                    "safety_glasses_required": requirements.safety_glasses_required,
+                    "gloves_required": requirements.gloves_required,
+                },
                 "ppe_alert": ppe_alert,
             },
         )

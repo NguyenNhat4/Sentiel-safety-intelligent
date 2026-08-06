@@ -29,7 +29,7 @@ export function AlertPanel({view, reviewPending, reviewSaving, snapshot, timer, 
       <div className="confidence">
         <div><span>Trạng thái inference</span><strong>{view.confidenceLabel}</strong></div>
         <div className="confidence-bar"><span style={{width: view.confidenceWidth}} /></div>
-        <small>Rule được hardcode cho baseline</small>
+        <small>Rule PPE theo cấu hình đã lưu</small>
       </div>
 
       {snapshot && <img className="snapshot visible" src={snapshot} alt="Khung hình cần xác minh" />}
