@@ -48,6 +48,6 @@ describe("Sentinel React application", () => {
       fireEvent.pointerUp(canvas, {pointerId: 1});
     });
     expect(screen.getByText("Vùng đã sẵn sàng · Kéo điểm để điều chỉnh")).toBeInTheDocument();
-    expect(screen.getByText("Sẵn sàng inference realtime · nhấn Phát video")).toBeInTheDocument();
+    expect(screen.getByText("Zone sẵn sàng · inference realtime")).toBeInTheDocument();
   });
 });

@@ -102,7 +102,9 @@ backend/app/api/v1/ppe_requirements.py
 backend/app/models/ppe_requirement.py
 backend/app/schemas/ppe_requirement.py
 backend/app/services/ppe_requirement_service.py
-backend/app/integrations/ppe_vision.py
+backend/app/int
+│   ├── pipeline.py                  # Detection/tracking/geometry/
+egrations/ppe_vision.py
 backend/tests/test_ppe_requirements.py
 ```
 

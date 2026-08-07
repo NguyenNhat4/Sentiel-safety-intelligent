@@ -31,7 +31,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter now returns per-person PPE observations through `vision.api`; only an explicit `missing` observation meeting the rules threshold can create a PPE alert.
+GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter returns all 17 SH17 detections plus per-person PPE observations through `vision.api`. Backend derives `missing` only when a person meets the confidence/association guard and has no associated required PPE detection.
 
 ```mermaid
 sequenceDiagram
@@ -73,13 +73,13 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people in this frame, and is any person's foot inside the configured danger zone while the machine is running?** It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/PPE objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** SH17 class `0` detects people; the same checkpoint detects all PPE/object classes. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
 #### 1. Configure once per connection
 
-After the operator defines the zone, send exactly four normalized points and the current machine state:
+Send four normalized points to activate zone evaluation, or an empty list to run detection without a zone, together with the current machine state:
 
 ```json
 {
@@ -160,12 +160,13 @@ The backend returns one correlated JSON result for each accepted JPEG:
 |---|---|
 | `frame_id`, `video_time` | Copied from `frame_meta` so the frontend can match the result to the analyzed frame. |
 | `people` | Every person detected by YOLO; an empty array means no person was detected. |
+| `detections` | Additive list of every SH17 model detection: `class_id`, `class_name`, original-frame `bbox`, confidence and nullable `person_index`. It can be non-empty even when `people` is empty. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |
 | `confidence` | YOLO's confidence that the detection is a person. |
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
 | `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
 | `safety_shirt` | Baseline high-visibility-shirt heuristic; supplementary metadata, not the zone-intrusion trigger. |
-| `review_required` | `true` only when the machine is running and at least one foot point is inside. The frontend pauses only for this value. |
+| `review_required` | `true` when the machine is running and at least one foot point is inside, or when a required PPE is `missing` for a qualified person. The frontend pauses only for this value. |
 | `result` | `violate` when `review_required=true`; otherwise `normal`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
 | `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
@@ -174,7 +175,8 @@ The current decision is:
 
 ```text
 person_inside_zone = any(person.inside_zone for person in people)
-review_required = person_inside_zone AND machine_state == "running"
+ppe_alert = any(person.missing_required_ppe for person in people)
+review_required = (person_inside_zone AND machine_state == "running") OR ppe_alert
 result = "violate" if review_required else "normal"
 ```
 
@@ -187,7 +189,7 @@ Common outcomes:
 | Person inside zone | Stopped | `true` | `normal` | `false` | No |
 | Person inside zone | Running | `true` | `violate` | `true` | Yes |
 
-Bounding boxes and `inside_zone` remain available when the machine is stopped; only review, video pause, and snapshot generation are suppressed.
+Bounding boxes and `inside_zone` remain available when the machine is stopped; zone-driven review, video pause, and snapshot generation are suppressed. A qualified required-PPE absence still requests review.
 
 ### Protocol errors
 

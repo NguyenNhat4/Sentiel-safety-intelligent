@@ -1,6 +1,7 @@
 import {fireEvent, render, screen} from "@testing-library/react";
 import {describe, expect, it, vi} from "vitest";
 import {AlertPanel} from "./AlertPanel";
+import type {ModelDetection} from "../../types";
 import type {MonitorView} from "../monitor/use-monitor";
 
 const view: MonitorView = {
@@ -19,5 +20,33 @@ describe("AlertPanel", () => {
     fireEvent.click(screen.getByRole("button", {name: /báo sai/}));
     expect(onReview).toHaveBeenNthCalledWith(1, "acknowledged");
     expect(onReview).toHaveBeenNthCalledWith(2, "false_alarm");
+  });
+
+  it("renders total detections list and triggers open review modal", () => {
+    const onReview = vi.fn();
+    const onOpenModal = vi.fn();
+    const detections: ModelDetection[] = [
+      {class_id: 14, class_name: "shoes", bbox: [10, 10, 50, 50], confidence: 0.88, person_index: 0},
+      {class_id: 10, class_name: "helmet", bbox: [20, 20, 40, 40], confidence: 0.94, person_index: null},
+    ];
+
+    render(
+      <AlertPanel
+        view={view}
+        reviewPending
+        reviewSaving={false}
+        detections={detections}
+        timer="00:05"
+        onReview={onReview}
+        onOpenModal={onOpenModal}
+      />
+    );
+
+    expect(screen.getByText("OBJECT DETECTIONS GROUPED BY PERSON (2)")).toBeInTheDocument();
+    expect(screen.getByText("SHOES")).toBeInTheDocument();
+    expect(screen.getByText("HELMET")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {name: /Mở Pop-up xác minh/}));
+    expect(onOpenModal).toHaveBeenCalledTimes(1);
   });
 });
