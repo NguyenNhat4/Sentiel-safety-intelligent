@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from vision.api import PersonPpeObservations, PpeVisionFacade
+from vision.api import PpeVisionFacade, PpeVisionResult
 
 
 class PpeVisionAdapter:
@@ -15,11 +15,14 @@ class PpeVisionAdapter:
         self,
         frame: np.ndarray,
         people: list[tuple[int, int, int, int, float]],
-    ) -> list[PersonPpeObservations]:
+    ) -> PpeVisionResult:
         return self._facade.observe(frame, people)
+
+    def preload(self) -> None:
+        self._facade.preload()
 
 
 PpeObserver = Callable[
     [np.ndarray, list[tuple[int, int, int, int, float]]],
-    list[PersonPpeObservations],
+    PpeVisionResult,
 ]

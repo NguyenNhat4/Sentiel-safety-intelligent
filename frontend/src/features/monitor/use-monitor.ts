@@ -5,6 +5,7 @@ import {saveReviewedEvent} from "../../api/events";
 import type {
   EventPayload,
   InferenceResult,
+  ModelDetection,
   PersonDetection,
   PpeRequirementUpdate,
   ReviewStatus,
@@ -73,6 +74,7 @@ export function useMonitor() {
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const zonePointsRef = useRef<ZonePoint[]>([]);
   const [latestPeople, setLatestPeople] = useState<PersonDetection[]>([]);
+  const [latestDetections, setLatestDetections] = useState<ModelDetection[]>([]);
   const [activePpeRequirements, setActivePpeRequirements] = useState<PpeRequirementUpdate>(
     DEFAULT_PPE_REQUIREMENTS,
   );
@@ -83,6 +85,7 @@ export function useMonitor() {
   const machineRunningRef = useRef(true);
   const [pendingViolation, setPendingViolation] = useState<InferenceResult | null>(null);
   const pendingViolationRef = useRef<InferenceResult | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [view, setView] = useState<MonitorView>(() => initialView());
@@ -112,7 +115,7 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zone_points: zonePointsRef.current,
+        zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
         machine_state: machineRunningRef.current ? "running" : "stopped"
       }),
       onResult: result => resultHandler.current(result),
@@ -154,6 +157,7 @@ export function useMonitor() {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
+    setLatestDetections(result.detections ?? []);
     setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
     const violation = result.result === "violate";
@@ -172,6 +176,7 @@ export function useMonitor() {
     session.current.running = false;
     pendingViolationRef.current = result;
     setPendingViolation(result);
+    setIsReviewModalOpen(true);
     const video = videoRef.current;
     if (video) {
       video.pause();
@@ -200,8 +205,8 @@ export function useMonitor() {
 
   useEffect(() => {
     const canvas = overlayRef.current;
-    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, selectedPoint, activePpeRequirements);
-  }, [activePpeRequirements, latestPeople, selectedPoint, zonePoints]);
+    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, latestDetections, selectedPoint, activePpeRequirements);
+  }, [activePpeRequirements, latestDetections, latestPeople, selectedPoint, zonePoints]);
 
   useEffect(() => {
     if (!toast) return;
@@ -230,6 +235,7 @@ export function useMonitor() {
     });
     updateZonePoints([]);
     setLatestPeople([]);
+    setLatestDetections([]);
     setSelectedPoint(null);
     pendingViolationRef.current = null;
     setPendingViolation(null);
@@ -317,12 +323,12 @@ export function useMonitor() {
     setPreviewSrc(undefined);
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
-    session.current.running = zonePointsRef.current.length === 4;
+    session.current.running = true;
     session.current.frameSequence = 0;
     session.current.lastHandledFrame = -1;
     session.current.lastSampleTime = -1;
-    setFlowStatus(session.current.running ? "Đang inference realtime" : "Đang xem video · dừng để cấu hình đủ 4 điểm");
-    setView(current => ({...current, confidenceLabel: session.current.running ? "RUNNING" : "PREVIEW", confidenceWidth: session.current.running ? "70%" : "25%"}));
+    setFlowStatus("Đang inference realtime");
+    setView(current => ({...current, confidenceLabel: "RUNNING", confidenceWidth: "70%"}));
     if (video.ended) video.currentTime = 0;
     if (session.current.running) {
       setFlowStatus("Đang kết nối inference");
@@ -420,7 +426,7 @@ export function useMonitor() {
       updateZonePoints([...zonePointsRef.current, position]);
       setSelectedPoint(zonePointsRef.current.length - 1);
     } else setSelectedPoint(null);
-    setFlowStatus(zonePointsRef.current.length === 4 ? "Sẵn sàng inference realtime · nhấn Phát video" : "Chờ đủ 4 điểm");
+    setFlowStatus(zonePointsRef.current.length === 4 ? "Zone sẵn sàng · inference realtime" : "Zone tùy chọn · detection vẫn chạy khi phát video");
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>): void {
@@ -451,6 +457,7 @@ export function useMonitor() {
       await saveReviewedEvent(buildEventPayload(status, pending, zonePointsRef.current, machineRunningRef.current));
       pendingViolationRef.current = null;
       setPendingViolation(null);
+      setIsReviewModalOpen(false);
       setReviewStartedAt(null);
       setPlaybackDisabled(false);
       setFlowStatus("Đã đóng xác minh");
@@ -469,16 +476,19 @@ export function useMonitor() {
   return {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
-      zonePoints, selectingZone, machineRunning, pendingViolation, reviewSaving, view,
+      zonePoints, selectingZone, machineRunning, pendingViolation, isReviewModalOpen, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
-      zoneDisabled, flowStatus, toast, selectedPointPosition, timer, peopleCount: latestPeople.length,
+      zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
+      latestPeople, latestDetections, peopleCount: latestPeople.length,
       ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
       resetZone, toggleZoneEditing, handlePointerDown, handlePointerMove,
-      handlePointerUp, deleteSelectedPoint, review
+      handlePointerUp, deleteSelectedPoint, review,
+      openReviewModal: () => setIsReviewModalOpen(true),
+      closeReviewModal: () => setIsReviewModalOpen(false),
     }
   };
 }

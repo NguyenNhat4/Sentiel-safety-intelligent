@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, engine
+from backend.app.services.frame_inference_service import frame_inference_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -23,6 +24,9 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables verified/created successfully.")
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
+
+    frame_inference_service.preload_models()
+    logger.info("SH17 inference models loaded.")
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield

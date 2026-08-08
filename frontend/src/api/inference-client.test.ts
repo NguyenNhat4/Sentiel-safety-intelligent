@@ -52,4 +52,29 @@ describe("InferenceClient", () => {
     expect(onResult).toHaveBeenCalledWith(result);
     expect(client.canSend).toBe(true);
   });
+
+  it("sends configure message even when zone_points is empty", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new InferenceClient({
+      getConfiguration: () => ({zone_points: [], machine_state: "running"}),
+      onResult: vi.fn(),
+      onFailure: vi.fn(),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket as unknown as WebSocket;
+      }
+    });
+
+    const connection = client.connect();
+    sockets[0].open();
+    expect(JSON.parse(sockets[0].sent[0] as string)).toEqual({
+      type: "configure",
+      zone_points: [],
+      machine_state: "running"
+    });
+    sockets[0].message({type: "configured"});
+    await connection;
+    expect(client.canSend).toBe(true);
+  });
 });

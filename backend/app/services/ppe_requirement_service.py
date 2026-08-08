@@ -21,10 +21,11 @@ def should_alert_for_missing_ppe(
     *,
     required: bool,
     status: PpeStatus,
-    confidence: float | None,
+    person_confidence: float,
     threshold: float,
+    association_is_valid: bool,
 ) -> bool:
-    return required and status is PpeStatus.MISSING and confidence is not None and confidence >= threshold
+    return required and status is PpeStatus.MISSING and person_confidence >= threshold and association_is_valid
 
 
 class PpeRequirementPersistenceError(RuntimeError):

@@ -17,24 +17,41 @@ class PersonPpeObservations(TypedDict):
     gloves: PpeObservationValue
 
 
+class ModelDetection(TypedDict):
+    class_id: int
+    class_name: str
+    bbox: list[int]
+    confidence: float
+    person_index: int | None
+
+
+class PpeVisionResult(TypedDict):
+    people: list[PersonPpeObservations]
+    detections: list[ModelDetection]
+
+
 class PpeVisionFacade:
     """Returns PPE-presence observations without applying safety rules."""
 
     _PPE_CLASS_TO_FIELD = {"helmet": "helmet", "glasses": "safety_glasses", "gloves": "gloves"}
 
-    def __init__(self, model_path: str, confidence_threshold: float = 0.35) -> None:
+    def __init__(
+        self,
+        model_path: str,
+        confidence_threshold: float = 0.35,
+        person_confidence_threshold: float = 0.5,
+    ) -> None:
         self._model_path = model_path
         self._confidence_threshold = confidence_threshold
+        self._person_confidence_threshold = person_confidence_threshold
         self._model = None
 
     def observe(
         self,
         frame: np.ndarray,
         people: list[tuple[int, int, int, int, float]],
-    ) -> list[PersonPpeObservations]:
+    ) -> PpeVisionResult:
         observations = [self._unknown_observations() for _ in people]
-        if not people:
-            return observations
 
         if self._model is None:
             from ultralytics import YOLO
@@ -43,23 +60,37 @@ class PpeVisionFacade:
 
         result = self._model.predict(frame, conf=self._confidence_threshold, verbose=False)[0]
         names = result.names
+        detections: list[ModelDetection] = []
         for box in result.boxes:
-            class_name = str(names[int(box.cls[0])]).lower()
-            field = self._PPE_CLASS_TO_FIELD.get(class_name)
-            if field is None:
-                continue
-
+            class_id = int(box.cls[0])
+            class_name = str(names[class_id]).lower()
             x1, y1, x2, y2 = (float(value) for value in box.xyxy[0].tolist())
+            confidence = float(box.conf[0])
             person_index = self._person_containing((x1 + x2) / 2, (y1 + y2) / 2, people)
-            if person_index is None:
+            detections.append(
+                {
+                    "class_id": class_id,
+                    "class_name": class_name,
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                    "confidence": confidence,
+                    "person_index": person_index,
+                }
+            )
+            field = self._PPE_CLASS_TO_FIELD.get(class_name)
+            if field is None or person_index is None:
                 continue
 
-            confidence = float(box.conf[0])
             current = observations[person_index][field]
             if current["confidence"] is None or confidence > current["confidence"]:
                 observations[person_index][field] = {"status": "present", "confidence": confidence}
 
-        return observations
+        return {"people": observations, "detections": detections}
+
+    def preload(self) -> None:
+        if self._model is None:
+            from ultralytics import YOLO
+
+            self._model = YOLO(str(Path(self._model_path)))
 
     @staticmethod
     def _unknown_observations() -> PersonPpeObservations:

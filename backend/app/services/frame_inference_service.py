@@ -9,11 +9,13 @@ from backend.app.integrations.ppe_vision import PpeObserver, PpeVisionAdapter
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     FrameInferenceResponse,
+    ModelDetection,
     PersonDetection,
     PersonPpeObservations,
 )
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.ppe_requirement_service import PpeStatus, should_alert_for_missing_ppe
+from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
 
 
 class InvalidFrameError(ValueError):
@@ -30,21 +32,22 @@ class FrameInferenceService:
         requirement_loader: Callable[[str, str], PpeRequirementResponse] | None = None,
         missing_ppe_threshold: float = 0.5,
     ) -> None:
-        if person_model_path is None:
-            from backend.app.core.config import get_settings
+        from backend.app.core.config import get_settings
 
-            settings = get_settings()
-            person_model_path = settings.person_model_path
-            ppe_model_path = settings.ppe_model_path
-        else:
-            from backend.app.core.config import get_settings
-
-            ppe_model_path = get_settings().ppe_model_path
-        self._person_model_path = person_model_path
+        settings = get_settings()
+        ppe_model_path = settings.ppe_model_path
+        self._person_model_path = person_model_path or ppe_model_path
         self._person_model = None
-        self._ppe_observer = ppe_observer or PpeVisionAdapter(ppe_model_path).observe
+        adapter = PpeVisionAdapter(ppe_model_path)
+        self._ppe_observer = ppe_observer or adapter.observe
+        self._ppe_preloader = adapter.preload if ppe_observer is None else lambda: None
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
+        self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
+
+    def preload_models(self) -> None:
+        self._load_person_model()
+        self._ppe_preloader()
 
     def infer(self, request: FrameInferenceRequest) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
@@ -55,15 +58,36 @@ class FrameInferenceService:
         )
 
         detected_people = self._detect_people(frame)
-        observations = self._ppe_observer(frame, detected_people)
+        vision_result = self._ppe_observer(frame, detected_people)
+        if isinstance(vision_result, dict) and "people" in vision_result:
+            observations = vision_result["people"]
+            detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+        else:
+            observations = vision_result
+            detections = []
         requirements = self._requirement_loader(request.camera_id, request.zone_id)
         people = []
+        rule_people = []
         for index, (x, y, box_width, box_height, confidence) in enumerate(detected_people):
             foot_point = [x + box_width // 2, y + box_height]
-            inside_zone = cv2.pointPolygonTest(polygon, tuple(foot_point), False) >= 0
+            inside_zone = len(polygon) == 4 and cv2.pointPolygonTest(polygon, tuple(foot_point), False) >= 0
             safety_shirt = self._has_safety_shirt(frame, x, y, box_width, box_height)
-            ppe = PersonPpeObservations.model_validate(observations[index])
-            missing_required_ppe = self._missing_required_ppe(ppe, requirements)
+            obs_data = (
+                observations[index]
+                if index < len(observations)
+                else {
+                    "helmet": {"status": "unknown", "confidence": None},
+                    "safety_glasses": {"status": "unknown", "confidence": None},
+                    "gloves": {"status": "unknown", "confidence": None},
+                }
+            )
+            ppe = self._derive_missing_ppe(
+                PersonPpeObservations.model_validate(obs_data),
+                person_confidence=confidence,
+                box_width=box_width,
+                box_height=box_height,
+            )
+            rule_people.append(RulePersonObservation(confidence=confidence, inside_zone=inside_zone, ppe=ppe))
             people.append(
                 PersonDetection(
                     bbox=[x, y, x + box_width, y + box_height],
@@ -72,22 +96,27 @@ class FrameInferenceService:
                     inside_zone=inside_zone,
                     safety_shirt=safety_shirt,
                     ppe=ppe,
-                    missing_required_ppe=missing_required_ppe,
+                    missing_required_ppe=[],
                 )
             )
 
-        person_inside_zone = any(person.inside_zone for person in people)
-        ppe_alert = any(person.missing_required_ppe for person in people)
-        review_required = (person_inside_zone and request.machine_state == "running") or ppe_alert
-        violation = review_required
+        decision = self._rule_engine.evaluate(
+            people=rule_people,
+            requirements=requirements,
+            machine_state=request.machine_state,
+            zone_active=len(polygon) == 4,
+        )
+        for person, missing in zip(people, decision.missing_required_ppe, strict=True):
+            person.missing_required_ppe = missing
 
         return FrameInferenceResponse(
-            result="violate" if violation else "normal",
-            review_required=review_required,
+            result=decision.outcome,
+            review_required=decision.review_required,
             people=people,
-            snapshot_data=request.image_data if review_required else None,
+            detections=detections,
+            snapshot_data=request.image_data if decision.review_required else None,
             rule={
-                "person_inside_zone": person_inside_zone,
+                "person_inside_zone": decision.person_inside_zone,
                 "machine_state": request.machine_state,
                 "safety_shirt_required": True,
                 "camera_id": request.camera_id,
@@ -97,14 +126,33 @@ class FrameInferenceService:
                     "safety_glasses_required": requirements.safety_glasses_required,
                     "gloves_required": requirements.gloves_required,
                 },
-                "ppe_alert": ppe_alert,
+                "ppe_alert": decision.ppe_alert,
             },
         )
+
+    def _derive_missing_ppe(
+        self,
+        ppe: PersonPpeObservations,
+        *,
+        person_confidence: float,
+        box_width: int,
+        box_height: int,
+    ) -> PersonPpeObservations:
+        if person_confidence < self._missing_ppe_threshold or box_width <= 0 or box_height <= 0:
+            return ppe
+        values = ppe.model_dump()
+        for name, observation in values.items():
+            if observation["status"] == "unknown":
+                values[name] = {"status": "missing", "confidence": None}
+        return PersonPpeObservations.model_validate(values)
 
     def _missing_required_ppe(
         self,
         ppe: PersonPpeObservations,
         requirements: PpeRequirementResponse,
+        *,
+        person_confidence: float,
+        association_is_valid: bool,
     ) -> list[str]:
         fields = (
             ("helmet", requirements.helmet_required, ppe.helmet),
@@ -117,8 +165,9 @@ class FrameInferenceService:
             if should_alert_for_missing_ppe(
                 required=required,
                 status=PpeStatus(observation.status),
-                confidence=observation.confidence,
+                person_confidence=person_confidence,
                 threshold=self._missing_ppe_threshold,
+                association_is_valid=association_is_valid,
             )
         ]
 
@@ -131,6 +180,16 @@ class FrameInferenceService:
             return PpeRequirementService(db).get(camera_id, zone_id)
 
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
+        model = self._load_person_model()
+
+        results = model.predict(frame, classes=[0], conf=0.35, verbose=False)
+        people = []
+        for box in results[0].boxes:
+            x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
+            people.append((x1, y1, x2 - x1, y2 - y1, float(box.conf[0])))
+        return people
+
+    def _load_person_model(self):
         if self._person_model is None:
             from pathlib import Path
 
@@ -141,13 +200,7 @@ class FrameInferenceService:
                 model_path = Path(model_path.name)
 
             self._person_model = YOLO(str(model_path))
-
-        results = self._person_model.predict(frame, classes=[0], conf=0.35, verbose=False)
-        people = []
-        for box in results[0].boxes:
-            x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
-            people.append((x1, y1, x2 - x1, y2 - y1, float(box.conf[0])))
-        return people
+        return self._person_model
 
     @staticmethod
     def _has_safety_shirt(

@@ -66,7 +66,7 @@ P-047/
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
-│   │   │   ├── alerts/  # Rule result and Human-in-the-Loop review
+│   │   │   ├── alerts/  # Rule result, detection list summary, and ReviewModal popup dialog
 │   │   │   ├── events/  # Acknowledged violation history
 │   │   │   ├── rules/   # PPE requirement switches and explicit-save state
 │   │   │   └── dashboard/ # Reserved dashboard boundary

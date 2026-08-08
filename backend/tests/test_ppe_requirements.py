@@ -159,24 +159,25 @@ def test_put_api_rejects_invalid_input(validator, payload):
 
 
 @pytest.mark.parametrize(
-    "required,status,confidence,expected",
+    "required,status,person_confidence,association_is_valid,expected",
     [
-        (False, PpeStatus.MISSING, 0.99, False),
-        (True, PpeStatus.PRESENT, 0.99, False),
-        (True, PpeStatus.UNKNOWN, None, False),
-        (True, PpeStatus.MISSING, None, False),
-        (True, PpeStatus.MISSING, 0.49, False),
-        (True, PpeStatus.MISSING, 0.5, True),
-        (True, PpeStatus.MISSING, 0.99, True),
+        (False, PpeStatus.MISSING, 0.99, True, False),
+        (True, PpeStatus.PRESENT, 0.99, True, False),
+        (True, PpeStatus.UNKNOWN, 0.99, True, False),
+        (True, PpeStatus.MISSING, 0.49, True, False),
+        (True, PpeStatus.MISSING, 0.5, False, False),
+        (True, PpeStatus.MISSING, 0.5, True, True),
+        (True, PpeStatus.MISSING, 0.99, True, True),
     ],
 )
-def test_missing_ppe_alert_truth_table(required, status, confidence, expected):
+def test_missing_ppe_alert_truth_table(required, status, person_confidence, association_is_valid, expected):
     assert (
         should_alert_for_missing_ppe(
             required=required,
             status=status,
-            confidence=confidence,
+            person_confidence=person_confidence,
             threshold=0.5,
+            association_is_valid=association_is_valid,
         )
         is expected
     )
