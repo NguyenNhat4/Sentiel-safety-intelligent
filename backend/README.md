@@ -15,7 +15,7 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 
 REST routes are interactive at <http://localhost:8000/docs>. The inference WebSocket at `ws://localhost:8000/api/v1/ws/inference` is intentionally absent from Swagger because WebSocket operations are not part of the generated OpenAPI schema.
 
-Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. If database persistence fails after writing a snapshot, the backend rolls back the transaction and removes that unreferenced snapshot.
+Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
 
 ## Frontend–Backend Interaction
 
@@ -240,7 +240,6 @@ Example confirmed violation:
   "status": "acknowledged",
   "acknowledged_by": "Safety Officer",
   "snapshot_data": "data:image/jpeg;base64,...",
-  "privacy_blurred": false,
   "details": {
     "inference_result": "violate",
     "review_result": "actual_violation",
@@ -252,7 +251,9 @@ Example confirmed violation:
 }
 ```
 
-`EventService` validates and decodes `snapshot_data`, writes a JPEG under `data/snapshots`, stores its `/snapshots/...` path in the event row, commits the database record, and returns `201 Created`. Reviewed records receive `acknowledged_at` on the server.
+`EventService` validates and decodes `snapshot_data`, invokes the shared SH17 facade, and writes only the returned redacted JPEG under `data/snapshots`. It sets `privacy_blurred=true` itself only after redaction succeeds, stores the `/snapshots/...` path in the event row, then commits the database record. A client-provided `privacy_blurred` or `snapshot_path` is ignored for compatibility and cannot bypass this gate. Reviewed records receive `acknowledged_at` on the server.
+
+The US-12 MVP policy blurs every `face`, `face-guard`, `face-mask` and `head` detected by SH17. Each `person` without one of those identity detections receives a conservative blur over the top 40% of its bounding box. If SH17 returns neither an identity region nor a person, processing fails closed: no snapshot is written and no reviewed event is created.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
 

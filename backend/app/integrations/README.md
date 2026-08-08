@@ -2,4 +2,4 @@
 
 Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành interface backend dùng được. Chúng không quyết định rule an toàn, severity hay event state.
 
-US-07 có `ppe_vision.py`, adapter gọi public facade `vision.api.PpeVisionFacade` và trả PPE observations theo từng person cho flow inference. Rule ON/OFF và quyết định alert vẫn thuộc `backend.app.services.ppe_requirement_service`.
+`ppe_vision.py` gọi public facade `vision.api.PpeVisionFacade` cho cả PPE observation trong inference và redaction snapshot US-12. Adapter cache một SH17 facade chung; nó không quyết định alert, event state hay privacy policy. Event service chỉ yêu cầu redaction, sau đó mới quyết định persistence.

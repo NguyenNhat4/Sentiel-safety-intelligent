@@ -5,7 +5,7 @@ from collections.abc import Callable
 import cv2
 import numpy as np
 
-from backend.app.integrations.ppe_vision import PpeObserver, PpeVisionAdapter
+from backend.app.integrations.ppe_vision import PpeObserver, get_ppe_vision_adapter
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     FrameInferenceResponse,
@@ -38,7 +38,7 @@ class FrameInferenceService:
         ppe_model_path = settings.ppe_model_path
         self._person_model_path = person_model_path or ppe_model_path
         self._person_model = None
-        adapter = PpeVisionAdapter(ppe_model_path)
+        adapter = get_ppe_vision_adapter(ppe_model_path)
         self._ppe_observer = ppe_observer or adapter.observe
         self._ppe_preloader = adapter.preload if ppe_observer is None else lambda: None
         self._requirement_loader = requirement_loader or self._load_requirements

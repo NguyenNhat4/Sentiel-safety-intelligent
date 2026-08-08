@@ -9,8 +9,6 @@ class EventBase(BaseModel):
     camera_id: str = "cam_01"
     event_type: str
     severity: str = "high"
-    snapshot_path: str | None = None
-    privacy_blurred: bool = True
     details: dict[str, Any] | None = None
 
 
@@ -33,6 +31,8 @@ class EventResponse(EventBase):
     id: int
     timestamp: datetime
     status: str
+    snapshot_path: str | None = None
+    privacy_blurred: bool = False
     acknowledged_by: str | None = None
     acknowledged_at: datetime | None = None
 

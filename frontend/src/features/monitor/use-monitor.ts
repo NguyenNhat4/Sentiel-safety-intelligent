@@ -530,7 +530,6 @@ export function buildEventPayload(
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
-    privacy_blurred: false,
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",

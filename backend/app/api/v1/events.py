@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.schemas.event import EventCreate, EventResponse, EventUpdate
-from backend.app.services.event_service import EventPersistenceError, EventService
+from backend.app.services.event_service import EventPersistenceError, EventPrivacyError, EventService
 
 router = APIRouter(prefix="/events", tags=["Safety Events"])
 
@@ -39,6 +39,8 @@ async def create_event(
         return service.create_event(event_in)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except EventPrivacyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except EventPersistenceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -64,7 +66,10 @@ async def update_event(
 ):
     """Acknowledge or update status of an event."""
     service = EventService(db)
-    updated = service.update_event(event_id, event_in)
+    try:
+        updated = service.update_event(event_id, event_in)
+    except EventPrivacyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not updated:
         raise HTTPException(status_code=404, detail="Event not found")
     return updated

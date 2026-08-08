@@ -130,7 +130,7 @@
 
 > Với vai trò người lao động, tôi muốn danh tính của mình được làm mờ trong snapshot, để quyền riêng tư được bảo vệ khi sự kiện được lưu.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-06
 - Acceptance criteria:
   - Ảnh được làm mờ mặt hoặc vùng nhận dạng trước khi ghi xuống storage.

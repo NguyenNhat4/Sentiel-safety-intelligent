@@ -32,6 +32,7 @@ describe("review event payload", () => {
       video_timestamp_seconds: 4.25
     });
     expect(payload.snapshot_data).toBe(pending.snapshot_data);
+    expect(payload).not.toHaveProperty("privacy_blurred");
   });
 
   it("uses configured PPE states instead of the legacy safety-shirt heuristic", () => {

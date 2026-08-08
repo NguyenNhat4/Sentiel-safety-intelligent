@@ -12,6 +12,7 @@ def test_create_and_get_event(client):
     data = response.json()
     assert data["zone_id"] == "zone_01"
     assert data["status"] == "unacknowledged"
+    assert data["privacy_blurred"] is False
     event_id = data["id"]
 
     # Get event

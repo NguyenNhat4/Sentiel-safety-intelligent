@@ -43,10 +43,10 @@ Baseline đang hoạt động gồm:
 - FastAPI phục vụ REST, WebSocket và production frontend build.
 - Upload video local, vẽ vùng bốn điểm và trạng thái máy chạy/dừng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
-- HITL review, lưu event đã xác nhận, nhật ký snapshot và thống kê baseline.
+- HITL review, lưu event đã xác nhận với snapshot đã che danh tính, và thống kê baseline.
 - SQLite cho local/test; PostgreSQL là database production đích.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face blur trước persistence, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 

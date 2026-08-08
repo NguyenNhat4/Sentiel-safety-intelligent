@@ -169,4 +169,8 @@ This is the single decision log for the repository. Prefix each entry with its o
   1. Safely fetch `observations[index]` with fallback to default unknown observations when `index >= len(observations)`.
   2. Reuse computed `confidence` in `PpeVisionFacade.observe()` loop to eliminate redundant calls.
 
+## 2026-08-08: [Cross-cutting] SH17 in-memory snapshot redaction with person-head fallback
+- **Reason:** US-12 requires that a raw review snapshot never reaches storage, while the MVP already includes a SH17 checkpoint that detects identity-adjacent classes and persons.
+- **Choice:** Reuse the cached SH17 facade to blur `face`, `face-guard`, `face-mask`, and `head` detections. For every person without one of those detections, blur the upper 40% of that person's box. If there is no usable identity or person region, fail closed: do not create a reviewed event or snapshot. The backend alone sets `privacy_blurred=true` after successful redaction; request values for it and `snapshot_path` are ignored.
+- **Constraint:** Decode, inference, blur, and encoding occur in memory before persistence. A database failure removes the newly written redacted file. SH17 privacy behavior is MVP-only; a dedicated face detector with benchmarked false-negative rate and approved license/provenance is required before pilot/production use.
 

@@ -24,7 +24,7 @@ P-047/
 │   │   │   └── database.py
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
-│   │   │   └── ppe_vision.py # Adapter to the public vision PPE facade
+│   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
 │   │   │   └── ppe_requirement.py
@@ -55,10 +55,12 @@ P-047/
 │       └── test_statistics.py
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
-│   ├── api.py           # Public PPE observation facade called through backend integration
+│   ├── api.py           # Public SH17 PPE observation/redaction facade called through backend integration
+│   ├── pipeline.py      # Pure identity redaction and person-head fallback logic
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       └── test_api.py
+│       └── test_privacy_pipeline.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
@@ -97,7 +99,8 @@ P-047/
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
 │   ├── done/            # Completed implementation specifications
 │   │   ├── README.md
-│   │   └── US-07-SPEC.md
+│   │   ├── US-07-SPEC.md
+│   │   └── US-12.md
 │   └── backlog/         # Remaining MVP and advanced user stories
 │       └── README.md
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code

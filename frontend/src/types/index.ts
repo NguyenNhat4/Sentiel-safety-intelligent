@@ -80,7 +80,6 @@ export interface EventPayload {
   status: ReviewStatus;
   acknowledged_by: string;
   snapshot_data?: string;
-  privacy_blurred: boolean;
   details: Record<string, unknown>;
 }
 

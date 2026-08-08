@@ -13,6 +13,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Required PPE state is rendered on each detected-person box: present is green, qualified absence is red `missing`, and unknown is labeled neutrally.
 - Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
 - Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
+- US-12 now redacts identity in memory before event persistence, with SH17 face/head detections, a per-person head fallback, fail-closed errors, and server-owned privacy metadata.
 
 ## Completed
 
@@ -24,9 +25,11 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Documented frontend/backend interaction and the recommended confirmed-warning persistence lifecycle.
 - [x] Added rules-owned PPE requirement persistence, strict GET/PUT contracts, migration, rollback behavior, and the ON/OFF missing-PPE truth table.
 - [x] Refactored PPE configuration from capability submodules into the flat backend layers while preserving runtime contracts.
+- [x] Added the US-12 event privacy gate: raw snapshots are decoded only in memory, redacted before write, rejected on no candidate or processing failure, and cleaned up if the database transaction fails.
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
+- [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
 
 ### Frontend
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
@@ -79,6 +82,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Condensed the completed US-07 specification to its active behavior, public contract, ownership, tests, boundaries, and production gates.
 - [x] [Cross-cutting] Added an execution-flow diagram and safety-priority order to US-07 for operator and implementation clarity.
 - [x] [Backend] Specified the deterministic US-07 rule-engine boundary: model observation plus UI configuration produces `normal` or `violate`, with violation always routed to human review.
+- [x] [Cross-cutting] Implemented US-12 privacy persistence with a server-owned `privacy_blurred` value, SH17 identity/head redaction, fail-closed processing, rollback cleanup, and completed specification.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
@@ -87,11 +91,11 @@ This is the single progress tracker for the repository. Completed work is groupe
 ## Known Issues
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
 - The PPE checkpoint is present with recorded provenance and class mapping, but it detects PPE presence only. Backend now derives `missing` from qualified absence; ground truth and false-negative benchmark validation remain US-07 blockers for real alerts.
-- Review snapshots are not face-blurred yet and currently record `privacy_blurred=false`.
+- SH17 identity redaction is an MVP safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.
 - The pytest suite collects successfully but stalls in the shared `TestClient` flow on the current Python 3.14 environment; focused non-`TestClient` checks and live smoke tests pass.
 - For the US-07 slice, `make setup` and `make run` startup succeed; full `make check` reaches the legacy Python suite and then stalls under Python 3.14. Chrome DevTools MCP is not configured, so browser visual/runtime verification remains pending.
 
 ## Next Steps
 1. Replace the safety-shirt heuristic while preserving the inference response contract.
-2. Blur faces before any confirmed snapshot is persisted.
+2. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
 3. Implement the PostgreSQL Alembic migration and authenticated Safety Officer identity.
