@@ -72,8 +72,17 @@ class FrameInferenceService:
             foot_point = [x + box_width // 2, y + box_height]
             inside_zone = len(polygon) == 4 and cv2.pointPolygonTest(polygon, tuple(foot_point), False) >= 0
             safety_shirt = self._has_safety_shirt(frame, x, y, box_width, box_height)
+            obs_data = (
+                observations[index]
+                if index < len(observations)
+                else {
+                    "helmet": {"status": "unknown", "confidence": None},
+                    "safety_glasses": {"status": "unknown", "confidence": None},
+                    "gloves": {"status": "unknown", "confidence": None},
+                }
+            )
             ppe = self._derive_missing_ppe(
-                PersonPpeObservations.model_validate(observations[index]),
+                PersonPpeObservations.model_validate(obs_data),
                 person_confidence=confidence,
                 box_width=box_width,
                 box_height=box_height,

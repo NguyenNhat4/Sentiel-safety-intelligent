@@ -190,3 +190,26 @@ def test_frame_without_zone_still_returns_person_and_detection_boxes():
     assert result.people[0].inside_zone is False
     assert result.people[0].bbox == [40, 10, 80, 90]
     assert result.detections[0].class_name == "helmet"
+
+
+def test_fewer_observations_than_people_safely_handled():
+    service = FrameInferenceService(
+        person_model_path="unused.pt",
+        ppe_observer=lambda frame, people: [],  # returns 0 observations for 2 detected people
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            helmet_required=False,
+            safety_glasses_required=False,
+            gloves_required=False,
+            updated_at=None,
+        ),
+    )
+    service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95), (100, 10, 40, 80, 0.9)]
+
+    result = service.infer(request())
+
+    assert len(result.people) == 2
+    assert result.people[0].ppe.helmet.status == "missing"
+    assert result.people[1].ppe.helmet.status == "missing"
+

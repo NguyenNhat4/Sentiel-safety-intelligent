@@ -44,6 +44,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added accessible helmet/glasses/gloves requirement switches with backend hydration, explicit save, retry states, and no `localStorage` dependency.
 - [x] Added Person-grouped object detection list to `AlertPanel` with class-matched bounding box colors, and implemented centered `ReviewModal` pop-up dialog with 70% screen 16:9 snapshot container for Human-in-the-Loop review.
 - [x] Fixed WebSocket client configuration timeout when starting video playback without 4 zone points.
+- [x] Resolved potential `IndexError` in `FrameInferenceService` when `observations` length is smaller than `detected_people`, and optimized detection loop in `PpeVisionFacade`.
 
 ### Documentation
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.

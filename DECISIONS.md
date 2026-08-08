@@ -163,3 +163,10 @@ This is the single decision log for the repository. Prefix each entry with its o
   1. Group model detections in `AlertPanel` under individual Person cards (`PERSON #1`, `PERSON #2`, ...) and standalone `SCENE OBJECTS` cards with bounding box color dots, omitting rule-based required PPE badges from the list.
   2. Center `ReviewModal` in the middle of the screen with a 16:9 widescreen snapshot container taking ~70% of screen height, with confirmation buttons directly below. Pop-up triggers strictly when `result === "violate"`.
 
+## 2026-08-08: [Backend] Observations index bounds safety and vision loop optimization
+- **Reason:** If a custom vision provider or mock returns fewer observations than detected people, accessing `observations[index]` causes an `IndexError`.
+- **Choice:**
+  1. Safely fetch `observations[index]` with fallback to default unknown observations when `index >= len(observations)`.
+  2. Reuse computed `confidence` in `PpeVisionFacade.observe()` loop to eliminate redundant calls.
+
+

@@ -65,13 +65,14 @@ class PpeVisionFacade:
             class_id = int(box.cls[0])
             class_name = str(names[class_id]).lower()
             x1, y1, x2, y2 = (float(value) for value in box.xyxy[0].tolist())
+            confidence = float(box.conf[0])
             person_index = self._person_containing((x1 + x2) / 2, (y1 + y2) / 2, people)
             detections.append(
                 {
                     "class_id": class_id,
                     "class_name": class_name,
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                    "confidence": float(box.conf[0]),
+                    "confidence": confidence,
                     "person_index": person_index,
                 }
             )
@@ -79,7 +80,6 @@ class PpeVisionFacade:
             if field is None or person_index is None:
                 continue
 
-            confidence = float(box.conf[0])
             current = observations[person_index][field]
             if current["confidence"] is None or confidence > current["confidence"]:
                 observations[person_index][field] = {"status": "present", "confidence": confidence}
