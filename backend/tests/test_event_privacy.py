@@ -82,6 +82,78 @@ def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_s
     assert not np.array_equal(persisted[10:42, 20:80], frame[10:42, 20:80])
 
 
+def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, tmp_path):
+    frame = _patterned_frame()
+    event_in = EventCreate.model_validate(
+        {
+            "zone_id": "zone_01",
+            "camera_id": "cam_01",
+            "event_type": "zone_intrusion",
+            "severity": "high",
+            "status": "acknowledged",
+            "acknowledged_by": "Safety Officer",
+            "snapshot_data": _snapshot_data(frame),
+            "snapshot_people": [
+                {
+                    "bbox": [20, 10, 80, 90],
+                    "confidence": 0.9,
+                    "foot_point": [50, 90],
+                    "inside_zone": True,
+                    "safety_shirt": False,
+                    "ppe": {
+                        "helmet": {"status": "missing", "confidence": None},
+                        "safety_glasses": {"status": "unknown", "confidence": None},
+                        "gloves": {"status": "unknown", "confidence": None},
+                    },
+                    "missing_required_ppe": ["helmet"],
+                }
+            ],
+            "snapshot_detections": [
+                {
+                    "class_id": 1,
+                    "class_name": "helmet",
+                    "bbox": [25, 15, 45, 35],
+                    "confidence": 0.8,
+                    "person_index": 0,
+                }
+            ],
+        }
+    )
+    recorded: dict[str, object] = {}
+
+    def annotate(redacted, people, detections):
+        recorded["redacted"] = not np.array_equal(redacted[10:42, 20:80], frame[10:42, 20:80])
+        recorded["people"] = people
+        recorded["detections"] = detections
+        annotated = redacted.copy()
+        annotated[70:90, 95:115] = (1, 2, 3)
+        return annotated
+
+    event = EventService(
+        db_session,
+        snapshot_redactor=_redact_person_head,
+        snapshot_annotator=annotate,
+        snapshot_dir=tmp_path,
+    ).create_event(event_in)
+
+    persisted = cv2.imread(str(tmp_path / event.snapshot_path.rsplit("/", 1)[-1]), cv2.IMREAD_COLOR)
+    assert recorded == {
+        "redacted": True,
+        "people": [{"bbox": [20, 10, 80, 90], "confidence": 0.9, "inside_zone": True}],
+        "detections": [
+            {
+                "class_id": 1,
+                "class_name": "helmet",
+                "bbox": [25, 15, 45, 35],
+                "confidence": 0.8,
+                "person_index": 0,
+            }
+        ],
+    }
+    assert persisted is not None
+    assert np.allclose(persisted[80, 105], [1, 2, 3], atol=15)
+
+
 def test_privacy_failure_creates_neither_event_nor_snapshot(db_session, tmp_path):
     def fail_redaction(_: np.ndarray):
         raise PrivacyRedactionError("no candidate")

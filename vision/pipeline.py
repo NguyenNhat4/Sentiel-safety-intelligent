@@ -20,6 +20,12 @@ class PrivacyRedactionResult(TypedDict):
     used_person_fallback: bool
 
 
+class SnapshotPerson(TypedDict):
+    bbox: list[int]
+    confidence: float
+    inside_zone: bool
+
+
 class PrivacyRedactionError(RuntimeError):
     """Raised when a snapshot cannot be safely redacted."""
 
@@ -27,6 +33,29 @@ class PrivacyRedactionError(RuntimeError):
 _IDENTITY_CLASS_NAMES = frozenset({"face", "face-guard", "face-mask", "head"})
 _PERSON_CLASS_NAME = "person"
 _PERSON_HEAD_HEIGHT_RATIO = 0.4
+_PERSON_NORMAL_COLOR = (94, 197, 34)
+_PERSON_VIOLATION_COLOR = (64, 73, 255)
+_DETECTION_COLORS = {
+    "helmet": (11, 158, 245),
+    "head": (11, 158, 245),
+    "glasses": (246, 92, 139),
+    "safety_glasses": (246, 92, 139),
+    "face": (246, 92, 139),
+    "face-guard": (246, 92, 139),
+    "face-mask": (246, 92, 139),
+    "gloves": (129, 185, 16),
+    "hands": (129, 185, 16),
+    "hand": (129, 185, 16),
+    "shoes": (246, 130, 59),
+    "foot": (246, 130, 59),
+    "safety-suit": (153, 72, 236),
+    "safety-vest": (153, 72, 236),
+    "medical-suit": (153, 72, 236),
+    "ear": (212, 182, 6),
+    "ear-mufs": (212, 182, 6),
+    "tool": (8, 179, 234),
+}
+_DEFAULT_DETECTION_COLOR = (246, 130, 59)
 
 
 def redact_identity_regions(
@@ -83,6 +112,38 @@ def redact_identity_regions(
     }
 
 
+def annotate_snapshot(
+    frame: np.ndarray,
+    people: list[SnapshotPerson],
+    detections: list[ModelDetection],
+) -> np.ndarray:
+    """Draw the reviewed frame's person and SH17 detection boxes after redaction."""
+    if frame.ndim != 3 or frame.shape[2] != 3:
+        raise ValueError("snapshot must be a three-channel image")
+
+    annotated = frame.copy()
+    height, width = annotated.shape[:2]
+    for index, person in enumerate(people):
+        region = _bounded_region(person["bbox"], width, height)
+        if region is None:
+            continue
+        color = _PERSON_VIOLATION_COLOR if person["inside_zone"] else _PERSON_NORMAL_COLOR
+        label = f"PERSON #{index + 1} {person['confidence']:.0%}"
+        _draw_box(annotated, region, color, label, thickness=3)
+
+    for detection in detections:
+        if detection["class_name"].lower() == _PERSON_CLASS_NAME:
+            continue
+        region = _bounded_region(detection["bbox"], width, height)
+        if region is None:
+            continue
+        class_name = detection["class_name"].lower()
+        label = f"{class_name.upper()} {detection['confidence']:.0%}"
+        _draw_box(annotated, region, _DETECTION_COLORS.get(class_name, _DEFAULT_DETECTION_COLOR), label)
+
+    return annotated
+
+
 def _bounded_region(bbox: list[int], width: int, height: int) -> list[int] | None:
     if len(bbox) != 4:
         return None
@@ -107,3 +168,25 @@ def _person_head_region(person_region: list[int]) -> list[int]:
 
 def _unique_regions(regions: list[list[int]]) -> list[list[int]]:
     return [list(region) for region in dict.fromkeys(tuple(region) for region in regions)]
+
+
+def _draw_box(
+    image: np.ndarray,
+    region: list[int],
+    color: tuple[int, int, int],
+    label: str,
+    *,
+    thickness: int = 2,
+) -> None:
+    x1, y1, x2, y2 = region
+    cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.45
+    text_thickness = 1
+    (text_width, text_height), baseline = cv2.getTextSize(label, font, scale, text_thickness)
+    label_top = max(0, y1 - text_height - baseline - 6)
+    label_bottom = label_top + text_height + baseline + 6
+    cv2.rectangle(image, (x1, label_top), (min(image.shape[1], x1 + text_width + 8), label_bottom), color, -1)
+    cv2.putText(
+        image, label, (x1 + 4, label_bottom - baseline - 3), font, scale, (255, 255, 255), text_thickness, cv2.LINE_AA
+    )

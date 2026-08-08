@@ -84,6 +84,8 @@ export function MonitorPage() {
         isOpen={state.isReviewModalOpen}
         onClose={actions.closeReviewModal}
         snapshot={state.pendingViolation?.snapshot_data}
+        people={state.pendingViolation?.people}
+        detections={state.pendingViolation?.detections}
         timer={state.timer}
         reviewSaving={state.reviewSaving}
         alertTitle={state.view.alertTitle}

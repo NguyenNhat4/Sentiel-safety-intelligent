@@ -3,7 +3,7 @@ from functools import cache
 
 import numpy as np
 
-from vision.api import PpeVisionFacade, PpeVisionResult, PrivacyRedactionResult
+from vision.api import ModelDetection, PpeVisionFacade, PpeVisionResult, PrivacyRedactionResult, SnapshotPerson
 
 
 class PpeVisionAdapter:
@@ -24,6 +24,14 @@ class PpeVisionAdapter:
 
     def redact_snapshot(self, frame: np.ndarray) -> PrivacyRedactionResult:
         return self._facade.redact_snapshot(frame)
+
+    def annotate_snapshot(
+        self,
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+        detections: list[ModelDetection],
+    ) -> np.ndarray:
+        return self._facade.annotate_snapshot(frame, people, detections)
 
 
 @cache

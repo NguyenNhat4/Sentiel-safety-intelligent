@@ -80,6 +80,8 @@ export interface EventPayload {
   status: ReviewStatus;
   acknowledged_by: string;
   snapshot_data?: string;
+  snapshot_people?: PersonDetection[];
+  snapshot_detections?: ModelDetection[];
   details: Record<string, unknown>;
 }
 

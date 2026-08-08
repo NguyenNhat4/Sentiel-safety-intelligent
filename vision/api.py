@@ -5,7 +5,13 @@ from typing import TypedDict
 
 import numpy as np
 
-from vision.pipeline import ModelDetection, PrivacyRedactionResult, redact_identity_regions
+from vision.pipeline import (
+    ModelDetection,
+    PrivacyRedactionResult,
+    SnapshotPerson,
+    annotate_snapshot,
+    redact_identity_regions,
+)
 
 
 class PpeObservationValue(TypedDict):
@@ -64,6 +70,14 @@ class PpeVisionFacade:
     def redact_snapshot(self, frame: np.ndarray) -> PrivacyRedactionResult:
         """Redact identity regions from a frame using the configured SH17 checkpoint."""
         return redact_identity_regions(frame, self._detect(frame, []))
+
+    @staticmethod
+    def annotate_snapshot(
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+        detections: list[ModelDetection],
+    ) -> np.ndarray:
+        return annotate_snapshot(frame, people, detections)
 
     def preload(self) -> None:
         self._load_model()

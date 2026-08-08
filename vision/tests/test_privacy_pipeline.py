@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from vision.pipeline import PrivacyRedactionError, redact_identity_regions
+from vision.pipeline import PrivacyRedactionError, annotate_snapshot, redact_identity_regions
 
 
 def _patterned_frame() -> np.ndarray:
@@ -54,3 +54,21 @@ def test_detected_identity_regions_for_multiple_people_are_all_redacted():
 def test_snapshot_without_a_redaction_candidate_fails_closed():
     with pytest.raises(PrivacyRedactionError, match="no face, head, or person"):
         redact_identity_regions(_patterned_frame(), [detection("tool", [20, 10, 80, 90])])
+
+
+def test_snapshot_annotation_draws_person_and_sh17_boxes_without_mutating_input():
+    frame = np.zeros((100, 120, 3), dtype=np.uint8)
+
+    annotated = annotate_snapshot(
+        frame,
+        [{"bbox": [10, 20, 40, 90], "confidence": 0.9, "inside_zone": True}],
+        [
+            detection("person", [0, 0, 5, 5]),
+            detection("helmet", [60, 30, 90, 60]),
+        ],
+    )
+
+    assert np.array_equal(frame, np.zeros((100, 120, 3), dtype=np.uint8))
+    assert annotated[20, 10].tolist() == [64, 73, 255]
+    assert annotated[30, 60].tolist() == [11, 158, 245]
+    assert np.array_equal(annotated[0, 0], frame[0, 0])

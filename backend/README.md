@@ -251,7 +251,7 @@ Example confirmed violation:
 }
 ```
 
-`EventService` validates and decodes `snapshot_data`, invokes the shared SH17 facade, and writes only the returned redacted JPEG under `data/snapshots`. It sets `privacy_blurred=true` itself only after redaction succeeds, stores the `/snapshots/...` path in the event row, then commits the database record. A client-provided `privacy_blurred` or `snapshot_path` is ignored for compatibility and cannot bypass this gate. Reviewed records receive `acknowledged_at` on the server.
+`EventService` validates and decodes `snapshot_data`, invokes the shared SH17 facade, and writes only the returned redacted JPEG under `data/snapshots`. It accepts additive transient `snapshot_people` and `snapshot_detections` fields from the same reviewed frame, then draws their person and SH17 boxes only **after** redaction and before JPEG encoding; these fields are excluded from event persistence/response. It sets `privacy_blurred=true` itself only after redaction succeeds, stores the `/snapshots/...` path in the event row, then commits the database record. A client-provided `privacy_blurred` or `snapshot_path` is ignored for compatibility and cannot bypass this gate. Reviewed records receive `acknowledged_at` on the server.
 
 The US-12 MVP policy blurs every `face`, `face-guard`, `face-mask` and `head` detected by SH17. Each `person` without one of those identity detections receives a conservative blur over the top 40% of its bounding box. If SH17 returns neither an identity region nor a person, processing fails closed: no snapshot is written and no reviewed event is created.
 

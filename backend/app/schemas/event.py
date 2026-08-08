@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.schemas.analysis import ModelDetection, PersonDetection
+
 
 class EventBase(BaseModel):
     zone_id: str
@@ -19,6 +21,16 @@ class EventCreate(EventBase):
         None,
         exclude=True,
         description="Base64 JPEG data URL captured at the violation timestamp",
+    )
+    snapshot_people: list[PersonDetection] = Field(
+        default_factory=list,
+        exclude=True,
+        description="Detected people used only to annotate the persisted snapshot",
+    )
+    snapshot_detections: list[ModelDetection] = Field(
+        default_factory=list,
+        exclude=True,
+        description="SH17 detections used only to annotate the persisted snapshot",
     )
 
 

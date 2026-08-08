@@ -9,8 +9,15 @@ import cv2
 import numpy as np
 from sqlalchemy.orm import Session
 
-from backend.app.integrations.ppe_vision import PrivacyRedactionResult, get_ppe_vision_adapter
+from backend.app.integrations.ppe_vision import (
+    ModelDetection,
+    PrivacyRedactionResult,
+    SnapshotPerson,
+    get_ppe_vision_adapter,
+)
 from backend.app.models.event import SafetyEvent
+from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
+from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
 from backend.app.schemas.event import EventCreate, EventUpdate
 
 
@@ -23,6 +30,7 @@ class EventPrivacyError(RuntimeError):
 
 
 SnapshotRedactor = Callable[[np.ndarray], PrivacyRedactionResult]
+SnapshotAnnotator = Callable[[np.ndarray, list[SnapshotPerson], list[ModelDetection]], np.ndarray]
 
 
 class EventService:
@@ -31,17 +39,23 @@ class EventService:
         db: Session,
         *,
         snapshot_redactor: SnapshotRedactor | None = None,
+        snapshot_annotator: SnapshotAnnotator | None = None,
         snapshot_dir: Path | None = None,
     ):
         self.db = db
         self._snapshot_redactor = snapshot_redactor or self._default_snapshot_redactor
+        self._snapshot_annotator = snapshot_annotator or self._default_snapshot_annotator
         self._snapshot_dir = snapshot_dir or Path(__file__).resolve().parents[3] / "data" / "snapshots"
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
         reviewed = event_in.status in {"acknowledged", "false_alarm"}
         snapshot_path = None
         if event_in.snapshot_data:
-            snapshot_path = self._save_snapshot(event_in.snapshot_data)
+            snapshot_path = self._save_snapshot(
+                event_in.snapshot_data,
+                event_in.snapshot_people,
+                event_in.snapshot_detections,
+            )
         db_event = SafetyEvent(
             zone_id=event_in.zone_id,
             camera_id=event_in.camera_id,
@@ -66,7 +80,12 @@ class EventService:
             raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
 
-    def _save_snapshot(self, snapshot_data: str) -> str:
+    def _save_snapshot(
+        self,
+        snapshot_data: str,
+        snapshot_people: list[SnapshotPersonDetection],
+        snapshot_detections: list[SnapshotDetection],
+    ) -> str:
         encoded = snapshot_data.split(",", 1)[-1]
         try:
             image_bytes = base64.b64decode(encoded, validate=True)
@@ -79,7 +98,19 @@ class EventService:
 
         try:
             redaction = self._snapshot_redactor(frame)
-            success, redacted_bytes = cv2.imencode(".jpg", redaction["image"])
+            annotated = self._snapshot_annotator(
+                redaction["image"],
+                [
+                    {
+                        "bbox": person.bbox,
+                        "confidence": person.confidence,
+                        "inside_zone": person.inside_zone,
+                    }
+                    for person in snapshot_people
+                ],
+                [detection.model_dump() for detection in snapshot_detections],
+            )
+            success, redacted_bytes = cv2.imencode(".jpg", annotated)
         except Exception as exc:
             raise EventPrivacyError("Privacy processing failed; the snapshot was not saved") from exc
         if not success:
@@ -100,6 +131,16 @@ class EventService:
         from backend.app.core.config import get_settings
 
         return get_ppe_vision_adapter(get_settings().ppe_model_path).redact_snapshot(frame)
+
+    @staticmethod
+    def _default_snapshot_annotator(
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+        detections: list[ModelDetection],
+    ) -> np.ndarray:
+        from backend.app.core.config import get_settings
+
+        return get_ppe_vision_adapter(get_settings().ppe_model_path).annotate_snapshot(frame, people, detections)
 
     def _snapshot_file(self, snapshot_path: str) -> Path:
         return self._snapshot_dir / Path(snapshot_path).name

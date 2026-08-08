@@ -66,6 +66,16 @@ interface SessionState {
   previewCandidateIndex: number;
 }
 
+export function captureVideoSnapshot(video: HTMLVideoElement, capture: HTMLCanvasElement): string | undefined {
+  if (!video.videoWidth || !video.videoHeight) return undefined;
+  capture.width = video.videoWidth;
+  capture.height = video.videoHeight;
+  const context = capture.getContext("2d");
+  if (!context) return undefined;
+  context.drawImage(video, 0, 0, capture.width, capture.height);
+  return capture.toDataURL("image/jpeg", JPEG_QUALITY);
+}
+
 export function useMonitor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -140,9 +150,9 @@ export function useMonitor() {
   const capturePausedFrame = useCallback(() => {
     const video = videoRef.current;
     const capture = captureRef.current;
-    if (!video?.videoWidth || !capture?.width) return;
-    capture.getContext("2d")?.drawImage(video, 0, 0, capture.width, capture.height);
-    setPreviewSrc(capture.toDataURL("image/jpeg", 0.9));
+    if (!video || !capture) return;
+    const snapshot = captureVideoSnapshot(video, capture);
+    if (snapshot) setPreviewSrc(snapshot);
   }, []);
 
   const showToast = useCallback((message: string) => setToast(message), []);
@@ -153,7 +163,7 @@ export function useMonitor() {
     showToast(message);
   }, [showToast, stopRealtimeInference]);
 
-  const handleInferenceResult = useCallback((result: InferenceResult) => {
+  function handleInferenceResult(result: InferenceResult): void {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
@@ -174,18 +184,11 @@ export function useMonitor() {
     if (!result.review_required || session.current.violationLatched) return;
     session.current.violationLatched = true;
     session.current.running = false;
-    pendingViolationRef.current = result;
-    setPendingViolation(result);
-    setIsReviewModalOpen(true);
     const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = result.video_time;
-    }
+    video?.pause();
     client.close();
     setPlaybackLabel("▶ Tiếp tục");
     setPlaybackDisabled(true);
-    setReviewStartedAt(Date.now());
     setFlowStatus("Chờ xác minh");
     setView(current => ({
       ...current,
@@ -198,7 +201,8 @@ export function useMonitor() {
       confidenceLabel: "VIOLATE",
       confidenceWidth: "100%"
     }));
-  }, [client]);
+    freezeAtViolationFrame(result);
+  }
 
   resultHandler.current = handleInferenceResult;
   failureHandler.current = handleInferenceFailure;
@@ -370,6 +374,41 @@ export function useMonitor() {
     if (session.current.running) requestAnimationFrame(sampleFrameLoop);
   }
 
+  function freezeAtViolationFrame(result: InferenceResult): void {
+    const video = videoRef.current;
+    const capture = captureRef.current;
+    if (!video || !capture || !video.videoWidth) {
+      openViolationReview(result, result.snapshot_data);
+      return;
+    }
+
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(fallbackTimer);
+      video.removeEventListener("seeked", renderStoppedFrame);
+      openViolationReview(result, captureVideoSnapshot(video, capture) ?? result.snapshot_data);
+    };
+    const renderStoppedFrame = () => {
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => finish());
+      else window.requestAnimationFrame(finish);
+    };
+
+    video.addEventListener("seeked", renderStoppedFrame, {once: true});
+    const fallbackTimer = window.setTimeout(finish, 800);
+    if (Math.abs(video.currentTime - result.video_time) < 0.01) renderStoppedFrame();
+    else video.currentTime = result.video_time;
+  }
+
+  function openViolationReview(result: InferenceResult, snapshotData?: string): void {
+    const reviewedFrame = snapshotData ? {...result, snapshot_data: snapshotData} : result;
+    pendingViolationRef.current = reviewedFrame;
+    setPendingViolation(reviewedFrame);
+    setIsReviewModalOpen(true);
+    setReviewStartedAt(Date.now());
+  }
+
   function stopPreviewPlayback(): void {
     stopRealtimeInference();
     capturePausedFrame();
@@ -530,6 +569,8 @@ export function buildEventPayload(
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
+    snapshot_people: pending.people,
+    snapshot_detections: pending.detections ?? [],
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
