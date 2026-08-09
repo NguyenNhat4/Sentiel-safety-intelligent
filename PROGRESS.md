@@ -13,6 +13,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Required PPE state is rendered on each detected-person box: present is green, qualified absence is red `missing`, and unknown is labeled neutrally.
 - Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
 - Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
+- US-13 now specifies a project-owned custom dataset as its primary acceptance source, with scenario coverage, versioned ground truth, calibration/final isolation and reproducible metric/latency evidence.
 
 ## Completed
 
@@ -79,10 +80,12 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Condensed the completed US-07 specification to its active behavior, public contract, ownership, tests, boundaries, and production gates.
 - [x] [Cross-cutting] Added an execution-flow diagram and safety-priority order to US-07 for operator and implementation clarity.
 - [x] [Backend] Specified the deterministic US-07 rule-engine boundary: model observation plus UI configuration produces `normal` or `violate`, with violation always routed to human review.
+- [x] [Cross-cutting] Updated and synchronized US-13 to require a consented custom evaluation dataset; recorded the dataset, split, privacy and benchmark constraints.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 - [ ] Establish ground truth, explicit-missing evidence and benchmark targets for the PPE model before production alerting.
+- [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
 ## Known Issues
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
@@ -92,6 +95,8 @@ This is the single progress tracker for the repository. Completed work is groupe
 - For the US-07 slice, `make setup` and `make run` startup succeed; full `make check` reaches the legacy Python suite and then stalls under Python 3.14. Chrome DevTools MCP is not configured, so browser visual/runtime verification remains pending.
 
 ## Next Steps
-1. Replace the safety-shirt heuristic while preserving the inference response contract.
-2. Blur faces before any confirmed snapshot is persisted.
-3. Implement the PostgreSQL Alembic migration and authenticated Safety Officer identity.
+1. Chốt US-13 metric protocol, annotation guide, scenario matrix, sample size and acceptance thresholds with the Product Owner.
+2. Record and annotate the custom US-13 calibration/final evaluation dataset with manifest and checksums.
+3. Replace the safety-shirt heuristic while preserving the inference response contract.
+4. Blur faces before any confirmed snapshot is persisted.
+5. Implement the PostgreSQL Alembic migration and authenticated Safety Officer identity.

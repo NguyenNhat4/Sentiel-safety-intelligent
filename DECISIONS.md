@@ -169,4 +169,9 @@ This is the single decision log for the repository. Prefix each entry with its o
   1. Safely fetch `observations[index]` with fallback to default unknown observations when `index >= len(observations)`.
   2. Reuse computed `confidence` in `PpeVisionFacade.observe()` loop to eliminate redundant calls.
 
+## 2026-08-09: [Cross-cutting] US-13 uses a project-owned custom evaluation dataset
+- **Reason:** Public workplace-video datasets do not provide the combined per-person helmet/glasses/gloves state, project-specific zone polygon, machine-state timeline, track/occurrence ground truth and expected HITL outcome required to evaluate the P-047 runtime contract.
+- **Choice:** Create a consented custom simulation dataset as the primary US-13 acceptance source. Public datasets may supplement regression or robustness checks but cannot replace the locked final evaluation set.
+- **Dataset contract:** Version a manifest and checksums for scenario/video identity, person/track annotations, per-person PPE state, zone, machine state, violation occurrences and expected review outcome. Split by video/scenario into calibration and final evaluation, and never tune against the final split.
+- **Privacy/storage constraint:** Use consenting participants and controlled simulated scenes. Do not commit raw media directly until an approved storage/access mechanism exists; version annotations, provenance and immutable media checksums instead.
 
