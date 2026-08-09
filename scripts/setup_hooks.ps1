@@ -4,14 +4,23 @@
 $ErrorActionPreference = 'Stop'
 
 $HookFile = '.git/hooks/pre-push'
+$BackupHook = '.git/hooks/pre-push.before-ai-log'
+
+if ((Test-Path $HookFile) -and -not (Select-String -Path $HookFile -Pattern 'AI log pre-push dispatcher' -Quiet)) {
+    Copy-Item -Path $HookFile -Destination $BackupHook -Force
+}
 
 # Git on Windows runs hooks via Git Bash, so the hook body must be bash.
 $HookBody = @'
 #!/usr/bin/env bash
-# Pre-push: sweep recent Antigravity / Gemini prompts, then submit AI logs.
+# AI log pre-push dispatcher. It preserves the pre-existing hook, then sweeps
+# recent Antigravity / Gemini prompts and submits all pending AI logs.
+set -e
+if [ -x .git/hooks/pre-push.before-ai-log ]; then
+  .git/hooks/pre-push.before-ai-log "$@"
+fi
 bash scripts/_pyrun.sh scripts/log_antigravity.py --auto || true
 bash scripts/_pyrun.sh scripts/submit_log.py || true
-exit 0
 '@
 
 Set-Content -Path $HookFile -Value $HookBody -Encoding UTF8 -NoNewline
