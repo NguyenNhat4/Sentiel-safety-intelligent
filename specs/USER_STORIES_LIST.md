@@ -1,10 +1,5 @@
 # User Story Backlog & Kế hoạch giao toàn bộ dự án
 
-Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toán thành hai giai đoạn delivery:
-
-1. **Tuần hiện tại:** đóng và nghiệm thu MVP theo PRD.
-2. **5 tuần tiếp theo:** hoàn thành yêu cầu nâng cao và các khoảng trống cần thiết để giao toàn bộ project problem statement.
-
 ## 1. Quy ước đồng bộ
 
 - `USER_STORIES_LIST.md` là backlog tổng và nguồn kế hoạch.
@@ -12,8 +7,7 @@ Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toá
 - Nội dung từ heading `### US-XX` đến hết Task trong file riêng phải giống nguyên văn mục tương ứng ở tài liệu này.
 - **P0:** bắt buộc để nghiệm thu giai đoạn; **P1:** cần hoàn thiện đầu ra nhưng có thể được Product Owner chấp thuận chuyển tiếp nếu có owner và deadline.
 - Done yêu cầu: đạt acceptance criteria, có test/evidence, cập nhật tài liệu và không làm hỏng contract hiện hành.
-
-## 2. Baseline đã hoàn thành
+- folder done chua cac US-XX da duoc trien khai va hoan thien. 
 
 ### US-01 — Tải và phát video mô phỏng
 
@@ -51,9 +45,6 @@ Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toá
 
 - Trạng thái: **Hoàn thành baseline; bắt buộc regression khi nghiệm thu MVP.**
 
-## 3. MVP phải đóng trong tuần hiện tại
-
-Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 ### US-07 — Phát hiện thiếu PPE bắt buộc bằng model
 
@@ -139,7 +130,7 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 > Với vai trò người lao động, tôi muốn danh tính của mình được làm mờ trong snapshot, để quyền riêng tư được bảo vệ khi sự kiện được lưu.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-06
 - Acceptance criteria:
   - Ảnh được làm mờ mặt hoặc vùng nhận dạng trước khi ghi xuống storage.

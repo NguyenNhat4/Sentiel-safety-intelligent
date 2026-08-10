@@ -48,7 +48,6 @@ export class InferenceClient {
   updateConfiguration(): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     const configuration = this.options.getConfiguration();
-    if (configuration.zone_points.length !== 4) return;
     this.configured = false;
     this.socket.send(JSON.stringify({type: "configure", ...configuration}));
   }

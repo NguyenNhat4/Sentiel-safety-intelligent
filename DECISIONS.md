@@ -127,3 +127,54 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** The current codebase and legacy `src` scaffold already use a small, familiar API/model/schema/service layout. Capability subfolders add navigation and boilerplate without enough MVP complexity to justify them.
 - **Choice:** Keep production backend code under `backend/app/api`, `core`, `integrations`, `models`, `schemas` and `services`; do not create `backend/app/modules/<capability>` or a repository layer for small resources.
 - **Migration:** Move US-07 PPE route, ORM, schemas and logic into their matching layers while preserving endpoint paths, payloads, database table and tests.
+
+## 2026-08-08: [Cross-cutting] Expose SH17 detections and use qualified PPE absence for alerts
+- **Supersedes:** Alert-semantics portions of the 2026-08-06 PPE requirements decision and the 2026-08-06 vision-observation decision; both entries remain as history.
+- **Reason:** Safety Officers need the full visual evidence from the installed 17-class SH17 checkpoint and explicitly require a missing helmet to alert when the helmet rule is ON.
+- **Choice:** Add an additive `detections` collection to REST/WebSocket inference results, containing every SH17 class with its ID, name, bbox, confidence and optional person association. Keep the existing three PPE requirements; the backend derives `missing` when a person passes the evaluation-confidence and association guards but has no associated helmet, glasses or gloves detection.
+- **Constraint:** Only helmet, safety glasses and gloves can alert in US-07. Vision supplies observations; backend remains the sole owner of absence evaluation and alert rules. `missing` has no fabricated detector confidence, and its false-negative rate must be benchmarked before production use.
+
+## 2026-08-08: [Cross-cutting] Detection is independent of danger-zone configuration
+- **Reason:** Safety Officers need to see model detections while defining or omitting a zone.
+- **Choice:** Start inference whenever playback starts. A zone is active only with exactly four points; zero or partial points are sent as an empty zone and produce no zone-intrusion result. PPE evaluation remains active in both cases.
+
+## 2026-08-08: [Vision] Use SH17 as the single inference checkpoint
+- **Reason:** One detector must provide both person and PPE/object boxes so associations share one class vocabulary and model artifact.
+- **Choice:** Use SH17 class `0` for person boxes and its remaining class IDs for PPE/object detections in US-07. The legacy YOLO11 person checkpoint is not used by this flow.
+
+## 2026-08-08: [Backend] Deterministic rule engine owns normal versus violate
+- **Reason:** Model observations and UI configuration must converge in one auditable decision before a human review is requested.
+- **Choice:** A backend service consumes observations, persisted PPE requirements, machine state and zone context, then returns only `normal` or `violate`; every `violate` requires HITL review. Vision and frontend do not decide violations.
+
+## 2026-08-08: [Frontend] Consolidated detection list in AlertPanel and ReviewModal pop-up
+- **Reason:** Drawing heavy text labels directly over bounding boxes on video/canvas causes text overlap and visual clutter when multiple objects are detected.
+- **Choice:**
+  1. Map detection classes to a consistent color palette shared between Canvas bounding boxes and the AlertPanel summary list.
+  2. Display all detected objects (shoes, clothing, helmet, gloves, etc.) in the AlertPanel with matching color indicator dots and confidence badges.
+  3. Transform human review into a pop-up dialog (`ReviewModal`) that automatically opens on alert or can be opened via a prominent alert trigger card, allowing the operator to select `VIOLATE` (Vi phạm thực tế) or `NORMAL` (Bình thường / báo sai).
+
+## 2026-08-08: [Frontend] Allow WebSocket configure message with empty zone_points
+- **Reason:** Users playing video before configuring 4 zone points experienced WebSocket connection timeouts because `InferenceClient.updateConfiguration()` incorrectly blocked sending `{type: "configure"}` when `zone_points.length !== 4`.
+- **Choice:** Remove the `zone_points.length !== 4` guard in `InferenceClient.updateConfiguration()`, allowing 0 to 4 zone points to be sent to backend WebSocket inference so detection streams immediately upon playback start.
+
+## 2026-08-08: [Frontend] Person-grouped detection list and centered 70% snapshot ReviewModal
+- **Reason:** Operators need detected objects organized hierarchically per detected individual, and a large centered snapshot dialog when inspecting violations.
+- **Choice:**
+  1. Group model detections in `AlertPanel` under individual Person cards (`PERSON #1`, `PERSON #2`, ...) and standalone `SCENE OBJECTS` cards with bounding box color dots, omitting rule-based required PPE badges from the list.
+  2. Center `ReviewModal` in the middle of the screen with a 16:9 widescreen snapshot container taking ~70% of screen height, with confirmation buttons directly below. Pop-up triggers strictly when `result === "violate"`.
+
+## 2026-08-08: [Backend] Observations index bounds safety and vision loop optimization
+- **Reason:** If a custom vision provider or mock returns fewer observations than detected people, accessing `observations[index]` causes an `IndexError`.
+- **Choice:**
+  1. Safely fetch `observations[index]` with fallback to default unknown observations when `index >= len(observations)`.
+  2. Reuse computed `confidence` in `PpeVisionFacade.observe()` loop to eliminate redundant calls.
+
+## 2026-08-08: [Cross-cutting] SH17 in-memory snapshot redaction with person-head fallback
+- **Reason:** US-12 requires that a raw review snapshot never reaches storage, while the MVP already includes a SH17 checkpoint that detects identity-adjacent classes and persons.
+- **Choice:** Reuse the cached SH17 facade to blur `face`, `face-guard`, `face-mask`, and `head` detections. For every person without one of those detections, blur the upper 40% of that person's box. If there is no usable identity or person region, fail closed: do not create a reviewed event or snapshot. The backend alone sets `privacy_blurred=true` after successful redaction; request values for it and `snapshot_path` are ignored.
+- **Constraint:** Decode, inference, blur, and encoding occur in memory before persistence. A database failure removes the newly written redacted file. SH17 privacy behavior is MVP-only; a dedicated face detector with benchmarked false-negative rate and approved license/provenance is required before pilot/production use.
+
+## 2026-08-08: [Cross-cutting] Review and persisted-snapshot boxes are annotated after redaction
+- **Reason:** Safety Officers need the reviewed person/PPE-object evidence to remain visible in both the confirmation popup and the JPEG later viewed from event history, without making visual annotation a safety or privacy input.
+- **Choice:** The frontend pauses and seeks to the violating inference timestamp, waits for that native video frame to render, captures it at its full source size, then overlays typed `people` and SH17 `detections` with the same aspect-ratio geometry. It sends the stopped-frame JPEG and additive, transient `snapshot_people` and `snapshot_detections` fields when the officer saves. The backend redacts the raw JPEG first, then draws person boxes and non-person SH17 boxes into the redacted JPEG before it is encoded and stored. These fields are excluded from the event row/response; older clients that omit them still save a redacted but unannotated snapshot.
+- **Constraint:** Box data never determines violation, redaction candidates, or `privacy_blurred`. SH17 `person` detections are skipped during annotation because rule/inference person boxes are the canonical person box source.

@@ -3,14 +3,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.schemas.analysis import ModelDetection, PersonDetection
+
 
 class EventBase(BaseModel):
     zone_id: str
     camera_id: str = "cam_01"
     event_type: str
     severity: str = "high"
-    snapshot_path: str | None = None
-    privacy_blurred: bool = True
     details: dict[str, Any] | None = None
 
 
@@ -21,6 +21,16 @@ class EventCreate(EventBase):
         None,
         exclude=True,
         description="Base64 JPEG data URL captured at the violation timestamp",
+    )
+    snapshot_people: list[PersonDetection] = Field(
+        default_factory=list,
+        exclude=True,
+        description="Detected people used only to annotate the persisted snapshot",
+    )
+    snapshot_detections: list[ModelDetection] = Field(
+        default_factory=list,
+        exclude=True,
+        description="SH17 detections used only to annotate the persisted snapshot",
     )
 
 
@@ -33,6 +43,8 @@ class EventResponse(EventBase):
     id: int
     timestamp: datetime
     status: str
+    snapshot_path: str | None = None
+    privacy_blurred: bool = False
     acknowledged_by: str | None = None
     acknowledged_at: datetime | None = None
 

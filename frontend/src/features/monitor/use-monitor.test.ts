@@ -1,6 +1,6 @@
-import {describe, expect, it} from "vitest";
+import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventPayload, buildPpeRule} from "./use-monitor";
+import {buildEventPayload, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -14,6 +14,9 @@ describe("review event payload", () => {
         gloves: {status: "unknown", confidence: null},
       },
       missing_required_ppe: [],
+    }],
+    detections: [{
+      class_id: 1, class_name: "helmet", bbox: [2, 3, 8, 9], confidence: 0.8, person_index: 0,
     }],
     rule: {
       person_inside_zone: true, machine_state: "running", safety_shirt_required: true,
@@ -32,6 +35,9 @@ describe("review event payload", () => {
       video_timestamp_seconds: 4.25
     });
     expect(payload.snapshot_data).toBe(pending.snapshot_data);
+    expect(payload.snapshot_people).toEqual(pending.people);
+    expect(payload.snapshot_detections).toEqual(pending.detections);
+    expect(payload).not.toHaveProperty("privacy_blurred");
   });
 
   it("uses configured PPE states instead of the legacy safety-shirt heuristic", () => {
@@ -44,5 +50,24 @@ describe("review event payload", () => {
       },
     };
     expect(buildPpeRule(helmetRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ", badge: "CHECK"});
+  });
+});
+
+describe("stopped-video review snapshot", () => {
+  it("captures the full native video frame before the review modal opens", () => {
+    const drawImage = vi.fn();
+    const toDataURL = vi.fn().mockReturnValue("data:image/jpeg;base64,stopped-frame");
+    const capture = {
+      width: 0,
+      height: 0,
+      getContext: () => ({drawImage}),
+      toDataURL,
+    } as unknown as HTMLCanvasElement;
+    const video = {videoWidth: 1920, videoHeight: 1080} as HTMLVideoElement;
+
+    expect(captureVideoSnapshot(video, capture)).toBe("data:image/jpeg;base64,stopped-frame");
+    expect(capture.width).toBe(1920);
+    expect(capture.height).toBe(1080);
+    expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 1920, 1080);
   });
 });

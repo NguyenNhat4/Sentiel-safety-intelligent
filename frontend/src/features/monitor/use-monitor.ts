@@ -5,6 +5,7 @@ import {saveReviewedEvent} from "../../api/events";
 import type {
   EventPayload,
   InferenceResult,
+  ModelDetection,
   PersonDetection,
   PpeRequirementUpdate,
   ReviewStatus,
@@ -65,6 +66,16 @@ interface SessionState {
   previewCandidateIndex: number;
 }
 
+export function captureVideoSnapshot(video: HTMLVideoElement, capture: HTMLCanvasElement): string | undefined {
+  if (!video.videoWidth || !video.videoHeight) return undefined;
+  capture.width = video.videoWidth;
+  capture.height = video.videoHeight;
+  const context = capture.getContext("2d");
+  if (!context) return undefined;
+  context.drawImage(video, 0, 0, capture.width, capture.height);
+  return capture.toDataURL("image/jpeg", JPEG_QUALITY);
+}
+
 export function useMonitor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -73,6 +84,7 @@ export function useMonitor() {
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const zonePointsRef = useRef<ZonePoint[]>([]);
   const [latestPeople, setLatestPeople] = useState<PersonDetection[]>([]);
+  const [latestDetections, setLatestDetections] = useState<ModelDetection[]>([]);
   const [activePpeRequirements, setActivePpeRequirements] = useState<PpeRequirementUpdate>(
     DEFAULT_PPE_REQUIREMENTS,
   );
@@ -83,6 +95,7 @@ export function useMonitor() {
   const machineRunningRef = useRef(true);
   const [pendingViolation, setPendingViolation] = useState<InferenceResult | null>(null);
   const pendingViolationRef = useRef<InferenceResult | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [view, setView] = useState<MonitorView>(() => initialView());
@@ -112,7 +125,7 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zone_points: zonePointsRef.current,
+        zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
         machine_state: machineRunningRef.current ? "running" : "stopped"
       }),
       onResult: result => resultHandler.current(result),
@@ -137,9 +150,9 @@ export function useMonitor() {
   const capturePausedFrame = useCallback(() => {
     const video = videoRef.current;
     const capture = captureRef.current;
-    if (!video?.videoWidth || !capture?.width) return;
-    capture.getContext("2d")?.drawImage(video, 0, 0, capture.width, capture.height);
-    setPreviewSrc(capture.toDataURL("image/jpeg", 0.9));
+    if (!video || !capture) return;
+    const snapshot = captureVideoSnapshot(video, capture);
+    if (snapshot) setPreviewSrc(snapshot);
   }, []);
 
   const showToast = useCallback((message: string) => setToast(message), []);
@@ -150,10 +163,11 @@ export function useMonitor() {
     showToast(message);
   }, [showToast, stopRealtimeInference]);
 
-  const handleInferenceResult = useCallback((result: InferenceResult) => {
+  function handleInferenceResult(result: InferenceResult): void {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
+    setLatestDetections(result.detections ?? []);
     setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
     const violation = result.result === "violate";
@@ -170,17 +184,11 @@ export function useMonitor() {
     if (!result.review_required || session.current.violationLatched) return;
     session.current.violationLatched = true;
     session.current.running = false;
-    pendingViolationRef.current = result;
-    setPendingViolation(result);
     const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = result.video_time;
-    }
+    video?.pause();
     client.close();
     setPlaybackLabel("▶ Tiếp tục");
     setPlaybackDisabled(true);
-    setReviewStartedAt(Date.now());
     setFlowStatus("Chờ xác minh");
     setView(current => ({
       ...current,
@@ -193,15 +201,16 @@ export function useMonitor() {
       confidenceLabel: "VIOLATE",
       confidenceWidth: "100%"
     }));
-  }, [client]);
+    freezeAtViolationFrame(result);
+  }
 
   resultHandler.current = handleInferenceResult;
   failureHandler.current = handleInferenceFailure;
 
   useEffect(() => {
     const canvas = overlayRef.current;
-    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, selectedPoint, activePpeRequirements);
-  }, [activePpeRequirements, latestPeople, selectedPoint, zonePoints]);
+    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, latestDetections, selectedPoint, activePpeRequirements);
+  }, [activePpeRequirements, latestDetections, latestPeople, selectedPoint, zonePoints]);
 
   useEffect(() => {
     if (!toast) return;
@@ -230,6 +239,7 @@ export function useMonitor() {
     });
     updateZonePoints([]);
     setLatestPeople([]);
+    setLatestDetections([]);
     setSelectedPoint(null);
     pendingViolationRef.current = null;
     setPendingViolation(null);
@@ -317,12 +327,12 @@ export function useMonitor() {
     setPreviewSrc(undefined);
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
-    session.current.running = zonePointsRef.current.length === 4;
+    session.current.running = true;
     session.current.frameSequence = 0;
     session.current.lastHandledFrame = -1;
     session.current.lastSampleTime = -1;
-    setFlowStatus(session.current.running ? "Đang inference realtime" : "Đang xem video · dừng để cấu hình đủ 4 điểm");
-    setView(current => ({...current, confidenceLabel: session.current.running ? "RUNNING" : "PREVIEW", confidenceWidth: session.current.running ? "70%" : "25%"}));
+    setFlowStatus("Đang inference realtime");
+    setView(current => ({...current, confidenceLabel: "RUNNING", confidenceWidth: "70%"}));
     if (video.ended) video.currentTime = 0;
     if (session.current.running) {
       setFlowStatus("Đang kết nối inference");
@@ -362,6 +372,41 @@ export function useMonitor() {
       }, "image/jpeg", JPEG_QUALITY);
     }
     if (session.current.running) requestAnimationFrame(sampleFrameLoop);
+  }
+
+  function freezeAtViolationFrame(result: InferenceResult): void {
+    const video = videoRef.current;
+    const capture = captureRef.current;
+    if (!video || !capture || !video.videoWidth) {
+      openViolationReview(result, result.snapshot_data);
+      return;
+    }
+
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(fallbackTimer);
+      video.removeEventListener("seeked", renderStoppedFrame);
+      openViolationReview(result, captureVideoSnapshot(video, capture) ?? result.snapshot_data);
+    };
+    const renderStoppedFrame = () => {
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => finish());
+      else window.requestAnimationFrame(finish);
+    };
+
+    video.addEventListener("seeked", renderStoppedFrame, {once: true});
+    const fallbackTimer = window.setTimeout(finish, 800);
+    if (Math.abs(video.currentTime - result.video_time) < 0.01) renderStoppedFrame();
+    else video.currentTime = result.video_time;
+  }
+
+  function openViolationReview(result: InferenceResult, snapshotData?: string): void {
+    const reviewedFrame = snapshotData ? {...result, snapshot_data: snapshotData} : result;
+    pendingViolationRef.current = reviewedFrame;
+    setPendingViolation(reviewedFrame);
+    setIsReviewModalOpen(true);
+    setReviewStartedAt(Date.now());
   }
 
   function stopPreviewPlayback(): void {
@@ -420,7 +465,7 @@ export function useMonitor() {
       updateZonePoints([...zonePointsRef.current, position]);
       setSelectedPoint(zonePointsRef.current.length - 1);
     } else setSelectedPoint(null);
-    setFlowStatus(zonePointsRef.current.length === 4 ? "Sẵn sàng inference realtime · nhấn Phát video" : "Chờ đủ 4 điểm");
+    setFlowStatus(zonePointsRef.current.length === 4 ? "Zone sẵn sàng · inference realtime" : "Zone tùy chọn · detection vẫn chạy khi phát video");
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>): void {
@@ -451,6 +496,7 @@ export function useMonitor() {
       await saveReviewedEvent(buildEventPayload(status, pending, zonePointsRef.current, machineRunningRef.current));
       pendingViolationRef.current = null;
       setPendingViolation(null);
+      setIsReviewModalOpen(false);
       setReviewStartedAt(null);
       setPlaybackDisabled(false);
       setFlowStatus("Đã đóng xác minh");
@@ -469,16 +515,19 @@ export function useMonitor() {
   return {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
-      zonePoints, selectingZone, machineRunning, pendingViolation, reviewSaving, view,
+      zonePoints, selectingZone, machineRunning, pendingViolation, isReviewModalOpen, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
-      zoneDisabled, flowStatus, toast, selectedPointPosition, timer, peopleCount: latestPeople.length,
+      zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
+      latestPeople, latestDetections, peopleCount: latestPeople.length,
       ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
       resetZone, toggleZoneEditing, handlePointerDown, handlePointerMove,
-      handlePointerUp, deleteSelectedPoint, review
+      handlePointerUp, deleteSelectedPoint, review,
+      openReviewModal: () => setIsReviewModalOpen(true),
+      closeReviewModal: () => setIsReviewModalOpen(false),
     }
   };
 }
@@ -520,7 +569,8 @@ export function buildEventPayload(
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
-    privacy_blurred: false,
+    snapshot_people: pending.people,
+    snapshot_detections: pending.detections ?? [],
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",

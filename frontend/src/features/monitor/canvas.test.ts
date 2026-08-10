@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {findPointAt, normalizedPointerPosition, requiredPpeBadges} from "./canvas";
+import {detectionLabel, findPointAt, getDetectionColor, normalizedPointerPosition, requiredPpeBadges} from "./canvas";
 
 describe("monitor Canvas coordinates", () => {
   it("normalizes and clamps pointer coordinates", () => {
@@ -32,5 +32,18 @@ describe("monitor Canvas coordinates", () => {
       {label: "✓ MŨ", tone: "present"},
       {label: "✕ GĂNG", tone: "missing"},
     ]);
+  });
+
+  it("labels every model detection with its class name and confidence", () => {
+    expect(detectionLabel({class_id: 7, class_name: "tool", bbox: [0, 0, 10, 20], confidence: 0.794, person_index: null}))
+      .toBe("TOOL · 79%");
+  });
+
+  it("maps detection classes to consistent bounding box & list colors", () => {
+    expect(getDetectionColor("person", 0, true)).toBe("#ff4940");
+    expect(getDetectionColor("person", 0, false)).toBe("#22c55e");
+    expect(getDetectionColor("helmet")).toBe("#f59e0b");
+    expect(getDetectionColor("shoes")).toBe("#3b82f6");
+    expect(getDetectionColor("gloves")).toBe("#10b981");
   });
 });

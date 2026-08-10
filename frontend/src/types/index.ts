@@ -25,6 +25,14 @@ export interface PpeObservation {
   confidence: number | null;
 }
 
+export interface ModelDetection {
+  class_id: number;
+  class_name: string;
+  bbox: [number, number, number, number];
+  confidence: number;
+  person_index: number | null;
+}
+
 export interface InferenceRule {
   person_inside_zone: boolean;
   machine_state: MachineState;
@@ -42,6 +50,7 @@ export interface InferenceResult {
   result: "normal" | "violate";
   review_required: boolean;
   people: PersonDetection[];
+  detections?: ModelDetection[];
   snapshot_data?: string;
   rule: InferenceRule;
 }
@@ -71,7 +80,8 @@ export interface EventPayload {
   status: ReviewStatus;
   acknowledged_by: string;
   snapshot_data?: string;
-  privacy_blurred: boolean;
+  snapshot_people?: PersonDetection[];
+  snapshot_detections?: ModelDetection[];
   details: Record<string, unknown>;
 }
 
