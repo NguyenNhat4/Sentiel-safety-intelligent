@@ -13,7 +13,7 @@ import type {
 } from "../../types";
 import {drawOverlay, findPointAt, normalizedPointerPosition} from "./canvas";
 
-const SAMPLE_INTERVAL_SECONDS = 0.5;
+const SAMPLE_INTERVAL_SECONDS = 0.1;
 const JPEG_QUALITY = 0.82;
 const PREVIEW_CANDIDATES = [0.05, 0.5, 1, 2, 3, 4, 5, 7, 10];
 const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {

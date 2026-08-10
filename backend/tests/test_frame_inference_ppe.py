@@ -3,6 +3,7 @@ import base64
 import cv2
 import numpy as np
 
+from backend.app.core.config import Settings
 from backend.app.schemas.analysis import FrameInferenceRequest, PpeObservation
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.frame_inference_service import FrameInferenceService
@@ -25,6 +26,17 @@ def request() -> FrameInferenceRequest:
         ],
         machine_state="stopped",
     )
+
+
+def test_default_person_detector_uses_dedicated_person_model(monkeypatch):
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(person_model_path="models/person.pt", ppe_model_path="models/ppe.pt"),
+    )
+
+    service = FrameInferenceService()
+
+    assert service._person_model_path == "models/person.pt"
 
 
 def test_required_explicitly_missing_ppe_requests_review():
@@ -212,4 +224,3 @@ def test_fewer_observations_than_people_safely_handled():
     assert len(result.people) == 2
     assert result.people[0].ppe.helmet.status == "missing"
     assert result.people[1].ppe.helmet.status == "missing"
-

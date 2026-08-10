@@ -86,6 +86,7 @@ P-047/
 │   │   ├── shooting-sheet-template.csv
 │   │   ├── ground-truth-template.json
 │   │   └── manifest-template.json
+│   ├── test.mp4         # Local model benchmark input when present
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
@@ -106,6 +107,13 @@ P-047/
 │   │   └── US-07-SPEC.md
 │   └── backlog/         # Remaining MVP and advanced user stories
 │       └── README.md
+├── scripts/             # Explicit-entrypoint automation and model benchmarks
+│   ├── README.md
+│   └── benchmark_model.py
+├── eval/                # Evaluation reports and benchmark results
+│   └── results/
+│       ├── report.md
+│       └── model-benchmark-report.md
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
 │   ├── agents/          # Example graph, state, nodes and tools
 │   ├── api/             # Legacy chat/status routes

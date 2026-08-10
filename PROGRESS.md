@@ -28,6 +28,11 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
+- [x] Fixed person false positives caused by using the SH17 PPE checkpoint as the person detector; frame inference now uses the dedicated YOLO11 person checkpoint while SH17 remains responsible for PPE/object observations.
+- [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
+- [x] Added pure-CV post-redaction JPEG annotation for reviewed person and SH17 bounding boxes, preserving the input frame and skipping duplicate SH17 `person` boxes.
+- [x] Added `scripts/benchmark_model.py` to measure YOLO latency (mean/P50/P95/P99) and inference throughput using `data/test.mp4` by default, including a combined person+PPE pipeline mode.
+- [x] Added `eval/results/model-benchmark-report.md` with the combined person+PPE benchmark result and measurement boundaries.
 
 ### Frontend
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
@@ -90,6 +95,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
 ## Known Issues
+- Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
 - The PPE checkpoint is present with recorded provenance and class mapping, but it detects PPE presence only. Backend now derives `missing` from qualified absence; ground truth and false-negative benchmark validation remain US-07 blockers for real alerts.
 - Review snapshots are not face-blurred yet and currently record `privacy_blurred=false`.
