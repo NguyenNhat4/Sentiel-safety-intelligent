@@ -48,6 +48,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Resolved potential `IndexError` in `FrameInferenceService` when `observations` length is smaller than `detected_people`, and optimized detection loop in `PpeVisionFacade`.
 
 ### Documentation
+- [x] [Vision] Added the US-13 Task 2 guide for consented custom recording, ground-truth annotation, cross-review, manifest/checksum generation, and locked calibration/final splits.
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
 - [x] Added new-developer setup, API documentation, testing, and manual smoke-test instructions to the root README.

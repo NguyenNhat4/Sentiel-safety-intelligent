@@ -89,7 +89,8 @@ P-047/
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
-│   └── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
+│   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
+│   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md

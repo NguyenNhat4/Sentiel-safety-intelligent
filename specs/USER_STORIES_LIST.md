@@ -50,7 +50,7 @@
 
 > Với vai trò cán bộ an toàn, tôi muốn hệ thống nhận biết từng người có thiếu mũ, kính hoặc găng bảo hộ hay không, để phát hiện đúng các vi phạm PPE trong problem statement.
 
-- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-03
 - Acceptance criteria:
   - Model PPE đã huấn luyện được nạp từ cấu hình và nhận biết tối thiểu ba nhóm bắt buộc: mũ, kính và găng bảo hộ; heuristic màu/áo phản quang không còn là kết quả PPE chính.
