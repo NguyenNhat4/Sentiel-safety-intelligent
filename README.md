@@ -80,6 +80,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
 | Chuẩn bị và khóa custom dataset cho US-13 | [US-13 Task 2 Dataset Guide](docs/US-13-task2-datapreparation.md) |
+| Dùng template và kiểm tra manifest US-13 | [US-13 evaluation workspace](data/evaluation/README.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |

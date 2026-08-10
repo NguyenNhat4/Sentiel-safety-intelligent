@@ -81,6 +81,11 @@ P-047/
 │   ├── package.json
 │   └── vite.config.ts
 ├── data/                # Sample video streams, test data and reviewed snapshots
+│   ├── evaluation/      # Committed US-13 templates; real dataset media remains outside Git
+│   │   ├── README.md
+│   │   ├── shooting-sheet-template.csv
+│   │   ├── ground-truth-template.json
+│   │   └── manifest-template.json
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
@@ -110,6 +115,8 @@ P-047/
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
+├── scripts/             # Explicit utility entrypoints, including dataset validation
+│   └── validate_us13_dataset.py
 ├── docker-compose.yml
 └── README.md
 ```
