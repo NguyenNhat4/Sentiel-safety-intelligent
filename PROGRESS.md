@@ -20,11 +20,15 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Required PPE state is rendered on each detected-person box: present is green, qualified absence is red `missing`, and unknown is labeled neutrally.
 - Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
 - Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
+- US-13 now specifies a project-owned custom dataset as its primary acceptance source, with scenario coverage, versioned ground truth, calibration/final isolation and reproducible metric/latency evidence.
 - US-12 now redacts identity in memory before event persistence, with SH17 face/head detections, a per-person head fallback, fail-closed errors, and server-owned privacy metadata.
 - ReviewModal now captures the full native video frame after it pauses at the violating inference timestamp, overlays its person and SH17 boxes with matching aspect ratio, and newly persisted US-12 snapshots contain the same annotations only after in-memory identity redaction.
 - Completed US-08 tracking/dedup with session-scoped track IDs, occurrence lifecycle, reconnect semantics, spatial track handoff, and database-enforced event idempotency.
 - US-08 core implementation now provides session-isolated ByteTrack IDs, deterministic rule occurrences, stale-frame/session guards, additive REST/WebSocket fields, and database-enforced reviewed-event idempotency.
 - Validated US-08 with a local-only synthetic 24-second multi-person video covering continuous presence, distinct concurrent tracks, exit/cooldown, and re-entry; test media is intentionally excluded from Git.
+- Backend now persists lightweight operational request, inference, and WebSocket outcome metrics to rotated JSONL and exposes bounded aggregates at `GET /api/v1/operational-metrics`.
+- `make setup` and `make run` now run versioned Alembic upgrades, so a new SQLite database is created at the current schema automatically.
+- A separate read-only “Quan sát hệ thống” page now displays JSONL operational request, latency, inference, and error aggregates.
 
 ## Completed
 
@@ -43,14 +47,21 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added the US-12 event privacy gate: raw snapshots are decoded only in memory, redacted before write, rejected on no candidate or processing failure, and cleaned up if the database transaction fails.
 - [x] Added transient reviewed-frame box metadata and a post-redaction snapshot annotator, so persisted JPEG evidence contains person and SH17 boxes without allowing annotations to affect privacy or rule decisions.
 - [x] Added session-scoped occurrence lifecycle, WebSocket stale-frame/session guards, and idempotent reviewed-event persistence keyed by occurrence IDs.
+- [x] Added privacy-safe rotating JSONL operational metrics, bounded aggregate API, HTTP/WebSocket instrumentation, and focused tests without external monitoring services.
+- [x] Added the idempotent `make db-upgrade` target to the standard setup/run flow; verified a new SQLite database reaches the current Alembic revision.
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
+- [x] Fixed person false positives caused by using the SH17 PPE checkpoint as the person detector; frame inference now uses the dedicated YOLO11 person checkpoint while SH17 remains responsible for PPE/object observations.
 - [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
 - [x] Added pure-CV post-redaction JPEG annotation for reviewed person and SH17 bounding boxes, preserving the input frame and skipping duplicate SH17 `person` boxes.
+- [x] Added `scripts/benchmark_model.py` to measure YOLO latency (mean/P50/P95/P99) and inference throughput using `data/test.mp4` by default, including a combined person+PPE pipeline mode.
+- [x] Added `eval/results/model-benchmark-report.md` with the combined person+PPE benchmark result and measurement boundaries.
 - [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
+- [x] Added WebSocket route connection counts for inference and alert channels to the separate operational-observability view.
+- [x] Added a separate operational-observability page with selectable window, refresh, aggregate KPIs, latency table, inference outcomes, errors, and loading/error/partial-data states.
 - [x] Added the system-admin sidebar entry and account, role/permission, and security tabs using the real authentication API.
 - [x] Removed the browser-only streaming simulation page, its login card, sidebar navigation, styles, and tests.
 - [x] Replaced the temporary authentication mock with typed login/session-restore/logout transport and focused token lifecycle tests.
@@ -77,6 +88,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added spatial track-ID handoff within the lost-track grace window so a nearby ByteTrack ID switch while a person exits preserves the reviewed occurrence instead of opening a duplicate popup; distant people remain independent.
 
 ### Documentation
+- [x] Added an operational-metrics guide covering JSONL events, privacy boundary, API/UI, retention, local operation, and single-process limits.
+- [x] [Vision] Added the US-13 Task 2 guide for consented custom recording, ground-truth annotation, cross-review, manifest/checksum generation, and locked calibration/final splits.
+- [x] [Vision] Added ready-to-use US-13 shooting-sheet, ground-truth and manifest templates plus a deterministic manifest validator with focused tests.
 - [x] [Frontend] Stabilized the login layout, reserved error-message space, and changed the three role cards into non-interactive descriptions.
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
@@ -111,15 +125,18 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Condensed the completed US-07 specification to its active behavior, public contract, ownership, tests, boundaries, and production gates.
 - [x] [Cross-cutting] Added an execution-flow diagram and safety-priority order to US-07 for operator and implementation clarity.
 - [x] [Backend] Specified the deterministic US-07 rule-engine boundary: model observation plus UI configuration produces `normal` or `violate`, with violation always routed to human review.
+- [x] [Cross-cutting] Updated and synchronized US-13 to require a consented custom evaluation dataset; recorded the dataset, split, privacy and benchmark constraints.
 - [x] [Cross-cutting] Implemented US-12 privacy persistence with a server-owned `privacy_blurred` value, SH17 identity/head redaction, fail-closed processing, rollback cleanup, and completed specification.
 - [x] [Cross-cutting] Added review and persisted-snapshot bounding boxes after the US-12 redaction gate, with focused Python and frontend component tests.
 
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 - [ ] Establish ground truth, explicit-missing evidence and benchmark targets for the PPE model before production alerting.
+- [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 - [ ] Replace the temporary clean SQLite database workaround with a safe legacy-database Alembic upgrade in the two-command setup/run path.
 
 ## Known Issues
+- Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - The current local `.venv` has an incomplete Pydantic installation (`pydantic_core` is missing), so backend pytest cannot start until dependencies are reinstalled.
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
 - The PPE checkpoint is present with recorded provenance and class mapping, but it detects PPE presence only. Backend now derives `missing` from qualified absence; ground truth and false-negative benchmark validation remain US-07 blockers for real alerts.
@@ -130,8 +147,11 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Legacy unversioned SQLite databases still require a safe Alembic upgrade path; browser QA passes against a newly created schema, while the original pre-US-08 database remains preserved as a backup.
 
 ## Next Steps
-1. Make Alembic upgrade safe for the existing unversioned SQLite database and include schema upgrade in the two-command setup/run path.
-2. Preserve the passing US-08 browser sequence as an automated repository E2E test.
+1. Chốt US-13 metric protocol, annotation guide, scenario matrix, sample size and acceptance thresholds with the Product Owner.
+2. Record and annotate the custom US-13 calibration/final evaluation dataset with manifest and checksums.
 3. Replace the safety-shirt heuristic while preserving the inference response contract.
-4. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
-5. Implement authenticated Safety Officer identity and validate migrations against PostgreSQL.
+4. Make Alembic upgrade safe for the existing unversioned SQLite database and include schema upgrade in the two-command setup/run path.
+5. Preserve the passing US-08 browser sequence as an automated repository E2E test.
+6. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
+7. Implement authenticated Safety Officer identity and validate migrations against PostgreSQL.
+8. Replace the JSONL writer with a centralized sink before any multi-worker deployment.

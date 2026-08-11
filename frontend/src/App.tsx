@@ -7,6 +7,7 @@ import {ForcedPasswordChangePage} from "./features/auth/ForcedPasswordChangePage
 import {AreaManagerPage} from "./features/area/AreaManagerPage";
 import {EventLogPage} from "./features/events/EventLogPage";
 import {MonitorPage} from "./features/monitor/MonitorPage";
+import {OperationalMetricsPage} from "./features/operational-metrics/OperationalMetricsPage";
 import type {AuthenticatedUser} from "./types";
 import {getCurrentUser, logout} from "./api/auth";
 
@@ -42,8 +43,10 @@ export default function App() {
     <AppShell page={page} onNavigate={setPage} user={user} onLogout={() => void handleLogout()}>
       {page === "monitor" && <MonitorPage />}
       <EventLogPage active={page === "events"} />
+      <OperationalMetricsPage active={page === "operations"} />
       {page === "area" && user.role !== "safety_manager" && <AreaManagerPage />}
       {page === "admin" && user.role === "system_admin" && <AdminUserPage currentUser={user} onLogout={() => void handleLogout()} />}
+      <OperationalMetricsPage active={page === "operations"} />
     </AppShell>
   );
 }

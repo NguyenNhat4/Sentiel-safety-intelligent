@@ -2,6 +2,21 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Frontend] Separate read-only operations view
+- **Choice:** Add a dedicated “Quan sát hệ thống” navigation view for operational JSONL aggregates, separate from the safety monitor and violation history.
+- **Reason:** Operational health needs an at-a-glance interface without exposing raw logs or distracting the Safety Officer's active monitoring workflow.
+- **Constraint:** The view only consumes aggregate data from `GET /api/v1/operational-metrics`; it has no write actions and does not expose raw events or sensitive payloads.
+
+## 2026-08-11: [Backend] Run database migrations in the two-command workflow
+- **Choice:** `make setup` and `make run` invoke `alembic upgrade head` through the idempotent `make db-upgrade` target before the backend starts.
+- **Reason:** A new developer or deployment must receive the current schema automatically, including new tables and migration-managed columns.
+- **Constraint:** This applies migrations that are already versioned and reviewed. A legacy database created outside Alembic and missing `alembic_version` still needs a safe one-time bootstrap migration; runtime model inspection must not silently mutate production schema.
+
+## 2026-08-11: [Backend] Lightweight operational metrics use rotated JSONL
+- **Choice:** Persist a finite, privacy-safe operational event schema to `data/operational-metrics.jsonl` and expose bounded aggregates through `GET /api/v1/operational-metrics`; do not add Prometheus, Grafana, a database table, or an external monitoring service in this MVP slice.
+- **Reason:** The Product Owner selected log-derived monitoring with restart persistence and minimal operational overhead.
+- **Constraints:** Only one writer process is supported. Events exclude frames, snapshot data, IDs, raw paths/query strings, client addresses, credentials, and exception text. Rotation is size-based; readers tolerate corrupt/partial records and report partial scans.
+
 ## 2026-08-11: [Backend] Reuse warm PostgreSQL connections
 - PostgreSQL uses a bounded LIFO pool, TCP keepalive and connection recycling. Per-checkout pre-ping is disabled by default because it adds a remote round-trip to every CRUD request; deployments with unstable idle connections may opt in through configuration.
 - ORM sessions retain loaded values after commit, and write services do not immediately refresh objects whose response fields are already generated client-side.
@@ -198,6 +213,12 @@ This is the single decision log for the repository. Prefix each entry with its o
   1. Safely fetch `observations[index]` with fallback to default unknown observations when `index >= len(observations)`.
   2. Reuse computed `confidence` in `PpeVisionFacade.observe()` loop to eliminate redundant calls.
 
+## 2026-08-09: [Cross-cutting] US-13 uses a project-owned custom evaluation dataset
+- **Reason:** Public workplace-video datasets do not provide the combined per-person helmet/glasses/gloves state, project-specific zone polygon, machine-state timeline, track/occurrence ground truth and expected HITL outcome required to evaluate the P-047 runtime contract.
+- **Choice:** Create a consented custom simulation dataset as the primary US-13 acceptance source. Public datasets may supplement regression or robustness checks but cannot replace the locked final evaluation set.
+- **Dataset contract:** Version a manifest and checksums for scenario/video identity, person/track annotations, per-person PPE state, zone, machine state, violation occurrences and expected review outcome. Split by video/scenario into calibration and final evaluation, and never tune against the final split.
+- **Privacy/storage constraint:** Use consenting participants and controlled simulated scenes. Do not commit raw media directly until an approved storage/access mechanism exists; version annotations, provenance and immutable media checksums instead.
+
 ## 2026-08-08: [Cross-cutting] SH17 in-memory snapshot redaction with person-head fallback
 - **Reason:** US-12 requires that a raw review snapshot never reaches storage, while the MVP already includes a SH17 checkpoint that detects identity-adjacent classes and persons.
 - **Choice:** Reuse the cached SH17 facade to blur `face`, `face-guard`, `face-mask`, and `head` detections. For every person without one of those detections, blur the upper 40% of that person's box. If there is no usable identity or person region, fail closed: do not create a reviewed event or snapshot. The backend alone sets `privacy_blurred=true` after successful redaction; request values for it and `snapshot_path` are ignored.
@@ -207,3 +228,8 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** Safety Officers need the reviewed person/PPE-object evidence to remain visible in both the confirmation popup and the JPEG later viewed from event history, without making visual annotation a safety or privacy input.
 - **Choice:** The frontend pauses and seeks to the violating inference timestamp, waits for that native video frame to render, captures it at its full source size, then overlays typed `people` and SH17 `detections` with the same aspect-ratio geometry. It sends the stopped-frame JPEG and additive, transient `snapshot_people` and `snapshot_detections` fields when the officer saves. The backend redacts the raw JPEG first, then draws person boxes and non-person SH17 boxes into the redacted JPEG before it is encoded and stored. These fields are excluded from the event row/response; older clients that omit them still save a redacted but unannotated snapshot.
 - **Constraint:** Box data never determines violation, redaction candidates, or `privacy_blurred`. SH17 `person` detections are skipped during annotation because rule/inference person boxes are the canonical person box source.
+## 2026-08-10: [Vision] Use the dedicated person checkpoint for person detection
+- **Supersedes:** The 2026-08-08 choice to use SH17 as the single inference checkpoint for person boxes in the browser frame-inference flow; SH17 remains the PPE/object observation checkpoint and is still used for snapshot privacy redaction.
+- **Reason:** The frame-inference service had a dedicated `person_model_path` configuration (`models/yolo11n.pt`) but accidentally defaulted it to the SH17 PPE model path. PPE/object checkpoints can produce false person detections on background objects, so person localization and PPE observation use separate model responsibilities.
+- **Choice:** `FrameInferenceService` uses `settings.person_model_path` for `_detect_people()` unless an explicit constructor override is supplied. `PpeVisionFacade` continues to use `settings.ppe_model_path` for SH17 detections and PPE association.
+- **Constraint:** This fixes model routing, not model quality. Thresholds and NMS must be benchmarked against labeled factory footage before production alerting.

@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
 
+    # Lightweight operational metrics persisted as rotated JSONL files.
+    operational_metrics_log_path: str = "data/operational-metrics.jsonl"
+    operational_metrics_log_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
+    operational_metrics_log_backup_count: int = Field(default=6, ge=1, le=30)
+    operational_metrics_max_scan_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    operational_metrics_max_scan_lines: int = Field(default=100_000, gt=0)
+
     # CORS
     cors_origins: list[str] | str = ["http://localhost:3000", "http://localhost:5173"]
 
@@ -53,6 +60,7 @@ class Settings(BaseSettings):
     ppe_model_path: str = "models/ppe_yolov8n.pt"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Violate frame least confidence threshold for PPE & Danger Zone detection
 
 
 @lru_cache

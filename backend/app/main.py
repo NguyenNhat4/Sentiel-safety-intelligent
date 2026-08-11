@@ -1,8 +1,9 @@
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, database_runtime, engine
+from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
 from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
 
@@ -19,6 +21,11 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_operational_metrics_logger(
+        settings.operational_metrics_log_path,
+        max_bytes=settings.operational_metrics_log_max_bytes,
+        backup_count=settings.operational_metrics_log_backup_count,
+    )
     # Auto-create tables in development if DB is reachable
     try:
         Base.metadata.create_all(bind=engine)
@@ -55,6 +62,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def record_http_metrics(request: Request, call_next):
+    if request.url.path == f"{settings.api_v1_prefix}/operational-metrics":
+        return await call_next(request)
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        record_operational_event(
+            "http_request_completed",
+            method=request.method,
+            route=getattr(request.scope.get("route"), "path", "unmatched"),
+            status_class="5xx",
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            outcome="error",
+            error_kind="unhandled_exception",
+        )
+        raise
+    record_operational_event(
+        "http_request_completed",
+        method=request.method,
+        route=getattr(request.scope.get("route"), "path", "unmatched"),
+        status_class=f"{response.status_code // 100}xx",
+        duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+        outcome="success" if response.status_code < 400 else "error",
+    )
+    return response
+
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
