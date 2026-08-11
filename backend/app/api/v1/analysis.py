@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
+from backend.app.core.database import get_db
 from backend.app.schemas.analysis import (
     AnalysisStatusResponse,
     FrameInferenceRequest,
@@ -8,6 +10,7 @@ from backend.app.schemas.analysis import (
 )
 from backend.app.services.analysis_service import AnalysisService
 from backend.app.services.frame_inference_service import InvalidFrameError, StaleFrameError, frame_inference_service
+from backend.app.services.monitoring_zone_service import MonitoringZoneGeometryError, MonitoringZoneService
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 analysis_service = AnalysisService()
@@ -38,11 +41,27 @@ async def get_analysis_status(session_id: str):
 
 
 @router.post("/frame", response_model=FrameInferenceResponse)
-async def infer_frame(request: FrameInferenceRequest):
+async def infer_frame(request: FrameInferenceRequest, db: Session = Depends(get_db)):
     """Evaluate one browser video frame against the predefined safety rule."""
     try:
+        if request.zones is not None:
+            persisted = MonitoringZoneService(db).get(request.camera_id)
+            requested_zones = [
+                zone.model_dump(mode="json") for zone in sorted(request.zones, key=lambda item: item.order)
+            ]
+            saved_zones = [zone.model_dump(mode="json") for zone in persisted.zones]
+            if request.zone_revision != persisted.revision or requested_zones != saved_zones:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "zone_revision_conflict"},
+                )
         return frame_inference_service.infer(request)
     except InvalidFrameError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except StaleFrameError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except MonitoringZoneGeometryError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "zone_geometry_conflict", "zone_ids": exc.zone_ids},
+        ) from exc

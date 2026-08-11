@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
-from backend.app.schemas.event import EventCreate, EventResponse, EventUpdate
+from backend.app.schemas.event import EventBatchCreate, EventBatchResponse, EventCreate, EventResponse, EventUpdate
 from backend.app.services.event_service import (
     EventConflictError,
     EventPersistenceError,
@@ -11,6 +11,37 @@ from backend.app.services.event_service import (
 )
 
 router = APIRouter(prefix="/events", tags=["Safety Events"])
+batch_router = APIRouter(prefix="/event-batches", tags=["Safety Events"])
+
+
+@batch_router.post("", response_model=EventBatchResponse, status_code=201)
+async def create_event_batch(batch_in: EventBatchCreate, db: Session = Depends(get_db)):
+    from backend.app.services.frame_inference_service import frame_inference_service
+
+    service = EventService(db)
+    all_occurrence_ids = [str(value) for item in batch_in.events for value in item.occurrence_ids]
+    if not service.has_persisted_occurrences(all_occurrence_ids):
+        for item in batch_in.events:
+            if not frame_inference_service.occurrences_belong_to_zone(
+                str(batch_in.monitoring_session_id),
+                item.zone_id,
+                [str(value) for value in item.occurrence_ids],
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Occurrence does not belong to the requested session and zone",
+                )
+    try:
+        batch_id, snapshot_path, events = service.create_batch(batch_in)
+        return {"batch_id": batch_id, "snapshot_path": snapshot_path, "events": events}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except EventPrivacyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except EventConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EventPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[EventResponse])

@@ -12,9 +12,9 @@ Xây dựng prototype dùng Computer Vision để:
 
 * Kiểm tra người có mặc áo bảo hộ hay không.
 
-* Xác định người có đi vào vùng nguy hiểm.
+* Xác định người có đi vào một hoặc nhiều vùng nguy hiểm trên cùng video.
 
-* Kết hợp trạng thái máy ON/OFF.
+* Kết hợp trạng thái máy ON/OFF độc lập theo từng vùng.
 
 * Tạo cảnh báo theo mức độ.
 
@@ -30,11 +30,11 @@ Xây dựng prototype dùng Computer Vision để:
 
 * Video mô phỏng, chưa dùng camera nhà máy thật.
 
-* Một vùng nguy hiểm.
+* Từ 0 đến nhiều vùng nguy hiểm bốn điểm không giao/chạm/chứa nhau trên một video mô phỏng; không đặt giới hạn số vùng ở cấp sản phẩm.
 
 * Một loại PPE trong baseline: áo phản quang.
 
-* Một trạng thái máy ON/OFF.
+* Một trạng thái máy ON/OFF mô phỏng cho mỗi vùng.
 
 * Một người dùng.
 
@@ -48,7 +48,7 @@ Xây dựng prototype dùng Computer Vision để:
 
 → Cán bộ mô tả → rule được tạo
 
-→ Cán bộ chấm bốn điểm vẽ vùng cấm.
+→ Cán bộ tạo một hoặc nhiều vùng cấm, mỗi vùng gồm bốn điểm và trạng thái máy riêng.
 
 → Video demo upload  
 → phát hiện người
@@ -66,7 +66,7 @@ Xây dựng prototype dùng Computer Vision để:
 
 * Một vi phạm chỉ tạo một event.
 
-* Critical alert xuất hiện gần realtime.
+* Critical alert xuất hiện gần realtime và chỉ gắn với vùng có máy đang chạy.
 
 * Người dùng có thể acknowledge, confirm hoặc false alarm.
 
@@ -76,4 +76,4 @@ Xây dựng prototype dùng Computer Vision để:
 
 ## Giới hạn
 
-Prototype chưa chứng minh độ chính xác trong nhà máy thật, chưa tích hợp PLC, chưa xử lý nhiều camera và không tự động dừng máy.
+Prototype chưa chứng minh độ chính xác trong nhà máy thật, chưa tích hợp PLC, chưa xử lý nhiều camera/video đồng thời và không tự động dừng máy. Trạng thái máy theo vùng là mô phỏng do người vận hành cấu hình.

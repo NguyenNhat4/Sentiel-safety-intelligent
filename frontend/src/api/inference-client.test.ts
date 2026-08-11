@@ -84,4 +84,32 @@ describe("InferenceClient", () => {
     await connection;
     expect(client.canSend).toBe(true);
   });
+
+  it("sends the saved multi-zone collection and revision", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new InferenceClient({
+      getConfiguration: () => ({
+        zones: [{
+          zone_id: "press_01", display_name: "Máy dập", machine_state: "running", enabled: true, order: 0,
+          points: [{x: 0, y: 0}, {x: 0.4, y: 0}, {x: 0.4, y: 1}, {x: 0, y: 1}],
+        }],
+        zone_revision: 7,
+        camera_id: "uploaded_video",
+        monitoring_session_id: "46a62d3a-4fb4-4a54-87bc-58e075722e2c",
+      }),
+      onResult: vi.fn(), onFailure: vi.fn(),
+      socketFactory: () => {
+        const socket = new FakeSocket(); sockets.push(socket); return socket as unknown as WebSocket;
+      },
+    });
+
+    const connection = client.connect();
+    sockets[0].open();
+    expect(JSON.parse(sockets[0].sent[0] as string)).toMatchObject({
+      type: "configure", zone_revision: 7, camera_id: "uploaded_video",
+      zones: [{zone_id: "press_01", machine_state: "running"}],
+    });
+    sockets[0].message({type: "configured", zone_revision: 7});
+    await connection;
+  });
 });

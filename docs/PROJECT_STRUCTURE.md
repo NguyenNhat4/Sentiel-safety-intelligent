@@ -16,6 +16,7 @@ P-047/
 │   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── monitoring_zones.py # Revisioned per-camera zone collection
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
 │   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
@@ -29,10 +30,12 @@ P-047/
 │   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
+│   │   │   ├── monitoring_zone.py
 │   │   │   └── ppe_requirement.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── event.py
+│   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
@@ -40,6 +43,7 @@ P-047/
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
@@ -50,13 +54,15 @@ P-047/
 │   │       ├── README.md
 │   │       ├── 20260801_01_create_safety_events.py
 │   │       ├── 20260806_01_add_ppe_requirements.py
-│   │       └── 20260807_01_add_event_occurrences.py
+│   │       ├── 20260807_01_add_event_occurrences.py
+│   │       └── 20260811_01_add_monitoring_zones.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
+│       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
 │       ├── test_violation_tracking.py
 │       └── test_statistics.py
@@ -72,10 +78,11 @@ P-047/
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
+│   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
-│   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
+│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
 │   │   │   ├── rules/   # PPE requirement switches and explicit-save state
@@ -111,7 +118,9 @@ P-047/
 │   │   ├── US-08-SPEC.md
 │   │   └── US-12.md
 │   └── backlog/         # Remaining MVP and advanced user stories
-│       └── README.md
+│       ├── README.md
+│       ├── US-09.md ... US-27.md
+│       └── US-27-MULTI-ZONE-SPEC.md # Draft multi-zone Phase 1 contract/spec
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
 │   ├── agents/          # Example graph, state, nodes and tools
 │   ├── api/             # Legacy chat/status routes

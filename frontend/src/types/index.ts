@@ -6,12 +6,29 @@ export interface ZonePoint {
   y: number;
 }
 
+export interface MonitoringZone {
+  zone_id: string;
+  display_name: string;
+  points: ZonePoint[];
+  machine_state: MachineState;
+  enabled: boolean;
+  order: number;
+}
+
+export interface MonitoringZoneCollection {
+  camera_id: string;
+  revision: number;
+  zones: MonitoringZone[];
+  updated_at: string | null;
+}
+
 export interface PersonDetection {
   track_id?: number;
   bbox: [number, number, number, number];
   confidence: number;
   foot_point?: [number, number];
   inside_zone: boolean;
+  zone_memberships?: ZoneMembership[];
   safety_shirt: boolean;
   ppe: {
     helmet: PpeObservation;
@@ -25,7 +42,20 @@ export interface PersonDetection {
 export interface ActiveViolation {
   occurrence_id: string;
   rule_key: string;
+  zone_id?: string | null;
   is_new: boolean;
+}
+
+export interface ZoneMembership {
+  zone_id: string;
+  inside: boolean;
+}
+
+export interface ZoneResult {
+  zone_id: string;
+  machine_state: MachineState;
+  person_inside_zone: boolean;
+  violation: boolean;
 }
 
 export interface PpeObservation {
@@ -49,6 +79,8 @@ export interface InferenceRule {
   zone_id: string;
   ppe_requirements: PpeRequirementUpdate;
   ppe_alert: boolean;
+  zone_revision?: number | null;
+  zone_results?: ZoneResult[];
 }
 
 export interface InferenceResult {
@@ -82,6 +114,32 @@ export interface SafetyEvent {
   };
   monitoring_session_id?: string | null;
   occurrence_ids?: string[];
+  batch_id?: string | null;
+}
+
+export interface EventBatchItem {
+  zone_id: string;
+  event_type: "zone_intrusion";
+  severity: string;
+  occurrence_ids: string[];
+  details: Record<string, unknown>;
+}
+
+export interface EventBatchPayload {
+  monitoring_session_id: string;
+  camera_id: string;
+  status: ReviewStatus;
+  acknowledged_by: string;
+  snapshot_data?: string;
+  snapshot_people?: PersonDetection[];
+  snapshot_detections?: ModelDetection[];
+  events: EventBatchItem[];
+}
+
+export interface EventBatchResponse {
+  batch_id: string;
+  snapshot_path?: string | null;
+  events: SafetyEvent[];
 }
 
 export interface EventPayload {

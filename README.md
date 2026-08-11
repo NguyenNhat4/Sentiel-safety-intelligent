@@ -30,7 +30,7 @@ Hệ thống hướng tới:
 
 Dự án đang phát triển theo hai giai đoạn:
 
-1. Đóng MVP với video/ảnh mô phỏng, PPE, vùng nguy hiểm, HITL, privacy, event log, authentication và dashboard cơ bản.
+1. Đóng MVP với video/ảnh mô phỏng, nhiều vùng nguy hiểm trên một stream, PPE, HITL, privacy, event log, authentication và dashboard cơ bản.
 2. Giao bản nâng cao trong 5 tuần với khu vực/ca, confidence triage, escalation, dashboard quản trị, báo cáo và cloud operations.
 
 Camera nhà máy thật, PLC, tự động dừng máy và xử lý đồng thời nhiều stream không thuộc phạm vi đã cam kết. Xem [Problem Statement](docs/project-problem-statement.md), [PRD](specs/PRD.md) và [User Story Backlog](specs/USER_STORIES_LIST.md) để biết phạm vi chính xác.
@@ -41,13 +41,13 @@ Baseline đang hoạt động gồm:
 
 - React 19 + TypeScript + Vite cho giao diện monitor.
 - FastAPI phục vụ REST, WebSocket và production frontend build.
-- Upload video local, vẽ vùng bốn điểm và trạng thái máy chạy/dừng.
+- Upload video local, tạo/lưu nhiều vùng bốn điểm không chồng nhau và trạng thái máy riêng cho từng vùng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
 - SQLite cho local/test; PostgreSQL là database production đích.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -82,6 +82,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
+| Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/backlog/US-27-MULTI-ZONE-SPEC.md) |
 | Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |

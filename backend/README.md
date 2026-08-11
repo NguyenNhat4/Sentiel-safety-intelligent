@@ -21,8 +21,10 @@ Baseline development persists reviewed events in `data/safety_events.db` via SQL
 
 The baseline uses two transports with separate responsibilities:
 
-- WebSocket `/api/v1/ws/inference` carries zone configuration, sampled JPEG frames, and inference results.
-- REST `/api/v1/events` persists a reviewed outcome and its snapshot.
+- WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
+- REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
+
+US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
 
 US-07 adds a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
 

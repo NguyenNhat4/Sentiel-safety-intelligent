@@ -108,6 +108,12 @@ class ViolationTrackingService:
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
+    def occurrence_context(self, occurrence_id: str) -> tuple[str, str] | None:
+        for (session_id, _track_id, rule_key), occurrence in self._occurrences.items():
+            if occurrence.occurrence_id == occurrence_id:
+                return session_id, rule_key
+        return None
+
     def _clear(self, occurrence: _Occurrence, now: float) -> None:
         occurrence.active = False
         occurrence.absent_frames = 0
