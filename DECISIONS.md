@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Backend] Run database migrations in the two-command workflow
+- **Choice:** `make setup` and `make run` invoke `alembic upgrade head` through the idempotent `make db-upgrade` target before the backend starts.
+- **Reason:** A new developer or deployment must receive the current schema automatically, including new tables and migration-managed columns.
+- **Constraint:** This applies migrations that are already versioned and reviewed. A legacy database created outside Alembic and missing `alembic_version` still needs a safe one-time bootstrap migration; runtime model inspection must not silently mutate production schema.
+
 ## 2026-08-11: [Backend] Lightweight operational metrics use rotated JSONL
 - **Choice:** Persist a finite, privacy-safe operational event schema to `data/operational-metrics.jsonl` and expose bounded aggregates through `GET /api/v1/operational-metrics`; do not add Prometheus, Grafana, a database table, or an external monitoring service in this MVP slice.
 - **Reason:** The Product Owner selected log-derived monitoring with restart persistence and minimal operational overhead.

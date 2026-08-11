@@ -20,6 +20,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - US-08 core implementation now provides session-isolated ByteTrack IDs, deterministic rule occurrences, stale-frame/session guards, additive REST/WebSocket fields, and database-enforced reviewed-event idempotency.
 - Validated US-08 with a local-only synthetic 24-second multi-person video covering continuous presence, distinct concurrent tracks, exit/cooldown, and re-entry; test media is intentionally excluded from Git.
 - Backend now persists lightweight operational request, inference, and WebSocket outcome metrics to rotated JSONL and exposes bounded aggregates at `GET /api/v1/operational-metrics`.
+- `make setup` and `make run` now run versioned Alembic upgrades, so a new SQLite database is created at the current schema automatically.
 
 ## Completed
 
@@ -35,6 +36,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added transient reviewed-frame box metadata and a post-redaction snapshot annotator, so persisted JPEG evidence contains person and SH17 boxes without allowing annotations to affect privacy or rule decisions.
 - [x] Added session-scoped occurrence lifecycle, WebSocket stale-frame/session guards, and idempotent reviewed-event persistence keyed by occurrence IDs.
 - [x] Added privacy-safe rotating JSONL operational metrics, bounded aggregate API, HTTP/WebSocket instrumentation, and focused tests without external monitoring services.
+- [x] Added the idempotent `make db-upgrade` target to the standard setup/run flow; verified a new SQLite database reaches the current Alembic revision.
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
