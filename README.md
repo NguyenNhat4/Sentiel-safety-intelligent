@@ -82,6 +82,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
 | Chuẩn bị và khóa custom dataset cho US-13 | [US-13 Task 2 Dataset Guide](docs/US-13-task2-datapreparation.md) |
 | Dùng template và kiểm tra manifest US-13 | [US-13 evaluation workspace](data/evaluation/README.md) |
+| Hiểu JSONL metrics, API và UI quan sát hệ thống | [Operational Metrics](docs/operational-metrics.md) |
 | Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
