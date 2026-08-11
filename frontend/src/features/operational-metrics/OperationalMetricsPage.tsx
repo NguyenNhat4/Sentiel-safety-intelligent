@@ -44,6 +44,9 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
       <section className="operations-table-card"><h3>Request & latency</h3><table><thead><tr><th>Method</th><th>Route</th><th>Status</th><th>Count</th><th>P50</th><th>P95</th></tr></thead><tbody>
         {metrics?.requests.length ? metrics.requests.map(item => <tr key={`${item.method}-${item.route}-${item.status_class}`}><td>{item.method}</td><td>{item.route}</td><td>{item.status_class}</td><td>{item.count}</td><td>{formatMs(item.latency.p50_ms)}</td><td>{formatMs(item.latency.p95_ms)}</td></tr>) : <tr><td colSpan={6}>Chưa có request trong khoảng thời gian này.</td></tr>}
       </tbody></table></section>
+      <section className="operations-table-card"><h3>WebSocket connections</h3><table><thead><tr><th>Route</th><th>Opened</th><th>Closed</th></tr></thead><tbody>
+        {metrics?.websocket_connections.length ? metrics.websocket_connections.map(item => <tr key={item.route}><td>{item.route}</td><td>{item.opened}</td><td>{item.closed}</td></tr>) : <tr><td colSpan={3}>Chưa có WebSocket connection trong khoảng thời gian này.</td></tr>}
+      </tbody></table></section>
       <section className="operations-breakdown"><Breakdown title="Inference outcomes" values={metrics?.inference_outcomes ?? {}} /><Breakdown title="Errors" values={metrics?.errors_by_kind ?? {}} /></section>
     </>}
   </section>;

@@ -54,6 +54,7 @@ active_inference_sessions: set[str] = set()
 async def websocket_alerts_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time safety violation alerts."""
     await manager.connect(websocket)
+    record_operational_event("websocket_connection_opened", route="/api/v1/ws/alerts", outcome="connected")
     try:
         while True:
             # Keep connection open & handle incoming client messages if any
@@ -62,6 +63,7 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "pong", "received": data}))
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        record_operational_event("websocket_connection_closed", route="/api/v1/ws/alerts", outcome="disconnected")
 
 
 async def send_inference_error(websocket: WebSocket, code: str, message: str) -> None:
@@ -73,7 +75,7 @@ async def send_inference_error(websocket: WebSocket, code: str, message: str) ->
 async def websocket_inference_endpoint(websocket: WebSocket):
     """Run sampled browser-frame inference over a persistent WebSocket."""
     await websocket.accept()
-    record_operational_event("websocket_connection_opened", outcome="connected")
+    record_operational_event("websocket_connection_opened", route="/api/v1/ws/inference", outcome="connected")
     configuration: InferenceWebSocketConfigure | None = None
     pending_frame: InferenceWebSocketFrameMeta | None = None
 
@@ -207,4 +209,4 @@ async def websocket_inference_endpoint(websocket: WebSocket):
     finally:
         if configuration is not None:
             active_inference_sessions.discard(str(configuration.monitoring_session_id))
-        record_operational_event("websocket_connection_closed", outcome="disconnected")
+        record_operational_event("websocket_connection_closed", route="/api/v1/ws/inference", outcome="disconnected")

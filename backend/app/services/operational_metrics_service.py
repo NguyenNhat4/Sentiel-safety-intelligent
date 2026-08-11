@@ -11,6 +11,7 @@ from backend.app.schemas.operational_metrics import (
     LatencySummary,
     OperationalMetricsSummaryResponse,
     RequestMetricsGroup,
+    WebSocketMetricsGroup,
 )
 
 
@@ -49,6 +50,7 @@ class OperationalMetricsService:
         counts: Counter[tuple[str, str, str]] = Counter()
         inference_outcomes: Counter[str] = Counter()
         errors_by_kind: Counter[str] = Counter()
+        websocket_connections: dict[str, Counter[str]] = defaultdict(Counter)
 
         for path in paths:
             try:
@@ -95,6 +97,10 @@ class OperationalMetricsService:
                             groups[key].append(float(event["duration_ms"]))
                     if event_type in {"inference_completed", "inference_failed"}:
                         inference_outcomes[str(event.get("outcome", event_type))] += 1
+                    if event_type in {"websocket_connection_opened", "websocket_connection_closed"}:
+                        route = event.get("route")
+                        if isinstance(route, str):
+                            websocket_connections[route]["opened" if event_type.endswith("opened") else "closed"] += 1
                     if isinstance(event.get("error_kind"), str):
                         errors_by_kind[event["error_kind"]] += 1
                 if partial_reasons:
@@ -128,6 +134,10 @@ class OperationalMetricsService:
             partial=bool(partial_reasons),
             partial_reasons=sorted(partial_reasons),
             requests=requests,
+            websocket_connections=[
+                WebSocketMetricsGroup(route=route, opened=counts["opened"], closed=counts["closed"])
+                for route, counts in sorted(websocket_connections.items())
+            ],
             inference_outcomes=dict(inference_outcomes),
             errors_by_kind=dict(errors_by_kind),
         )

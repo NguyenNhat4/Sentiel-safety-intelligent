@@ -54,6 +54,23 @@ def test_operational_metrics_summary_skips_malformed_records_and_uses_nearest_ra
     assert summary.requests[0].latency.p95_ms == 40
 
 
+def test_operational_metrics_summary_groups_websocket_connections(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    log_path.write_text(
+        "\n".join(
+            json.dumps({"timestamp": timestamp, "event_type": event_type, "route": "/api/v1/ws/inference"})
+            for event_type in ("websocket_connection_opened", "websocket_connection_opened", "websocket_connection_closed")
+        ) + "\n",
+        encoding="utf-8",
+    )
+    summary = OperationalMetricsService(Settings(operational_metrics_log_path=str(log_path))).summary(window_minutes=5)
+
+    assert summary.websocket_connections[0].route == "/api/v1/ws/inference"
+    assert summary.websocket_connections[0].opened == 2
+    assert summary.websocket_connections[0].closed == 1
+
+
 def test_operational_metrics_endpoint_validates_window_and_excludes_itself(client):
     assert client.get("/api/v1/operational-metrics?window_minutes=0").status_code == 422
 

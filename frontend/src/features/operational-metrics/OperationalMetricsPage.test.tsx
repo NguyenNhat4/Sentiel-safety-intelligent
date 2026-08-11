@@ -14,6 +14,7 @@ const metrics = {
     method: "GET", route: "/health", status_class: "2xx", count: 3,
     latency: {count: 3, min_ms: 2, mean_ms: 4, p50_ms: 4, p95_ms: 6, max_ms: 6}
   }],
+  websocket_connections: [{route: "/api/v1/ws/inference", opened: 1, closed: 1}],
   inference_outcomes: {normal: 2},
   errors_by_kind: {}
 };
@@ -29,6 +30,7 @@ describe("OperationalMetricsPage", () => {
 
     await waitFor(() => expect(screen.getByText("3 requests")).toBeInTheDocument());
     expect(screen.getByText("/health")).toBeInTheDocument();
+    expect(screen.getByText("/api/v1/ws/inference")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Làm mới/}));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
   });

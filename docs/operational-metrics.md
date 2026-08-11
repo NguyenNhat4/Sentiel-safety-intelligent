@@ -79,6 +79,8 @@ Trong frontend, chọn **Quan sát hệ thống** ở sidebar. Đây là trang r
 
 UI không hiển thị raw log record.
 
+Phần **WebSocket connections** hiển thị riêng số lần opened/closed cho `/api/v1/ws/inference` và `/api/v1/ws/alerts`. WebSocket không xuất hiện trong bảng HTTP vì không có HTTP method, status class hoặc request-response latency tương đương.
+
 ## Vận hành local
 
 ```bash
