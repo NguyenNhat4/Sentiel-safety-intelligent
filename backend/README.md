@@ -15,6 +15,8 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 
 REST routes are interactive at <http://localhost:8000/docs>. The inference WebSocket at `ws://localhost:8000/api/v1/ws/inference` is intentionally absent from Swagger because WebSocket operations are not part of the generated OpenAPI schema.
 
+Operational monitoring is deliberately lightweight: one process writes rotated, privacy-safe JSONL events to `data/operational-metrics.jsonl`; `GET /api/v1/operational-metrics?window_minutes=60` returns bounded request latency, inference outcomes, and stable error-kind aggregates. The stream never contains frames, snapshots, IDs, raw URLs/query strings, credentials, addresses, or exception text. This file-backed writer is single-process only; use a centralized sink before enabling multiple backend workers.
+
 Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
 
 ## Frontend–Backend Interaction

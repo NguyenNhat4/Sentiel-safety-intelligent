@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Backend] Lightweight operational metrics use rotated JSONL
+- **Choice:** Persist a finite, privacy-safe operational event schema to `data/operational-metrics.jsonl` and expose bounded aggregates through `GET /api/v1/operational-metrics`; do not add Prometheus, Grafana, a database table, or an external monitoring service in this MVP slice.
+- **Reason:** The Product Owner selected log-derived monitoring with restart persistence and minimal operational overhead.
+- **Constraints:** Only one writer process is supported. Events exclude frames, snapshot data, IDs, raw paths/query strings, client addresses, credentials, and exception text. Rotation is size-based; readers tolerate corrupt/partial records and report partial scans.
+
 ## 2026-08-11: [Vision/Backend] Preserve occurrences across nearby track-ID handoffs
 - **Choice:** When a new track with the same rule appears near the last normalized foot-point of an active track that just disappeared, transfer the active occurrence during the lost-track grace window.
 - **Reason:** This prevents a ByteTrack ID switch at the zone boundary from opening a second review while the same person exits.

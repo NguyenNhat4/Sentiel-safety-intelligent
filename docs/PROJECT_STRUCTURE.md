@@ -16,13 +16,15 @@ P-047/
 │   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── operational_metrics.py # Read-only JSONL operational metrics aggregate
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
 │   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
 │   │   │   └── router.py
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
-│   │   │   └── database.py
+│   │   │   ├── database.py
+│   │   │   └── operational_metrics.py # Rotated privacy-safe JSONL writer
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── person_tracking.py # Adapter to session-isolated ByteTrack
@@ -34,6 +36,7 @@ P-047/
 │   │   │   ├── analysis.py
 │   │   │   ├── event.py
 │   │   │   ├── ppe_requirement.py
+│   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
 │   │   │   ├── analysis_service.py
@@ -41,6 +44,7 @@ P-047/
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
+│   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
 │   │   └── main.py      # FastAPI App entrypoint
@@ -58,6 +62,7 @@ P-047/
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
 │       ├── test_ppe_requirements.py
+│       ├── test_operational_metrics.py
 │       ├── test_violation_tracking.py
 │       └── test_statistics.py
 ├── vision/              # Framework- and persistence-independent CV observations
@@ -106,7 +111,8 @@ P-047/
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
-│   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
+│   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
+│   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md

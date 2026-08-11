@@ -2,10 +2,12 @@ import asyncio
 import base64
 import json
 import logging
+import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
+from backend.app.core.operational_metrics import record_operational_event
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     InferenceWebSocketConfigure,
@@ -63,6 +65,7 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
 
 
 async def send_inference_error(websocket: WebSocket, code: str, message: str) -> None:
+    record_operational_event("inference_failed", outcome="error", error_kind=code)
     await websocket.send_json({"type": "error", "code": code, "message": message})
 
 
@@ -70,6 +73,7 @@ async def send_inference_error(websocket: WebSocket, code: str, message: str) ->
 async def websocket_inference_endpoint(websocket: WebSocket):
     """Run sampled browser-frame inference over a persistent WebSocket."""
     await websocket.accept()
+    record_operational_event("websocket_connection_opened", outcome="connected")
     configuration: InferenceWebSocketConfigure | None = None
     pending_frame: InferenceWebSocketFrameMeta | None = None
 
@@ -170,6 +174,7 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                 monitoring_session_id=configuration.monitoring_session_id,
                 frame_id=frame_meta.frame_id,
             )
+            started_at = time.perf_counter()
             try:
                 result = await asyncio.to_thread(frame_inference_service.infer, request)
             except InvalidFrameError as exc:
@@ -192,8 +197,14 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                     **result.model_dump(mode="json"),
                 }
             )
+            record_operational_event(
+                "inference_completed",
+                outcome=result.result,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            )
     except WebSocketDisconnect:
         pass
     finally:
         if configuration is not None:
             active_inference_sessions.discard(str(configuration.monitoring_session_id))
+        record_operational_event("websocket_connection_closed", outcome="disconnected")
