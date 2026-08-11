@@ -30,3 +30,8 @@ PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
 The report includes mean/min/max/P50/P95/P99 latency in milliseconds and throughput in FPS.
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing
 inside Ultralytics are included. Run the same command on the same hardware when comparing models.
+
+`bootstrap_legacy_sqlite.py` is called by `make db-upgrade`. It recognizes the former local
+SQLite schema that predates Alembic, writes a timestamped `.bak` backup beside the database,
+adds the missing occurrence migration column, and stamps the known schema revision. New and
+already-versioned databases are unchanged; PostgreSQL is never bootstrapped by this script.

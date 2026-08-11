@@ -128,6 +128,7 @@ P-047/
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
 │   └── benchmark_model.py
+│   └── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 ├── eval/                # Evaluation reports and benchmark results
 │   └── results/
 │       ├── report.md
@@ -143,6 +144,8 @@ P-047/
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
 ├── scripts/             # Explicit utility entrypoints, including dataset validation
 │   └── validate_us13_dataset.py
+├── tests/                # Cross-cutting and automation tests
+│   └── test_bootstrap_legacy_sqlite.py
 ├── docker-compose.yml
 └── README.md
 ```
