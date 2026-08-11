@@ -60,13 +60,38 @@ def test_operational_metrics_summary_groups_websocket_connections(tmp_path):
     log_path.write_text(
         "\n".join(
             json.dumps({"timestamp": timestamp, "event_type": event_type, "route": "/api/v1/ws/inference"})
-            for event_type in ("websocket_connection_opened", "websocket_connection_opened", "websocket_connection_closed")
-        ) + "\n",
+            for event_type in (
+                "websocket_connection_opened",
+                "websocket_connection_opened",
+                "websocket_connection_closed",
+            )
+        )
+        + "\n",
         encoding="utf-8",
     )
     with log_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps({"timestamp": timestamp, "event_type": "inference_completed", "route": "/api/v1/ws/inference", "duration_ms": 20}) + "\n")
-        handle.write(json.dumps({"timestamp": timestamp, "event_type": "inference_completed", "route": "/api/v1/ws/inference", "duration_ms": 40}) + "\n")
+        handle.write(
+            json.dumps(
+                {
+                    "timestamp": timestamp,
+                    "event_type": "inference_completed",
+                    "route": "/api/v1/ws/inference",
+                    "duration_ms": 20,
+                }
+            )
+            + "\n"
+        )
+        handle.write(
+            json.dumps(
+                {
+                    "timestamp": timestamp,
+                    "event_type": "inference_completed",
+                    "route": "/api/v1/ws/inference",
+                    "duration_ms": 40,
+                }
+            )
+            + "\n"
+        )
     summary = OperationalMetricsService(Settings(operational_metrics_log_path=str(log_path))).summary(window_minutes=5)
 
     assert summary.websocket_connections[0].route == "/api/v1/ws/inference"

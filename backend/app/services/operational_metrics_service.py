@@ -8,8 +8,8 @@ from pathlib import Path
 
 from backend.app.core.config import Settings
 from backend.app.schemas.operational_metrics import (
-    LatencySummary,
     InferenceLatencySample,
+    LatencySummary,
     OperationalMetricsSummaryResponse,
     RequestMetricsGroup,
     WebSocketMetricsGroup,

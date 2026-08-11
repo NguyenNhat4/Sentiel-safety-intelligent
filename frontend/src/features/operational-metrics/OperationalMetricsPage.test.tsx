@@ -34,7 +34,7 @@ describe("OperationalMetricsPage", () => {
 
     await waitFor(() => expect(screen.getByText("3 requests")).toBeInTheDocument());
     expect(screen.getByText("/health")).toBeInTheDocument();
-    expect(screen.getAllByText("/api/v1/ws/inference")).toHaveLength(2);
+    expect(screen.getAllByText("/api/v1/ws/inference")).toHaveLength(1);
     expect(screen.getByRole("img", {name: /Biểu đồ inference latency theo frame/})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Làm mới/}));
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
