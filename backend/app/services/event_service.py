@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.integrations.ppe_vision import (
@@ -15,7 +16,7 @@ from backend.app.integrations.ppe_vision import (
     SnapshotPerson,
     get_ppe_vision_adapter,
 )
-from backend.app.models.event import SafetyEvent
+from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
 from backend.app.schemas.event import EventCreate, EventUpdate
@@ -33,6 +34,10 @@ SnapshotRedactor = Callable[[np.ndarray], PrivacyRedactionResult]
 SnapshotAnnotator = Callable[[np.ndarray, list[SnapshotPerson], list[ModelDetection]], np.ndarray]
 
 
+class EventConflictError(RuntimeError):
+    pass
+
+
 class EventService:
     def __init__(
         self,
@@ -48,6 +53,12 @@ class EventService:
         self._snapshot_dir = snapshot_dir or Path(__file__).resolve().parents[3] / "data" / "snapshots"
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
+        occurrence_ids = [str(value) for value in event_in.occurrence_ids]
+        existing = self._events_for_occurrences(occurrence_ids)
+        if existing:
+            if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
+                return existing[0]
+            raise EventConflictError("One or more occurrences already belong to another event")
         reviewed = event_in.status in {"acknowledged", "false_alarm"}
         snapshot_path = None
         if event_in.snapshot_data:
@@ -68,17 +79,52 @@ class EventService:
             acknowledged_by=event_in.acknowledged_by,
             acknowledged_at=datetime.now(UTC) if reviewed else None,
             timestamp=datetime.now(UTC),
+            monitoring_session_id=(str(event_in.monitoring_session_id) if event_in.monitoring_session_id else None),
         )
         self.db.add(db_event)
+        for occurrence_id in occurrence_ids:
+            db_event.occurrences.append(EventOccurrence(occurrence_id=occurrence_id))
         try:
             self.db.commit()
             self.db.refresh(db_event)
+        except IntegrityError as exc:
+            self.db.rollback()
+            if event_in.snapshot_data and snapshot_path:
+                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+            existing = self._events_for_occurrences(occurrence_ids)
+            if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
+                return existing[0]
+            raise EventConflictError("One or more occurrences already belong to another event") from exc
         except Exception as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
                 self._snapshot_file(snapshot_path).unlink(missing_ok=True)
             raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
+
+    def _events_for_occurrences(self, occurrence_ids: list[str]) -> list[SafetyEvent]:
+        if not occurrence_ids:
+            return []
+        return (
+            self.db.query(SafetyEvent)
+            .join(EventOccurrence)
+            .filter(EventOccurrence.occurrence_id.in_(occurrence_ids))
+            .distinct()
+            .all()
+        )
+
+    @staticmethod
+    def _matches_retry(event: SafetyEvent, event_in: EventCreate, occurrence_ids: list[str]) -> bool:
+        return (
+            set(event.occurrence_ids) == set(occurrence_ids)
+            and event.zone_id == event_in.zone_id
+            and event.camera_id == event_in.camera_id
+            and event.event_type == event_in.event_type
+            and event.severity == event_in.severity
+            and event.status == event_in.status
+            and event.monitoring_session_id
+            == (str(event_in.monitoring_session_id) if event_in.monitoring_session_id else None)
+        )
 
     def _save_snapshot(
         self,

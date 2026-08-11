@@ -1,11 +1,17 @@
 import base64
 import binascii
+import time
 from collections.abc import Callable
+from uuid import uuid4
 
 import cv2
 import numpy as np
 
+from backend.app.integrations.person_tracking import PersonTrackingAdapter
 from backend.app.integrations.ppe_vision import PpeObserver, get_ppe_vision_adapter
+from backend.app.schemas.analysis import (
+    ActiveViolation as ActiveViolationSchema,
+)
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     FrameInferenceResponse,
@@ -16,9 +22,14 @@ from backend.app.schemas.analysis import (
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.ppe_requirement_service import PpeStatus, should_alert_for_missing_ppe
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 class InvalidFrameError(ValueError):
+    pass
+
+
+class StaleFrameError(ValueError):
     pass
 
 
@@ -44,6 +55,8 @@ class FrameInferenceService:
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
+        self._person_tracker = PersonTrackingAdapter(person_model_path or self._person_model_path)
+        self._violation_tracker = ViolationTrackingService()
 
     def preload_models(self) -> None:
         self._load_person_model()
@@ -51,14 +64,24 @@ class FrameInferenceService:
 
     def infer(self, request: FrameInferenceRequest) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
+        now = time.monotonic()
+        if (
+            request.monitoring_session_id is not None
+            and request.frame_id is not None
+            and not self._violation_tracker.accept_frame(str(request.monitoring_session_id), request.frame_id, now=now)
+        ):
+            raise StaleFrameError("frame_id must increase within a monitoring session")
         height, width = frame.shape[:2]
         polygon = np.array(
             [[point.x * width, point.y * height] for point in request.zone_points],
             dtype=np.float32,
         )
 
-        detected_people = self._detect_people(frame)
-        vision_result = self._ppe_observer(frame, detected_people)
+        if request.monitoring_session_id is None:
+            detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
+        else:
+            detected_people = self._track_people(str(request.monitoring_session_id), frame)
+        vision_result = self._ppe_observer(frame, [person[:5] for person in detected_people])
         if isinstance(vision_result, dict) and "people" in vision_result:
             observations = vision_result["people"]
             detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
@@ -68,7 +91,7 @@ class FrameInferenceService:
         requirements = self._requirement_loader(request.camera_id, request.zone_id)
         people = []
         rule_people = []
-        for index, (x, y, box_width, box_height, confidence) in enumerate(detected_people):
+        for index, (x, y, box_width, box_height, confidence, track_id) in enumerate(detected_people):
             foot_point = [x + box_width // 2, y + box_height]
             inside_zone = len(polygon) == 4 and cv2.pointPolygonTest(polygon, tuple(foot_point), False) >= 0
             safety_shirt = self._has_safety_shirt(frame, x, y, box_width, box_height)
@@ -90,6 +113,7 @@ class FrameInferenceService:
             rule_people.append(RulePersonObservation(confidence=confidence, inside_zone=inside_zone, ppe=ppe))
             people.append(
                 PersonDetection(
+                    track_id=track_id,
                     bbox=[x, y, x + box_width, y + box_height],
                     confidence=round(confidence, 3),
                     foot_point=foot_point,
@@ -109,12 +133,46 @@ class FrameInferenceService:
         for person, missing in zip(people, decision.missing_required_ppe, strict=True):
             person.missing_required_ppe = missing
 
+        observed_rules: dict[int, set[str]] = {}
+        for person in people:
+            rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
+            if person.inside_zone and request.machine_state == "running":
+                rules.add("zone_intrusion")
+            observed_rules[person.track_id] = rules
+
+        if request.monitoring_session_id is not None:
+            active = self._violation_tracker.evaluate(
+                str(request.monitoring_session_id),
+                observed_rules,
+                {person.track_id for person in people},
+                now=now,
+            )
+            for person in people:
+                person.active_violations = [
+                    ActiveViolationSchema(
+                        occurrence_id=item.occurrence_id,
+                        rule_key=item.rule_key,
+                        is_new=item.is_new,
+                    )
+                    for item in active.get(person.track_id, [])
+                ]
+        else:
+            for person in people:
+                person.active_violations = [
+                    ActiveViolationSchema(occurrence_id=uuid4(), rule_key=rule, is_new=True)
+                    for rule in sorted(observed_rules[person.track_id])
+                ]
+
+        has_active_violation = any(person.active_violations for person in people)
+        review_required = any(violation.is_new for person in people for violation in person.active_violations)
+
         return FrameInferenceResponse(
             result=decision.outcome,
-            review_required=decision.review_required,
+            review_required=review_required,
+            has_active_violation=has_active_violation,
             people=people,
             detections=detections,
-            snapshot_data=request.image_data if decision.review_required else None,
+            snapshot_data=request.image_data if review_required else None,
             rule={
                 "person_inside_zone": decision.person_inside_zone,
                 "machine_state": request.machine_state,
@@ -145,6 +203,9 @@ class FrameInferenceService:
             if observation["status"] == "unknown":
                 values[name] = {"status": "missing", "confidence": None}
         return PersonPpeObservations.model_validate(values)
+
+    def _track_people(self, session_id: str, frame: np.ndarray):
+        return self._person_tracker.track(session_id, frame)
 
     def _missing_required_ppe(
         self,

@@ -1,5 +1,6 @@
 import base64
 import re
+from uuid import uuid4
 
 import cv2
 import numpy as np
@@ -19,10 +20,12 @@ def jpeg_data_url(width=160, height=120):
     return f"data:image/jpeg;base64,{base64.b64encode(jpeg_bytes(width, height)).decode()}"
 
 
-def configure_inference_websocket(websocket, zone_points=None):
+def configure_inference_websocket(websocket, zone_points=None, monitoring_session_id=None):
+    monitoring_session_id = monitoring_session_id or str(uuid4())
     websocket.send_json(
         {
             "type": "configure",
+            "monitoring_session_id": monitoring_session_id,
             "zone_points": zone_points
             or [
                 {"x": 0.1, "y": 0.1},
@@ -33,7 +36,11 @@ def configure_inference_websocket(websocket, zone_points=None):
             "machine_state": "running",
         }
     )
-    assert websocket.receive_json() == {"type": "configured"}
+    assert websocket.receive_json() == {
+        "type": "configured",
+        "monitoring_session_id": monitoring_session_id,
+    }
+    return monitoring_session_id
 
 
 def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=None):
@@ -220,7 +227,7 @@ def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch)
 
 
 def test_inference_websocket_returns_empty_people(client, monkeypatch):
-    monkeypatch.setattr(frame_inference_service, "_detect_people", lambda frame: [])
+    monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [])
     with client.websocket_connect("/api/v1/ws/inference") as websocket:
         configure_inference_websocket(websocket)
         body = send_inference_websocket_frame(websocket, frame_id=7, video_time=4.25)
@@ -235,8 +242,8 @@ def test_inference_websocket_returns_empty_people(client, monkeypatch):
 def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
-        "_detect_people",
-        lambda frame: [(40, 60, 40, 50, 0.91)],
+        "_track_people",
+        lambda session_id, frame: [(40, 60, 40, 50, 0.91, 7)],
     )
     monkeypatch.setattr(
         frame_inference_service,
@@ -259,11 +266,7 @@ def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
 
 
 def test_inference_websocket_requests_review_for_person_inside_zone(client, monkeypatch):
-    monkeypatch.setattr(
-        frame_inference_service,
-        "_detect_people",
-        lambda frame: [(40, 10, 40, 90, 0.91)],
-    )
+    monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [(40, 10, 40, 90, 0.91, 7)])
     monkeypatch.setattr(
         frame_inference_service,
         "_has_safety_shirt",
@@ -275,7 +278,10 @@ def test_inference_websocket_requests_review_for_person_inside_zone(client, monk
 
     assert body["people"][0]["bbox"] == [40, 10, 80, 100]
     assert body["people"][0]["inside_zone"] is True
+    assert body["people"][0]["track_id"] == 7
+    assert body["people"][0]["active_violations"][0]["rule_key"] == "zone_intrusion"
     assert body["review_required"] is True
+    assert body["has_active_violation"] is True
     assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
 
 
@@ -314,3 +320,32 @@ def test_inference_websocket_rejects_invalid_jpeg(client):
 
     assert body["type"] == "error"
     assert body["code"] == "invalid_frame"
+
+
+def test_inference_websocket_deduplicates_a_continuous_violation(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [(40, 10, 40, 90, 0.91, 7)])
+    monkeypatch.setattr(frame_inference_service, "_has_safety_shirt", lambda *args: True)
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket)
+        first = send_inference_websocket_frame(websocket, frame_id=1)
+        repeated = send_inference_websocket_frame(websocket, frame_id=2)
+
+    assert first["review_required"] is True
+    assert repeated["review_required"] is False
+    assert repeated["result"] == "violate"
+    assert (
+        repeated["people"][0]["active_violations"][0]["occurrence_id"]
+        == first["people"][0]["active_violations"][0]["occurrence_id"]
+    )
+
+
+def test_inference_websocket_rejects_stale_frame_id(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [])
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket)
+        assert send_inference_websocket_frame(websocket, frame_id=4)["type"] == "inference_result"
+        stale = send_inference_websocket_frame(websocket, frame_id=4)
+
+    assert stale["type"] == "error"
+    assert stale["code"] == "stale_frame"

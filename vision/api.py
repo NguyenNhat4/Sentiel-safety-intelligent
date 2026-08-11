@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
 
@@ -12,6 +13,68 @@ from vision.pipeline import (
     annotate_snapshot,
     redact_identity_regions,
 )
+
+TrackedPerson = tuple[int, int, int, int, float, int]
+
+
+class PersonTrackingFacade:
+    """Keeps one Ultralytics ByteTrack instance per monitoring session."""
+
+    def __init__(
+        self,
+        model_path: str,
+        *,
+        session_ttl_seconds: float = 300.0,
+        model_factory: Callable[[str], Any] | None = None,
+    ) -> None:
+        self._model_path = model_path
+        self._session_ttl_seconds = session_ttl_seconds
+        self._model_factory = model_factory
+        self._sessions: dict[str, tuple[Any, float]] = {}
+
+    def track(self, session_id: str, frame: np.ndarray, *, now: float) -> list[TrackedPerson]:
+        self._expire(now)
+        session = self._sessions.get(session_id)
+        if session is None:
+            model = self._create_model()
+        else:
+            model = session[0]
+        self._sessions[session_id] = (model, now)
+
+        result = model.track(
+            frame,
+            persist=True,
+            tracker="bytetrack.yaml",
+            classes=[0],
+            conf=0.35,
+            verbose=False,
+        )[0]
+        people: list[TrackedPerson] = []
+        for box in result.boxes:
+            if box.id is None:
+                continue
+            x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
+            people.append((x1, y1, x2 - x1, y2 - y1, float(box.conf[0]), int(box.id[0].item())))
+        return people
+
+    def end_session(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+
+    def _create_model(self) -> Any:
+        if self._model_factory is not None:
+            return self._model_factory(self._model_path)
+        from ultralytics import YOLO
+
+        return YOLO(str(Path(self._model_path)))
+
+    def _expire(self, now: float) -> None:
+        expired = [
+            session_id
+            for session_id, (_, last_seen) in self._sessions.items()
+            if now - last_seen >= self._session_ttl_seconds
+        ]
+        for session_id in expired:
+            self._sessions.pop(session_id, None)
 
 
 class PpeObservationValue(TypedDict):

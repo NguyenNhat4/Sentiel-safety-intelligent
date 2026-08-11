@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,11 +13,13 @@ class EventBase(BaseModel):
     event_type: str
     severity: str = "high"
     details: dict[str, Any] | None = None
+    monitoring_session_id: UUID | None = None
 
 
 class EventCreate(EventBase):
     status: Literal["unacknowledged", "acknowledged", "false_alarm"] = "unacknowledged"
     acknowledged_by: str | None = None
+    occurrence_ids: list[UUID] = Field(default_factory=list)
     snapshot_data: str | None = Field(
         None,
         exclude=True,
@@ -47,5 +50,6 @@ class EventResponse(EventBase):
     privacy_blurred: bool = False
     acknowledged_by: str | None = None
     acknowledged_at: datetime | None = None
+    occurrence_ids: list[UUID] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

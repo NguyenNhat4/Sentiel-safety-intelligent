@@ -33,6 +33,8 @@ PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 
 GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter returns all 17 SH17 detections plus per-person PPE observations through `vision.api`. Backend derives `missing` only when a person meets the confidence/association guard and has no associated required PPE detection.
 
+US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
+
 ```mermaid
 sequenceDiagram
     actor Officer as Safety Officer
@@ -84,6 +86,7 @@ Send four normalized points to activate zone evaluation, or an empty list to run
 ```json
 {
   "type": "configure",
+  "monitoring_session_id": "3cddfe85-9428-44d7-afbf-0cd9e5fc0640",
   "zone_points": [
     {"x": 0.12, "y": 0.30},
     {"x": 0.72, "y": 0.28},
@@ -97,7 +100,7 @@ Send four normalized points to activate zone evaluation, or an empty list to run
 `x` and `y` are normalized to the source frame and must be between `0` and `1`. The backend responds with:
 
 ```json
-{"type": "configured"}
+{"type": "configured", "monitoring_session_id": "3cddfe85-9428-44d7-afbf-0cd9e5fc0640"}
 ```
 
 Send `configure` again when the machine state or zone changes.
@@ -132,6 +135,7 @@ The backend returns one correlated JSON result for each accepted JPEG:
   "review_required": true,
   "people": [
     {
+      "track_id": 7,
       "bbox": [420, 115, 535, 610],
       "confidence": 0.91,
       "foot_point": [477, 610],
@@ -161,6 +165,8 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `frame_id`, `video_time` | Copied from `frame_meta` so the frontend can match the result to the analyzed frame. |
 | `people` | Every person detected by YOLO; an empty array means no person was detected. |
 | `detections` | Additive list of every SH17 model detection: `class_id`, `class_name`, original-frame `bbox`, confidence and nullable `person_index`. It can be non-empty even when `people` is empty. |
+| `track_id` | ByteTrack association ID scoped to one monitoring session; it is not a personal identity. |
+| `active_violations` | Per-track rule occurrences. Only `is_new=true` opens a new review candidate. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |
 | `confidence` | YOLO's confidence that the detection is a person. |
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |

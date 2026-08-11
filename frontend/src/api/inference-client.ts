@@ -4,6 +4,7 @@ import {inferenceWebSocketUrls, setBackendFromSocket} from "./config";
 interface Configuration {
   zone_points: ZonePoint[];
   machine_state: MachineState;
+  monitoring_session_id: string;
 }
 
 interface InferenceClientOptions {

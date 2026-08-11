@@ -1,6 +1,7 @@
 from typing import Any, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class StartAnalysisRequest(BaseModel):
@@ -33,6 +34,14 @@ class FrameInferenceRequest(BaseModel):
     machine_state: Literal["running", "stopped"] = "running"
     camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
     zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+    monitoring_session_id: UUID | None = None
+    frame_id: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_session_frame_pair(self):
+        if (self.monitoring_session_id is None) != (self.frame_id is None):
+            raise ValueError("monitoring_session_id and frame_id must be provided together")
+        return self
 
 
 class PpeObservation(BaseModel):
@@ -54,7 +63,14 @@ class ModelDetection(BaseModel):
     person_index: int | None = Field(default=None, ge=0)
 
 
+class ActiveViolation(BaseModel):
+    occurrence_id: UUID
+    rule_key: str
+    is_new: bool
+
+
 class PersonDetection(BaseModel):
+    track_id: int | None = Field(default=None, ge=1)
     bbox: list[int]
     confidence: float
     foot_point: list[int]
@@ -62,11 +78,13 @@ class PersonDetection(BaseModel):
     safety_shirt: bool
     ppe: PersonPpeObservations
     missing_required_ppe: list[Literal["helmet", "safety_glasses", "gloves"]] = Field(default_factory=list)
+    active_violations: list[ActiveViolation] = Field(default_factory=list)
 
 
 class FrameInferenceResponse(BaseModel):
     result: Literal["normal", "violate"]
     review_required: bool
+    has_active_violation: bool
     people: list[PersonDetection]
     detections: list[ModelDetection] = Field(default_factory=list)
     snapshot_data: str | None = None
@@ -75,6 +93,7 @@ class FrameInferenceResponse(BaseModel):
 
 class InferenceWebSocketConfigure(BaseModel):
     type: Literal["configure"]
+    monitoring_session_id: UUID
     zone_points: list[ZonePoint] = Field(default_factory=list, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
     camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)

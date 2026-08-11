@@ -7,7 +7,7 @@ from backend.app.schemas.analysis import (
     StartAnalysisRequest,
 )
 from backend.app.services.analysis_service import AnalysisService
-from backend.app.services.frame_inference_service import InvalidFrameError, frame_inference_service
+from backend.app.services.frame_inference_service import InvalidFrameError, StaleFrameError, frame_inference_service
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 analysis_service = AnalysisService()
@@ -44,3 +44,5 @@ async def infer_frame(request: FrameInferenceRequest):
         return frame_inference_service.infer(request)
     except InvalidFrameError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StaleFrameError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
