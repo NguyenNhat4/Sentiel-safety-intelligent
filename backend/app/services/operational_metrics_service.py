@@ -9,6 +9,7 @@ from pathlib import Path
 from backend.app.core.config import Settings
 from backend.app.schemas.operational_metrics import (
     LatencySummary,
+    InferenceLatencySample,
     OperationalMetricsSummaryResponse,
     RequestMetricsGroup,
     WebSocketMetricsGroup,
@@ -51,6 +52,8 @@ class OperationalMetricsService:
         inference_outcomes: Counter[str] = Counter()
         errors_by_kind: Counter[str] = Counter()
         websocket_connections: dict[str, Counter[str]] = defaultdict(Counter)
+        websocket_latencies: dict[str, list[float]] = defaultdict(list)
+        inference_latency_samples: list[InferenceLatencySample] = []
 
         for path in paths:
             try:
@@ -97,6 +100,18 @@ class OperationalMetricsService:
                             groups[key].append(float(event["duration_ms"]))
                     if event_type in {"inference_completed", "inference_failed"}:
                         inference_outcomes[str(event.get("outcome", event_type))] += 1
+                    if event_type == "inference_completed":
+                        route, duration_ms = event.get("route"), event.get("duration_ms")
+                        if isinstance(route, str) and isinstance(duration_ms, (int, float)):
+                            websocket_latencies[route].append(float(duration_ms))
+                            inference_latency_samples.append(
+                                InferenceLatencySample(
+                                    timestamp=timestamp,
+                                    route=route,
+                                    duration_ms=float(duration_ms),
+                                    outcome=str(event.get("outcome", "unknown")),
+                                )
+                            )
                     if event_type in {"websocket_connection_opened", "websocket_connection_closed"}:
                         route = event.get("route")
                         if isinstance(route, str):
@@ -135,9 +150,26 @@ class OperationalMetricsService:
             partial_reasons=sorted(partial_reasons),
             requests=requests,
             websocket_connections=[
-                WebSocketMetricsGroup(route=route, opened=counts["opened"], closed=counts["closed"])
+                WebSocketMetricsGroup(
+                    route=route,
+                    opened=counts["opened"],
+                    closed=counts["closed"],
+                    inference_latency=_latency_summary(websocket_latencies[route]),
+                )
                 for route, counts in sorted(websocket_connections.items())
             ],
+            inference_latency_samples=sorted(inference_latency_samples, key=lambda sample: sample.timestamp)[-200:],
             inference_outcomes=dict(inference_outcomes),
             errors_by_kind=dict(errors_by_kind),
         )
+
+
+def _latency_summary(values: list[float]) -> LatencySummary:
+    return LatencySummary(
+        count=len(values),
+        min_ms=min(values) if values else None,
+        mean_ms=sum(values) / len(values) if values else None,
+        p50_ms=_percentile(values, 0.5),
+        p95_ms=_percentile(values, 0.95),
+        max_ms=max(values) if values else None,
+    )

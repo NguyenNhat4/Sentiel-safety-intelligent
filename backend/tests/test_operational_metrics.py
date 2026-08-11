@@ -64,11 +64,17 @@ def test_operational_metrics_summary_groups_websocket_connections(tmp_path):
         ) + "\n",
         encoding="utf-8",
     )
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"timestamp": timestamp, "event_type": "inference_completed", "route": "/api/v1/ws/inference", "duration_ms": 20}) + "\n")
+        handle.write(json.dumps({"timestamp": timestamp, "event_type": "inference_completed", "route": "/api/v1/ws/inference", "duration_ms": 40}) + "\n")
     summary = OperationalMetricsService(Settings(operational_metrics_log_path=str(log_path))).summary(window_minutes=5)
 
     assert summary.websocket_connections[0].route == "/api/v1/ws/inference"
     assert summary.websocket_connections[0].opened == 2
     assert summary.websocket_connections[0].closed == 1
+    assert summary.websocket_connections[0].inference_latency.p50_ms == 20
+    assert summary.websocket_connections[0].inference_latency.p95_ms == 40
+    assert [sample.duration_ms for sample in summary.inference_latency_samples] == [20, 40]
 
 
 def test_operational_metrics_endpoint_validates_window_and_excludes_itself(client):

@@ -138,7 +138,8 @@ export interface OperationalMetricsSummary {
   partial: boolean;
   partial_reasons: string[];
   requests: OperationalRequestMetrics[];
-  websocket_connections: Array<{route: string; opened: number; closed: number}>;
+  websocket_connections: Array<{route: string; opened: number; closed: number; inference_latency: OperationalLatency}>;
+  inference_latency_samples: Array<{timestamp: string; route: string; duration_ms: number; outcome: string}>;
   inference_outcomes: Record<string, number>;
   errors_by_kind: Record<string, number>;
 }

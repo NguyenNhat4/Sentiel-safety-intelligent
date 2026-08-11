@@ -25,7 +25,7 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
 
   return <section className={`page operations-page ${active ? "active" : ""}`}>
     <div className="operations-toolbar">
-      <div><p className="eyebrow">OPERATIONS</p><h2>Quan sát hệ thống</h2><p>Aggregate từ JSONL đã xoay file; không hiển thị raw log hoặc dữ liệu video.</p></div>
+      <div><p className="eyebrow">Aggregate từ JSONL đã xoay file; không hiển thị raw log hoặc dữ liệu video.</p></div>
       <div className="operations-actions">
         <label>Khoảng thời gian<select value={windowMinutes} onChange={event => setWindowMinutes(Number(event.target.value))}>
           <option value={5}>5 phút</option><option value={60}>1 giờ</option><option value={360}>6 giờ</option><option value={1440}>24 giờ</option>
@@ -44,9 +44,10 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
       <section className="operations-table-card"><h3>Request & latency</h3><table><thead><tr><th>Method</th><th>Route</th><th>Status</th><th>Count</th><th>P50</th><th>P95</th></tr></thead><tbody>
         {metrics?.requests.length ? metrics.requests.map(item => <tr key={`${item.method}-${item.route}-${item.status_class}`}><td>{item.method}</td><td>{item.route}</td><td>{item.status_class}</td><td>{item.count}</td><td>{formatMs(item.latency.p50_ms)}</td><td>{formatMs(item.latency.p95_ms)}</td></tr>) : <tr><td colSpan={6}>Chưa có request trong khoảng thời gian này.</td></tr>}
       </tbody></table></section>
-      <section className="operations-table-card"><h3>WebSocket connections</h3><table><thead><tr><th>Route</th><th>Opened</th><th>Closed</th></tr></thead><tbody>
-        {metrics?.websocket_connections.length ? metrics.websocket_connections.map(item => <tr key={item.route}><td>{item.route}</td><td>{item.opened}</td><td>{item.closed}</td></tr>) : <tr><td colSpan={3}>Chưa có WebSocket connection trong khoảng thời gian này.</td></tr>}
+      <section className="operations-table-card"><h3>WebSocket connections & inference latency</h3><table><thead><tr><th>Route</th><th>Opened</th><th>Closed</th><th>Inference P50</th><th>Inference P95</th></tr></thead><tbody>
+        {metrics?.websocket_connections.length ? metrics.websocket_connections.map(item => <tr key={item.route}><td>{item.route}</td><td>{item.opened}</td><td>{item.closed}</td><td>{formatMs(item.inference_latency.p50_ms)}</td><td>{formatMs(item.inference_latency.p95_ms)}</td></tr>) : <tr><td colSpan={5}>Chưa có WebSocket connection trong khoảng thời gian này.</td></tr>}
       </tbody></table></section>
+      <InferenceLatencyChart samples={metrics?.inference_latency_samples ?? []} />
       <section className="operations-breakdown"><Breakdown title="Inference outcomes" values={metrics?.inference_outcomes ?? {}} /><Breakdown title="Errors" values={metrics?.errors_by_kind ?? {}} /></section>
     </>}
   </section>;
@@ -57,3 +58,11 @@ function Breakdown({title, values}: {title: string; values: Record<string, numbe
 function sum(values: Record<string, number> | undefined): number { return Object.values(values ?? {}).reduce((total, value) => total + value, 0); }
 function maxP95(metrics: OperationalMetricsSummary | undefined): number | null { return Math.max(...(metrics?.requests.map(item => item.latency.p95_ms ?? 0) ?? [0])) || null; }
 function formatMs(value: number | null): string { return value === null ? "—" : `${value.toFixed(1)} ms`; }
+
+function InferenceLatencyChart({samples}: {samples: OperationalMetricsSummary["inference_latency_samples"]}) {
+  if (!samples.length) return <section className="operations-table-card"><h3>Inference latency theo frame</h3><p>Chưa có inference completed trong khoảng thời gian này.</p></section>;
+  const maximum = Math.max(...samples.map(sample => sample.duration_ms));
+  const minimum = Math.min(...samples.map(sample => sample.duration_ms));
+  const points = samples.map((sample, index) => `${samples.length === 1 ? 50 : 4 + index * 92 / (samples.length - 1)},${maximum === minimum ? 50 : 94 - (sample.duration_ms - minimum) * 88 / (maximum - minimum)}`).join(" ");
+  return <section className="operations-table-card latency-frame-chart"><div className="chart-heading"><div><h3>Inference latency theo frame</h3><p>{samples.length} inference gần nhất · backend processing time</p></div><strong>{formatMs(maximum)}</strong></div><svg viewBox="0 0 100 100" role="img" aria-label="Biểu đồ inference latency theo frame" preserveAspectRatio="none"><line x1="4" y1="94" x2="96" y2="94" /><line x1="4" y1="6" x2="4" y2="94" /><polyline points={points} /></svg><div className="chart-axis"><span>{formatMs(minimum)}</span><span>{formatMs(maximum)}</span></div></section>;
+}

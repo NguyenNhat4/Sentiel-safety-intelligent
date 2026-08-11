@@ -201,6 +201,7 @@ async def websocket_inference_endpoint(websocket: WebSocket):
             )
             record_operational_event(
                 "inference_completed",
+                route="/api/v1/ws/inference",
                 outcome=result.result,
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
             )

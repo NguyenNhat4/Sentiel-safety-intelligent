@@ -24,6 +24,14 @@ class WebSocketMetricsGroup(BaseModel):
     route: str
     opened: int
     closed: int
+    inference_latency: LatencySummary
+
+
+class InferenceLatencySample(BaseModel):
+    timestamp: datetime
+    route: str
+    duration_ms: float
+    outcome: str
 
 
 class OperationalMetricsSummaryResponse(BaseModel):
@@ -36,5 +44,6 @@ class OperationalMetricsSummaryResponse(BaseModel):
     partial_reasons: list[str]
     requests: list[RequestMetricsGroup]
     websocket_connections: list[WebSocketMetricsGroup]
+    inference_latency_samples: list[InferenceLatencySample]
     inference_outcomes: dict[str, int]
     errors_by_kind: dict[str, int]
