@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Frontend] Separate read-only operations view
+- **Choice:** Add a dedicated “Quan sát hệ thống” navigation view for operational JSONL aggregates, separate from the safety monitor and violation history.
+- **Reason:** Operational health needs an at-a-glance interface without exposing raw logs or distracting the Safety Officer's active monitoring workflow.
+- **Constraint:** The view only consumes aggregate data from `GET /api/v1/operational-metrics`; it has no write actions and does not expose raw events or sensitive payloads.
+
 ## 2026-08-11: [Backend] Run database migrations in the two-command workflow
 - **Choice:** `make setup` and `make run` invoke `alembic upgrade head` through the idempotent `make db-upgrade` target before the backend starts.
 - **Reason:** A new developer or deployment must receive the current schema automatically, including new tables and migration-managed columns.

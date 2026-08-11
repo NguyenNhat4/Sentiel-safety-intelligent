@@ -111,3 +111,33 @@ export interface PpeRequirement extends PpeRequirementUpdate {
   is_configured: boolean;
   updated_at: string | null;
 }
+
+export interface OperationalLatency {
+  count: number;
+  min_ms: number | null;
+  mean_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  max_ms: number | null;
+}
+
+export interface OperationalRequestMetrics {
+  method: string;
+  route: string;
+  status_class: string;
+  count: number;
+  latency: OperationalLatency;
+}
+
+export interface OperationalMetricsSummary {
+  generated_at: string;
+  window_start: string;
+  window_end: string;
+  records_scanned: number;
+  skipped_malformed_records: number;
+  partial: boolean;
+  partial_reasons: string[];
+  requests: OperationalRequestMetrics[];
+  inference_outcomes: Record<string, number>;
+  errors_by_kind: Record<string, number>;
+}

@@ -1,7 +1,7 @@
 import {useEffect, useState} from "react";
 import type {ReactNode} from "react";
 
-export type Page = "monitor" | "events";
+export type Page = "monitor" | "events" | "operations";
 
 interface AppShellProps {
   page: Page;
@@ -21,6 +21,7 @@ export function AppShell({page, onNavigate, children}: AppShellProps) {
         <nav>
           <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>
           <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>
+          <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>
           <button className="nav-item muted-nav" disabled><span>⌁</span> Dashboard</button>
           <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
         </nav>
@@ -38,7 +39,7 @@ export function AppShell({page, onNavigate, children}: AppShellProps) {
       </aside>
       <main>
         <header>
-          <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{page === "monitor" ? "Live Monitor" : "Nhật ký vi phạm"}</h1></div>
+          <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : "Quan sát hệ thống"}</h1></div>
           <div className="header-actions">
             <div className="clock"><span>{clock}</span><small>Safety shirt baseline</small></div>
             <button className="icon-btn">⌕</button>

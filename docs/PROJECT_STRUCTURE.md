@@ -83,6 +83,7 @@ P-047/
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
+│   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page
 │   │   │   ├── rules/   # PPE requirement switches and explicit-save state
 │   │   │   └── dashboard/ # Reserved dashboard boundary
 │   │   ├── styles/      # React CSS entrypoint composing Sentinel styles

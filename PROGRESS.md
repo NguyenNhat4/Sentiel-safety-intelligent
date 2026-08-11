@@ -21,6 +21,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Validated US-08 with a local-only synthetic 24-second multi-person video covering continuous presence, distinct concurrent tracks, exit/cooldown, and re-entry; test media is intentionally excluded from Git.
 - Backend now persists lightweight operational request, inference, and WebSocket outcome metrics to rotated JSONL and exposes bounded aggregates at `GET /api/v1/operational-metrics`.
 - `make setup` and `make run` now run versioned Alembic upgrades, so a new SQLite database is created at the current schema automatically.
+- A separate read-only “Quan sát hệ thống” page now displays JSONL operational request, latency, inference, and error aggregates.
 
 ## Completed
 
@@ -48,6 +49,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
+- [x] Added a separate operational-observability page with selectable window, refresh, aggregate KPIs, latency table, inference outcomes, errors, and loading/error/partial-data states.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
 - [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
