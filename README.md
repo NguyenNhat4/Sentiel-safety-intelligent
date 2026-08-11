@@ -43,10 +43,10 @@ Baseline đang hoạt động gồm:
 - FastAPI phục vụ REST, WebSocket và production frontend build.
 - Upload video local, vẽ vùng bốn điểm và trạng thái máy chạy/dừng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
-- HITL review, lưu event đã xác nhận, nhật ký snapshot và thống kê baseline.
+- HITL review, lưu event đã xác nhận với snapshot đã che danh tính, và thống kê baseline.
 - SQLite cho local/test; PostgreSQL là database production đích.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face blur trước persistence, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -79,6 +79,8 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
+| Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
+| Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow của AI/contributor | [AGENTS.md](AGENTS.md) |
@@ -159,8 +161,8 @@ npm --prefix frontend run build
 
 ## Quy tắc đóng góp quan trọng
 
-- Chọn đúng một primary owning module cho mỗi task.
-- Đọc README của module trước khi đọc hoặc sửa implementation bên trong.
+- Chọn đúng production owner và technical layer cho mỗi task.
+- Đọc README của production owner trước khi đọc hoặc sửa implementation bên trong.
 - Không đọc `src/` nếu người dùng không yêu cầu trực tiếp.
 - Không tạo top-level directory hoặc module boundary mới khi chưa có quyết định kiến trúc.
 - Cập nhật `docs/PROJECT_STRUCTURE.md` khi filesystem thay đổi.

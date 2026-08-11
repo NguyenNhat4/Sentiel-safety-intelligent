@@ -139,6 +139,8 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                 image_data=image_data,
                 zone_points=configuration.zone_points,
                 machine_state=configuration.machine_state,
+                camera_id=configuration.camera_id,
+                zone_id=configuration.zone_id,
             )
             try:
                 result = await asyncio.to_thread(frame_inference_service.infer, request)

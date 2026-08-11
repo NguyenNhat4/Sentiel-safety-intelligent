@@ -1,11 +1,13 @@
 import {AlertPanel} from "../alerts/AlertPanel";
+import {ReviewModal} from "../alerts/ReviewModal";
+import {PpeRequirementsPanel} from "../rules/PpeRequirementsPanel";
 import {useMonitor} from "./use-monitor";
 
 export function MonitorPage() {
   const {refs, state, actions} = useMonitor();
   const zoneHint = state.zonePoints.length === 4
     ? "Vùng đã sẵn sàng · Kéo điểm để điều chỉnh"
-    : `Chọn 4 điểm · ${state.zonePoints.length}/4`;
+    : `Detection đang chạy · Zone tùy chọn ${state.zonePoints.length}/4`;
   const deleteStyle = state.selectedPointPosition
     ? {left: `${state.selectedPointPosition.x * 100}%`, top: `${state.selectedPointPosition.y * 100}%`}
     : undefined;
@@ -26,9 +28,11 @@ export function MonitorPage() {
         <button className="secondary-btn" onClick={actions.openFilePicker}>＋ Tải video</button>
         <button className="secondary-btn" disabled={state.playbackDisabled} onClick={() => void actions.handlePlayback()}>{state.playbackLabel}</button>
         <button className={`secondary-btn ${state.selectingZone ? "zone-config-active" : ""}`} disabled={state.zoneDisabled} onClick={actions.toggleZoneEditing}>
-          {state.selectingZone ? "✓ Xong cấu hình" : "⌗ Cấu hình vùng"}
+          {state.selectingZone ? "✓ Xong cấu hình" : "⌗ Cấu hình zone (tùy chọn)"}
         </button>
       </div>
+
+      <PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />
 
       <div className="monitor-grid">
         <article className="video-card">
@@ -50,26 +54,48 @@ export function MonitorPage() {
             <div className="person-box">
               <div className="person"><div className="head"><span className="blur" /></div><div className="body" /><div className="leg l" /><div className="leg r" /></div>
               <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
-              <label>PERSON · 96%</label><em>NO SAFETY SHIRT</em>
+              <label>PERSON · 96%</label><em>PPE CHECK</em>
             </div>
-            {!state.stageReady && <div className="empty-state"><strong>Tải video demo</strong><span>Sau đó chọn 4 điểm để tạo vùng nguy hiểm.</span></div>}
+            {!state.stageReady && <div className="empty-state"><strong>Tải video demo</strong><span>Phát video để xem detection; zone 4 điểm là tùy chọn.</span></div>}
             <div className="zone-hint">{state.stageReady ? zoneHint : "Chưa cấu hình vùng"}</div>
           </div>
           <footer>
             <span><i /> AI Detection</span>
             <span>{state.peopleCount} người</span>
-            <span>1 áo bảo hộ yêu cầu</span>
+            <span>{state.ppeRequirementCount} PPE bắt buộc</span>
             <strong className={state.view.violation ? "result-violate" : "result-normal"}>{state.view.violation ? "● VIOLATE" : state.stageReady ? "● NORMAL" : "● Chờ video"}</strong>
           </footer>
         </article>
 
-        <AlertPanel view={state.view} reviewPending={Boolean(state.pendingViolation)} reviewSaving={state.reviewSaving}
-          snapshot={state.pendingViolation?.snapshot_data} timer={state.timer} onReview={status => void actions.review(status)} />
+        <AlertPanel
+          view={state.view}
+          reviewPending={Boolean(state.pendingViolation)}
+          reviewSaving={state.reviewSaving}
+          people={state.latestPeople}
+          detections={state.latestDetections}
+          snapshot={state.pendingViolation?.snapshot_data}
+          timer={state.timer}
+          onReview={status => void actions.review(status)}
+          onOpenModal={actions.openReviewModal}
+        />
       </div>
+
+      <ReviewModal
+        isOpen={state.isReviewModalOpen}
+        onClose={actions.closeReviewModal}
+        snapshot={state.pendingViolation?.snapshot_data}
+        people={state.pendingViolation?.people}
+        detections={state.pendingViolation?.detections}
+        timer={state.timer}
+        reviewSaving={state.reviewSaving}
+        alertTitle={state.view.alertTitle}
+        alertSummary={state.view.alertSummary}
+        onReview={status => void actions.review(status)}
+      />
 
       <div className="activity-strip">
         <div><span className="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
-        <span>ONE ZONE</span><span className="medium-pill">ONE PPE</span>
+        <span>ONE ZONE</span><span className="medium-pill">PPE RULES</span>
         <span>{state.flowStatus}</span>
         <button onClick={actions.openFilePicker}>Bắt đầu bằng video →</button>
       </div>

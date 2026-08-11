@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base
+from backend.app.models import ppe_requirement  # noqa: F401
 
 config = context.config
 

@@ -2,12 +2,25 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import type {ChangeEvent, PointerEvent as ReactPointerEvent, RefObject} from "react";
 import {InferenceClient} from "../../api/inference-client";
 import {saveReviewedEvent} from "../../api/events";
-import type {EventPayload, InferenceResult, PersonDetection, ReviewStatus, ZonePoint} from "../../types";
+import type {
+  EventPayload,
+  InferenceResult,
+  ModelDetection,
+  PersonDetection,
+  PpeRequirementUpdate,
+  ReviewStatus,
+  ZonePoint,
+} from "../../types";
 import {drawOverlay, findPointAt, normalizedPointerPosition} from "./canvas";
 
 const SAMPLE_INTERVAL_SECONDS = 0.5;
 const JPEG_QUALITY = 0.82;
 const PREVIEW_CANDIDATES = [0.05, 0.5, 1, 2, 3, 4, 5, 7, 10];
+const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
+  helmet_required: false,
+  safety_glasses_required: false,
+  gloves_required: false,
+};
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
 
@@ -29,7 +42,7 @@ const initialView = (machineRunning = true): MonitorView => ({
   violation: false,
   alertTitle: "Chưa có vi phạm",
   severity: "NORMAL",
-  alertSummary: "Người trong vùng nguy hiểm phải mặc áo bảo hộ khi máy đang hoạt động.",
+  alertSummary: "Cảnh báo PPE chỉ áp dụng cho các loại đã được cấu hình bắt buộc.",
   reviewMessage: "Khung hình vi phạm sẽ hiện tại đây",
   eventStatus: "CHƯA CÓ SỰ KIỆN ĐƯỢC LƯU",
   confidenceLabel: "READY",
@@ -53,6 +66,16 @@ interface SessionState {
   previewCandidateIndex: number;
 }
 
+export function captureVideoSnapshot(video: HTMLVideoElement, capture: HTMLCanvasElement): string | undefined {
+  if (!video.videoWidth || !video.videoHeight) return undefined;
+  capture.width = video.videoWidth;
+  capture.height = video.videoHeight;
+  const context = capture.getContext("2d");
+  if (!context) return undefined;
+  context.drawImage(video, 0, 0, capture.width, capture.height);
+  return capture.toDataURL("image/jpeg", JPEG_QUALITY);
+}
+
 export function useMonitor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -61,6 +84,10 @@ export function useMonitor() {
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const zonePointsRef = useRef<ZonePoint[]>([]);
   const [latestPeople, setLatestPeople] = useState<PersonDetection[]>([]);
+  const [latestDetections, setLatestDetections] = useState<ModelDetection[]>([]);
+  const [activePpeRequirements, setActivePpeRequirements] = useState<PpeRequirementUpdate>(
+    DEFAULT_PPE_REQUIREMENTS,
+  );
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const draggingPoint = useRef<number | null>(null);
   const [selectingZone, setSelectingZone] = useState(false);
@@ -68,6 +95,7 @@ export function useMonitor() {
   const machineRunningRef = useRef(true);
   const [pendingViolation, setPendingViolation] = useState<InferenceResult | null>(null);
   const pendingViolationRef = useRef<InferenceResult | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [view, setView] = useState<MonitorView>(() => initialView());
@@ -97,7 +125,7 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zone_points: zonePointsRef.current,
+        zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
         machine_state: machineRunningRef.current ? "running" : "stopped"
       }),
       onResult: result => resultHandler.current(result),
@@ -122,9 +150,9 @@ export function useMonitor() {
   const capturePausedFrame = useCallback(() => {
     const video = videoRef.current;
     const capture = captureRef.current;
-    if (!video?.videoWidth || !capture?.width) return;
-    capture.getContext("2d")?.drawImage(video, 0, 0, capture.width, capture.height);
-    setPreviewSrc(capture.toDataURL("image/jpeg", 0.9));
+    if (!video || !capture) return;
+    const snapshot = captureVideoSnapshot(video, capture);
+    if (snapshot) setPreviewSrc(snapshot);
   }, []);
 
   const showToast = useCallback((message: string) => setToast(message), []);
@@ -135,12 +163,13 @@ export function useMonitor() {
     showToast(message);
   }, [showToast, stopRealtimeInference]);
 
-  const handleInferenceResult = useCallback((result: InferenceResult) => {
+  function handleInferenceResult(result: InferenceResult): void {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
+    setLatestDetections(result.detections ?? []);
+    setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
-    const missingShirt = result.people.some(person => person.inside_zone && !person.safety_shirt);
     const violation = result.result === "violate";
     setView(current => ({
       ...current,
@@ -149,23 +178,17 @@ export function useMonitor() {
       severity: violation ? "VIOLATE" : "NORMAL",
       alertSummary: violation ? current.alertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
       zoneRule: {yes: inside, text: inside ? "Trong vùng nguy hiểm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
-      ppeRule: {yes: !missingShirt, text: missingShirt ? "Không có áo bảo hộ" : "Có áo / không yêu cầu", badge: missingShirt ? "MISS" : "OK"}
+      ppeRule: buildPpeRule(result),
     }));
     if (!result.review_required) session.current.violationLatched = false;
     if (!result.review_required || session.current.violationLatched) return;
     session.current.violationLatched = true;
     session.current.running = false;
-    pendingViolationRef.current = result;
-    setPendingViolation(result);
     const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = result.video_time;
-    }
+    video?.pause();
     client.close();
     setPlaybackLabel("▶ Tiếp tục");
     setPlaybackDisabled(true);
-    setReviewStartedAt(Date.now());
     setFlowStatus("Chờ xác minh");
     setView(current => ({
       ...current,
@@ -178,15 +201,16 @@ export function useMonitor() {
       confidenceLabel: "VIOLATE",
       confidenceWidth: "100%"
     }));
-  }, [client]);
+    freezeAtViolationFrame(result);
+  }
 
   resultHandler.current = handleInferenceResult;
   failureHandler.current = handleInferenceFailure;
 
   useEffect(() => {
     const canvas = overlayRef.current;
-    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, selectedPoint);
-  }, [latestPeople, selectedPoint, zonePoints]);
+    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, latestDetections, selectedPoint, activePpeRequirements);
+  }, [activePpeRequirements, latestDetections, latestPeople, selectedPoint, zonePoints]);
 
   useEffect(() => {
     if (!toast) return;
@@ -215,6 +239,7 @@ export function useMonitor() {
     });
     updateZonePoints([]);
     setLatestPeople([]);
+    setLatestDetections([]);
     setSelectedPoint(null);
     pendingViolationRef.current = null;
     setPendingViolation(null);
@@ -302,12 +327,12 @@ export function useMonitor() {
     setPreviewSrc(undefined);
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
-    session.current.running = zonePointsRef.current.length === 4;
+    session.current.running = true;
     session.current.frameSequence = 0;
     session.current.lastHandledFrame = -1;
     session.current.lastSampleTime = -1;
-    setFlowStatus(session.current.running ? "Đang inference realtime" : "Đang xem video · dừng để cấu hình đủ 4 điểm");
-    setView(current => ({...current, confidenceLabel: session.current.running ? "RUNNING" : "PREVIEW", confidenceWidth: session.current.running ? "70%" : "25%"}));
+    setFlowStatus("Đang inference realtime");
+    setView(current => ({...current, confidenceLabel: "RUNNING", confidenceWidth: "70%"}));
     if (video.ended) video.currentTime = 0;
     if (session.current.running) {
       setFlowStatus("Đang kết nối inference");
@@ -347,6 +372,41 @@ export function useMonitor() {
       }, "image/jpeg", JPEG_QUALITY);
     }
     if (session.current.running) requestAnimationFrame(sampleFrameLoop);
+  }
+
+  function freezeAtViolationFrame(result: InferenceResult): void {
+    const video = videoRef.current;
+    const capture = captureRef.current;
+    if (!video || !capture || !video.videoWidth) {
+      openViolationReview(result, result.snapshot_data);
+      return;
+    }
+
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(fallbackTimer);
+      video.removeEventListener("seeked", renderStoppedFrame);
+      openViolationReview(result, captureVideoSnapshot(video, capture) ?? result.snapshot_data);
+    };
+    const renderStoppedFrame = () => {
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => finish());
+      else window.requestAnimationFrame(finish);
+    };
+
+    video.addEventListener("seeked", renderStoppedFrame, {once: true});
+    const fallbackTimer = window.setTimeout(finish, 800);
+    if (Math.abs(video.currentTime - result.video_time) < 0.01) renderStoppedFrame();
+    else video.currentTime = result.video_time;
+  }
+
+  function openViolationReview(result: InferenceResult, snapshotData?: string): void {
+    const reviewedFrame = snapshotData ? {...result, snapshot_data: snapshotData} : result;
+    pendingViolationRef.current = reviewedFrame;
+    setPendingViolation(reviewedFrame);
+    setIsReviewModalOpen(true);
+    setReviewStartedAt(Date.now());
   }
 
   function stopPreviewPlayback(): void {
@@ -405,7 +465,7 @@ export function useMonitor() {
       updateZonePoints([...zonePointsRef.current, position]);
       setSelectedPoint(zonePointsRef.current.length - 1);
     } else setSelectedPoint(null);
-    setFlowStatus(zonePointsRef.current.length === 4 ? "Sẵn sàng inference realtime · nhấn Phát video" : "Chờ đủ 4 điểm");
+    setFlowStatus(zonePointsRef.current.length === 4 ? "Zone sẵn sàng · inference realtime" : "Zone tùy chọn · detection vẫn chạy khi phát video");
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>): void {
@@ -436,6 +496,7 @@ export function useMonitor() {
       await saveReviewedEvent(buildEventPayload(status, pending, zonePointsRef.current, machineRunningRef.current));
       pendingViolationRef.current = null;
       setPendingViolation(null);
+      setIsReviewModalOpen(false);
       setReviewStartedAt(null);
       setPlaybackDisabled(false);
       setFlowStatus("Đã đóng xác minh");
@@ -454,17 +515,44 @@ export function useMonitor() {
   return {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
-      zonePoints, selectingZone, machineRunning, pendingViolation, reviewSaving, view,
+      zonePoints, selectingZone, machineRunning, pendingViolation, isReviewModalOpen, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
-      zoneDisabled, flowStatus, toast, selectedPointPosition, timer, peopleCount: latestPeople.length
+      zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
+      latestPeople, latestDetections, peopleCount: latestPeople.length,
+      ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
       resetZone, toggleZoneEditing, handlePointerDown, handlePointerMove,
-      handlePointerUp, deleteSelectedPoint, review
+      handlePointerUp, deleteSelectedPoint, review,
+      openReviewModal: () => setIsReviewModalOpen(true),
+      closeReviewModal: () => setIsReviewModalOpen(false),
     }
   };
+}
+
+export function buildPpeRule(result: InferenceResult): RuleView {
+  const requirements = result.rule.ppe_requirements;
+  const requiredLabels = [
+    requirements.helmet_required ? "mũ" : null,
+    requirements.safety_glasses_required ? "kính" : null,
+    requirements.gloves_required ? "găng" : null,
+  ].filter((label): label is string => label !== null);
+  if (!requiredLabels.length) return {yes: null, text: "Không yêu cầu PPE", badge: "OFF"};
+
+  const missing = [...new Set(result.people.flatMap(person => person.missing_required_ppe))];
+  const ppeLabel: Record<string, string> = {helmet: "mũ", safety_glasses: "kính", gloves: "găng"};
+  if (missing.length) return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
+
+  const hasUnknown = result.people.some(person =>
+    requiredLabels.some(label => {
+      const item = label === "mũ" ? "helmet" : label === "kính" ? "safety_glasses" : "gloves";
+      return person.ppe[item].status === "unknown";
+    }),
+  );
+  if (hasUnknown) return {yes: null, text: `Đang kiểm tra ${requiredLabels.join(", ")}`, badge: "CHECK"};
+  return {yes: true, text: `Đủ PPE: ${requiredLabels.join(", ")}`, badge: "OK"};
 }
 
 export function buildEventPayload(
@@ -481,7 +569,8 @@ export function buildEventPayload(
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
-    privacy_blurred: false,
+    snapshot_people: pending.people,
+    snapshot_detections: pending.detections ?? [],
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",

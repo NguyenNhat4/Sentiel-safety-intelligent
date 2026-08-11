@@ -1,4 +1,11 @@
-import type {PersonDetection, ZonePoint} from "../../types";
+import type {ModelDetection, PersonDetection, PpeRequirementUpdate, ZonePoint} from "../../types";
+
+type PpeBadgeTone = "present" | "missing" | "unknown";
+
+interface PpeBadge {
+  label: string;
+  tone: PpeBadgeTone;
+}
 
 export function normalizedPointerPosition(
   clientX: number,
@@ -24,17 +31,71 @@ export function findPointAt(
   return index === -1 ? null : index;
 }
 
+export function getDetectionColor(className: string, personIndex?: number | null, insideZone?: boolean): string {
+  const name = className.toLowerCase().trim();
+  if (name === "person") {
+    return insideZone ? "#ff4940" : "#22c55e";
+  }
+  switch (name) {
+    case "helmet":
+    case "head":
+      return "#f59e0b";
+    case "glasses":
+    case "safety_glasses":
+    case "face":
+    case "face-guard":
+    case "face-mask":
+      return "#8b5cf6";
+    case "gloves":
+    case "hands":
+    case "hand":
+      return "#10b981";
+    case "shoes":
+    case "foot":
+      return "#3b82f6";
+    case "safety-suit":
+    case "safety-vest":
+    case "medical-suit":
+      return "#ec4899";
+    case "ear":
+    case "ear-mufs":
+      return "#06b6d4";
+    case "tool":
+      return "#eab308";
+    default:
+      return personIndex !== null && personIndex !== undefined ? "#a855f7" : "#3b82f6";
+  }
+}
+
 export function drawOverlay(
   canvas: HTMLCanvasElement,
   points: ZonePoint[],
   people: PersonDetection[],
-  selectedPoint: number | null
+  detections: ModelDetection[],
+  selectedPoint: number | null,
+  ppeRequirements: PpeRequirementUpdate
 ): void {
   const context = canvas.getContext("2d");
   if (!context) return;
   context.clearRect(0, 0, canvas.width, canvas.height);
   drawZone(context, canvas, points, selectedPoint);
-  people.forEach(person => drawPerson(context, person));
+  people.forEach((person, index) => drawPerson(context, person, ppeRequirements, index));
+  detections.forEach(detection => drawDetection(context, detection));
+}
+
+export function detectionLabel(detection: ModelDetection): string {
+  return `${detection.class_name.toUpperCase()} · ${Math.round(detection.confidence * 100)}%`;
+}
+
+function drawDetection(context: CanvasRenderingContext2D, detection: ModelDetection): void {
+  const [x1, y1, x2, y2] = detection.bbox;
+  const color = getDetectionColor(detection.class_name, detection.person_index);
+  context.strokeStyle = color;
+  context.lineWidth = 2;
+  context.strokeRect(x1, y1, x2 - x1, y2 - y1);
+  context.fillStyle = color;
+  context.font = "bold 11px Manrope";
+  context.fillText(detectionLabel(detection), x1, Math.max(13, y1 - 4));
 }
 
 function drawZone(
@@ -82,21 +143,73 @@ function drawZonePoint(
   context.fillText(String(index + 1), x - 3, y + 4);
 }
 
-function drawPerson(context: CanvasRenderingContext2D, person: PersonDetection): void {
+export function requiredPpeBadges(
+  person: PersonDetection,
+  requirements: PpeRequirementUpdate,
+): PpeBadge[] {
+  const ppe = [
+    ["helmet_required", "helmet", "MŨ"],
+    ["safety_glasses_required", "safety_glasses", "KÍNH"],
+    ["gloves_required", "gloves", "GĂNG"],
+  ] as const;
+
+  const badges: PpeBadge[] = [];
+  for (const [requirement, item, label] of ppe) {
+    if (!requirements[requirement]) continue;
+    const status = person.ppe[item].status;
+    if (status === "present") badges.push({label: `✓ ${label}`, tone: "present"});
+    else if (status === "missing") badges.push({label: `✕ ${label}`, tone: "missing"});
+    else badges.push({label: `? ${label}`, tone: "unknown"});
+  }
+  return badges;
+}
+
+function drawPerson(
+  context: CanvasRenderingContext2D,
+  person: PersonDetection,
+  ppeRequirements: PpeRequirementUpdate,
+  personIndex?: number,
+): void {
   const [x1, y1, x2, y2] = person.bbox;
-  context.strokeStyle = person.inside_zone ? "#ff4940" : "#68e29a";
-  context.lineWidth = 4;
+  const color = getDetectionColor("person", personIndex, person.inside_zone);
+  context.strokeStyle = color;
+  context.lineWidth = 3;
   context.strokeRect(x1, y1, x2 - x1, y2 - y1);
-  context.fillStyle = context.strokeStyle;
-  context.font = "bold 16px Manrope";
-  context.fillText(person.safety_shirt ? "PERSON · SHIRT" : "PERSON · NO SHIRT", x1, Math.max(18, y1 - 7));
+  const badges = requiredPpeBadges(person, ppeRequirements);
+  drawPpeBadges(context, badges, x1, y1);
+  context.fillStyle = color;
+  context.font = "bold 14px Manrope";
+  const personLabel = `PERSON ${personIndex !== undefined ? `#${personIndex + 1} ` : ""}· ${Math.round(person.confidence * 100)}%`;
+  context.fillText(personLabel, x1, Math.max(16, y1 - 6));
   if (!person.foot_point) return;
   const [footX, footY] = person.foot_point;
   context.beginPath();
-  context.arc(footX, footY, 7, 0, Math.PI * 2);
-  context.fillStyle = person.inside_zone ? "#ff4940" : "#68e29a";
+  context.arc(footX, footY, 6, 0, Math.PI * 2);
+  context.fillStyle = color;
   context.fill();
   context.strokeStyle = "#fff";
   context.lineWidth = 2;
   context.stroke();
+}
+
+function drawPpeBadges(
+  context: CanvasRenderingContext2D,
+  badges: PpeBadge[],
+  x: number,
+  y: number,
+): void {
+  const colors: Record<PpeBadgeTone, {background: string; text: string}> = {
+    present: {background: "#1e7057", text: "#ffffff"},
+    missing: {background: "#db3d35", text: "#ffffff"},
+    unknown: {background: "#59645f", text: "#ffffff"},
+  };
+  context.font = "bold 12px Manrope";
+  badges.forEach((badge, index) => {
+    const badgeY = Math.max(16, y - 28 - (badges.length - index - 1) * 20);
+    const width = context.measureText(badge.label).width + 14;
+    context.fillStyle = colors[badge.tone].background;
+    context.fillRect(x, badgeY - 13, width, 17);
+    context.fillStyle = colors[badge.tone].text;
+    context.fillText(badge.label, x + 7, badgeY);
+  });
 }

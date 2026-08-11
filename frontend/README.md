@@ -37,14 +37,15 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 ## Runtime Flow
 
-1. Select a local video; it remains in the browser.
-2. Select exactly four normalized zone points. Points can be dragged, deleted, or reset while paused.
-3. Play with four points to open `/api/v1/ws/inference` and send configuration.
-4. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
-5. Draw returned person boxes and foot points in source-video coordinates.
-6. Pause only when `review_required=true`, which means a foot point is inside the zone while the machine is running.
-7. Keep the candidate in memory until the Safety Officer confirms it or marks it as a false alarm.
-8. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.
+1. Load the shared default-OFF PPE requirements for `uploaded_video` and `zone_01`; edits remain draft until **Lưu cấu hình** succeeds.
+2. Select a local video; it remains in the browser.
+3. Select up to four normalized zone points. Points can be dragged, deleted, or reset while paused; only four points activate zone evaluation.
+4. Play to open `/api/v1/ws/inference` and receive detections regardless of zone state.
+5. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
+6. Draw returned person boxes, foot points và mọi SH17 model detection trong source-video coordinates.
+7. Pause only when `review_required=true`, seek back to that inference result's `video_time`, wait for the browser to render it, then capture the full native video frame for review.
+8. Keep that stopped-frame candidate and its detection coordinates in memory until the Safety Officer confirms it or marks it as a false alarm.
+9. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.
 
 ## Source Boundaries
 
@@ -63,6 +64,7 @@ frontend/
     │   ├── monitor/  # Video, zone, Canvas and inference orchestration
     │   ├── alerts/   # Rule result and Human-in-the-Loop review UI
     │   ├── events/   # Acknowledged violation history
+    │   ├── rules/    # Persisted PPE requirement controls and draft/save state
     │   └── dashboard/# Reserved MVP dashboard boundary
     ├── styles/       # React CSS entrypoint
     └── types/        # Typed backend contracts

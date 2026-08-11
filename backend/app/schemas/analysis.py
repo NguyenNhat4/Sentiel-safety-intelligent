@@ -29,8 +29,29 @@ class ZonePoint(BaseModel):
 
 class FrameInferenceRequest(BaseModel):
     image_data: str = Field(..., description="Base64 JPEG data URL")
-    zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
+    zone_points: list[ZonePoint] = Field(default_factory=list, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
+    camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
+    zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+
+
+class PpeObservation(BaseModel):
+    status: Literal["present", "missing", "unknown"]
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class PersonPpeObservations(BaseModel):
+    helmet: PpeObservation
+    safety_glasses: PpeObservation
+    gloves: PpeObservation
+
+
+class ModelDetection(BaseModel):
+    class_id: int = Field(..., ge=0, le=16)
+    class_name: str = Field(..., min_length=1)
+    bbox: list[int] = Field(..., min_length=4, max_length=4)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    person_index: int | None = Field(default=None, ge=0)
 
 
 class PersonDetection(BaseModel):
@@ -39,20 +60,25 @@ class PersonDetection(BaseModel):
     foot_point: list[int]
     inside_zone: bool
     safety_shirt: bool
+    ppe: PersonPpeObservations
+    missing_required_ppe: list[Literal["helmet", "safety_glasses", "gloves"]] = Field(default_factory=list)
 
 
 class FrameInferenceResponse(BaseModel):
     result: Literal["normal", "violate"]
     review_required: bool
     people: list[PersonDetection]
+    detections: list[ModelDetection] = Field(default_factory=list)
     snapshot_data: str | None = None
     rule: dict[str, Any]
 
 
 class InferenceWebSocketConfigure(BaseModel):
     type: Literal["configure"]
-    zone_points: list[ZonePoint] = Field(..., min_length=4, max_length=4)
+    zone_points: list[ZonePoint] = Field(default_factory=list, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
+    camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
+    zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
 
 
 class InferenceWebSocketFrameMeta(BaseModel):

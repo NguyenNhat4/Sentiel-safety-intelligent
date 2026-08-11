@@ -15,41 +15,62 @@ P-047/
 │   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
 │   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
 │   │   │   └── router.py
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
 │   │   │   └── database.py
-│   │   ├── models/      # SQLAlchemy ORM Models (SafetyEvent)
-│   │   │   └── event.py
+│   │   ├── integrations/ # Provider adapters; no safety decisions
+│   │   │   ├── README.md
+│   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
+│   │   ├── models/      # SQLAlchemy ORM models by resource
+│   │   │   ├── event.py
+│   │   │   └── ppe_requirement.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── event.py
+│   │   │   ├── ppe_requirement.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
 │   │   │   └── statistics_service.py
 │   │   └── main.py      # FastAPI App entrypoint
 │   ├── migrations/      # Alembic DB Migrations
+│   │   └── versions/     # Ordered, reversible Alembic revisions
+│   │       ├── README.md
+│   │       └── 20260806_01_add_ppe_requirements.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_analysis.py
 │       ├── test_events.py
+│       ├── test_frame_inference_ppe.py
+│       ├── test_ppe_requirements.py
 │       └── test_statistics.py
-├── vision/              # Computer Vision pipeline (YOLO & OpenCV)
+├── vision/              # Framework- and persistence-independent CV observations
+│   ├── README.md
+│   ├── api.py           # Public SH17 PPE observation/redaction facade called through backend integration
+│   ├── pipeline.py      # Pure identity redaction and person-head fallback logic
+│   └── tests/           # Unit tests for vision-only behavior
+│       ├── README.md
+│       └── test_api.py
+│       └── test_privacy_pipeline.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
+│   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
-│   │   │   ├── alerts/  # Rule result and Human-in-the-Loop review
+│   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
+│   │   │   ├── rules/   # PPE requirement switches and explicit-save state
 │   │   │   └── dashboard/ # Reserved dashboard boundary
 │   │   ├── styles/      # React CSS entrypoint composing Sentinel styles
 │   │   ├── types/       # Typed REST/WebSocket contracts
@@ -63,10 +84,10 @@ P-047/
 │   └── vite.config.ts
 ├── data/                # Sample video streams, test data and reviewed snapshots
 │   └── snapshots/
-├── models/              # Machine learning model weights (YOLO & PPE weights)
-│   ├── README.md
-│   ├── ppe_yolov8n.pt
-│   └── yolo11n.pt
+├── models/              # Git LFS-managed baseline and PPE model checkpoints
+│   ├── README.md        # Provenance, checksums, licenses and class mapping
+│   ├── ppe_yolov8n.pt  # SH17 YOLOv8n PPE-presence checkpoint
+│   └── yolo11n.pt      # Person-detection baseline checkpoint
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
@@ -76,9 +97,12 @@ P-047/
 │   ├── PRD.md
 │   ├── USER_STORIES_LIST.md
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
-│   └── backlog/         # Incomplete MVP and five-week advanced user stories
-│       ├── README.md
-│       └── US-07.md ... US-26.md
+│   ├── done/            # Completed implementation specifications
+│   │   ├── README.md
+│   │   ├── US-07-SPEC.md
+│   │   └── US-12.md
+│   └── backlog/         # Remaining MVP and advanced user stories
+│       └── README.md
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
 │   ├── agents/          # Example graph, state, nodes and tools
 │   ├── api/             # Legacy chat/status routes

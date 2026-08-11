@@ -1,10 +1,5 @@
 # User Story Backlog & Kế hoạch giao toàn bộ dự án
 
-Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toán thành hai giai đoạn delivery:
-
-1. **Tuần hiện tại:** đóng và nghiệm thu MVP theo PRD.
-2. **5 tuần tiếp theo:** hoàn thành yêu cầu nâng cao và các khoảng trống cần thiết để giao toàn bộ project problem statement.
-
 ## 1. Quy ước đồng bộ
 
 - `USER_STORIES_LIST.md` là backlog tổng và nguồn kế hoạch.
@@ -12,8 +7,7 @@ Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toá
 - Nội dung từ heading `### US-XX` đến hết Task trong file riêng phải giống nguyên văn mục tương ứng ở tài liệu này.
 - **P0:** bắt buộc để nghiệm thu giai đoạn; **P1:** cần hoàn thiện đầu ra nhưng có thể được Product Owner chấp thuận chuyển tiếp nếu có owner và deadline.
 - Done yêu cầu: đạt acceptance criteria, có test/evidence, cập nhật tài liệu và không làm hỏng contract hiện hành.
-
-## 2. Baseline đã hoàn thành
+- folder done chua cac US-XX da duoc trien khai va hoan thien. 
 
 ### US-01 — Tải và phát video mô phỏng
 
@@ -51,9 +45,6 @@ Tài liệu này chuyển phạm vi MVP và yêu cầu đầu ra của bài toá
 
 - Trạng thái: **Hoàn thành baseline; bắt buộc regression khi nghiệm thu MVP.**
 
-## 3. MVP phải đóng trong tuần hiện tại
-
-Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 ### US-07 — Phát hiện thiếu PPE bắt buộc bằng model
 
@@ -64,11 +55,16 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 - Acceptance criteria:
   - Model PPE đã huấn luyện được nạp từ cấu hình và nhận biết tối thiểu ba nhóm bắt buộc: mũ, kính và găng bảo hộ; heuristic màu/áo phản quang không còn là kết quả PPE chính.
   - Kết quả PPE được gắn đúng theo từng person/track, nêu rõ hạng mục có/thiếu và confidence mà không phá vỡ inference contract.
-  - Danh sách PPE bắt buộc và confidence threshold có thể cấu hình; có test class mapping, threshold, thiếu một/nhiều PPE, không phát hiện PPE và nhiều người.
+  - Giao diện có công tắc ON/OFF riêng cho yêu cầu mũ, kính và găng cùng nút **Lưu cấu hình**; trước lần lưu đầu tiên, cả ba yêu cầu mặc định OFF.
+  - Cấu hình được lưu bền vững tại backend theo cặp camera–khu vực, tự khôi phục sau khi tải lại hoặc khởi động lại hệ thống và dùng chung giữa người dùng, trình duyệt và thiết bị. Trong MVP chỉ hỗ trợ một cặp camera–khu vực cố định.
+  - Model vẫn phát hiện và trả kết quả cho cả ba nhóm PPE bất kể trạng thái công tắc. Hệ thống chỉ tạo cảnh báo thiếu một loại PPE khi yêu cầu tương ứng đang ON; trạng thái OFF không tạo cảnh báo cho loại đó.
+  - Confidence threshold có thể cấu hình; có test class mapping, threshold, thiếu một/nhiều PPE, không phát hiện PPE, nhiều người, giá trị mặc định, lưu/khôi phục cấu hình và luật cảnh báo ON/OFF.
 - Task:
   1. Chốt weights, class mapping cho mũ/kính/găng, giấy phép model và bộ dữ liệu demo có ground truth theo từng người.
   2. Tạo adapter PPE model và cấu hình weights/device/threshold.
-  3. Tích hợp kết quả PPE theo person/track vào REST và WebSocket; chạy integration test và benchmark cho từng nhóm PPE.
+  3. Tạo persistence và API đọc/lưu cấu hình yêu cầu PPE cho cặp camera–khu vực cố định, với giá trị mặc định OFF.
+  4. Thêm ba công tắc và nút **Lưu cấu hình** trên giao diện; tải cấu hình dùng chung từ backend khi khởi tạo.
+  5. Tích hợp kết quả PPE theo person/track vào REST và WebSocket, áp dụng cấu hình vào luật cảnh báo; chạy integration test và benchmark cho từng nhóm PPE.
 
 ### US-08 — Theo dõi người và chống tạo event trùng
 
@@ -134,7 +130,7 @@ Phạm vi gồm regression US-01 đến US-06 và hoàn tất các story sau.
 
 > Với vai trò người lao động, tôi muốn danh tính của mình được làm mờ trong snapshot, để quyền riêng tư được bảo vệ khi sự kiện được lưu.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-06
 - Acceptance criteria:
   - Ảnh được làm mờ mặt hoặc vùng nhận dạng trước khi ghi xuống storage.

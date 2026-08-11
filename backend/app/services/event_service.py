@@ -1,12 +1,23 @@
 import base64
 import binascii
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import cv2
+import numpy as np
 from sqlalchemy.orm import Session
 
+from backend.app.integrations.ppe_vision import (
+    ModelDetection,
+    PrivacyRedactionResult,
+    SnapshotPerson,
+    get_ppe_vision_adapter,
+)
 from backend.app.models.event import SafetyEvent
+from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
+from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
 from backend.app.schemas.event import EventCreate, EventUpdate
 
 
@@ -14,22 +25,44 @@ class EventPersistenceError(RuntimeError):
     pass
 
 
+class EventPrivacyError(RuntimeError):
+    pass
+
+
+SnapshotRedactor = Callable[[np.ndarray], PrivacyRedactionResult]
+SnapshotAnnotator = Callable[[np.ndarray, list[SnapshotPerson], list[ModelDetection]], np.ndarray]
+
+
 class EventService:
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        *,
+        snapshot_redactor: SnapshotRedactor | None = None,
+        snapshot_annotator: SnapshotAnnotator | None = None,
+        snapshot_dir: Path | None = None,
+    ):
         self.db = db
+        self._snapshot_redactor = snapshot_redactor or self._default_snapshot_redactor
+        self._snapshot_annotator = snapshot_annotator or self._default_snapshot_annotator
+        self._snapshot_dir = snapshot_dir or Path(__file__).resolve().parents[3] / "data" / "snapshots"
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
         reviewed = event_in.status in {"acknowledged", "false_alarm"}
-        snapshot_path = event_in.snapshot_path
+        snapshot_path = None
         if event_in.snapshot_data:
-            snapshot_path = self._save_snapshot(event_in.snapshot_data)
+            snapshot_path = self._save_snapshot(
+                event_in.snapshot_data,
+                event_in.snapshot_people,
+                event_in.snapshot_detections,
+            )
         db_event = SafetyEvent(
             zone_id=event_in.zone_id,
             camera_id=event_in.camera_id,
             event_type=event_in.event_type,
             severity=event_in.severity,
             snapshot_path=snapshot_path,
-            privacy_blurred=event_in.privacy_blurred,
+            privacy_blurred=snapshot_path is not None,
             details=event_in.details,
             status=event_in.status,
             acknowledged_by=event_in.acknowledged_by,
@@ -47,23 +80,70 @@ class EventService:
             raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
 
-    @staticmethod
-    def _save_snapshot(snapshot_data: str) -> str:
+    def _save_snapshot(
+        self,
+        snapshot_data: str,
+        snapshot_people: list[SnapshotPersonDetection],
+        snapshot_detections: list[SnapshotDetection],
+    ) -> str:
         encoded = snapshot_data.split(",", 1)[-1]
         try:
             image_bytes = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ValueError("snapshot_data must be a valid base64 image") from exc
 
-        snapshot_dir = Path(__file__).resolve().parents[3] / "data" / "snapshots"
-        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        frame = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            raise ValueError("snapshot_data could not be decoded as an image")
+
+        try:
+            redaction = self._snapshot_redactor(frame)
+            annotated = self._snapshot_annotator(
+                redaction["image"],
+                [
+                    {
+                        "bbox": person.bbox,
+                        "confidence": person.confidence,
+                        "inside_zone": person.inside_zone,
+                    }
+                    for person in snapshot_people
+                ],
+                [detection.model_dump() for detection in snapshot_detections],
+            )
+            success, redacted_bytes = cv2.imencode(".jpg", annotated)
+        except Exception as exc:
+            raise EventPrivacyError("Privacy processing failed; the snapshot was not saved") from exc
+        if not success:
+            raise EventPrivacyError("Privacy processing could not encode the redacted snapshot")
+
+        self._snapshot_dir.mkdir(parents=True, exist_ok=True)
         filename = f"event-{uuid.uuid4().hex}.jpg"
-        (snapshot_dir / filename).write_bytes(image_bytes)
+        snapshot_file = self._snapshot_dir / filename
+        try:
+            snapshot_file.write_bytes(redacted_bytes.tobytes())
+        except OSError as exc:
+            snapshot_file.unlink(missing_ok=True)
+            raise EventPersistenceError("Could not persist the redacted snapshot") from exc
         return f"/snapshots/{filename}"
 
     @staticmethod
-    def _snapshot_file(snapshot_path: str) -> Path:
-        return Path(__file__).resolve().parents[3] / "data" / "snapshots" / Path(snapshot_path).name
+    def _default_snapshot_redactor(frame: np.ndarray) -> PrivacyRedactionResult:
+        from backend.app.core.config import get_settings
+
+        return get_ppe_vision_adapter(get_settings().ppe_model_path).redact_snapshot(frame)
+
+    @staticmethod
+    def _default_snapshot_annotator(
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+        detections: list[ModelDetection],
+    ) -> np.ndarray:
+        from backend.app.core.config import get_settings
+
+        return get_ppe_vision_adapter(get_settings().ppe_model_path).annotate_snapshot(frame, people, detections)
+
+    def _snapshot_file(self, snapshot_path: str) -> Path:
+        return self._snapshot_dir / Path(snapshot_path).name
 
     def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()
@@ -91,6 +171,12 @@ class EventService:
             return None
 
         if event_in.status is not None:
+            if (
+                event_in.status in {"acknowledged", "false_alarm"}
+                and db_event.snapshot_path
+                and not db_event.privacy_blurred
+            ):
+                raise EventPrivacyError("An event with an unredacted snapshot cannot be reviewed")
             db_event.status = event_in.status
             if event_in.status in ["acknowledged", "false_alarm"]:
                 db_event.acknowledged_at = datetime.now(UTC)

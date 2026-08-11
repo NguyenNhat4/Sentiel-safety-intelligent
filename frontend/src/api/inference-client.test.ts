@@ -41,10 +41,40 @@ describe("InferenceClient", () => {
     const result: InferenceResult = {
       type: "inference_result", frame_id: 7, video_time: 2.5,
       result: "normal", review_required: false, people: [],
-      rule: {person_inside_zone: false, machine_state: "running", safety_shirt_required: true}
+      rule: {
+        person_inside_zone: false, machine_state: "running", safety_shirt_required: true,
+        camera_id: "uploaded_video", zone_id: "zone_01",
+        ppe_requirements: {helmet_required: false, safety_glasses_required: false, gloves_required: false},
+        ppe_alert: false,
+      }
     };
     sockets[0].message(result);
     expect(onResult).toHaveBeenCalledWith(result);
+    expect(client.canSend).toBe(true);
+  });
+
+  it("sends configure message even when zone_points is empty", async () => {
+    const sockets: FakeSocket[] = [];
+    const client = new InferenceClient({
+      getConfiguration: () => ({zone_points: [], machine_state: "running"}),
+      onResult: vi.fn(),
+      onFailure: vi.fn(),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket as unknown as WebSocket;
+      }
+    });
+
+    const connection = client.connect();
+    sockets[0].open();
+    expect(JSON.parse(sockets[0].sent[0] as string)).toEqual({
+      type: "configure",
+      zone_points: [],
+      machine_state: "running"
+    });
+    sockets[0].message({type: "configured"});
+    await connection;
     expect(client.canSend).toBe(true);
   });
 });

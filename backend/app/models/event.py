@@ -33,7 +33,7 @@ class SafetyEvent(Base):
     severity = Column(String(20), nullable=False, default="high")
     timestamp = Column(DateTime(timezone=True), default=utc_now, index=True)
     snapshot_path = Column(String(255), nullable=True)
-    privacy_blurred = Column(Boolean, default=True)
+    privacy_blurred = Column(Boolean, default=False)
     status = Column(String(20), default="unacknowledged", index=True)  # unacknowledged, acknowledged, false_alarm
     acknowledged_by = Column(String(100), nullable=True)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
