@@ -15,6 +15,7 @@ P-047/
 │   │   │   ├── v1/
 │   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
+│   │   │   │   ├── auth.py        # Authentication and system-admin account APIs
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
@@ -29,13 +30,16 @@ P-047/
 │   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
-│   │   │   └── ppe_requirement.py
+│   │   │   ├── ppe_requirement.py
+│   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
+│   │   │   ├── auth.py
 │   │   │   ├── event.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
+│   │   │   ├── auth_service.py
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
@@ -50,7 +54,9 @@ P-047/
 │   │       ├── README.md
 │   │       ├── 20260801_01_create_safety_events.py
 │   │       ├── 20260806_01_add_ppe_requirements.py
-│   │       └── 20260807_01_add_event_occurrences.py
+│   │       ├── 20260807_01_add_event_occurrences.py
+│   │       ├── 20260811_01_add_authentication_schema.py
+│   │       └── 20260811_02_add_forced_password_change.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -72,9 +78,13 @@ P-047/
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
+│   │   │   ├── auth.ts   # Authentication/account transport
+│   │   │   ├── statistics.ts # Area-dashboard statistics transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
+│   │   │   ├── auth/    # Login and system-admin account management
+│   │   │   ├── area/    # Dedicated area-manager compliance dashboard
 │   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history

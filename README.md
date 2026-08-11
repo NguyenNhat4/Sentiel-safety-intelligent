@@ -23,8 +23,9 @@ Hệ thống hướng tới:
 
 | Vai trò | Nhu cầu chính |
 |---|---|
-| Cán bộ an toàn (`safety_officer`) | Theo dõi, nhận cảnh báo, review, xác nhận vi phạm hoặc false alarm |
-| Quản lý khu vực (`zone_manager`) | Quản lý khu vực/ca, xem dashboard, escalation và báo cáo |
+| Quản trị hệ thống (`system_admin`) | Giám sát an toàn và quản trị tài khoản, vai trò, mật khẩu tạm |
+| Cán bộ an toàn (`safety_manager`) | Theo dõi, nhận cảnh báo, review, xác nhận vi phạm hoặc false alarm |
+| Quản lý khu vực (`area_manager`) | Xem dashboard tuân thủ và sự kiện theo khu vực phụ trách |
 
 ## Phạm vi và giới hạn
 
@@ -45,9 +46,10 @@ Baseline đang hoạt động gồm:
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
-- SQLite cho local/test; PostgreSQL là database production đích.
+- PostgreSQL là database chính; SQLite chỉ là fallback local/test có kiểm soát.
+- Đăng nhập bằng session lưu phía server với đúng ba role và workspace phù hợp.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, dedup hoàn chỉnh, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -82,7 +84,6 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
-| Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow của AI/contributor | [AGENTS.md](AGENTS.md) |

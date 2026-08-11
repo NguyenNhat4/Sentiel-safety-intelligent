@@ -66,7 +66,6 @@ class PpeRequirementService:
             requirement.safety_glasses_required = update.safety_glasses_required
             requirement.gloves_required = update.gloves_required
             self._db.commit()
-            self._db.refresh(requirement)
         except SQLAlchemyError as exc:
             self._db.rollback()
             raise PpeRequirementPersistenceError("Could not save PPE requirements") from exc

@@ -203,15 +203,16 @@
   2. Harden validation, file access, CORS, headers và logging.
   3. Chạy dependency/static scan và xử lý phát hiện high/critical.
 
-### US-20 — Đăng nhập và phân quyền hai vai trò
+### US-20 — Đăng nhập và phân quyền ba vai trò
 
-> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò cán bộ an toàn hoặc quản lý khu vực, để chỉ truy cập đúng chức năng và dữ liệu được phép.
+> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò quản trị hệ thống, cán bộ an toàn hoặc quản lý khu vực, để truy cập đúng workspace và dữ liệu được phép.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
 - Phụ thuộc: US-17
 - Acceptance criteria:
   - Có login/logout, password hashing, session/token expiry và tài khoản seed an toàn cho môi trường demo.
-  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực được xem dashboard/báo cáo theo phạm vi.
+  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực có dashboard riêng; quản trị hệ thống có chức năng của cán bộ an toàn và thêm quản trị tài khoản.
+  - Tài khoản mới/reset dùng mật khẩu tạm và bắt buộc thay ở lần đăng nhập tiếp theo.
   - Backend thực thi authorization cho API và WebSocket; ẩn nút trên UI không được xem là đủ bảo mật.
   - Audit event lưu actor; có test matrix cho allowed, forbidden và unauthenticated.
 - Task:

@@ -15,7 +15,9 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 
 REST routes are interactive at <http://localhost:8000/docs>. The inference WebSocket at `ws://localhost:8000/api/v1/ws/inference` is intentionally absent from Swagger because WebSocket operations are not part of the generated OpenAPI schema.
 
-Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
+PostgreSQL from `DATABASE_URL` is the primary database. If it is unreachable during process startup and `DATABASE_FALLBACK_ENABLED=true`, the backend uses `DATABASE_FALLBACK_URL` (local SQLite by default), creates the schema, and seeds development accounts when the database is empty. The selected database remains fixed until restart and is exposed by `/health`. SQLite fallback data is local and is not automatically synchronized back to PostgreSQL, so production deployments that require strict consistency should disable fallback. Supabase is optional; any standard managed PostgreSQL service is sufficient. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
+
+PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minute connection recycling. `DATABASE_POOL_PRE_PING` defaults to `false` so a warm connection checkout does not add a database round-trip to every request. Enable it only for a provider that repeatedly drops idle sessions. ORM sessions keep loaded values after commit, avoiding an automatic response-time reload; explicit queries remain the source of truth for subsequent requests.
 
 ## Frontend–Backend Interaction
 

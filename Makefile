@@ -1,6 +1,10 @@
 .PHONY: setup py-setup env-setup run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build
 
+ifeq ($(OS),Windows_NT)
+VENV_BIN = .venv/Scripts
+else
 VENV_BIN = .venv/bin
+endif
 
 setup: py-setup frontend-install env-setup
 
