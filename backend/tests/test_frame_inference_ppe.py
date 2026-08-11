@@ -212,4 +212,3 @@ def test_fewer_observations_than_people_safely_handled():
     assert len(result.people) == 2
     assert result.people[0].ppe.helmet.status == "missing"
     assert result.people[1].ppe.helmet.status == "missing"
-

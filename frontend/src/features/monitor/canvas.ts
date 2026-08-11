@@ -178,8 +178,10 @@ function drawPerson(
   const badges = requiredPpeBadges(person, ppeRequirements);
   drawPpeBadges(context, badges, x1, y1);
   context.fillStyle = color;
-  context.font = "bold 14px Manrope";
-  const personLabel = `PERSON ${personIndex !== undefined ? `#${personIndex + 1} ` : ""}· ${Math.round(person.confidence * 100)}%`;
+  context.font = "bold 16px Manrope";
+  const personLabel = person.track_id === undefined
+    ? `PERSON ${personIndex !== undefined ? `#${personIndex + 1}` : ""}`
+    : `TRACK #${person.track_id}`;
   context.fillText(personLabel, x1, Math.max(16, y1 - 6));
   if (!person.foot_point) return;
   const [footX, footY] = person.foot_point;

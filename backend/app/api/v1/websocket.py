@@ -11,7 +11,11 @@ from backend.app.schemas.analysis import (
     InferenceWebSocketConfigure,
     InferenceWebSocketFrameMeta,
 )
-from backend.app.services.frame_inference_service import InvalidFrameError, frame_inference_service
+from backend.app.services.frame_inference_service import (
+    InvalidFrameError,
+    StaleFrameError,
+    frame_inference_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+active_inference_sessions: set[str] = set()
 
 
 @router.websocket("/ws/alerts")
@@ -84,9 +89,30 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                 message_type = payload.get("type") if isinstance(payload, dict) else None
                 try:
                     if message_type == "configure":
-                        configuration = InferenceWebSocketConfigure.model_validate(payload)
+                        candidate = InferenceWebSocketConfigure.model_validate(payload)
+                        if (
+                            configuration is not None
+                            and candidate.monitoring_session_id != configuration.monitoring_session_id
+                        ):
+                            await send_inference_error(
+                                websocket, "session_mismatch", "A connection cannot change monitoring session"
+                            )
+                            continue
+                        candidate_session = str(candidate.monitoring_session_id)
+                        if configuration is None and candidate_session in active_inference_sessions:
+                            await send_inference_error(
+                                websocket, "session_in_use", "Monitoring session already has an active connection"
+                            )
+                            continue
+                        configuration = candidate
+                        active_inference_sessions.add(candidate_session)
                         pending_frame = None
-                        await websocket.send_json({"type": "configured"})
+                        await websocket.send_json(
+                            {
+                                "type": "configured",
+                                "monitoring_session_id": str(configuration.monitoring_session_id),
+                            }
+                        )
                     elif message_type == "frame_meta":
                         if configuration is None:
                             await send_inference_error(
@@ -141,11 +167,16 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                 machine_state=configuration.machine_state,
                 camera_id=configuration.camera_id,
                 zone_id=configuration.zone_id,
+                monitoring_session_id=configuration.monitoring_session_id,
+                frame_id=frame_meta.frame_id,
             )
             try:
                 result = await asyncio.to_thread(frame_inference_service.infer, request)
             except InvalidFrameError as exc:
                 await send_inference_error(websocket, "invalid_frame", str(exc))
+                continue
+            except StaleFrameError as exc:
+                await send_inference_error(websocket, "stale_frame", str(exc))
                 continue
             except Exception:
                 logger.exception("WebSocket frame inference failed")
@@ -155,10 +186,14 @@ async def websocket_inference_endpoint(websocket: WebSocket):
             await websocket.send_json(
                 {
                     "type": "inference_result",
+                    "monitoring_session_id": str(configuration.monitoring_session_id),
                     "frame_id": frame_meta.frame_id,
                     "video_time": frame_meta.video_time,
-                    **result.model_dump(),
+                    **result.model_dump(mode="json"),
                 }
             )
     except WebSocketDisconnect:
         pass
+    finally:
+        if configuration is not None:
+            active_inference_sessions.discard(str(configuration.monitoring_session_id))

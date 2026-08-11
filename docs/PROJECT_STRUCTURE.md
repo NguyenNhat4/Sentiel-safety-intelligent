@@ -8,6 +8,7 @@ Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự 
 
 ```text
 P-047/
+├── alembic.ini          # Alembic entrypoint for backend migrations
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
 │   │   ├── api/         # API Routers (v1 REST endpoints, WebSocket & AI Safety Agent)
@@ -24,6 +25,7 @@ P-047/
 │   │   │   └── database.py
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
+│   │   │   ├── person_tracking.py # Adapter to session-isolated ByteTrack
 │   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
@@ -39,12 +41,16 @@ P-047/
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
+│   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
 │   │   └── main.py      # FastAPI App entrypoint
 │   ├── migrations/      # Alembic DB Migrations
+│   │   ├── README.md
 │   │   └── versions/     # Ordered, reversible Alembic revisions
 │   │       ├── README.md
-│   │       └── 20260806_01_add_ppe_requirements.py
+│   │       ├── 20260801_01_create_safety_events.py
+│   │       ├── 20260806_01_add_ppe_requirements.py
+│   │       └── 20260807_01_add_event_occurrences.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -52,15 +58,17 @@ P-047/
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
 │       ├── test_ppe_requirements.py
+│       ├── test_violation_tracking.py
 │       └── test_statistics.py
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
-│   ├── api.py           # Public SH17 PPE observation/redaction facade called through backend integration
+│   ├── api.py           # Public PPE, redaction and session-tracking facades
 │   ├── pipeline.py      # Pure identity redaction and person-head fallback logic
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
-│       └── test_api.py
-│       └── test_privacy_pipeline.py
+│       ├── test_api.py
+│       ├── test_privacy_pipeline.py
+│       └── test_tracking.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
@@ -102,7 +110,9 @@ P-047/
 │   │   ├── US-07-SPEC.md
 │   │   └── US-12.md
 │   └── backlog/         # Remaining MVP and advanced user stories
-│       └── README.md
+│       ├── README.md
+│       ├── US-08.md
+│       └── US-08-SPEC.md # Draft tracking/dedup implementation specification
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
 │   ├── agents/          # Example graph, state, nodes and tools
 │   ├── api/             # Legacy chat/status routes

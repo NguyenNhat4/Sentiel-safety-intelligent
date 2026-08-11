@@ -2,6 +2,19 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Vision/Backend] Preserve occurrences across nearby track-ID handoffs
+- **Choice:** When a new track with the same rule appears near the last normalized foot-point of an active track that just disappeared, transfer the active occurrence during the lost-track grace window.
+- **Reason:** This prevents a ByteTrack ID switch at the zone boundary from opening a second review while the same person exits.
+- **Boundary:** A distant track, a different rule, or a replacement after the grace window still opens an independent occurrence.
+
+## 2026-08-07: [Cross-cutting] Session-scoped tracking and occurrence-based event deduplication
+- **Reason:** Frame-independent detections and the current WebSocket reconnect after review can assign a new identity to the same person and create repeated review/event candidates for one continuous violation.
+- **Choice:** Frontend owns a UUID `monitoring_session_id` for one selected video; vision owns session-isolated ByteTrack IDs; backend services own deterministic violation occurrences keyed by session, track, and rule. A new `occurrence_id` is emitted only after a violation clears and re-arms.
+- **Defaults:** Lost-track grace is 3 sampled frames, exit confirmation is 2 frames, cooldown is 2 seconds, and in-memory session TTL is 300 seconds.
+- **Review semantics:** Multiple new occurrences in one frame use one grouped HITL review. False alarm does not re-open the same occurrence before it clears.
+- **Persistence:** Session/tracker state remains bounded in memory for MVP. Reviewed event creation persists occurrence IDs and enforces database idempotency; REST/WebSocket contract changes are additive.
+- **Privacy:** `track_id` is session-local technical association only and must never become biometric identity or cross-session/cross-camera recognition.
+
 ## 2026-08-01: [Backend] FastAPI + SQLAlchemy modular monolith
 - **Reason:** Fast development speed, native WebSocket support, and direct integration with YOLO, OpenCV, LangChain, and PostgreSQL.
 - **Rejected alternative:** Microservices, because their operational overhead is not justified during MVP.
