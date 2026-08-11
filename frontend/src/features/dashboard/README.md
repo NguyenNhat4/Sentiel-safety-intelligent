@@ -1,3 +1,3 @@
 # Dashboard
 
-Reserved for the MVP compliance dashboard. The current navigation remains disabled until dashboard metrics are implemented.
+Legacy reserved boundary. The active compliance Dashboard is implemented in `features/area/` because the area-management workspace owns its UI state; statistics transport remains in `api/statistics.ts`. Do not add duplicate dashboard behavior here.

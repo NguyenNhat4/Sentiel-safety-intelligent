@@ -1,7 +1,7 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class StartAnalysisRequest(BaseModel):
@@ -98,6 +98,13 @@ class InferenceWebSocketConfigure(BaseModel):
     machine_state: Literal["running", "stopped"] = "running"
     camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
     zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+
+    @field_validator("zone_points")
+    @classmethod
+    def require_empty_or_four_point_zone(cls, value: list[ZonePoint]) -> list[ZonePoint]:
+        if len(value) not in (0, 4):
+            raise ValueError("zone_points must contain zero or four points")
+        return value
 
 
 class InferenceWebSocketFrameMeta(BaseModel):

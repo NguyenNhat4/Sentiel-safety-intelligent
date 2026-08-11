@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
-from backend.app.core.database import Base, engine
+from backend.app.core.database import Base, SessionLocal, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
+from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,13 @@ async def lifespan(app: FastAPI):
     # Auto-create tables in development if DB is reachable
     try:
         Base.metadata.create_all(bind=engine)
-        logger.info("Database tables verified/created successfully.")
+        if settings.app_env != "production":
+            db = SessionLocal()
+            try:
+                AuthService(db).seed_demo_users()
+            finally:
+                db.close()
+        logger.info("Database tables verified/created successfully using %s.", database_runtime.backend)
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
 
@@ -96,7 +103,13 @@ app.mount("/snapshots", StaticFiles(directory=snapshot_dir), name="event-snapsho
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
-    return {"status": "ok", "env": settings.app_env, "service": settings.app_name}
+    return {
+        "status": "ok",
+        "env": settings.app_env,
+        "service": settings.app_name,
+        "database": database_runtime.backend,
+        "database_fallback_active": database_runtime.fallback_active,
+    }
 
 
 @app.get("/", include_in_schema=False)
