@@ -37,7 +37,10 @@ def test_returns_normal_when_observations_match_configured_rules():
 
 def test_returns_violate_and_review_for_required_missing_ppe():
     result = SafetyRuleEngine().evaluate(
-        people=[person(helmet="missing")], requirements=requirements(helmet_required=True), machine_state="stopped", zone_active=False
+        people=[person(helmet="missing")],
+        requirements=requirements(helmet_required=True),
+        machine_state="stopped",
+        zone_active=False,
     )
 
     assert result.outcome == "violate"

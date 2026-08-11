@@ -15,6 +15,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
 - US-12 now redacts identity in memory before event persistence, with SH17 face/head detections, a per-person head fallback, fail-closed errors, and server-owned privacy metadata.
 - ReviewModal now captures the full native video frame after it pauses at the violating inference timestamp, overlays its person and SH17 boxes with matching aspect ratio, and newly persisted US-12 snapshots contain the same annotations only after in-memory identity redaction.
+- Completed US-08 tracking/dedup with session-scoped track IDs, occurrence lifecycle, reconnect semantics, spatial track handoff, and database-enforced event idempotency.
+- US-08 core implementation now provides session-isolated ByteTrack IDs, deterministic rule occurrences, stale-frame/session guards, additive REST/WebSocket fields, and database-enforced reviewed-event idempotency.
+- Validated US-08 with a local-only synthetic 24-second multi-person video covering continuous presence, distinct concurrent tracks, exit/cooldown, and re-entry; test media is intentionally excluded from Git.
 
 ## Completed
 
@@ -29,11 +32,13 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Refactored PPE configuration from capability submodules into the flat backend layers while preserving runtime contracts.
 - [x] Added the US-12 event privacy gate: raw snapshots are decoded only in memory, redacted before write, rejected on no candidate or processing failure, and cleaned up if the database transaction fails.
 - [x] Added transient reviewed-frame box metadata and a post-redaction snapshot annotator, so persisted JPEG evidence contains person and SH17 boxes without allowing annotations to affect privacy or rule decisions.
+- [x] Added session-scoped occurrence lifecycle, WebSocket stale-frame/session guards, and idempotent reviewed-event persistence keyed by occurrence IDs.
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
 - [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
 - [x] Added pure-CV post-redaction JPEG annotation for reviewed person and SH17 bounding boxes, preserving the input frame and skipping duplicate SH17 `person` boxes.
+- [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
 - [x] Added mock login/logout entry points for Safety Manager, Area Manager, and Simulation Operator, with documented backend authentication contracts.
@@ -55,6 +60,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Fixed WebSocket client configuration timeout when starting video playback without 4 zone points.
 - [x] Resolved potential `IndexError` in `FrameInferenceService` when `observations` length is smaller than `detected_people`, and optimized detection loop in `PpeVisionFacade`.
 - [x] Added `SnapshotOverlay` SVG boxes to the Human-in-the-Loop popup, captured the full video frame after seeking to the detected violation timestamp, and forwarded its typed frame metadata solely for persisted-snapshot annotation.
+- [x] Kept one monitoring-session UUID and monotonic frame sequence across review/reconnect, rendered track IDs, and persisted only newly opened occurrence IDs.
+- [x] Fixed review resume to preserve the monotonic frame sequence, then passed the synthetic-video browser flow with two distinct occurrences in one monitoring session and no duplicate pause during continuous presence.
+- [x] Added spatial track-ID handoff within the lost-track grace window so a nearby ByteTrack ID switch while a person exits preserves the reviewed occurrence instead of opening a duplicate popup; distant people remain independent.
 
 ### Documentation
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
@@ -71,6 +79,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Made the approved future structure a mandatory read-only coding policy in `AGENTS.md`, including task-to-owner mapping and incremental migration rules.
 - [x] Added a separate future-structure interpretation guide covering every major path, responsibility boundaries, task-routing examples, and common agent misunderstandings without modifying the read-only baseline.
 - [x] Added shared API and database contracts covering REST/WebSocket conventions, RBAC, event lifecycle, capability-owned ERD, privacy, retention, migrations, and traceability for MVP plus the five-week advanced delivery.
+- [x] Moved the completed US-08 implementation specification to `specs/done/US-08-SPEC.md` and removed its obsolete backlog story file.
 - [x] Split the shared API and database contracts into task-routed chapter directories with lightweight README indexes to prevent AI context-window overflow.
 - [x] Marked both shared contract directories as mandatory read-only references in `AGENTS.md`, their indexes, and the documentation catalog.
 - [x] Refreshed the root `README.md` as the project introduction and repository master index, with task-oriented navigation to scope, architecture, read-only contracts, tracking, and development guides.
@@ -95,6 +104,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 ## In Progress
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 - [ ] Establish ground truth, explicit-missing evidence and benchmark targets for the PPE model before production alerting.
+- [ ] Replace the temporary clean SQLite database workaround with a safe legacy-database Alembic upgrade in the two-command setup/run path.
 
 ## Known Issues
 - The current local `.venv` has an incomplete Pydantic installation (`pydantic_core` is missing), so backend pytest cannot start until dependencies are reinstalled.
@@ -103,8 +113,12 @@ This is the single progress tracker for the repository. Completed work is groupe
 - SH17 identity redaction is an MVP safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.
 - The pytest suite collects successfully but stalls in the shared `TestClient` flow on the current Python 3.14 environment; focused non-`TestClient` checks and live smoke tests pass.
 - For the US-07 slice, `make setup` and `make run` startup succeed; full `make check` reaches the legacy Python suite and then stalls under Python 3.14. Chrome DevTools MCP is not configured, so browser visual/runtime verification remains pending.
+- US-08 browser QA passes with local synthetic media through two reviewed occurrences in one monitoring session; the test media is intentionally not distributed in the repository.
+- Legacy unversioned SQLite databases still require a safe Alembic upgrade path; browser QA passes against a newly created schema, while the original pre-US-08 database remains preserved as a backup.
 
 ## Next Steps
-1. Replace the safety-shirt heuristic while preserving the inference response contract.
-2. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
-3. Implement the PostgreSQL Alembic migration and authenticated Safety Officer identity.
+1. Make Alembic upgrade safe for the existing unversioned SQLite database and include schema upgrade in the two-command setup/run path.
+2. Preserve the passing US-08 browser sequence as an automated repository E2E test.
+3. Replace the safety-shirt heuristic while preserving the inference response contract.
+4. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
+5. Implement authenticated Safety Officer identity and validate migrations against PostgreSQL.

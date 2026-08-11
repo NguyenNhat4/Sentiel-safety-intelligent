@@ -36,13 +36,13 @@ frontend-build:
 	npm --prefix frontend run build
 
 test:
-	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ -v
+	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ vision/tests/ -v
 
 lint:
-	$(VENV_BIN)/ruff check src/ backend/
+	$(VENV_BIN)/ruff check src/ backend/ vision/
 
 format:
-	$(VENV_BIN)/ruff format --check src/ backend/
+	$(VENV_BIN)/ruff format --check src/ backend/ vision/
 
 check: lint format frontend-lint frontend-type-check frontend-test frontend-build test
 

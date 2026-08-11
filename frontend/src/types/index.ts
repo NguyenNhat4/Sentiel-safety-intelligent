@@ -12,6 +12,7 @@ export interface ZonePoint {
 }
 
 export interface PersonDetection {
+  track_id?: number;
   bbox: [number, number, number, number];
   confidence: number;
   foot_point?: [number, number];
@@ -23,6 +24,13 @@ export interface PersonDetection {
     gloves: PpeObservation;
   };
   missing_required_ppe: Array<"helmet" | "safety_glasses" | "gloves">;
+  active_violations?: ActiveViolation[];
+}
+
+export interface ActiveViolation {
+  occurrence_id: string;
+  rule_key: string;
+  is_new: boolean;
 }
 
 export interface PpeObservation {
@@ -54,6 +62,8 @@ export interface InferenceResult {
   video_time: number;
   result: "normal" | "violate";
   review_required: boolean;
+  has_active_violation?: boolean;
+  monitoring_session_id?: string;
   people: PersonDetection[];
   detections?: ModelDetection[];
   snapshot_data?: string;
@@ -75,6 +85,8 @@ export interface SafetyEvent {
     video_timestamp_seconds?: number;
     review_result?: string;
   };
+  monitoring_session_id?: string | null;
+  occurrence_ids?: string[];
 }
 
 export interface EventPayload {
@@ -88,6 +100,8 @@ export interface EventPayload {
   snapshot_people?: PersonDetection[];
   snapshot_detections?: ModelDetection[];
   details: Record<string, unknown>;
+  monitoring_session_id?: string;
+  occurrence_ids: string[];
 }
 
 export interface PpeRequirementUpdate {

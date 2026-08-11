@@ -64,6 +64,7 @@ interface SessionState {
   violationLatched: boolean;
   previewReady: boolean;
   previewCandidateIndex: number;
+  monitoringSessionId: string;
 }
 
 export function captureVideoSnapshot(video: HTMLVideoElement, capture: HTMLCanvasElement): string | undefined {
@@ -116,7 +117,8 @@ export function useMonitor() {
     lastSampleTime: -1,
     violationLatched: false,
     previewReady: false,
-    previewCandidateIndex: 0
+    previewCandidateIndex: 0,
+    monitoringSessionId: crypto.randomUUID()
   });
   const resultHandler = useRef<(result: InferenceResult) => void>(() => undefined);
   const failureHandler = useRef<(message: string) => void>(() => undefined);
@@ -126,7 +128,8 @@ export function useMonitor() {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
         zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
-        machine_state: machineRunningRef.current ? "running" : "stopped"
+        machine_state: machineRunningRef.current ? "running" : "stopped",
+        monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
       onFailure: message => failureHandler.current(message)
@@ -235,7 +238,8 @@ export function useMonitor() {
     video.load();
     Object.assign(session.current, {
       running: false, lastHandledFrame: -1, lastSampleTime: -1,
-      violationLatched: false, previewReady: false, previewCandidateIndex: 0
+      violationLatched: false, previewReady: false, previewCandidateIndex: 0,
+      frameSequence: 0, monitoringSessionId: crypto.randomUUID()
     });
     updateZonePoints([]);
     setLatestPeople([]);
@@ -328,7 +332,6 @@ export function useMonitor() {
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
     session.current.running = true;
-    session.current.frameSequence = 0;
     session.current.lastHandledFrame = -1;
     session.current.lastSampleTime = -1;
     setFlowStatus("Đang inference realtime");
@@ -561,6 +564,11 @@ export function buildEventPayload(
   zonePoints: ZonePoint[],
   machineRunning: boolean
 ): EventPayload {
+  const occurrenceIds = [...new Set(
+    pending.people.flatMap(person =>
+      person.active_violations?.filter(item => item.is_new).map(item => item.occurrence_id) ?? []
+    ),
+  )];
   return {
     zone_id: "zone_01",
     camera_id: "uploaded_video",
@@ -571,6 +579,8 @@ export function buildEventPayload(
     snapshot_data: pending.snapshot_data,
     snapshot_people: pending.people,
     snapshot_detections: pending.detections ?? [],
+    monitoring_session_id: pending.monitoring_session_id,
+    occurrence_ids: occurrenceIds,
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
