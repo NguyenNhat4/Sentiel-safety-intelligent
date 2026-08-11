@@ -141,11 +141,11 @@ P-047/
 │   │   ├── README.md
 │   │   ├── US-07-SPEC.md
 │   │   ├── US-08-SPEC.md
-│   │   └── US-12.md
+│   │   ├── US-12.md
+│   │   └── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
 │   └── backlog/         # Remaining MVP and advanced user stories
 │       ├── README.md
-│       ├── US-09.md ... US-27.md
-│       └── US-27-MULTI-ZONE-SPEC.md # Draft multi-zone Phase 1 contract/spec
+│       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
 │   ├── benchmark_model.py

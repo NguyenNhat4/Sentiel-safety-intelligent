@@ -1,5 +1,7 @@
 # Spec: US-27 — Giám sát nhiều vùng nguy hiểm trên một video
 
+> Trạng thái: Hoàn thành implementation; browser UAT nhiều vùng vẫn thuộc release gate cuối MVP.
+
 ## Trạng thái đặc tả
 
 - Phase: **3 — Implemented, verification pending**.

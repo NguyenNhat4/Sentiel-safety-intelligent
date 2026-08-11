@@ -88,7 +88,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
-| Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/backlog/US-27-MULTI-ZONE-SPEC.md) |
+| Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/done/US-27-MULTI-ZONE-SPEC.md) |
 | Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
