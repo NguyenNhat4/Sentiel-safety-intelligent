@@ -50,7 +50,7 @@ class FrameInferenceService:
 
         settings = get_settings()
         ppe_model_path = settings.ppe_model_path
-        self._person_model_path = person_model_path or ppe_model_path
+        self._person_model_path = person_model_path or settings.person_model_path
         self._person_model = None
         adapter = get_ppe_vision_adapter(ppe_model_path)
         self._ppe_observer = ppe_observer or adapter.observe

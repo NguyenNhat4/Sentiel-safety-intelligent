@@ -2,12 +2,14 @@ import asyncio
 import base64
 import json
 import logging
+import time
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
+from backend.app.core.operational_metrics import record_operational_event
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     InferenceWebSocketConfigure,
@@ -59,6 +61,7 @@ active_inference_sessions: set[str] = set()
 async def websocket_alerts_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time safety violation alerts."""
     await manager.connect(websocket)
+    record_operational_event("websocket_connection_opened", route="/api/v1/ws/alerts", outcome="connected")
     try:
         while True:
             # Keep connection open & handle incoming client messages if any
@@ -67,9 +70,11 @@ async def websocket_alerts_endpoint(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "pong", "received": data}))
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        record_operational_event("websocket_connection_closed", route="/api/v1/ws/alerts", outcome="disconnected")
 
 
 async def send_inference_error(websocket: WebSocket, code: str, message: str) -> None:
+    record_operational_event("inference_failed", outcome="error", error_kind=code)
     await websocket.send_json({"type": "error", "code": code, "message": message})
 
 
@@ -77,6 +82,7 @@ async def send_inference_error(websocket: WebSocket, code: str, message: str) ->
 async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     """Run sampled browser-frame inference over a persistent WebSocket."""
     await websocket.accept()
+    record_operational_event("websocket_connection_opened", route="/api/v1/ws/inference", outcome="connected")
     configuration: InferenceWebSocketConfigure | None = None
     pending_frame: InferenceWebSocketFrameMeta | None = None
 
@@ -212,6 +218,7 @@ async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depen
                 frame_id=frame_meta.frame_id,
                 **configuration_fields,
             )
+            started_at = time.perf_counter()
             try:
                 result = await asyncio.to_thread(frame_inference_service.infer, request)
             except InvalidFrameError as exc:
@@ -234,8 +241,15 @@ async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depen
                     **result.model_dump(mode="json"),
                 }
             )
+            record_operational_event(
+                "inference_completed",
+                route="/api/v1/ws/inference",
+                outcome=result.result,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            )
     except WebSocketDisconnect:
         pass
     finally:
         if configuration is not None:
             active_inference_sessions.discard(str(configuration.monitoring_session_id))
+        record_operational_event("websocket_connection_closed", route="/api/v1/ws/inference", outcome="disconnected")

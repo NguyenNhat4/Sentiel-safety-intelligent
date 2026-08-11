@@ -1,0 +1,19 @@
+{
+  "dataset_id": "p047-custom-eval",
+  "dataset_version": "0.1.0-pilot",
+  "annotation_schema_version": "1.0.0",
+  "split_policy": "grouped_by_video_and_scenario",
+  "split_seed": 13047,
+  "videos": [
+    {
+      "video_id": "VID_S06_001",
+      "scenario_id": "S06",
+      "split": "calibration",
+      "media_uri": "approved-storage://p047/VID_S06_001.mp4",
+      "media_sha256": "replace-with-64-character-sha256",
+      "annotation_path": "annotations/VID_S06_001.json",
+      "annotation_sha256": "replace-with-64-character-sha256",
+      "consent_record_id": "CONSENT_001"
+    }
+  ]
+}

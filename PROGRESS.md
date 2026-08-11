@@ -3,6 +3,13 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
+- New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
+- The current MVP and two-command developer workflow default to SQLite. PostgreSQL remains supported through an explicit `DATABASE_URL`; runtime fallback and `/health` backend reporting from `develop2` are preserved.
+- Authentication now exposes exactly system admin, safety officer, and area manager; the legacy simulation-operator role and demo account are removed.
+- System administrators have a tabbed account-management workspace in the existing one-column sidebar layout, backed by RBAC-protected create/delete/role/password APIs.
+- The persisted `system_admin` identity is supported consistently by backend authentication and frontend wire types.
+- Authentication now starts successfully, persists hashed server sessions, and the browser uses the real login/me/logout API with a tab-scoped token.
 - The baseline upload → four-point zone → binary WebSocket inference → foot-point zone review → event save flow is implemented.
 - FastAPI serves the React production build at `/` and provides REST plus WebSocket APIs.
 - Frontend uses React 19, TypeScript, Vite, typed feature boundaries, and a tested transport layer.
@@ -13,16 +20,25 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Required PPE state is rendered on each detected-person box: present is green, qualified absence is red `missing`, and unknown is labeled neutrally.
 - Removed legacy safety-shirt labels and rule text from the monitoring UI; the operator now sees the saved helmet/glasses/gloves requirement state instead.
 - Moved the canonical US-07 implementation specification to `specs/done/US-07-SPEC.md` and documented the returned rule context plus person-box PPE badges.
+- US-13 now specifies a project-owned custom dataset as its primary acceptance source, with scenario coverage, versioned ground truth, calibration/final isolation and reproducible metric/latency evidence.
 - US-12 now redacts identity in memory before event persistence, with SH17 face/head detections, a per-person head fallback, fail-closed errors, and server-owned privacy metadata.
 - ReviewModal now captures the full native video frame after it pauses at the violating inference timestamp, overlays its person and SH17 boxes with matching aspect ratio, and newly persisted US-12 snapshots contain the same annotations only after in-memory identity redaction.
 - Completed US-08 tracking/dedup with session-scoped track IDs, occurrence lifecycle, reconnect semantics, spatial track handoff, and database-enforced event idempotency.
 - US-08 core implementation now provides session-isolated ByteTrack IDs, deterministic rule occurrences, stale-frame/session guards, additive REST/WebSocket fields, and database-enforced reviewed-event idempotency.
 - Validated US-08 with a local-only synthetic 24-second multi-person video covering continuous presence, distinct concurrent tracks, exit/cooldown, and re-entry; test media is intentionally excluded from Git.
 - US-27 is implemented for multiple disjoint four-point danger zones on one video, per-zone simulated machine state, revisioned persistence, zone-scoped dedup, additive inference contracts and atomic grouped-review persistence. PPE remains the unchanged whole-frame `uploaded_video/zone_01` configuration.
+- The US-27 feature branch is merged with `origin/develop2` at `9c0141c`; auth, operational metrics and multi-zone routes coexist, and Alembic now advances linearly through auth `20260811_01`, forced-password `20260811_02` and monitoring-zones `20260811_03`.
+- Backend now persists lightweight operational request, inference, and WebSocket outcome metrics to rotated JSONL and exposes bounded aggregates at `GET /api/v1/operational-metrics`.
+- `make setup` and `make run` now run versioned Alembic upgrades, so a new SQLite database is created at the current schema automatically.
+- A separate read-only “Quan sát hệ thống” page now displays JSONL operational request, latency, inference, and error aggregates.
 
 ## Completed
 
 ### Backend
+- [x] Optimized remote PostgreSQL CRUD latency with reusable LIFO pooling, optional pre-ping, TCP keepalive, connection recycling, non-expiring committed ORM state, and removal of redundant post-commit refresh queries.
+- [x] Added system-admin-only user listing, creation, deletion, role assignment, and password reset with self-removal/last-admin safeguards and session revocation.
+- [x] Restored auth router and startup wiring, and added an Alembic authentication schema revision after the current PPE revision.
+- [x] Added database-backed authentication endpoints for login, current-session lookup, and logout, with seeded development users and persisted token digests.
 - [x] Established the FastAPI modular monolith, typed settings, SQLAlchemy database layer, REST APIs, and test scaffolding.
 - [x] Added safety-event lifecycle, reviewed snapshot persistence, statistics, and Safety Agent endpoints.
 - [x] Added YOLO person detection, foot-point polygon evaluation, safety-shirt baseline rule, and REST frame inference.
@@ -35,14 +51,25 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added session-scoped occurrence lifecycle, WebSocket stale-frame/session guards, and idempotent reviewed-event persistence keyed by occurrence IDs.
 - [x] [Backend] Added revisioned monitoring-zone collection persistence and GET/PUT APIs, atomic geometry validation, saved-revision checks for REST/WebSocket inference, per-person memberships, per-zone results and zone-scoped occurrence keys.
 - [x] [Backend] Added atomic grouped-review event batches with one zone-specific event per candidate, one shared redacted snapshot, occurrence/session/zone validation, database retry idempotency and rollback cleanup.
+- [x] Added privacy-safe rotating JSONL operational metrics, bounded aggregate API, HTTP/WebSocket instrumentation, and focused tests without external monitoring services.
+- [x] Added the idempotent `make db-upgrade` target to the standard setup/run flow; verified a new SQLite database reaches the current Alembic revision.
 
 ### Vision
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
+- [x] Fixed person false positives caused by using the SH17 PPE checkpoint as the person detector; frame inference now uses the dedicated YOLO11 person checkpoint while SH17 remains responsible for PPE/object observations.
 - [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
 - [x] Added pure-CV post-redaction JPEG annotation for reviewed person and SH17 bounding boxes, preserving the input frame and skipping duplicate SH17 `person` boxes.
+- [x] Added `scripts/benchmark_model.py` to measure YOLO latency (mean/P50/P95/P99) and inference throughput using `data/test.mp4` by default, including a combined person+PPE pipeline mode.
+- [x] Added `eval/results/model-benchmark-report.md` with the combined person+PPE benchmark result and measurement boundaries.
 - [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
+- [x] Added WebSocket route connection counts for inference and alert channels to the separate operational-observability view.
+- [x] Added a separate operational-observability page with selectable window, refresh, aggregate KPIs, latency table, inference outcomes, errors, and loading/error/partial-data states.
+- [x] Added the system-admin sidebar entry and account, role/permission, and security tabs using the real authentication API.
+- [x] Removed the browser-only streaming simulation page, its login card, sidebar navigation, styles, and tests.
+- [x] Replaced the temporary authentication mock with typed login/session-restore/logout transport and focused token lifecycle tests.
+- [x] Added role-aware login/logout entry points backed by persisted server sessions.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
 - [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
@@ -67,6 +94,10 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Frontend] Switched the monitor to saved multi-zone WebSocket configuration and grouped review payloads while retaining the legacy event path for non-zone/PPE review behavior.
 
 ### Documentation
+- [x] Added an operational-metrics guide covering JSONL events, privacy boundary, API/UI, retention, local operation, and single-process limits.
+- [x] [Vision] Added the US-13 Task 2 guide for consented custom recording, ground-truth annotation, cross-review, manifest/checksum generation, and locked calibration/final splits.
+- [x] [Vision] Added ready-to-use US-13 shooting-sheet, ground-truth and manifest templates plus a deterministic manifest validator with focused tests.
+- [x] [Frontend] Stabilized the login layout, reserved error-message space, and changed the three role cards into non-interactive descriptions.
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
 - [x] Added new-developer setup, API documentation, testing, and manual smoke-test instructions to the root README.
@@ -100,19 +131,22 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Condensed the completed US-07 specification to its active behavior, public contract, ownership, tests, boundaries, and production gates.
 - [x] [Cross-cutting] Added an execution-flow diagram and safety-priority order to US-07 for operator and implementation clarity.
 - [x] [Backend] Specified the deterministic US-07 rule-engine boundary: model observation plus UI configuration produces `normal` or `violate`, with violation always routed to human review.
+- [x] [Cross-cutting] Updated and synchronized US-13 to require a consented custom evaluation dataset; recorded the dataset, split, privacy and benchmark constraints.
 - [x] [Cross-cutting] Implemented US-12 privacy persistence with a server-owned `privacy_blurred` value, SH17 identity/head redaction, fail-closed processing, rollback cleanup, and completed specification.
 - [x] [Cross-cutting] Added review and persisted-snapshot bounding boxes after the US-12 redaction gate, with focused Python and frontend component tests.
 - [x] [Cross-cutting] Completed Product Owner review of the US-27 Phase 1 specification: unlimited zone count at product level, disjoint polygons, grouped review with atomic zone-specific events, and PPE explicitly unchanged/out of scope.
 - [x] [Frontend] Amended US-27 with one explicit **Tạo vùng** button as the only creation entrypoint, a single four-point draft drawing mode, cancel/reset behavior and focused UI/E2E acceptance criteria.
-- [x] [Cross-cutting] Implemented US-27 with a fully passing clean-database `make check` (5 legacy, 69 backend, 8 vision and 34 frontend tests), passing frontend production build and a reversible SQLite Alembic migration smoke test. Bare local `make check` still exposes the three pre-existing developer-PPE-state failures recorded below.
+- [x] [Cross-cutting] Implemented US-27 and merged the latest `develop2` with a fully passing migrated clean-SQLite `make check` (8 root, 87 backend, 8 vision and 44 frontend tests), frontend production build and the complete Alembic chain through `20260811_03`. Bare local `make check` still exposes the three pre-existing developer-PPE-state failures recorded below.
 
 ## In Progress
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 - [ ] Establish ground truth, explicit-missing evidence and benchmark targets for the PPE model before production alerting.
+- [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 - [ ] Replace the temporary clean SQLite database workaround with a safe legacy-database Alembic upgrade in the two-command setup/run path.
 
 ## Known Issues
+- Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - The safety-shirt classifier is a color heuristic and is not production PPE detection.
 - The PPE checkpoint is present with recorded provenance and class mapping, but it detects PPE presence only. Backend now derives `missing` from qualified absence; ground truth and false-negative benchmark validation remain US-07 blockers for real alerts.
 - SH17 identity redaction is an MVP safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.
@@ -123,8 +157,12 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ## Next Steps
 1. Run US-27 browser UAT with two disjoint zones, mixed machine states, reload restoration and grouped review/event verification.
-2. Make Alembic upgrade safe for the existing unversioned SQLite database and include schema upgrade in the two-command setup/run path.
-3. Isolate the legacy analysis tests from developer PPE database state without changing PPE runtime semantics.
-4. Replace the safety-shirt heuristic while preserving the inference response contract.
-5. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
-6. Implement authenticated Safety Officer identity and validate migrations against PostgreSQL.
+2. Chốt US-13 metric protocol, annotation guide, scenario matrix, sample size and acceptance thresholds with the Product Owner.
+3. Record and annotate the custom US-13 calibration/final evaluation dataset with manifest and checksums.
+4. Make Alembic adoption safe for existing unversioned SQLite databases in the two-command setup/run path.
+5. Isolate legacy analysis tests from developer PPE database state without changing PPE runtime semantics.
+6. Replace the safety-shirt heuristic while preserving the inference response contract.
+7. Preserve the passing US-08 browser sequence as an automated repository E2E test.
+8. Validate or replace the MVP redactor with a dedicated face detector before pilot/production use.
+9. Validate authentication and the complete migration chain against PostgreSQL.
+10. Replace the JSONL writer with a centralized sink before any multi-worker deployment.

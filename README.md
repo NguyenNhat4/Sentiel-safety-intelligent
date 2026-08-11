@@ -23,8 +23,9 @@ Hệ thống hướng tới:
 
 | Vai trò | Nhu cầu chính |
 |---|---|
-| Cán bộ an toàn (`safety_officer`) | Theo dõi, nhận cảnh báo, review, xác nhận vi phạm hoặc false alarm |
-| Quản lý khu vực (`zone_manager`) | Quản lý khu vực/ca, xem dashboard, escalation và báo cáo |
+| Quản trị hệ thống (`system_admin`) | Giám sát an toàn và quản trị tài khoản, vai trò, mật khẩu tạm |
+| Cán bộ an toàn (`safety_manager`) | Theo dõi, nhận cảnh báo, review, xác nhận vi phạm hoặc false alarm |
+| Quản lý khu vực (`area_manager`) | Xem dashboard tuân thủ và sự kiện theo khu vực phụ trách |
 
 ## Phạm vi và giới hạn
 
@@ -45,9 +46,10 @@ Baseline đang hoạt động gồm:
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
-- SQLite cho local/test; PostgreSQL là database production đích.
+- SQLite là mặc định hiện tại cho MVP/local/test; PostgreSQL vẫn được hỗ trợ qua cấu hình `DATABASE_URL` cho môi trường triển khai sau khi được xác thực.
+- Đăng nhập bằng session lưu phía server với đúng ba role và workspace phù hợp.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authentication/RBAC, migration PostgreSQL, zone/shift, escalation và reporting. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -80,6 +82,10 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và xem acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
+| Chuẩn bị và khóa custom dataset cho US-13 | [US-13 Task 2 Dataset Guide](docs/US-13-task2-datapreparation.md) |
+| Dùng template và kiểm tra manifest US-13 | [US-13 evaluation workspace](data/evaluation/README.md) |
+| Hiểu JSONL metrics, API và UI quan sát hệ thống | [Operational Metrics](docs/operational-metrics.md) |
+| Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
 | Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/backlog/US-27-MULTI-ZONE-SPEC.md) |

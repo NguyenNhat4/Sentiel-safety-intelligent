@@ -1,5 +1,18 @@
 export type MachineState = "running" | "stopped";
 export type ReviewStatus = "acknowledged" | "false_alarm";
+export type UserRole = "system_admin" | "safety_manager" | "area_manager";
+export type AssignableUserRole = UserRole;
+
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; }
+export interface LoginRequest { email: string; password: string; }
+export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
+export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
+export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; }
+export interface PasswordChangeRequest { new_password: string; current_password?: string; }
+export interface UserRoleUpdate { role: AssignableUserRole; }
+
+export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
+export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
 
 export interface ZonePoint {
   x: number;
@@ -168,4 +181,36 @@ export interface PpeRequirement extends PpeRequirementUpdate {
   zone_id: string;
   is_configured: boolean;
   updated_at: string | null;
+}
+
+export interface OperationalLatency {
+  count: number;
+  min_ms: number | null;
+  mean_ms: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  max_ms: number | null;
+}
+
+export interface OperationalRequestMetrics {
+  method: string;
+  route: string;
+  status_class: string;
+  count: number;
+  latency: OperationalLatency;
+}
+
+export interface OperationalMetricsSummary {
+  generated_at: string;
+  window_start: string;
+  window_end: string;
+  records_scanned: number;
+  skipped_malformed_records: number;
+  partial: boolean;
+  partial_reasons: string[];
+  requests: OperationalRequestMetrics[];
+  websocket_connections: Array<{route: string; opened: number; closed: number; inference_latency: OperationalLatency}>;
+  inference_latency_samples: Array<{timestamp: string; route: string; duration_ms: number; outcome: string}>;
+  inference_outcomes: Record<string, number>;
+  errors_by_kind: Record<string, number>;
 }

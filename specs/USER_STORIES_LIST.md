@@ -50,7 +50,7 @@
 
 > Với vai trò cán bộ an toàn, tôi muốn hệ thống nhận biết từng người có thiếu mũ, kính hoặc găng bảo hộ hay không, để phát hiện đúng các vi phạm PPE trong problem statement.
 
-- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-03
 - Acceptance criteria:
   - Model PPE đã huấn luyện được nạp từ cấu hình và nhận biết tối thiểu ba nhóm bắt buộc: mũ, kính và găng bảo hộ; heuristic màu/áo phản quang không còn là kết quả PPE chính.
@@ -145,16 +145,21 @@
 
 > Với vai trò nhóm phát triển, tôi muốn đo các chỉ số chất lượng của prototype, để chứng minh MVP đáp ứng tiêu chí thành công và nêu rõ giới hạn.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Đã chốt custom dataset, chưa triển khai**
 - Phụ thuộc: US-07, US-08, US-09
 - Acceptance criteria:
-  - Bộ demo có ground truth phiên bản hóa cho person, PPE và zone violation.
-  - Báo cáo có precision, recall, false-alarm rate, latency p50/p95 và nêu hardware, model, threshold, kích thước mẫu.
-  - Latency được đo xuyên suốt từ gửi frame đến hiển thị cảnh báo; ngưỡng nghiệm thu được Product Owner chốt trong tuần hiện tại.
+  - Nguồn nghiệm thu chính là custom dataset do dự án tự tạo trong bối cảnh mô phỏng có sự đồng ý của người tham gia; public dataset chỉ được dùng bổ sung để regression hoặc tham khảo, không thay thế final evaluation set.
+  - Custom dataset bao phủ người không vi phạm, thiếu riêng/tổ hợp mũ, kính và găng, zone entry khi máy ON/OFF, ra khỏi zone rồi tái xâm nhập, mất track ngắn/che khuất và nhiều người có trạng thái khác nhau.
+  - Ground truth được phiên bản hóa bằng manifest và checksum, gồm video/scenario ID, split, person bbox/track, trạng thái PPE `present`/`missing`/`unknown` theo người, polygon zone, machine-state timeline, khoảng violation occurrence và expected review outcome; raw media không được commit trực tiếp nếu chưa có storage/quyền truy cập phù hợp.
+  - Dataset được chia theo video/scenario thành calibration và final evaluation; final evaluation được khóa trước benchmark và không được dùng để chọn model, threshold hoặc chỉnh rule.
+  - Báo cáo có precision/recall cho person, từng loại PPE và zone occurrence; false-alarm rate theo định nghĩa đã duyệt; latency end-to-end p50/p95; đồng thời nêu hardware, model/checksum, threshold, dataset version, kích thước mẫu, failure cases và giới hạn của prototype.
+  - Latency được correlate xuyên frontend–backend–vision và đo từ lúc browser gửi frame đến khi cảnh báo được render; metric definition, sample size và ngưỡng nghiệm thu được Product Owner chốt trước khi khóa final evaluation.
 - Task:
-  1. Chuẩn hóa dataset/ground truth và script đánh giá có thể chạy lại.
-  2. Instrument timestamp/correlation ID xuyên frontend–backend–vision.
-  3. Chạy baseline/final, đối chiếu review data và xuất báo cáo.
+  1. Chốt metric protocol, scenario matrix, annotation guide, quyền sử dụng/đồng ý của người tham gia, sample size và ngưỡng nghiệm thu với Product Owner.
+  2. Quay custom dataset, gán ground truth, kiểm tra chéo annotation, tạo manifest/checksum và khóa calibration/final split theo video/scenario.
+  3. Xây script đánh giá có thể chạy lại cho person/PPE/zone occurrence, dedup và false alarm; thêm fixture/test cho matching, zero-denominator và duplicate occurrence.
+  4. Instrument correlation ID cùng timestamp xuyên frontend–backend–vision, đo thời điểm alert render và kiểm thử contract theo hướng additive.
+  5. Chạy baseline, chỉ tune trên calibration set, khóa model/threshold/rule rồi chạy final evaluation; đối chiếu review data và xuất báo cáo tái lập được.
 
 ### US-24 — Phân tích ảnh mô phỏng
 
@@ -203,15 +208,16 @@
   2. Harden validation, file access, CORS, headers và logging.
   3. Chạy dependency/static scan và xử lý phát hiện high/critical.
 
-### US-20 — Đăng nhập và phân quyền hai vai trò
+### US-20 — Đăng nhập và phân quyền ba vai trò
 
-> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò cán bộ an toàn hoặc quản lý khu vực, để chỉ truy cập đúng chức năng và dữ liệu được phép.
+> Với vai trò người dùng hệ thống, tôi muốn đăng nhập theo vai trò quản trị hệ thống, cán bộ an toàn hoặc quản lý khu vực, để truy cập đúng workspace và dữ liệu được phép.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
 - Phụ thuộc: US-17
 - Acceptance criteria:
   - Có login/logout, password hashing, session/token expiry và tài khoản seed an toàn cho môi trường demo.
-  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực được xem dashboard/báo cáo theo phạm vi.
+  - Cán bộ an toàn được monitor, review, acknowledge; quản lý khu vực có dashboard riêng; quản trị hệ thống có chức năng của cán bộ an toàn và thêm quản trị tài khoản.
+  - Tài khoản mới/reset dùng mật khẩu tạm và bắt buộc thay ở lần đăng nhập tiếp theo.
   - Backend thực thi authorization cho API và WebSocket; ẩn nút trên UI không được xem là đủ bảo mật.
   - Audit event lưu actor; có test matrix cho allowed, forbidden và unauthenticated.
 - Task:

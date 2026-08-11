@@ -1,7 +1,7 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.app.schemas.monitoring_zone import MonitoringZone, ZonePoint
 
@@ -118,6 +118,13 @@ class InferenceWebSocketConfigure(BaseModel):
         if self.zones is None and "zone_revision" in self.model_fields_set:
             raise ValueError("zone_revision is only valid with zones")
         return self
+
+    @field_validator("zone_points")
+    @classmethod
+    def require_empty_or_four_point_zone(cls, value: list[ZonePoint]) -> list[ZonePoint]:
+        if len(value) not in (0, 4):
+            raise ValueError("zone_points must contain zero or four points")
+        return value
 
 
 class InferenceWebSocketFrameMeta(BaseModel):
