@@ -1,7 +1,8 @@
 import datetime
 import enum
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
 
 from backend.app.core.database import Base
 
@@ -33,8 +34,28 @@ class SafetyEvent(Base):
     severity = Column(String(20), nullable=False, default="high")
     timestamp = Column(DateTime(timezone=True), default=utc_now, index=True)
     snapshot_path = Column(String(255), nullable=True)
-    privacy_blurred = Column(Boolean, default=True)
+    privacy_blurred = Column(Boolean, default=False)
     status = Column(String(20), default="unacknowledged", index=True)  # unacknowledged, acknowledged, false_alarm
     acknowledged_by = Column(String(100), nullable=True)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     details = Column(JSON, nullable=True)  # JSON for detected items, track_id, bounding boxes
+    monitoring_session_id = Column(String(36), nullable=True, index=True)
+    occurrences = relationship(
+        "EventOccurrence",
+        back_populates="event",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    @property
+    def occurrence_ids(self) -> list[str]:
+        return [occurrence.occurrence_id for occurrence in self.occurrences]
+
+
+class EventOccurrence(Base):
+    __tablename__ = "event_occurrences"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    occurrence_id = Column(String(36), nullable=False, unique=True, index=True)
+    event_id = Column(Integer, ForeignKey("safety_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    event = relationship("SafetyEvent", back_populates="occurrences")

@@ -19,7 +19,8 @@ describe("InferenceClient", () => {
     const client = new InferenceClient({
       getConfiguration: () => ({
         zone_points: [{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: 1}],
-        machine_state: "running"
+        machine_state: "running",
+        monitoring_session_id: "3cddfe85-9428-44d7-afbf-0cd9e5fc0640"
       }),
       onResult,
       onFailure: vi.fn(),
@@ -33,6 +34,7 @@ describe("InferenceClient", () => {
     const connection = client.connect();
     sockets[0].open();
     expect(JSON.parse(sockets[0].sent[0] as string).type).toBe("configure");
+    expect(JSON.parse(sockets[0].sent[0] as string).monitoring_session_id).toBe("3cddfe85-9428-44d7-afbf-0cd9e5fc0640");
     sockets[0].message({type: "configured"});
     await connection;
 
@@ -56,7 +58,11 @@ describe("InferenceClient", () => {
   it("sends configure message even when zone_points is empty", async () => {
     const sockets: FakeSocket[] = [];
     const client = new InferenceClient({
-      getConfiguration: () => ({zone_points: [], machine_state: "running"}),
+      getConfiguration: () => ({
+        zone_points: [],
+        machine_state: "running",
+        monitoring_session_id: "46a62d3a-4fb4-4a54-87bc-58e075722e2c"
+      }),
       onResult: vi.fn(),
       onFailure: vi.fn(),
       socketFactory: () => {
@@ -71,7 +77,8 @@ describe("InferenceClient", () => {
     expect(JSON.parse(sockets[0].sent[0] as string)).toEqual({
       type: "configure",
       zone_points: [],
-      machine_state: "running"
+      machine_state: "running",
+      monitoring_session_id: "46a62d3a-4fb4-4a54-87bc-58e075722e2c"
     });
     sockets[0].message({type: "configured"});
     await connection;

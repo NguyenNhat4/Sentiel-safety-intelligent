@@ -92,12 +92,12 @@ Các bất biến an toàn:
 ## Trạng thái triển khai
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, polygon/machine rule,
-review và SQLite event history. PostgreSQL, PPE production model, tracking/dedup hoàn chỉnh,
-privacy gate, RBAC và các capability nâng cao vẫn là đích cần triển khai.
+review, privacy gate in-memory và SQLite event history. PostgreSQL, PPE/face detector production
+model, tracking/dedup hoàn chỉnh, RBAC và các capability nâng cao vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
-1. **Đóng MVP:** PPE + tracking/dedup + event state + privacy + auth/RBAC + image parity + metrics.
+1. **Đóng MVP:** PPE + tracking/dedup + event state + auth/RBAC + image parity + metrics.
 2. **Bổ sung context:** zone/shift và confidence-based HITL.
 3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
 4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.

@@ -15,7 +15,7 @@ PYTHONPATH=. .venv/bin/pytest backend/tests -v
 
 REST routes are interactive at <http://localhost:8000/docs>. The inference WebSocket at `ws://localhost:8000/api/v1/ws/inference` is intentionally absent from Swagger because WebSocket operations are not part of the generated OpenAPI schema.
 
-Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. If database persistence fails after writing a snapshot, the backend rolls back the transaction and removes that unreferenced snapshot.
+Baseline development persists reviewed events in `data/safety_events.db` via SQLite. Production deployments should override `DATABASE_URL` with the managed PostgreSQL connection string. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
 
 ## Frontend–Backend Interaction
 
@@ -32,6 +32,8 @@ PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
 GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter returns all 17 SH17 detections plus per-person PPE observations through `vision.api`. Backend derives `missing` only when a person meets the confidence/association guard and has no associated required PPE detection.
+
+US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
 ```mermaid
 sequenceDiagram
@@ -84,6 +86,7 @@ Send four normalized points to activate zone evaluation, or an empty list to run
 ```json
 {
   "type": "configure",
+  "monitoring_session_id": "3cddfe85-9428-44d7-afbf-0cd9e5fc0640",
   "zone_points": [
     {"x": 0.12, "y": 0.30},
     {"x": 0.72, "y": 0.28},
@@ -97,7 +100,7 @@ Send four normalized points to activate zone evaluation, or an empty list to run
 `x` and `y` are normalized to the source frame and must be between `0` and `1`. The backend responds with:
 
 ```json
-{"type": "configured"}
+{"type": "configured", "monitoring_session_id": "3cddfe85-9428-44d7-afbf-0cd9e5fc0640"}
 ```
 
 Send `configure` again when the machine state or zone changes.
@@ -132,6 +135,7 @@ The backend returns one correlated JSON result for each accepted JPEG:
   "review_required": true,
   "people": [
     {
+      "track_id": 7,
       "bbox": [420, 115, 535, 610],
       "confidence": 0.91,
       "foot_point": [477, 610],
@@ -161,6 +165,8 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `frame_id`, `video_time` | Copied from `frame_meta` so the frontend can match the result to the analyzed frame. |
 | `people` | Every person detected by YOLO; an empty array means no person was detected. |
 | `detections` | Additive list of every SH17 model detection: `class_id`, `class_name`, original-frame `bbox`, confidence and nullable `person_index`. It can be non-empty even when `people` is empty. |
+| `track_id` | ByteTrack association ID scoped to one monitoring session; it is not a personal identity. |
+| `active_violations` | Per-track rule occurrences. Only `is_new=true` opens a new review candidate. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |
 | `confidence` | YOLO's confidence that the detection is a person. |
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
@@ -240,7 +246,6 @@ Example confirmed violation:
   "status": "acknowledged",
   "acknowledged_by": "Safety Officer",
   "snapshot_data": "data:image/jpeg;base64,...",
-  "privacy_blurred": false,
   "details": {
     "inference_result": "violate",
     "review_result": "actual_violation",
@@ -252,7 +257,9 @@ Example confirmed violation:
 }
 ```
 
-`EventService` validates and decodes `snapshot_data`, writes a JPEG under `data/snapshots`, stores its `/snapshots/...` path in the event row, commits the database record, and returns `201 Created`. Reviewed records receive `acknowledged_at` on the server.
+`EventService` validates and decodes `snapshot_data`, invokes the shared SH17 facade, and writes only the returned redacted JPEG under `data/snapshots`. It accepts additive transient `snapshot_people` and `snapshot_detections` fields from the same reviewed frame, then draws their person and SH17 boxes only **after** redaction and before JPEG encoding; these fields are excluded from event persistence/response. It sets `privacy_blurred=true` itself only after redaction succeeds, stores the `/snapshots/...` path in the event row, then commits the database record. A client-provided `privacy_blurred` or `snapshot_path` is ignored for compatibility and cannot bypass this gate. Reviewed records receive `acknowledged_at` on the server.
+
+The US-12 MVP policy blurs every `face`, `face-guard`, `face-mask` and `head` detected by SH17. Each `person` without one of those identity detections receives a conservative blur over the top 40% of its bounding box. If SH17 returns neither an identity region nor a person, processing fails closed: no snapshot is written and no reviewed event is created.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
 

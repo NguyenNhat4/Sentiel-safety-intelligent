@@ -43,8 +43,8 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 4. Play to open `/api/v1/ws/inference` and receive detections regardless of zone state.
 5. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
 6. Draw returned person boxes, foot points và mọi SH17 model detection trong source-video coordinates.
-7. Pause only when `review_required=true`, which currently means a foot point is inside the zone while the machine is running.
-8. Keep the candidate in memory until the Safety Officer confirms it or marks it as a false alarm.
+7. Pause only when `review_required=true`, seek back to that inference result's `video_time`, wait for the browser to render it, then capture the full native video frame for review.
+8. Keep that stopped-frame candidate and its detection coordinates in memory until the Safety Officer confirms it or marks it as a false alarm.
 9. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.
 
 ## Source Boundaries

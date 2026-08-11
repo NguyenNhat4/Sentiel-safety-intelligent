@@ -2,6 +2,19 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Vision/Backend] Preserve occurrences across nearby track-ID handoffs
+- **Choice:** When a new track with the same rule appears near the last normalized foot-point of an active track that just disappeared, transfer the active occurrence during the lost-track grace window.
+- **Reason:** This prevents a ByteTrack ID switch at the zone boundary from opening a second review while the same person exits.
+- **Boundary:** A distant track, a different rule, or a replacement after the grace window still opens an independent occurrence.
+
+## 2026-08-07: [Cross-cutting] Session-scoped tracking and occurrence-based event deduplication
+- **Reason:** Frame-independent detections and the current WebSocket reconnect after review can assign a new identity to the same person and create repeated review/event candidates for one continuous violation.
+- **Choice:** Frontend owns a UUID `monitoring_session_id` for one selected video; vision owns session-isolated ByteTrack IDs; backend services own deterministic violation occurrences keyed by session, track, and rule. A new `occurrence_id` is emitted only after a violation clears and re-arms.
+- **Defaults:** Lost-track grace is 3 sampled frames, exit confirmation is 2 frames, cooldown is 2 seconds, and in-memory session TTL is 300 seconds.
+- **Review semantics:** Multiple new occurrences in one frame use one grouped HITL review. False alarm does not re-open the same occurrence before it clears.
+- **Persistence:** Session/tracker state remains bounded in memory for MVP. Reviewed event creation persists occurrence IDs and enforces database idempotency; REST/WebSocket contract changes are additive.
+- **Privacy:** `track_id` is session-local technical association only and must never become biometric identity or cross-session/cross-camera recognition.
+
 ## 2026-08-01: [Backend] FastAPI + SQLAlchemy modular monolith
 - **Reason:** Fast development speed, native WebSocket support, and direct integration with YOLO, OpenCV, LangChain, and PostgreSQL.
 - **Rejected alternative:** Microservices, because their operational overhead is not justified during MVP.
@@ -175,11 +188,15 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Dataset contract:** Version a manifest and checksums for scenario/video identity, person/track annotations, per-person PPE state, zone, machine state, violation occurrences and expected review outcome. Split by video/scenario into calibration and final evaluation, and never tune against the final split.
 - **Privacy/storage constraint:** Use consenting participants and controlled simulated scenes. Do not commit raw media directly until an approved storage/access mechanism exists; version annotations, provenance and immutable media checksums instead.
 
+## 2026-08-08: [Cross-cutting] SH17 in-memory snapshot redaction with person-head fallback
+- **Reason:** US-12 requires that a raw review snapshot never reaches storage, while the MVP already includes a SH17 checkpoint that detects identity-adjacent classes and persons.
+- **Choice:** Reuse the cached SH17 facade to blur `face`, `face-guard`, `face-mask`, and `head` detections. For every person without one of those detections, blur the upper 40% of that person's box. If there is no usable identity or person region, fail closed: do not create a reviewed event or snapshot. The backend alone sets `privacy_blurred=true` after successful redaction; request values for it and `snapshot_path` are ignored.
+- **Constraint:** Decode, inference, blur, and encoding occur in memory before persistence. A database failure removes the newly written redacted file. SH17 privacy behavior is MVP-only; a dedicated face detector with benchmarked false-negative rate and approved license/provenance is required before pilot/production use.
+
 ## 2026-08-08: [Cross-cutting] Review and persisted-snapshot boxes are annotated after redaction
 - **Reason:** Safety Officers need the reviewed person/PPE-object evidence to remain visible in both the confirmation popup and the JPEG later viewed from event history, without making visual annotation a safety or privacy input.
 - **Choice:** The frontend pauses and seeks to the violating inference timestamp, waits for that native video frame to render, captures it at its full source size, then overlays typed `people` and SH17 `detections` with the same aspect-ratio geometry. It sends the stopped-frame JPEG and additive, transient `snapshot_people` and `snapshot_detections` fields when the officer saves. The backend redacts the raw JPEG first, then draws person boxes and non-person SH17 boxes into the redacted JPEG before it is encoded and stored. These fields are excluded from the event row/response; older clients that omit them still save a redacted but unannotated snapshot.
 - **Constraint:** Box data never determines violation, redaction candidates, or `privacy_blurred`. SH17 `person` detections are skipped during annotation because rule/inference person boxes are the canonical person box source.
-
 ## 2026-08-10: [Vision] Use the dedicated person checkpoint for person detection
 - **Supersedes:** The 2026-08-08 choice to use SH17 as the single inference checkpoint for person boxes in the browser frame-inference flow; SH17 remains the PPE/object observation checkpoint and is still used for snapshot privacy redaction.
 - **Reason:** The frame-inference service had a dedicated `person_model_path` configuration (`models/yolo11n.pt`) but accidentally defaulted it to the SH17 PPE model path. PPE/object checkpoints can produce false person detections on background objects, so person localization and PPE observation use separate model responsibilities.

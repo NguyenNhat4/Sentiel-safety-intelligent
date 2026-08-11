@@ -70,16 +70,16 @@
 
 > Với vai trò cán bộ an toàn, tôi muốn một vi phạm liên tục chỉ tạo một event, để nhật ký không bị lặp và cảnh báo không gây nhiễu.
 
-- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần, cần xác minh**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-03, US-07
 - Acceptance criteria:
   - Mỗi detection có `track_id` ổn định trong một phiên video.
   - Cùng người, cùng rule và cùng lần vi phạm chỉ có một event active.
   - Event mới chỉ được tạo sau khi vi phạm kết thúc rồi tái diễn hoặc hết cooldown; có test mất track ngắn, tái xâm nhập và nhiều người.
-- Task:
-  1. Hoàn thiện ByteTrack/session tracking và mapping detection-to-track.
-  2. Định nghĩa dedup key, trạng thái bắt đầu/kết thúc và cooldown.
-  3. Lưu violation state theo track ở backend và kiểm thử chuỗi frame/database.
+- Task hoàn thành:
+  1. [x] ByteTrack/session tracking và mapping detection-to-track.
+  2. [x] Dedup key, occurrence lifecycle, exit confirmation và cooldown.
+  3. [x] Violation state theo track, idempotent event persistence và kiểm thử frame/database/browser.
 
 ### US-09 — Vòng đời review của cảnh báo
 
@@ -130,7 +130,7 @@
 
 > Với vai trò người lao động, tôi muốn danh tính của mình được làm mờ trong snapshot, để quyền riêng tư được bảo vệ khi sự kiện được lưu.
 
-- Ưu tiên / trạng thái: **P0 / Chưa làm**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-06
 - Acceptance criteria:
   - Ảnh được làm mờ mặt hoặc vùng nhận dạng trước khi ghi xuống storage.

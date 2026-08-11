@@ -64,6 +64,17 @@ interface SessionState {
   violationLatched: boolean;
   previewReady: boolean;
   previewCandidateIndex: number;
+  monitoringSessionId: string;
+}
+
+export function captureVideoSnapshot(video: HTMLVideoElement, capture: HTMLCanvasElement): string | undefined {
+  if (!video.videoWidth || !video.videoHeight) return undefined;
+  capture.width = video.videoWidth;
+  capture.height = video.videoHeight;
+  const context = capture.getContext("2d");
+  if (!context) return undefined;
+  context.drawImage(video, 0, 0, capture.width, capture.height);
+  return capture.toDataURL("image/jpeg", JPEG_QUALITY);
 }
 
 export function useMonitor() {
@@ -106,7 +117,8 @@ export function useMonitor() {
     lastSampleTime: -1,
     violationLatched: false,
     previewReady: false,
-    previewCandidateIndex: 0
+    previewCandidateIndex: 0,
+    monitoringSessionId: crypto.randomUUID()
   });
   const resultHandler = useRef<(result: InferenceResult) => void>(() => undefined);
   const failureHandler = useRef<(message: string) => void>(() => undefined);
@@ -116,7 +128,8 @@ export function useMonitor() {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
         zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
-        machine_state: machineRunningRef.current ? "running" : "stopped"
+        machine_state: machineRunningRef.current ? "running" : "stopped",
+        monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
       onFailure: message => failureHandler.current(message)
@@ -140,9 +153,9 @@ export function useMonitor() {
   const capturePausedFrame = useCallback(() => {
     const video = videoRef.current;
     const capture = captureRef.current;
-    if (!video?.videoWidth || !capture?.width) return;
-    capture.getContext("2d")?.drawImage(video, 0, 0, capture.width, capture.height);
-    setPreviewSrc(capture.toDataURL("image/jpeg", 0.9));
+    if (!video || !capture) return;
+    const snapshot = captureVideoSnapshot(video, capture);
+    if (snapshot) setPreviewSrc(snapshot);
   }, []);
 
   const showToast = useCallback((message: string) => setToast(message), []);
@@ -153,7 +166,7 @@ export function useMonitor() {
     showToast(message);
   }, [showToast, stopRealtimeInference]);
 
-  const handleInferenceResult = useCallback((result: InferenceResult) => {
+  function handleInferenceResult(result: InferenceResult): void {
     if (result.frame_id <= session.current.lastHandledFrame) return;
     session.current.lastHandledFrame = result.frame_id;
     setLatestPeople(result.people);
@@ -174,18 +187,11 @@ export function useMonitor() {
     if (!result.review_required || session.current.violationLatched) return;
     session.current.violationLatched = true;
     session.current.running = false;
-    pendingViolationRef.current = result;
-    setPendingViolation(result);
-    setIsReviewModalOpen(true);
     const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = result.video_time;
-    }
+    video?.pause();
     client.close();
     setPlaybackLabel("▶ Tiếp tục");
     setPlaybackDisabled(true);
-    setReviewStartedAt(Date.now());
     setFlowStatus("Chờ xác minh");
     setView(current => ({
       ...current,
@@ -198,7 +204,8 @@ export function useMonitor() {
       confidenceLabel: "VIOLATE",
       confidenceWidth: "100%"
     }));
-  }, [client]);
+    freezeAtViolationFrame(result);
+  }
 
   resultHandler.current = handleInferenceResult;
   failureHandler.current = handleInferenceFailure;
@@ -231,7 +238,8 @@ export function useMonitor() {
     video.load();
     Object.assign(session.current, {
       running: false, lastHandledFrame: -1, lastSampleTime: -1,
-      violationLatched: false, previewReady: false, previewCandidateIndex: 0
+      violationLatched: false, previewReady: false, previewCandidateIndex: 0,
+      frameSequence: 0, monitoringSessionId: crypto.randomUUID()
     });
     updateZonePoints([]);
     setLatestPeople([]);
@@ -324,7 +332,6 @@ export function useMonitor() {
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
     session.current.running = true;
-    session.current.frameSequence = 0;
     session.current.lastHandledFrame = -1;
     session.current.lastSampleTime = -1;
     setFlowStatus("Đang inference realtime");
@@ -368,6 +375,41 @@ export function useMonitor() {
       }, "image/jpeg", JPEG_QUALITY);
     }
     if (session.current.running) requestAnimationFrame(sampleFrameLoop);
+  }
+
+  function freezeAtViolationFrame(result: InferenceResult): void {
+    const video = videoRef.current;
+    const capture = captureRef.current;
+    if (!video || !capture || !video.videoWidth) {
+      openViolationReview(result, result.snapshot_data);
+      return;
+    }
+
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(fallbackTimer);
+      video.removeEventListener("seeked", renderStoppedFrame);
+      openViolationReview(result, captureVideoSnapshot(video, capture) ?? result.snapshot_data);
+    };
+    const renderStoppedFrame = () => {
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => finish());
+      else window.requestAnimationFrame(finish);
+    };
+
+    video.addEventListener("seeked", renderStoppedFrame, {once: true});
+    const fallbackTimer = window.setTimeout(finish, 800);
+    if (Math.abs(video.currentTime - result.video_time) < 0.01) renderStoppedFrame();
+    else video.currentTime = result.video_time;
+  }
+
+  function openViolationReview(result: InferenceResult, snapshotData?: string): void {
+    const reviewedFrame = snapshotData ? {...result, snapshot_data: snapshotData} : result;
+    pendingViolationRef.current = reviewedFrame;
+    setPendingViolation(reviewedFrame);
+    setIsReviewModalOpen(true);
+    setReviewStartedAt(Date.now());
   }
 
   function stopPreviewPlayback(): void {
@@ -522,6 +564,11 @@ export function buildEventPayload(
   zonePoints: ZonePoint[],
   machineRunning: boolean
 ): EventPayload {
+  const occurrenceIds = [...new Set(
+    pending.people.flatMap(person =>
+      person.active_violations?.filter(item => item.is_new).map(item => item.occurrence_id) ?? []
+    ),
+  )];
   return {
     zone_id: "zone_01",
     camera_id: "uploaded_video",
@@ -530,7 +577,10 @@ export function buildEventPayload(
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
-    privacy_blurred: false,
+    snapshot_people: pending.people,
+    snapshot_detections: pending.detections ?? [],
+    monitoring_session_id: pending.monitoring_session_id,
+    occurrence_ids: occurrenceIds,
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
