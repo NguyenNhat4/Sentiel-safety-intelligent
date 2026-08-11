@@ -108,11 +108,10 @@ P-047/
 │   ├── done/            # Completed implementation specifications
 │   │   ├── README.md
 │   │   ├── US-07-SPEC.md
+│   │   ├── US-08-SPEC.md
 │   │   └── US-12.md
 │   └── backlog/         # Remaining MVP and advanced user stories
-│       ├── README.md
-│       ├── US-08.md
-│       └── US-08-SPEC.md # Draft tracking/dedup implementation specification
+│       └── README.md
 ├── src/                 # Legacy LangGraph scaffold; migrate/remove incrementally, no new production code
 │   ├── agents/          # Example graph, state, nodes and tools
 │   ├── api/             # Legacy chat/status routes

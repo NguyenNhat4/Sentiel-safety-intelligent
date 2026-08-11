@@ -2,7 +2,7 @@
 
 ## Trạng thái đặc tả
 
-- Giai đoạn: **VERIFY — core implementation và browser validation với local fixture hoàn tất**
+- Giai đoạn: **DONE — implementation, automated tests và browser validation với local fixture hoàn tất**
 - Primary owner của tracking: `vision`
 - Primary owner của violation lifecycle và dedup: `backend services`
 - Phạm vi phát hành: đóng MVP
