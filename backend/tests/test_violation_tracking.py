@@ -43,6 +43,74 @@ def test_short_track_loss_does_not_create_a_new_occurrence():
     assert resumed.is_new is False
 
 
+def test_nearby_track_id_handoff_keeps_occurrence_while_person_exits():
+    service = ViolationTrackingService(track_handoff_max_distance=0.12)
+    first = service.evaluate(
+        "session-a",
+        {4: {"zone_intrusion"}},
+        {4},
+        track_positions={4: (0.48, 0.72)},
+        now=0.0,
+    )[4][0]
+
+    handed_off = service.evaluate(
+        "session-a",
+        {9: {"zone_intrusion"}},
+        {9},
+        track_positions={9: (0.51, 0.73)},
+        now=0.5,
+    )[9][0]
+
+    assert handed_off.occurrence_id == first.occurrence_id
+    assert handed_off.is_new is False
+
+
+def test_distant_new_track_still_opens_an_independent_occurrence():
+    service = ViolationTrackingService(track_handoff_max_distance=0.12)
+    first = service.evaluate(
+        "session-a",
+        {4: {"zone_intrusion"}},
+        {4},
+        track_positions={4: (0.20, 0.70)},
+        now=0.0,
+    )[4][0]
+
+    distant = service.evaluate(
+        "session-a",
+        {9: {"zone_intrusion"}},
+        {9},
+        track_positions={9: (0.80, 0.70)},
+        now=0.5,
+    )[9][0]
+
+    assert distant.occurrence_id != first.occurrence_id
+    assert distant.is_new is True
+
+
+def test_track_handoff_after_lost_grace_opens_a_new_occurrence():
+    service = ViolationTrackingService(lost_grace_frames=2, track_handoff_max_distance=0.12)
+    first = service.evaluate(
+        "session-a",
+        {4: {"zone_intrusion"}},
+        {4},
+        track_positions={4: (0.48, 0.72)},
+        now=0.0,
+    )[4][0]
+    service.evaluate("session-a", {}, set(), now=0.5)
+    service.evaluate("session-a", {}, set(), now=1.0)
+
+    replacement = service.evaluate(
+        "session-a",
+        {9: {"zone_intrusion"}},
+        {9},
+        track_positions={9: (0.50, 0.73)},
+        now=1.5,
+    )[9][0]
+
+    assert replacement.occurrence_id != first.occurrence_id
+    assert replacement.is_new is True
+
+
 def test_tracks_and_rules_have_independent_occurrences():
     service = ViolationTrackingService()
     result = service.evaluate(

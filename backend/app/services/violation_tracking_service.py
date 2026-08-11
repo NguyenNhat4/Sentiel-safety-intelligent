@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import hypot
 from uuid import uuid4
 
 
@@ -28,12 +29,15 @@ class ViolationTrackingService:
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
         session_ttl_seconds: float = 300.0,
+        track_handoff_max_distance: float = 0.12,
     ) -> None:
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
         self._session_ttl_seconds = session_ttl_seconds
+        self._track_handoff_max_distance = track_handoff_max_distance
         self._occurrences: dict[tuple[str, int, str], _Occurrence] = {}
+        self._track_positions: dict[tuple[str, int], tuple[float, float]] = {}
         self._last_seen: dict[str, float] = {}
         self._last_frame: dict[str, int] = {}
 
@@ -52,6 +56,7 @@ class ViolationTrackingService:
         observed_rules: dict[int, set[str]],
         present_tracks: set[int],
         *,
+        track_positions: dict[int, tuple[float, float]] | None = None,
         now: float,
     ) -> dict[int, list[ActiveViolation]]:
         self._expire(now)
@@ -60,6 +65,8 @@ class ViolationTrackingService:
         observed_keys = {
             (session_id, track_id, rule_key) for track_id, rules in observed_rules.items() for rule_key in rules
         }
+        positions = track_positions or {}
+        self._handoff_nearby_tracks(session_id, observed_keys, present_tracks, positions)
 
         for key in observed_keys:
             _, track_id, rule_key = key
@@ -91,10 +98,13 @@ class ViolationTrackingService:
 
         for violations in output.values():
             violations.sort(key=lambda item: item.rule_key)
+        for track_id, position in positions.items():
+            self._track_positions[(session_id, track_id)] = position
         return output
 
     def end_session(self, session_id: str) -> None:
         self._occurrences = {key: value for key, value in self._occurrences.items() if key[0] != session_id}
+        self._track_positions = {key: value for key, value in self._track_positions.items() if key[0] != session_id}
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
@@ -103,6 +113,41 @@ class ViolationTrackingService:
         occurrence.absent_frames = 0
         occurrence.lost_frames = 0
         occurrence.cooldown_until = now + self._cooldown_seconds
+
+    def _handoff_nearby_tracks(
+        self,
+        session_id: str,
+        observed_keys: set[tuple[str, int, str]],
+        present_tracks: set[int],
+        positions: dict[int, tuple[float, float]],
+    ) -> None:
+        for new_key in sorted(observed_keys):
+            if new_key in self._occurrences:
+                continue
+            _, new_track_id, rule_key = new_key
+            new_position = positions.get(new_track_id)
+            if new_position is None:
+                continue
+            candidates: list[tuple[float, tuple[str, int, str]]] = []
+            for old_key, occurrence in self._occurrences.items():
+                old_session_id, old_track_id, old_rule_key = old_key
+                old_position = self._track_positions.get((session_id, old_track_id))
+                if (
+                    old_session_id != session_id
+                    or old_rule_key != rule_key
+                    or old_track_id in present_tracks
+                    or not occurrence.active
+                    or occurrence.lost_frames >= self._lost_grace_frames
+                    or old_position is None
+                ):
+                    continue
+                distance = hypot(new_position[0] - old_position[0], new_position[1] - old_position[1])
+                if distance <= self._track_handoff_max_distance:
+                    candidates.append((distance, old_key))
+            if not candidates:
+                continue
+            _, old_key = min(candidates)
+            self._occurrences[new_key] = self._occurrences.pop(old_key)
 
     def _expire(self, now: float) -> None:
         expired = [

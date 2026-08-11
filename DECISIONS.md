@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Vision/Backend] Preserve occurrences across nearby track-ID handoffs
+- **Choice:** When a new track with the same rule appears near the last normalized foot-point of an active track that just disappeared, transfer the active occurrence during the lost-track grace window.
+- **Reason:** This prevents a ByteTrack ID switch at the zone boundary from opening a second review while the same person exits.
+- **Boundary:** A distant track, a different rule, or a replacement after the grace window still opens an independent occurrence.
+
 ## 2026-08-07: [Cross-cutting] Session-scoped tracking and occurrence-based event deduplication
 - **Reason:** Frame-independent detections and the current WebSocket reconnect after review can assign a new identity to the same person and create repeated review/event candidates for one continuous violation.
 - **Choice:** Frontend owns a UUID `monitoring_session_id` for one selected video; vision owns session-isolated ByteTrack IDs; backend services own deterministic violation occurrences keyed by session, track, and rule. A new `occurrence_id` is emitted only after a violation clears and re-arms.

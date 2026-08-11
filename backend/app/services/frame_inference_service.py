@@ -145,6 +145,9 @@ class FrameInferenceService:
                 str(request.monitoring_session_id),
                 observed_rules,
                 {person.track_id for person in people},
+                track_positions={
+                    person.track_id: (person.foot_point[0] / width, person.foot_point[1] / height) for person in people
+                },
                 now=now,
             )
             for person in people:

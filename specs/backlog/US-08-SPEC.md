@@ -88,6 +88,7 @@ Semantics bắt buộc:
 - `REARMED → ACTIVE`: sinh một `occurrence_id`; chỉ transition này có `is_new=true`.
 - `ACTIVE → ACTIVE`: giữ cùng occurrence; không yêu cầu review mới.
 - Track mất ngắn hơn lost-track grace vẫn giữ occurrence active.
+- Track ID đổi trong lost-track grace nhưng foot-point mới ở gần vị trí cuối của track cũ và cùng rule được coi là handoff, giữ nguyên occurrence đã review.
 - Violation phải vắng mặt đủ exit-confirmation window mới được coi là cleared; một frame chập chờn không kết thúc occurrence.
 - Tái phạm trong cooldown không tạo occurrence mới và quay lại occurrence hiện hành.
 - Chỉ sau khi cleared và cooldown kết thúc, lần vi phạm tiếp theo mới sinh occurrence mới.
@@ -321,6 +322,7 @@ class ViolationKey:
 - Hai người cắt ngang hoặc overlap ngắn không ghi đè ID trong fixture đã chốt.
 - Track mất 1–3 frame rồi xuất hiện lại giữ ID theo grace window.
 - Track mất quá grace tạo ID mới.
+- Track ID handoff gần biên zone không tạo review mới; track mới ở xa vẫn tạo occurrence độc lập.
 - Hai monitoring sessions dùng state/counter độc lập.
 - Empty frame, low-confidence detection và end-of-session cleanup.
 
