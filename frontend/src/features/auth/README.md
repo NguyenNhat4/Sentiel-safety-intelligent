@@ -1,3 +1,3 @@
 # Authentication feature
 
-Owns the temporary login experience and its role-oriented guidance. It calls only `api/auth.ts`; it does not access monitor state, events, or WebSocket inference. A successful `safety_manager` login hands the typed user to `App.tsx`, which opens the existing monitor baseline. Other roles remain on the temporary confirmation screen. The mock API and the contract to replace it are recorded in [`frontend/API_MOCKS.md`](../../API_MOCKS.md).
+Owns login, forced temporary-password replacement, and the `system_admin` account-management workspace. It calls only `api/auth.ts`; backend RBAC remains authoritative for account APIs. The admin workspace reuses the application sidebar and provides separate tabs for account CRUD, role assignment, and administrator-issued password resets. A normal user can replace a password only while `must_change_password=true`; forgotten-password recovery returns to System Admin.

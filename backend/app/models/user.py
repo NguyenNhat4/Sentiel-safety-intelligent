@@ -9,9 +9,9 @@ from backend.app.core.database import Base
 
 
 class UserRole(enum.StrEnum):
+    SYSTEM_ADMIN = "system_admin"
     SAFETY_MANAGER = "safety_manager"
     AREA_MANAGER = "area_manager"
-    SIMULATION_OPERATOR = "simulation_operator"
 
 
 def utc_now() -> datetime.datetime:
@@ -27,6 +27,7 @@ class User(Base):
     role = Column(String(32), nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
+    must_change_password = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 

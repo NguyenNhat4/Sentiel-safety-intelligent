@@ -18,12 +18,27 @@ class LoginRequest(BaseModel):
         return normalized
 
 
+class UserCreate(LoginRequest):
+    full_name: str = Field(min_length=1, max_length=120)
+    role: UserRole
+
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
+class PasswordChangeRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=256)
+    current_password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
 class AuthUser(BaseModel):
     id: str
     full_name: str
     email: str
     role: UserRole
     role_label: str
+    must_change_password: bool
 
 
 class LoginResponse(BaseModel):
@@ -35,3 +50,8 @@ class LoginResponse(BaseModel):
 class SessionResponse(BaseModel):
     user: AuthUser
     expires_at: datetime
+
+
+class ManagedUser(AuthUser):
+    is_active: bool
+    created_at: datetime

@@ -3,6 +3,13 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
+- New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
+- The backend prefers PostgreSQL, can explicitly fall back to seeded local SQLite when the primary database is unavailable at startup, and reports the selected backend through `/health`.
+- Authentication now exposes exactly system admin, safety officer, and area manager; the legacy simulation-operator role and demo account are removed.
+- System administrators have a tabbed account-management workspace in the existing one-column sidebar layout, backed by RBAC-protected create/delete/role/password APIs.
+- The persisted `system_admin` identity is supported consistently by backend authentication and frontend wire types.
+- Authentication now starts successfully, persists hashed server sessions, and the browser uses the real login/me/logout API with a tab-scoped token.
 - The baseline upload → four-point zone → binary WebSocket inference → foot-point zone review → event save flow is implemented.
 - FastAPI serves the React production build at `/` and provides REST plus WebSocket APIs.
 - Frontend uses React 19, TypeScript, Vite, typed feature boundaries, and a tested transport layer.
@@ -22,6 +29,9 @@ This is the single progress tracker for the repository. Completed work is groupe
 ## Completed
 
 ### Backend
+- [x] Optimized remote PostgreSQL CRUD latency with reusable LIFO pooling, optional pre-ping, TCP keepalive, connection recycling, non-expiring committed ORM state, and removal of redundant post-commit refresh queries.
+- [x] Added system-admin-only user listing, creation, deletion, role assignment, and password reset with self-removal/last-admin safeguards and session revocation.
+- [x] Restored auth router and startup wiring, and added an Alembic authentication schema revision after the current PPE revision.
 - [x] Added database-backed authentication endpoints for login, current-session lookup, and logout, with seeded development users and persisted token digests.
 - [x] Established the FastAPI modular monolith, typed settings, SQLAlchemy database layer, REST APIs, and test scaffolding.
 - [x] Added safety-event lifecycle, reviewed snapshot persistence, statistics, and Safety Agent endpoints.
@@ -41,8 +51,10 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
-- [x] Added mock login/logout entry points for Safety Manager, Area Manager, and Simulation Operator, with documented backend authentication contracts.
-- [x] Added a browser-only Streaming simulation page with local-video preview and Start/Pause/Stop controls; no video is uploaded or persisted in this MVP screen.
+- [x] Added the system-admin sidebar entry and account, role/permission, and security tabs using the real authentication API.
+- [x] Removed the browser-only streaming simulation page, its login card, sidebar navigation, styles, and tests.
+- [x] Replaced the temporary authentication mock with typed login/session-restore/logout transport and focused token lifecycle tests.
+- [x] Added role-aware login/logout entry points backed by persisted server sessions.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
 - [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
@@ -65,6 +77,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added spatial track-ID handoff within the lost-track grace window so a nearby ByteTrack ID switch while a person exits preserves the reviewed occurrence instead of opening a duplicate popup; distant people remain independent.
 
 ### Documentation
+- [x] [Frontend] Stabilized the login layout, reserved error-message space, and changed the three role cards into non-interactive descriptions.
 - [x] Documented current/future project structure, WebSocket contracts, runtime diagrams, and review persistence recommendations.
 - [x] Consolidated module tracking into central root `DECISIONS.md` and `PROGRESS.md` files.
 - [x] Added new-developer setup, API documentation, testing, and manual smoke-test instructions to the root README.

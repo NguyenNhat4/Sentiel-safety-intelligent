@@ -36,6 +36,15 @@ class Settings(BaseSettings):
 
     # Database Settings
     database_url: str = "postgresql://postgres:postgres@localhost:5432/ppe_safety_db"
+    database_fallback_enabled: bool = True
+    database_fallback_url: str = "sqlite:///./data/safety_events.db"
+    database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    database_pool_pre_ping: bool = False
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    database_pool_max_overflow: int = Field(default=10, ge=0, le=100)
+    database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3600)
+    database_pool_use_lifo: bool = True
 
     # Video & Model paths
     demo_video_dir: str = "data/demo"

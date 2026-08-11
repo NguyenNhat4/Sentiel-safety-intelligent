@@ -86,7 +86,6 @@ class EventService:
             db_event.occurrences.append(EventOccurrence(occurrence_id=occurrence_id))
         try:
             self.db.commit()
-            self.db.refresh(db_event)
         except IntegrityError as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
@@ -230,5 +229,4 @@ class EventService:
             db_event.acknowledged_by = event_in.acknowledged_by
 
         self.db.commit()
-        self.db.refresh(db_event)
         return db_event

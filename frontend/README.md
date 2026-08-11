@@ -61,21 +61,19 @@ frontend/
     ├── api/          # REST and WebSocket transport only
     ├── components/   # Shared application shell
     ├── features/
+    │   ├── auth/     # Login and system-admin account/role/security tabs
+    │   ├── area/     # Area-manager dashboard using statistics and event APIs
     │   ├── monitor/  # Video, zone, Canvas and inference orchestration
     │   ├── alerts/   # Rule result and Human-in-the-Loop review UI
     │   ├── events/   # Acknowledged violation history
     │   ├── rules/    # Persisted PPE requirement controls and draft/save state
-    │   └── dashboard/# Reserved MVP dashboard boundary
+    │   └── dashboard/# Reserved legacy boundary; active dashboard is owned by area/
     ├── styles/       # React CSS entrypoint
     └── types/        # Typed backend contracts
 ```
 
 Transport code does not render UI. Canvas utilities do not call the network. Feature state crosses boundaries only through typed props and callbacks.
 
-## Login mock and backend handoff
+## Authentication
 
-The current frontend entry point is the login screen for Safety Manager, Area Manager, and Simulation Operator. Its temporary authentication transport and the backend contracts needed to connect it are documented in [API_MOCKS.md](API_MOCKS.md).
-
-## Streaming simulation
-
-The **Mô phỏng streaming** page is frontend-only: it previews a local video and simulates Start, Pause, and Stop. It does not upload a video, create a database record, or open a WebSocket. The current behavior and proposed backend handoff fields are documented in [API_MOCKS.md](API_MOCKS.md#browser-only-streaming-simulation).
+The login screen calls `POST /api/v1/auth/login`, stores the returned bearer token only in browser `sessionStorage`, restores a tab session through `GET /api/v1/auth/me`, and revokes it through `POST /api/v1/auth/logout`. A `system_admin` retains the safety monitor/event workspace and sees an additional account-management entry whose tabs call RBAC-protected backend endpoints. An `area_manager` lands on the dedicated area dashboard. New and administrator-reset accounts must replace their temporary password before entering a role workspace.

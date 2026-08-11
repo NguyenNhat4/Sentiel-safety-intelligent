@@ -3,22 +3,25 @@ import hashlib
 import hmac
 import secrets
 
+from sqlalchemy import or_, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.app.models.user import User, UserRole, UserSession, utc_now
 
 ROLE_LABELS = {
-    UserRole.SAFETY_MANAGER: "Quản lý an toàn",
+    UserRole.SYSTEM_ADMIN: "Quản trị hệ thống",
+    UserRole.SAFETY_MANAGER: "Cán bộ an toàn",
     UserRole.AREA_MANAGER: "Quản lý khu vực",
-    UserRole.SIMULATION_OPERATOR: "Vận hành mô phỏng",
 }
 SESSION_TTL = datetime.timedelta(hours=8)
 DEMO_USERS = (
+    ("admin@sentinel.local", "System Admin", UserRole.SYSTEM_ADMIN),
     ("antoan@sentinel.local", "Nguyễn Anh Tuấn", UserRole.SAFETY_MANAGER),
     ("khuvuc@sentinel.local", "Trần Minh Hà", UserRole.AREA_MANAGER),
-    ("mophong@sentinel.local", "Lê Gia Huy", UserRole.SIMULATION_OPERATOR),
 )
+LEGACY_SIMULATION_EMAIL = "mophong@sentinel.local"
+LEGACY_SIMULATION_ROLE = "simulation_operator"
 
 
 class AuthError(Exception):
@@ -38,6 +41,14 @@ class InvalidSessionError(AuthError):
 
 
 class AuthenticationUnavailableError(AuthError):
+    pass
+
+
+class DuplicateEmailError(AuthError):
+    pass
+
+
+class UserManagementError(AuthError):
     pass
 
 
@@ -69,6 +80,16 @@ class AuthService:
 
     def seed_demo_users(self) -> None:
         try:
+            legacy_user = (
+                self.db.query(User)
+                .filter(
+                    User.email == LEGACY_SIMULATION_EMAIL,
+                    User.role == LEGACY_SIMULATION_ROLE,
+                )
+                .first()
+            )
+            if legacy_user:
+                self.db.delete(legacy_user)
             for email, full_name, role in DEMO_USERS:
                 if not self.db.query(User).filter(User.email == email).first():
                     self.db.add(
@@ -102,11 +123,102 @@ class AuthService:
             self.db.rollback()
             raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
 
+    def list_users(self, query: str | None = None, role: UserRole | None = None) -> list[User]:
+        try:
+            users = self.db.query(User)
+            if query:
+                pattern = f"%{query.strip().lower()}%"
+                users = users.filter(or_(User.email.ilike(pattern), User.full_name.ilike(pattern)))
+            if role:
+                users = users.filter(User.role == role.value)
+            return users.order_by(User.full_name.asc(), User.email.asc()).all()
+        except SQLAlchemyError as exc:
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
+    def create_user(self, *, full_name: str, email: str, password: str, role: UserRole) -> User:
+        try:
+            normalized_email = email.strip().lower()
+            if self.db.query(User.id).filter(User.email == normalized_email).first():
+                raise DuplicateEmailError("An account with this email already exists")
+            user = User(
+                email=normalized_email,
+                full_name=full_name.strip(),
+                role=role.value,
+                password_hash=hash_password(password),
+                must_change_password=True,
+            )
+            self.db.add(user)
+            self.db.commit()
+            return user
+        except AuthError:
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
+    def update_role(self, *, actor: User, target_user_id: str, role: UserRole) -> User:
+        try:
+            target = self._get_managed_user(target_user_id)
+            if target.id == actor.id:
+                raise UserManagementError("You cannot change your own role")
+            if target.role == UserRole.SYSTEM_ADMIN.value and role != UserRole.SYSTEM_ADMIN:
+                self._require_another_admin(target.id)
+            target.role = role.value
+            self._revoke_sessions(target)
+            self.db.commit()
+            return target
+        except AuthError:
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
+    def change_password(
+        self, *, actor: User, target_user_id: str, new_password: str, current_password: str | None
+    ) -> User:
+        try:
+            target = self._get_managed_user(target_user_id)
+            if target.id == actor.id:
+                if not target.must_change_password:
+                    raise UserManagementError(
+                        "Password change requires a new temporary password from a system administrator"
+                    )
+                if not current_password or not verify_password(current_password, actor.password_hash):
+                    raise UserManagementError("The current temporary password is required")
+                target.must_change_password = False
+            else:
+                target.must_change_password = True
+            target.password_hash = hash_password(new_password)
+            self._revoke_sessions(target)
+            self.db.commit()
+            return target
+        except AuthError:
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
+    def delete_user(self, *, actor: User, target_user_id: str) -> None:
+        try:
+            target = self._get_managed_user(target_user_id)
+            if target.id == actor.id:
+                raise UserManagementError("You cannot delete your own account")
+            if target.role == UserRole.SYSTEM_ADMIN.value:
+                self._require_another_admin(target.id)
+            self.db.delete(target)
+            self.db.commit()
+        except AuthError:
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
     def get_current_user(self, token: str) -> tuple[User, datetime.datetime]:
         try:
             now = utc_now()
             session = (
                 self.db.query(UserSession)
+                .options(joinedload(UserSession.user))
                 .filter(
                     UserSession.token_digest == token_digest(token),
                     UserSession.revoked_at.is_(None),
@@ -138,3 +250,30 @@ class AuthService:
         except SQLAlchemyError as exc:
             self.db.rollback()
             raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
+    def _get_managed_user(self, user_id: str) -> User:
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise UserManagementError("Account was not found")
+        return user
+
+    def _require_another_admin(self, excluded_user_id: str) -> None:
+        another_admin = (
+            self.db.query(User.id)
+            .filter(
+                User.role == UserRole.SYSTEM_ADMIN.value,
+                User.id != excluded_user_id,
+                User.is_active.is_(True),
+            )
+            .first()
+        )
+        if not another_admin:
+            raise UserManagementError("The last active system administrator cannot be removed")
+
+    def _revoke_sessions(self, user: User) -> None:
+        revoked_at = utc_now()
+        self.db.execute(
+            update(UserSession)
+            .where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None))
+            .values(revoked_at=revoked_at)
+        )

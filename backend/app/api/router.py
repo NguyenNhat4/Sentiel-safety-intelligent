@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from backend.app.api.v1 import agent, analysis, events, ppe_requirements, statistics, websocket
+from backend.app.api.v1 import agent, analysis, auth, events, ppe_requirements, statistics, websocket
 
 api_router = APIRouter()
 

@@ -1,10 +1,18 @@
 export type MachineState = "running" | "stopped";
 export type ReviewStatus = "acknowledged" | "false_alarm";
-export type UserRole = "safety_manager" | "area_manager" | "simulation_operator";
+export type UserRole = "system_admin" | "safety_manager" | "area_manager";
+export type AssignableUserRole = UserRole;
 
-export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; }
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; }
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
+export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
+export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; }
+export interface PasswordChangeRequest { new_password: string; current_password?: string; }
+export interface UserRoleUpdate { role: AssignableUserRole; }
+
+export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
+export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
 
 export interface ZonePoint {
   x: number;

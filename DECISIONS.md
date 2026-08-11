@@ -2,6 +2,22 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Backend] Reuse warm PostgreSQL connections
+- PostgreSQL uses a bounded LIFO pool, TCP keepalive and connection recycling. Per-checkout pre-ping is disabled by default because it adds a remote round-trip to every CRUD request; deployments with unstable idle connections may opt in through configuration.
+- ORM sessions retain loaded values after commit, and write services do not immediately refresh objects whose response fields are already generated client-side.
+
+## 2026-08-11: [Frontend] Role workspaces and system administration
+- Safety officers use Live Monitor and event history; area managers use the dedicated compliance dashboard; system administrators retain safety operations and receive the additional account-management entry.
+
+## 2026-08-11: [Cross-cutting] Temporary-password recovery flow
+- New and administrator-reset accounts must replace their temporary password after login. Further self-service changes are disabled; forgotten-password recovery returns to System Admin.
+
+## 2026-08-11: [Backend] PostgreSQL-first runtime with SQLite startup fallback
+- Runtime prefers `DATABASE_URL`, optionally selects local SQLite once at startup, and reports the selected backend through `/health`. Alembic never follows the fallback.
+
+## 2026-08-11: [Cross-cutting] Persisted browser authentication and exactly three roles
+- Server-side hashed sessions back login/me/logout. Supported roles are `system_admin`, `safety_manager`, and `area_manager`; only system administrators may call account-management APIs.
+
 ## 2026-08-11: [Vision/Backend] Preserve occurrences across nearby track-ID handoffs
 - **Choice:** When a new track with the same rule appears near the last normalized foot-point of an active track that just disappeared, transfer the active occurrence during the lost-track grace window.
 - **Reason:** This prevents a ByteTrack ID switch at the zone boundary from opening a second review while the same person exits.
