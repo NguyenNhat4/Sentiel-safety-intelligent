@@ -22,12 +22,13 @@ describe("AlertPanel", () => {
     expect(onReview).toHaveBeenNthCalledWith(2, "false_alarm");
   });
 
-  it("renders total detections list and triggers open review modal", () => {
+  it("lists only the selected PPE classes and keeps the person count accurate", () => {
     const onReview = vi.fn();
     const onOpenModal = vi.fn();
     const detections: ModelDetection[] = [
       {class_id: 14, class_name: "shoes", bbox: [10, 10, 50, 50], confidence: 0.88, person_index: 0},
       {class_id: 10, class_name: "helmet", bbox: [20, 20, 40, 40], confidence: 0.94, person_index: null},
+      {class_id: 9, class_name: "gloves", bbox: [30, 20, 45, 40], confidence: 0.92, person_index: null},
     ];
 
     render(
@@ -35,6 +36,15 @@ describe("AlertPanel", () => {
         view={view}
         reviewPending
         reviewSaving={false}
+        people={[{
+          bbox: [0, 0, 100, 120], confidence: 0.95, inside_zone: false, safety_shirt: true,
+          ppe: {
+            helmet: {status: "present", confidence: 0.94},
+            safety_glasses: {status: "unknown", confidence: null},
+            gloves: {status: "present", confidence: 0.92},
+          },
+          missing_required_ppe: [],
+        }]}
         detections={detections}
         timer="00:05"
         onReview={onReview}
@@ -42,9 +52,10 @@ describe("AlertPanel", () => {
       />
     );
 
-    expect(screen.getByText("OBJECT DETECTIONS GROUPED BY PERSON (2)")).toBeInTheDocument();
-    expect(screen.getByText("SHOES")).toBeInTheDocument();
+    expect(screen.getByText("OBJECT DETECTIONS GROUPED BY PERSON (3)")).toBeInTheDocument();
+    expect(screen.queryByText("SHOES")).not.toBeInTheDocument();
     expect(screen.getByText("HELMET")).toBeInTheDocument();
+    expect(screen.getByText("GLOVES")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", {name: /Mở Pop-up xác minh/}));
     expect(onOpenModal).toHaveBeenCalledTimes(1);

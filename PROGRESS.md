@@ -64,6 +64,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
 
 ### Frontend
+- [x] Curated browser-facing SH17 detection displays to people plus canonical `helmet`, `glasses`, `gloves`, and `safety-vest` classes across the live Canvas, grouped alert list, and review overlay, while preserving the complete inference and review-metadata payload.
 - [x] Added WebSocket route connection counts for inference and alert channels to the separate operational-observability view.
 - [x] Added a separate operational-observability page with selectable window, refresh, aggregate KPIs, latency table, inference outcomes, errors, and loading/error/partial-data states.
 - [x] Added the system-admin sidebar entry and account, role/permission, and security tabs using the real authentication API.

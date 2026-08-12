@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {detectionLabel, findPointAt, getDetectionColor, normalizedPointerPosition, requiredPpeBadges} from "./canvas";
+import {detectionLabel, findPointAt, getDetectionColor, isDisplayedPpeDetection, normalizedPointerPosition, requiredPpeBadges} from "./canvas";
 
 describe("monitor Canvas coordinates", () => {
   it("normalizes and clamps pointer coordinates", () => {
@@ -45,5 +45,15 @@ describe("monitor Canvas coordinates", () => {
     expect(getDetectionColor("helmet")).toBe("#f59e0b");
     expect(getDetectionColor("shoes")).toBe("#3b82f6");
     expect(getDetectionColor("gloves")).toBe("#10b981");
+  });
+
+  it("limits operator PPE displays to the canonical SH17 class names", () => {
+    expect(isDisplayedPpeDetection("helmet")).toBe(true);
+    expect(isDisplayedPpeDetection(" glasses ")).toBe(true);
+    expect(isDisplayedPpeDetection("GLOVES")).toBe(true);
+    expect(isDisplayedPpeDetection("safety-vest")).toBe(true);
+    expect(isDisplayedPpeDetection("person")).toBe(false);
+    expect(isDisplayedPpeDetection("tool")).toBe(false);
+    expect(isDisplayedPpeDetection("safety-suit")).toBe(false);
   });
 });

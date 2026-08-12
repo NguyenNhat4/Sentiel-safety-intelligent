@@ -7,6 +7,16 @@ interface PpeBadge {
   tone: PpeBadgeTone;
 }
 
+const DISPLAYED_PPE_CLASS_NAMES = new Set(["helmet", "glasses", "gloves", "safety-vest"]);
+
+/**
+ * Returns whether a SH17 model detection belongs in operator-facing PPE displays.
+ * Person boxes are rendered from the typed people collection to avoid duplicates.
+ */
+export function isDisplayedPpeDetection(className: string): boolean {
+  return DISPLAYED_PPE_CLASS_NAMES.has(className.toLowerCase().trim());
+}
+
 export function normalizedPointerPosition(
   clientX: number,
   clientY: number,
@@ -87,7 +97,7 @@ export function drawOverlay(
     zone.zone_id === selectedZoneId ? selectedPoint : null,
   ));
   people.forEach((person, index) => drawPerson(context, person, ppeRequirements, index));
-  detections.forEach(detection => drawDetection(context, detection));
+  detections.filter(detection => isDisplayedPpeDetection(detection.class_name)).forEach(detection => drawDetection(context, detection));
 }
 
 export function detectionLabel(detection: ModelDetection): string {
