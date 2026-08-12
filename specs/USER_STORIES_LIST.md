@@ -379,6 +379,26 @@
   2. Chạy full regression, security/performance test và sửa defect release-blocking.
   3. Chốt release candidate, demo rehearsal, tài liệu vận hành và biên bản nghiệm thu.
 
+### US-27 — Trang AI auto-label dữ liệu phục vụ dataset
+
+> Với vai trò nhóm phát triển dataset, tôi muốn có một trang riêng dùng AI để đề xuất nhãn cho ảnh và frame video mô phỏng, để tăng tốc chuẩn bị custom dataset nhưng vẫn giữ ground truth đã được con người kiểm duyệt.
+
+- Ưu tiên / trạng thái: **P1 nâng cao / Chưa làm**
+- Phụ thuộc: US-07, US-08, US-12, US-13, US-20
+- Acceptance criteria:
+  - Có workspace riêng, chỉ người dùng được phân quyền phù hợp mới truy cập; workspace không trộn với màn hình monitor/review sự cố đang vận hành.
+  - Người dùng có thể tải ảnh hoặc trích frame từ video mô phỏng có quyền sử dụng; hệ thống chạy model hiện có để đề xuất bounding box `person`, trạng thái PPE mũ/kính/găng và `track_id` chỉ trong phạm vi video annotation.
+  - UI cho phép duyệt, sửa, thêm, xóa hoặc từ chối từng nhãn AI; nhãn chỉ trở thành `human_verified` sau thao tác xác nhận rõ ràng của người dùng.
+  - Mỗi annotation lưu provenance tối thiểu: media/frame ID, loại nhãn, giá trị/bounding box, confidence, model/checksum, thời điểm tạo và reviewer/quyết định; không lưu hay suy luận danh tính, khuôn mặt hoặc đặc trưng sinh trắc học.
+  - Có thể xuất dataset manifest phiên bản hóa tương thích protocol US-13; manifest phân biệt rõ `ai_suggested`, `human_verified` và `rejected`, kèm checksum. Final evaluation chỉ nhận nhãn `human_verified` và không dùng nhãn chưa duyệt làm ground truth.
+  - Khi AI inference, upload hoặc lưu annotation lỗi, UI hiển thị lỗi có thể xử lý; không tạo annotation một phần hoặc làm mất nhãn đã được reviewer lưu trước đó.
+  - Có test cho quyền truy cập, luồng accept/edit/reject, provenance/export, và giới hạn không nhận diện danh tính.
+- Task:
+  1. Chốt annotation schema, class taxonomy, permission matrix, retention/quyền sử dụng media và format manifest với protocol US-13.
+  2. Xây API/service dùng vision facade hiện có để tạo AI suggestion, lưu version/provenance và xuất manifest; không để frontend gọi model trực tiếp hoặc để vision truy cập database.
+  3. Xây trang frontend độc lập cho upload/frame selection, annotation canvas và review queue; bổ sung route guard, trạng thái loading/empty/error và accessibility cơ bản.
+  4. Viết unit, API và component/E2E tests cho lifecycle annotation, authorization, export checksum và regression privacy.
+
 ## 5. Kế hoạch delivery nâng cao 5 tuần
 
 | Tuần | Mục tiêu | Story / task chính | Exit criteria |
