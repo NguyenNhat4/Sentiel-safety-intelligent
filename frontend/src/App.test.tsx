@@ -191,4 +191,71 @@ describe("Sentinel React application", () => {
     await waitFor(() => expect(screen.getByText("Vùng 1 · 4/4 · kéo điểm để chỉnh")).toBeInTheDocument());
     expect(screen.getByText((_, node) => node?.textContent === "4/4 · BẬT · STOP")).toBeInTheDocument();
   });
+
+  it("removes a confirmed zone from the UI and persists only when configuration is saved", async () => {
+    window.sessionStorage.setItem("sentinel.auth.access_token", "token-1");
+    const points = [{x: 0.1, y: 0.1}, {x: 0.4, y: 0.1}, {x: 0.4, y: 0.4}, {x: 0.1, y: 0.4}];
+    const zones = [
+      {zone_id: "zone_1", display_name: "Vùng 1", points, machine_state: "running", enabled: true, order: 0},
+      {zone_id: "zone_2", display_name: "Vùng 2", points, machine_state: "stopped", enabled: true, order: 1},
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/auth/me")) return jsonResponse({user, expires_at: "2026-08-11T00:00:00Z"});
+      if (url.includes("/ppe-requirements/")) return jsonResponse({
+        camera_id: "uploaded_video",
+        zone_id: "zone_01",
+        helmet_required: false,
+        safety_glasses_required: false,
+        gloves_required: false,
+        is_configured: false,
+        updated_at: null,
+      });
+      if (url.includes("/monitoring-zones") && init?.method === "PUT") {
+        return jsonResponse({camera_id: "uploaded_video", revision: 2, zones: [zones[0]], updated_at: null});
+      }
+      if (url.includes("/monitoring-zones")) {
+        return jsonResponse({camera_id: "uploaded_video", revision: 1, zones, updated_at: null});
+      }
+      return jsonResponse([]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const confirmRemoval = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const canvasLabels = new Set<string>();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: () => canvasLabels.clear(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      arc: vi.fn(),
+      setLineDash: vi.fn(),
+      fillText: (label: string) => canvasLabels.add(label),
+    } as unknown as CanvasRenderingContext2D);
+
+    render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+    await screen.findByText("2 vùng đã cấu hình");
+    expect(canvasLabels).toContain("Vùng 2 · STOP");
+    fireEvent.click(screen.getByRole("button", {name: /Vùng 2/}));
+
+    fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
+    expect(screen.getByText("2 vùng đã cấu hình")).toBeInTheDocument();
+
+    confirmRemoval.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
+    expect(screen.getByText("1 vùng đã cấu hình")).toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Vùng 2/})).not.toBeInTheDocument();
+    expect(canvasLabels).not.toContain("Vùng 2 · STOP");
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình vùng"}));
+    await waitFor(() => {
+      const saveCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(saveCall).toBeDefined();
+      expect(JSON.parse(String(saveCall?.[1]?.body)).zones).toEqual([zones[0]]);
+    });
+  });
 });

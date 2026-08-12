@@ -511,6 +511,33 @@ export function useMonitor() {
     setFlowStatus("Đã hủy tạo vùng");
   }
 
+  function deleteSelectedZone(): void {
+    if (zoneSaving) return;
+    const selectedIndex = zonesRef.current.findIndex(zone => zone.zone_id === selectedZoneId);
+    if (selectedIndex === -1) return;
+
+    const selected = zonesRef.current[selectedIndex];
+    const confirmed = window.confirm(
+      `Xóa "${selected.display_name}" khỏi cấu hình đang chỉnh sửa? Bấm Lưu cấu hình vùng để cập nhật database.`
+    );
+    if (!confirmed) return;
+
+    const remaining = zonesRef.current
+      .filter(zone => zone.zone_id !== selected.zone_id)
+      .map((zone, order) => ({...zone, order}));
+    const nextSelectedZoneId = remaining[Math.min(selectedIndex, remaining.length - 1)]?.zone_id ?? null;
+
+    updateZones(remaining);
+    setSelectedZoneId(nextSelectedZoneId);
+    if (newDraftZoneId === selected.zone_id) setNewDraftZoneId(null);
+    setDrawingZoneId(null);
+    setSelectedPoint(null);
+    draggingPoint.current = null;
+    draggingZoneId.current = null;
+    setFlowStatus(`Đã xóa ${selected.display_name} trên UI · chưa lưu`);
+    showToast(`Đã xóa ${selected.display_name} trên UI. Bấm Lưu cấu hình vùng để cập nhật database.`);
+  }
+
   async function saveZones(): Promise<void> {
     const incomplete = zonesRef.current.find(zone => zone.points.length !== 4);
     if (incomplete) {
@@ -640,7 +667,7 @@ export function useMonitor() {
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
-      resetZone, createZone, cancelZoneCreation, saveZones,
+      resetZone, createZone, cancelZoneCreation, deleteSelectedZone, saveZones,
       selectZone: (zoneId: string) => { setSelectedZoneId(zoneId); setSelectedPoint(null); },
       updateSelectedZoneName: (displayName: string) => selectedZoneId
         && updateZone(selectedZoneId, zone => ({...zone, display_name: displayName})),

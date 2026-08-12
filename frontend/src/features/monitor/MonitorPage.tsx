@@ -54,7 +54,18 @@ export function MonitorPage() {
           <div className="zone-fields">
             <label>Tên vùng<input value={state.selectedZone.display_name} maxLength={100} onChange={event => actions.updateSelectedZoneName(event.target.value)} /></label>
             <label className="zone-enabled"><input type="checkbox" checked={state.selectedZone.enabled} onChange={actions.toggleSelectedZoneEnabled} /> Bật inference cho vùng</label>
-            <span>ID: {state.selectedZone.zone_id}</span>
+            <div className="zone-field-actions">
+              <span>ID: {state.selectedZone.zone_id}</span>
+              <button
+                type="button"
+                className="zone-delete-button"
+                aria-label={`Xóa vùng ${state.selectedZone.display_name}`}
+                disabled={state.zoneSaving}
+                onClick={actions.deleteSelectedZone}
+              >
+                Xóa vùng
+              </button>
+            </div>
           </div>
         )}
       </section>
