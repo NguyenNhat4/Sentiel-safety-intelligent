@@ -1,6 +1,11 @@
 import time
 from uuid import uuid4
 
+from sqlalchemy import event as sqlalchemy_event
+from sqlalchemy.exc import OperationalError
+
+from backend.app.models.event import EventOccurrence, SafetyEvent
+from backend.app.services.event_service import EventService
 from backend.app.services.frame_inference_service import frame_inference_service
 
 
@@ -179,3 +184,60 @@ def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client):
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Occurrence does not belong to the requested session and zone"
+
+
+def test_event_batch_returns_503_when_occurrence_lookup_loses_database_connection(
+    client,
+    db_session,
+    monkeypatch,
+):
+    def disconnected_query(*_args, **_kwargs):
+        raise OperationalError("SELECT safety_events", {}, ConnectionError("connection closed"))
+
+    monkeypatch.setattr(db_session, "query", disconnected_query)
+    response = client.post(
+        "/api/v1/event-batches",
+        json={
+            "monitoring_session_id": str(uuid4()),
+            "camera_id": "uploaded_video",
+            "status": "acknowledged",
+            "acknowledged_by": "Safety Officer",
+            "events": [
+                {
+                    "zone_id": "zone_2",
+                    "event_type": "zone_intrusion",
+                    "severity": "critical",
+                    "occurrence_ids": [str(uuid4())],
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Could not query event occurrences from the database"
+
+
+def test_occurrence_lookup_avoids_distinct_over_postgresql_json_columns(db_session):
+    occurrence_id = str(uuid4())
+    event = SafetyEvent(
+        zone_id="zone_2",
+        event_type="zone_intrusion",
+        details={"review_result": "actual_violation"},
+        occurrences=[EventOccurrence(occurrence_id=occurrence_id)],
+    )
+    db_session.add(event)
+    db_session.commit()
+
+    statements: list[str] = []
+
+    def capture_statement(_connection, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    engine = db_session.get_bind()
+    sqlalchemy_event.listen(engine, "before_cursor_execute", capture_statement)
+    try:
+        assert EventService(db_session).has_persisted_occurrences([occurrence_id]) is True
+    finally:
+        sqlalchemy_event.remove(engine, "before_cursor_execute", capture_statement)
+
+    assert not any(statement.lstrip().upper().startswith("SELECT DISTINCT") for statement in statements)

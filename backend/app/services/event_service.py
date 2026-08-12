@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.integrations.ppe_vision import (
@@ -194,13 +194,14 @@ class EventService:
     def _events_for_occurrences(self, occurrence_ids: list[str]) -> list[SafetyEvent]:
         if not occurrence_ids:
             return []
-        return (
-            self.db.query(SafetyEvent)
-            .join(EventOccurrence)
-            .filter(EventOccurrence.occurrence_id.in_(occurrence_ids))
-            .distinct()
-            .all()
-        )
+        try:
+            return (
+                self.db.query(SafetyEvent)
+                .filter(SafetyEvent.occurrences.any(EventOccurrence.occurrence_id.in_(occurrence_ids)))
+                .all()
+            )
+        except SQLAlchemyError as exc:
+            raise EventPersistenceError("Could not query event occurrences from the database") from exc
 
     def has_persisted_occurrences(self, occurrence_ids: list[str]) -> bool:
         return bool(self._events_for_occurrences(occurrence_ids))

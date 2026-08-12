@@ -20,18 +20,18 @@ async def create_event_batch(batch_in: EventBatchCreate, db: Session = Depends(g
 
     service = EventService(db)
     all_occurrence_ids = [str(value) for item in batch_in.events for value in item.occurrence_ids]
-    if not service.has_persisted_occurrences(all_occurrence_ids):
-        for item in batch_in.events:
-            if not frame_inference_service.occurrences_belong_to_zone(
-                str(batch_in.monitoring_session_id),
-                item.zone_id,
-                [str(value) for value in item.occurrence_ids],
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail="Occurrence does not belong to the requested session and zone",
-                )
     try:
+        if not service.has_persisted_occurrences(all_occurrence_ids):
+            for item in batch_in.events:
+                if not frame_inference_service.occurrences_belong_to_zone(
+                    str(batch_in.monitoring_session_id),
+                    item.zone_id,
+                    [str(value) for value in item.occurrence_ids],
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Occurrence does not belong to the requested session and zone",
+                    )
         batch_id, snapshot_path, events = service.create_batch(batch_in)
         return {"batch_id": batch_id, "snapshot_path": snapshot_path, "events": events}
     except ValueError as exc:
