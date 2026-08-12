@@ -35,6 +35,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 ## Completed
 
 ### Backend
+- [x] [Backend] Fixed grouped-review occurrence lookup on PostgreSQL by replacing row-wide `DISTINCT` over JSON event details with an `EXISTS` relationship filter; database lookup failures now return a typed `503 Service Unavailable`, with focused regression coverage and local pool pre-ping enabled.
 - [x] Optimized remote PostgreSQL CRUD latency with reusable LIFO pooling, optional pre-ping, TCP keepalive, connection recycling, non-expiring committed ORM state, and removal of redundant post-commit refresh queries.
 - [x] Added system-admin-only user listing, creation, deletion, role assignment, and password reset with self-removal/last-admin safeguards and session revocation.
 - [x] Restored auth router and startup wiring, and added an Alembic authentication schema revision after the current PPE revision.
@@ -65,6 +66,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ### Frontend
 - [x] Curated browser-facing SH17 detection displays to people plus canonical `helmet`, `glasses`, `gloves`, and `safety-vest` classes across the live Canvas, grouped alert list, and review overlay, while preserving the complete inference and review-metadata payload.
+- [x] [Frontend] Added confirmed monitoring-zone deletion that removes the zone immediately from the list/canvas draft, selects and reorders remaining zones safely, and persists the reduced collection only through the explicit save action.
 - [x] Added WebSocket route connection counts for inference and alert channels to the separate operational-observability view.
 - [x] Added a separate operational-observability page with selectable window, refresh, aggregate KPIs, latency table, inference outcomes, errors, and loading/error/partial-data states.
 - [x] Added the system-admin sidebar entry and account, role/permission, and security tabs using the real authentication API.
