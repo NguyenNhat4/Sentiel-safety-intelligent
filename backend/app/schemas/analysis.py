@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from backend.app.schemas.monitoring_zone import MonitoringZone, ZonePoint
+
 
 class StartAnalysisRequest(BaseModel):
     source_type: str = Field(..., description="video_file, rtsp_stream, or demo")
@@ -23,17 +25,14 @@ class AnalysisStatusResponse(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class ZonePoint(BaseModel):
-    x: float = Field(..., ge=0.0, le=1.0)
-    y: float = Field(..., ge=0.0, le=1.0)
-
-
 class FrameInferenceRequest(BaseModel):
     image_data: str = Field(..., description="Base64 JPEG data URL")
     zone_points: list[ZonePoint] = Field(default_factory=list, max_length=4)
     machine_state: Literal["running", "stopped"] = "running"
     camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
     zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+    zones: list[MonitoringZone] | None = None
+    zone_revision: int | None = Field(default=None, ge=0)
     monitoring_session_id: UUID | None = None
     frame_id: int | None = Field(default=None, ge=0)
 
@@ -41,6 +40,10 @@ class FrameInferenceRequest(BaseModel):
     def validate_session_frame_pair(self):
         if (self.monitoring_session_id is None) != (self.frame_id is None):
             raise ValueError("monitoring_session_id and frame_id must be provided together")
+        if self.zones is not None and {"zone_points", "machine_state", "zone_id"} & self.model_fields_set:
+            raise ValueError("Use either legacy zone fields or zones, not both")
+        if self.zones is None and "zone_revision" in self.model_fields_set:
+            raise ValueError("zone_revision is only valid with zones")
         return self
 
 
@@ -66,7 +69,13 @@ class ModelDetection(BaseModel):
 class ActiveViolation(BaseModel):
     occurrence_id: UUID
     rule_key: str
+    zone_id: str | None = None
     is_new: bool
+
+
+class ZoneMembership(BaseModel):
+    zone_id: str
+    inside: bool
 
 
 class PersonDetection(BaseModel):
@@ -75,6 +84,7 @@ class PersonDetection(BaseModel):
     confidence: float
     foot_point: list[int]
     inside_zone: bool
+    zone_memberships: list[ZoneMembership] = Field(default_factory=list)
     safety_shirt: bool
     ppe: PersonPpeObservations
     missing_required_ppe: list[Literal["helmet", "safety_glasses", "gloves"]] = Field(default_factory=list)
@@ -98,6 +108,16 @@ class InferenceWebSocketConfigure(BaseModel):
     machine_state: Literal["running", "stopped"] = "running"
     camera_id: str = Field(default="uploaded_video", min_length=1, max_length=50)
     zone_id: str = Field(default="zone_01", min_length=1, max_length=50)
+    zones: list[MonitoringZone] | None = None
+    zone_revision: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_configuration_mode(self):
+        if self.zones is not None and {"zone_points", "machine_state", "zone_id"} & self.model_fields_set:
+            raise ValueError("Use either legacy zone fields or zones, not both")
+        if self.zones is None and "zone_revision" in self.model_fields_set:
+            raise ValueError("zone_revision is only valid with zones")
+        return self
 
     @field_validator("zone_points")
     @classmethod

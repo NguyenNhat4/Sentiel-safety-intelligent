@@ -18,8 +18,11 @@ from backend.app.schemas.analysis import (
     ModelDetection,
     PersonDetection,
     PersonPpeObservations,
+    ZoneMembership,
 )
+from backend.app.schemas.monitoring_zone import MonitoringZone
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.monitoring_zone_service import validate_zone_geometry
 from backend.app.services.ppe_requirement_service import PpeStatus, should_alert_for_missing_ppe
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
 from backend.app.services.violation_tracking_service import ViolationTrackingService
@@ -62,6 +65,12 @@ class FrameInferenceService:
         self._load_person_model()
         self._ppe_preloader()
 
+    def occurrences_belong_to_zone(self, session_id: str, zone_id: str, occurrence_ids: list[str]) -> bool:
+        expected = (session_id, f"zone_intrusion:{zone_id}")
+        return all(
+            self._violation_tracker.occurrence_context(occurrence_id) == expected for occurrence_id in occurrence_ids
+        )
+
     def infer(self, request: FrameInferenceRequest) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
         now = time.monotonic()
@@ -72,10 +81,17 @@ class FrameInferenceService:
         ):
             raise StaleFrameError("frame_id must increase within a monitoring session")
         height, width = frame.shape[:2]
-        polygon = np.array(
-            [[point.x * width, point.y * height] for point in request.zone_points],
-            dtype=np.float32,
-        )
+        multi_zone_mode = request.zones is not None
+        zones = self._normalized_zones(request)
+        validate_zone_geometry(zones)
+        active_zones = [zone for zone in sorted(zones, key=lambda item: item.order) if zone.enabled]
+        polygons = {
+            zone.zone_id: np.array(
+                [[point.x * width, point.y * height] for point in zone.points],
+                dtype=np.float32,
+            )
+            for zone in active_zones
+        }
 
         if request.monitoring_session_id is None:
             detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
@@ -93,7 +109,14 @@ class FrameInferenceService:
         rule_people = []
         for index, (x, y, box_width, box_height, confidence, track_id) in enumerate(detected_people):
             foot_point = [x + box_width // 2, y + box_height]
-            inside_zone = len(polygon) == 4 and cv2.pointPolygonTest(polygon, tuple(foot_point), False) >= 0
+            memberships = [
+                ZoneMembership(
+                    zone_id=zone.zone_id,
+                    inside=cv2.pointPolygonTest(polygons[zone.zone_id], tuple(foot_point), False) >= 0,
+                )
+                for zone in active_zones
+            ]
+            inside_zone = any(item.inside for item in memberships)
             safety_shirt = self._has_safety_shirt(frame, x, y, box_width, box_height)
             obs_data = (
                 observations[index]
@@ -118,6 +141,7 @@ class FrameInferenceService:
                     confidence=round(confidence, 3),
                     foot_point=foot_point,
                     inside_zone=inside_zone,
+                    zone_memberships=memberships,
                     safety_shirt=safety_shirt,
                     ppe=ppe,
                     missing_required_ppe=[],
@@ -127,8 +151,8 @@ class FrameInferenceService:
         decision = self._rule_engine.evaluate(
             people=rule_people,
             requirements=requirements,
-            machine_state=request.machine_state,
-            zone_active=len(polygon) == 4,
+            machine_state="stopped",
+            zone_active=False,
         )
         for person, missing in zip(people, decision.missing_required_ppe, strict=True):
             person.missing_required_ppe = missing
@@ -136,8 +160,10 @@ class FrameInferenceService:
         observed_rules: dict[int, set[str]] = {}
         for person in people:
             rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
-            if person.inside_zone and request.machine_state == "running":
-                rules.add("zone_intrusion")
+            membership_by_id = {item.zone_id: item.inside for item in person.zone_memberships}
+            for zone in active_zones:
+                if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
+                    rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             observed_rules[person.track_id] = rules
 
         if request.monitoring_session_id is not None:
@@ -155,6 +181,7 @@ class FrameInferenceService:
                     ActiveViolationSchema(
                         occurrence_id=item.occurrence_id,
                         rule_key=item.rule_key,
+                        zone_id=self._zone_id_for_rule(item.rule_key, request.zone_id),
                         is_new=item.is_new,
                     )
                     for item in active.get(person.track_id, [])
@@ -162,26 +189,57 @@ class FrameInferenceService:
         else:
             for person in people:
                 person.active_violations = [
-                    ActiveViolationSchema(occurrence_id=uuid4(), rule_key=rule, is_new=True)
+                    ActiveViolationSchema(
+                        occurrence_id=uuid4(),
+                        rule_key=rule,
+                        zone_id=self._zone_id_for_rule(rule, request.zone_id),
+                        is_new=True,
+                    )
                     for rule in sorted(observed_rules[person.track_id])
                 ]
 
         has_active_violation = any(person.active_violations for person in people)
         review_required = any(violation.is_new for person in people for violation in person.active_violations)
 
+        zone_results = [
+            {
+                "zone_id": zone.zone_id,
+                "machine_state": zone.machine_state,
+                "person_inside_zone": any(
+                    membership.zone_id == zone.zone_id and membership.inside
+                    for person in people
+                    for membership in person.zone_memberships
+                ),
+                "violation": zone.machine_state == "running"
+                and any(
+                    membership.zone_id == zone.zone_id and membership.inside
+                    for person in people
+                    for membership in person.zone_memberships
+                ),
+            }
+            for zone in active_zones
+        ]
+        zone_violation = any(item["violation"] for item in zone_results)
+        person_inside_zone = any(item["person_inside_zone"] for item in zone_results)
+        primary_zone = self._primary_zone(active_zones, people)
+        primary_machine_state = primary_zone.machine_state if primary_zone else request.machine_state
+        primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
+
         return FrameInferenceResponse(
-            result=decision.outcome,
+            result="violate" if decision.ppe_alert or zone_violation else "normal",
             review_required=review_required,
             has_active_violation=has_active_violation,
             people=people,
             detections=detections,
             snapshot_data=request.image_data if review_required else None,
             rule={
-                "person_inside_zone": decision.person_inside_zone,
-                "machine_state": request.machine_state,
+                "person_inside_zone": person_inside_zone,
+                "machine_state": primary_machine_state,
                 "safety_shirt_required": True,
                 "camera_id": request.camera_id,
-                "zone_id": request.zone_id,
+                "zone_id": primary_zone_id,
+                "zone_revision": request.zone_revision,
+                "zone_results": zone_results,
                 "ppe_requirements": {
                     "helmet_required": requirements.helmet_required,
                     "safety_glasses_required": requirements.safety_glasses_required,
@@ -190,6 +248,41 @@ class FrameInferenceService:
                 "ppe_alert": decision.ppe_alert,
             },
         )
+
+    @staticmethod
+    def _normalized_zones(request: FrameInferenceRequest) -> list[MonitoringZone]:
+        if request.zones is not None:
+            return request.zones
+        if len(request.zone_points) != 4:
+            return []
+        return [
+            MonitoringZone(
+                zone_id=request.zone_id,
+                display_name=request.zone_id,
+                points=request.zone_points,
+                machine_state=request.machine_state,
+                enabled=True,
+                order=0,
+            )
+        ]
+
+    @staticmethod
+    def _zone_id_for_rule(rule_key: str, legacy_zone_id: str) -> str | None:
+        if rule_key == "zone_intrusion":
+            return legacy_zone_id
+        if rule_key.startswith("zone_intrusion:"):
+            return rule_key.split(":", 1)[1]
+        return None
+
+    @staticmethod
+    def _primary_zone(zones: list[MonitoringZone], people: list[PersonDetection]) -> MonitoringZone | None:
+        new_zone_ids = {
+            violation.zone_id
+            for person in people
+            for violation in person.active_violations
+            if violation.is_new and violation.zone_id is not None
+        }
+        return next((zone for zone in zones if zone.zone_id in new_zone_ids), zones[0] if zones else None)
 
     def _derive_missing_ppe(
         self,

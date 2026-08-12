@@ -6,7 +6,7 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 ## Mục tiêu và ràng buộc
 
 - Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ/kính/găng và xâm nhập vùng nguy hiểm.
-- Xâm nhập vùng chỉ là critical khi máy chạy; kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
+- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập chỉ là critical khi chính máy của vùng đó đang chạy. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
 - Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
 - Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
 - Hai vai trò được backend phân quyền: `safety_officer` và `zone_manager`.
@@ -67,11 +67,11 @@ sequenceDiagram
     participant CV as Vision
     participant R as Rules / Events
     participant P as Persistence
-    UI->>API: config + frame JPEG / image
-    API->>CV: analyze(frame, zone)
+    UI->>API: zone collection config + frame JPEG / image
+    API->>CV: analyze frame once
     CV-->>API: observations, track, confidence, redacted image
-    API->>R: observations + machine/rule/session context
-    R->>R: triage confidence + dedup + severity
+    API->>R: observations + zones/machines/rule/session context
+    R->>R: point-in-polygons + triage + zone-scoped dedup + severity
     alt normal hoặc dưới ngưỡng
         R-->>UI: result, không tạo event
     else mơ hồ hoặc vi phạm
@@ -84,20 +84,21 @@ sequenceDiagram
 Các bất biến an toàn:
 
 1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
-2. Zone entry khi máy chạy luôn critical; lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
-3. Dedup theo session + track + rule + occurrence; retry dùng idempotency key.
+2. Zone entry khi máy của chính vùng đó chạy luôn critical; vùng stopped không được làm phát sinh zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
+3. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
 4. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
-5. Audit giữ rule version, machine/zone/shift, confidence, actor và transition; không giữ raw stream.
+5. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.
 
 ## Trạng thái triển khai
 
-Hiện đã có React → FastAPI qua REST/WebSocket, person detection, polygon/machine rule,
-review, privacy gate in-memory và SQLite event history. PostgreSQL, PPE/face detector production
-model, tracking/dedup hoàn chỉnh, RBAC và các capability nâng cao vẫn là đích cần triển khai.
+Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
+machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
+event history. PostgreSQL, PPE/face detector production model, RBAC và các
+capability nâng cao vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
-1. **Đóng MVP:** PPE + tracking/dedup + event state + auth/RBAC + image parity + metrics.
+1. **Đóng MVP:** PPE + tracking/dedup + multi-zone một stream + event state + auth/RBAC + image parity + metrics.
 2. **Bổ sung context:** zone/shift và confidence-based HITL.
 3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
 4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.

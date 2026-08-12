@@ -1,11 +1,20 @@
-import type {InferenceResult, MachineState, ZonePoint} from "../types";
+import type {InferenceResult, MachineState, MonitoringZone, ZonePoint} from "../types";
 import {inferenceWebSocketUrls, setBackendFromSocket} from "./config";
 
-interface Configuration {
+interface LegacyConfiguration {
   zone_points: ZonePoint[];
   machine_state: MachineState;
   monitoring_session_id: string;
 }
+
+interface MultiZoneConfiguration {
+  zones: MonitoringZone[];
+  zone_revision: number;
+  camera_id: string;
+  monitoring_session_id: string;
+}
+
+type Configuration = LegacyConfiguration | MultiZoneConfiguration;
 
 interface InferenceClientOptions {
   getConfiguration: () => Configuration;

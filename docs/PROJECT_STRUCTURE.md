@@ -17,6 +17,7 @@ P-047/
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── auth.py        # Authentication and system-admin account APIs
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── monitoring_zones.py # Revisioned per-camera zone collection
 │   │   │   │   ├── operational_metrics.py # Read-only JSONL operational metrics aggregate
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
@@ -32,12 +33,14 @@ P-047/
 │   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
+│   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
 │   │   │   ├── event.py
+│   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
@@ -47,6 +50,7 @@ P-047/
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
@@ -60,13 +64,15 @@ P-047/
 │   │       ├── 20260806_01_add_ppe_requirements.py
 │   │       ├── 20260807_01_add_event_occurrences.py
 │   │       ├── 20260811_01_add_authentication_schema.py
-│   │       └── 20260811_02_add_forced_password_change.py
+│   │       ├── 20260811_02_add_forced_password_change.py
+│   │       └── 20260811_03_add_monitoring_zones.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
+│       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
 │       ├── test_operational_metrics.py
 │       ├── test_violation_tracking.py
@@ -84,13 +90,14 @@ P-047/
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── auth.ts   # Authentication/account transport
+│   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
 │   │   │   ├── statistics.ts # Area-dashboard statistics transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
-│   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
+│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page
@@ -134,13 +141,16 @@ P-047/
 │   │   ├── README.md
 │   │   ├── US-07-SPEC.md
 │   │   ├── US-08-SPEC.md
-│   │   └── US-12.md
+│   │   ├── US-12.md
+│   │   └── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
 │   └── backlog/         # Remaining MVP and advanced user stories
-│       └── README.md
+│       ├── README.md
+│       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
-│   └── benchmark_model.py
-│   └── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── benchmark_model.py
+│   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums
 ├── eval/                # Evaluation reports and benchmark results
 │   └── results/
 │       ├── report.md
@@ -154,10 +164,9 @@ P-047/
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
-├── scripts/             # Explicit utility entrypoints, including dataset validation
-│   └── validate_us13_dataset.py
 ├── tests/                # Cross-cutting and automation tests
-│   └── test_bootstrap_legacy_sqlite.py
+│   ├── test_bootstrap_legacy_sqlite.py
+│   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
 └── README.md
 ```

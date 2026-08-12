@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
     # Database Settings
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/ppe_safety_db"
+    database_url: str = "sqlite:///./data/safety_events.db"
     database_fallback_enabled: bool = True
     database_fallback_url: str = "sqlite:///./data/safety_events.db"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)

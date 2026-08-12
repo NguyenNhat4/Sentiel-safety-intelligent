@@ -5,6 +5,7 @@ from backend.app.api.v1 import (
     analysis,
     auth,
     events,
+    monitoring_zones,
     operational_metrics,
     ppe_requirements,
     statistics,
@@ -16,6 +17,8 @@ api_router = APIRouter()
 api_router.include_router(analysis.router)
 api_router.include_router(auth.router)
 api_router.include_router(events.router)
+api_router.include_router(events.batch_router)
+api_router.include_router(monitoring_zones.router)
 api_router.include_router(statistics.router)
 api_router.include_router(operational_metrics.router)
 api_router.include_router(websocket.router)

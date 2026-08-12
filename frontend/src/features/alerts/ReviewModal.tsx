@@ -27,6 +27,11 @@ export function ReviewModal({
   onReview,
 }: ReviewModalProps) {
   if (!isOpen) return null;
+  const affectedZones = [...new Set(
+    people?.flatMap(person => person.active_violations
+      ?.filter(violation => violation.is_new && violation.zone_id)
+      .map(violation => violation.zone_id as string) ?? []) ?? [],
+  )];
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -50,6 +55,12 @@ export function ReviewModal({
 
         <div className="modal-body">
           <p className="modal-summary">{alertSummary}</p>
+          {affectedZones.length > 0 && (
+            <div className="review-zone-list" aria-label="Các vùng cần xác minh">
+              <strong>{affectedZones.length} vùng trong lần xác minh này</strong>
+              {affectedZones.map(zoneId => <span key={zoneId}>{zoneId}</span>)}
+            </div>
+          )}
           {snapshot ? (
             <div className="modal-snapshot-container">
               <SnapshotOverlay snapshot={snapshot} people={people} detections={detections} />

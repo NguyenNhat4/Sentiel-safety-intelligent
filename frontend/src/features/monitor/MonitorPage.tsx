@@ -5,9 +5,9 @@ import {useMonitor} from "./use-monitor";
 
 export function MonitorPage() {
   const {refs, state, actions} = useMonitor();
-  const zoneHint = state.zonePoints.length === 4
-    ? "Vùng đã sẵn sàng · Kéo điểm để điều chỉnh"
-    : `Detection đang chạy · Zone tùy chọn ${state.zonePoints.length}/4`;
+  const zoneHint = state.selectedZone
+    ? `${state.selectedZone.display_name} · ${state.selectedZone.points.length}/4${state.drawingZoneId ? " · đang vẽ" : " · kéo điểm để chỉnh"}`
+    : "Chưa có vùng · bấm Tạo vùng để bắt đầu";
   const deleteStyle = state.selectedPointPosition
     ? {left: `${state.selectedPointPosition.x * 100}%`, top: `${state.selectedPointPosition.y * 100}%`}
     : undefined;
@@ -21,25 +21,50 @@ export function MonitorPage() {
           <span>⌄</span>
         </div>
         <div className="machine-control">
-          <div><small>MACHINE A</small><strong>{state.machineRunning ? "Đang hoạt động" : "Đã dừng"}</strong></div>
-          <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy" onClick={actions.toggleMachine}><span /></button>
+          <div><small>VÙNG ĐANG CHỌN</small><strong>{state.selectedZone ? (state.machineRunning ? "Đang hoạt động" : "Đã dừng") : "Chưa chọn vùng"}</strong></div>
+          <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy của vùng đang chọn" disabled={!state.selectedZone} onClick={actions.toggleMachine}><span /></button>
         </div>
         <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
         <button className="secondary-btn" onClick={actions.openFilePicker}>＋ Tải video</button>
         <button className="secondary-btn" disabled={state.playbackDisabled} onClick={() => void actions.handlePlayback()}>{state.playbackLabel}</button>
-        <button className={`secondary-btn ${state.selectingZone ? "zone-config-active" : ""}`} disabled={state.zoneDisabled} onClick={actions.toggleZoneEditing}>
-          {state.selectingZone ? "✓ Xong cấu hình" : "⌗ Cấu hình zone (tùy chọn)"}
-        </button>
+        <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || state.zoneDisabled || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
       </div>
 
       <PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />
+
+      <section className="zone-manager" aria-label="Cấu hình vùng nguy hiểm">
+        <div className="zone-manager-head">
+          <div><small>VÙNG NGUY HIỂM · REVISION {state.zoneRevision}</small><strong>{state.zones.length} vùng đã cấu hình</strong></div>
+          <div>
+            {state.newDraftZoneId && <button className="secondary-btn" onClick={actions.cancelZoneCreation}>Hủy tạo vùng</button>}
+            <button className="ppe-save-button" disabled={state.zoneSaving || Boolean(state.drawingZoneId)} onClick={() => void actions.saveZones()}>
+              {state.zoneSaving ? "Đang lưu…" : "Lưu cấu hình vùng"}
+            </button>
+          </div>
+        </div>
+        <div className="zone-list">
+          {state.zones.map(zone => (
+            <button key={zone.zone_id} className={`zone-list-item ${state.selectedZoneId === zone.zone_id ? "selected" : ""}`} onClick={() => actions.selectZone(zone.zone_id)}>
+              <span>{zone.order + 1}</span><strong>{zone.display_name}</strong><small>{zone.points.length}/4 · {zone.enabled ? "BẬT" : "TẮT"} · {zone.machine_state === "running" ? "RUN" : "STOP"}</small>
+            </button>
+          ))}
+          {!state.zones.length && <p className="zone-empty">Canvas không tự tạo vùng. Hãy bấm <strong>Tạo vùng</strong>.</p>}
+        </div>
+        {state.selectedZone && (
+          <div className="zone-fields">
+            <label>Tên vùng<input value={state.selectedZone.display_name} maxLength={100} onChange={event => actions.updateSelectedZoneName(event.target.value)} /></label>
+            <label className="zone-enabled"><input type="checkbox" checked={state.selectedZone.enabled} onChange={actions.toggleSelectedZoneEnabled} /> Bật inference cho vùng</label>
+            <span>ID: {state.selectedZone.zone_id}</span>
+          </div>
+        )}
+      </section>
 
       <div className="monitor-grid">
         <article className="video-card">
           <div className="video-head">
             <span><i className="live-dot" /> VIDEO</span>
             <p>{state.videoMeta}</p>
-            <button onClick={actions.resetZone} title="Xóa vùng">↺</button>
+            <button onClick={actions.resetZone} disabled={!state.selectedZone} title="Vẽ lại vùng đang chọn">↺</button>
           </div>
           <div className={`camera-scene ${state.stageReady ? "ready" : ""}`}>
             <video ref={refs.videoRef} className="uploaded-media active" preload="auto" playsInline muted
@@ -57,7 +82,7 @@ export function MonitorPage() {
               <label>PERSON · 96%</label><em>PPE CHECK</em>
             </div>
             {!state.stageReady && <div className="empty-state"><strong>Tải video demo</strong><span>Phát video để xem detection; zone 4 điểm là tùy chọn.</span></div>}
-            <div className="zone-hint">{state.stageReady ? zoneHint : "Chưa cấu hình vùng"}</div>
+            <div className="zone-hint">{state.stageReady ? zoneHint : "Chưa tải video"}</div>
           </div>
           <footer>
             <span><i /> AI Detection</span>
@@ -95,7 +120,7 @@ export function MonitorPage() {
 
       <div className="activity-strip">
         <div><span className="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
-        <span>ONE ZONE</span><span className="medium-pill">PPE RULES</span>
+        <span>MULTI ZONE</span><span className="medium-pill">PPE RULES GIỮ NGUYÊN</span>
         <span>{state.flowStatus}</span>
         <button onClick={actions.openFilePicker}>Bắt đầu bằng video →</button>
       </div>

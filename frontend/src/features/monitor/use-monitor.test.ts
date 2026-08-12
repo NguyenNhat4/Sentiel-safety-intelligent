@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventPayload, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
+import {buildEventBatchPayload, buildEventPayload, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -70,6 +70,28 @@ describe("review event payload", () => {
       },
     };
     expect(buildPpeRule(helmetRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ", badge: "CHECK"});
+  });
+
+  it("partitions a grouped review into one event per zone", () => {
+    const multi = {
+      ...pending,
+      people: [{
+        ...pending.people[0],
+        active_violations: [
+          {occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "zone_intrusion:left", zone_id: "left", is_new: true},
+          {occurrence_id: "9a2c2d52-73ce-4a35-8a27-e5052925e17c", rule_key: "zone_intrusion:right", zone_id: "right", is_new: true},
+        ],
+      }],
+    };
+    const zones = ["left", "right"].map((zoneId, order) => ({
+      zone_id: zoneId, display_name: zoneId, points: [], machine_state: "running" as const, enabled: true, order,
+    }));
+
+    const payload = buildEventBatchPayload("acknowledged", multi, zones);
+    expect(payload?.events.map(event => ({zone_id: event.zone_id, occurrence_ids: event.occurrence_ids}))).toEqual([
+      {zone_id: "left", occurrence_ids: ["7aedf540-36da-4cf8-bb9b-8cd7aeab460d"]},
+      {zone_id: "right", occurrence_ids: ["9a2c2d52-73ce-4a35-8a27-e5052925e17c"]},
+    ]);
   });
 });
 

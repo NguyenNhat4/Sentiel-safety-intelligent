@@ -1,4 +1,7 @@
+import time
 from uuid import uuid4
+
+from backend.app.services.frame_inference_service import frame_inference_service
 
 
 def test_create_and_get_event(client):
@@ -97,3 +100,82 @@ def test_occurrence_cannot_be_reused_for_a_conflicting_event(client):
         json={**original, "event_type": "missing_ppe", "severity": "critical"},
     )
     assert conflict.status_code == 409
+
+
+def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client):
+    session_id = str(uuid4())
+    active = frame_inference_service._violation_tracker.evaluate(
+        session_id,
+        {1: {"zone_intrusion:left"}, 2: {"zone_intrusion:right"}},
+        {1, 2},
+        now=time.monotonic(),
+    )
+    left_id = active[1][0].occurrence_id
+    right_id = active[2][0].occurrence_id
+    payload = {
+        "monitoring_session_id": session_id,
+        "camera_id": "uploaded_video",
+        "status": "acknowledged",
+        "acknowledged_by": "Safety Officer",
+        "events": [
+            {
+                "zone_id": "left",
+                "event_type": "zone_intrusion",
+                "severity": "critical",
+                "occurrence_ids": [left_id],
+                "details": {"machine_state": "running"},
+            },
+            {
+                "zone_id": "right",
+                "event_type": "zone_intrusion",
+                "severity": "critical",
+                "occurrence_ids": [right_id],
+                "details": {"machine_state": "running"},
+            },
+        ],
+    }
+
+    try:
+        first = client.post("/api/v1/event-batches", json=payload)
+        frame_inference_service._violation_tracker.end_session(session_id)
+        retry = client.post("/api/v1/event-batches", json=payload)
+    finally:
+        frame_inference_service._violation_tracker.end_session(session_id)
+
+    assert first.status_code == 201
+    assert retry.status_code == 201
+    assert retry.json()["batch_id"] == first.json()["batch_id"]
+    assert [event["zone_id"] for event in first.json()["events"]] == ["left", "right"]
+    assert len({event["batch_id"] for event in first.json()["events"]}) == 1
+
+
+def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client):
+    session_id = str(uuid4())
+    active = frame_inference_service._violation_tracker.evaluate(
+        session_id,
+        {1: {"zone_intrusion:left"}},
+        {1},
+        now=time.monotonic(),
+    )
+    occurrence_id = active[1][0].occurrence_id
+    try:
+        response = client.post(
+            "/api/v1/event-batches",
+            json={
+                "monitoring_session_id": session_id,
+                "camera_id": "uploaded_video",
+                "status": "false_alarm",
+                "events": [
+                    {
+                        "zone_id": "right",
+                        "event_type": "zone_intrusion",
+                        "occurrence_ids": [occurrence_id],
+                    }
+                ],
+            },
+        )
+    finally:
+        frame_inference_service._violation_tracker.end_session(session_id)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Occurrence does not belong to the requested session and zone"

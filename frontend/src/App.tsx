@@ -46,7 +46,6 @@ export default function App() {
       <OperationalMetricsPage active={page === "operations"} />
       {page === "area" && user.role !== "safety_manager" && <AreaManagerPage />}
       {page === "admin" && user.role === "system_admin" && <AdminUserPage currentUser={user} onLogout={() => void handleLogout()} />}
-      <OperationalMetricsPage active={page === "operations"} />
     </AppShell>
   );
 }

@@ -2,6 +2,22 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-11: [Backend] Keep SQLite as the current MVP default
+- **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
+- **Reason:** The Product Owner explicitly deferred database expansion and chose to continue with SQLite for now. This also lets a new team member run `make setup` and `make run` without provisioning PostgreSQL first.
+- **Constraint:** Keep Alembic revisions portable across SQLite and PostgreSQL; do not introduce a second persistence implementation or remove the PostgreSQL runtime path.
+
+## 2026-08-11: [Cross-cutting] Expand one monitoring video to multiple danger zones
+- **Context:** The running baseline has one fixed `zone_01`, one polygon and one machine toggle, so it cannot represent multiple machines or danger areas visible in the same frame.
+- **Choice:** Add US-27 for multiple four-point zones on one `uploaded_video` monitoring session. Each zone has a stable `zone_id`, display name, enabled state and independent simulated `running`/`stopped` state. Detection/tracking runs once per frame; backend evaluates every active polygon afterward.
+- **Safety semantics:** Zone intrusion occurrences use `zone_intrusion:{zone_id}` and are deduplicated independently. Active polygons must be spatially disjoint: intersection, boundary/vertex contact and containment are rejected atomically because the current boundary-inclusive foot-point rule would otherwise make zone ownership ambiguous. One grouped HITL review may cover multiple distinct zones, while persistence keeps one event per zone in an atomic batch so audit/statistics remain attributable.
+- **Compatibility:** Extend REST/WebSocket responses with zone collections, memberships and zone results. Preserve the scalar one-zone contract and `POST /api/v1/events` during a documented compatibility period; new clients must not infer multi-zone safety decisions from scalar summary fields.
+- **MVP boundary:** One video/stream at a time, no fixed product-level zone-count limit, simulated machine state only. Generic HTTP/WebSocket payload-size and runtime safety controls still apply, but they must not encode a business rule such as `max_zones`. PLC and multi-stream are not part of US-27.
+- **PPE boundary:** US-27 does not modify PPE. The installed SH17 checkpoint, whole-frame `uploaded_video/zone_01` requirements, qualified-absence rule, alerts, UI and persistence retain their current behavior. Per-zone PPE requires a separate story and decision.
+- **Creation workflow:** The monitor exposes one explicit **Tạo vùng** button. It creates and selects one draft, then enables four-point Canvas drawing; ordinary Canvas clicks never create a zone. A second draft cannot start until the current draft is completed or cancelled.
+- **Implementation:** The saved collection is an optimistic-revision REST resource; WebSocket/REST multi-zone inference accepts only the saved revision. Grouped review uses `event-batches`, one shared redacted snapshot and one event per zone in a single transaction. The legacy scalar inference and single-event routes remain available.
+- **Gate:** Product Owner approved Phase 1 and requested implementation. The US-27 code slice is complete; release/browser UAT remains part of final MVP verification. No PPE behavior was changed.
+
 ## 2026-08-11: [Frontend] Separate read-only operations view
 - **Choice:** Add a dedicated “Quan sát hệ thống” navigation view for operational JSONL aggregates, separate from the safety monitor and violation history.
 - **Reason:** Operational health needs an at-a-glance interface without exposing raw logs or distracting the Safety Officer's active monitoring workflow.

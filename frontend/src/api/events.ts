@@ -1,4 +1,4 @@
-import type {EventPayload, SafetyEvent} from "../types";
+import type {EventBatchPayload, EventBatchResponse, EventPayload, SafetyEvent} from "../types";
 import {apiUrl} from "./config";
 
 export async function loadAcknowledgedEvents(): Promise<SafetyEvent[]> {
@@ -15,6 +15,16 @@ export async function saveReviewedEvent(payload: EventPayload): Promise<SafetyEv
   });
   if (!response.ok) throw new Error(await readErrorMessage(response));
   return response.json() as Promise<SafetyEvent>;
+}
+
+export async function saveReviewedEventBatch(payload: EventBatchPayload): Promise<EventBatchResponse> {
+  const response = await fetch(apiUrl("/event-batches"), {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response));
+  return response.json() as Promise<EventBatchResponse>;
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
