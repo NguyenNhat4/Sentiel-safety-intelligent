@@ -1,6 +1,6 @@
 import type {ModelDetection, PersonDetection, ReviewStatus} from "../../types";
 import type {MonitorView} from "../monitor/use-monitor";
-import {getDetectionColor} from "../monitor/canvas";
+import {getDetectionColor, isDisplayedPpeDetection} from "../monitor/canvas";
 
 interface AlertPanelProps {
   view: MonitorView;
@@ -25,7 +25,8 @@ export function AlertPanel({
   onReview,
   onOpenModal,
 }: AlertPanelProps) {
-  const totalDetections = people.length + detections.length;
+  const displayedDetections = detections.filter(detection => isDisplayedPpeDetection(detection.class_name));
+  const totalDetections = people.length + displayedDetections.length;
 
   return (
     <aside className={`alert-panel ${view.violation ? "violation" : ""}`} id="alert-panel">
@@ -54,7 +55,7 @@ export function AlertPanel({
               const personIndices = Array.from(
                 new Set([
                   ...people.map((_, idx) => idx),
-                  ...detections
+                  ...displayedDetections
                     .map(d => d.person_index)
                     .filter((idx): idx is number => idx !== null),
                 ])
@@ -63,7 +64,7 @@ export function AlertPanel({
               return personIndices.map(pIdx => {
                 const person = people[pIdx];
                 const personColor = getDetectionColor("person", pIdx, person?.inside_zone);
-                const associatedDetections = detections.filter(d => d.person_index === pIdx);
+                const associatedDetections = displayedDetections.filter(d => d.person_index === pIdx);
                 return (
                   <div key={`person-group-${pIdx}`} className="person-group-card" style={{borderLeftColor: personColor}}>
                     <div className="person-group-header">
@@ -98,7 +99,7 @@ export function AlertPanel({
               });
             })()}
             {(() => {
-              const unassociated = detections.filter(d => d.person_index === null);
+              const unassociated = displayedDetections.filter(d => d.person_index === null);
               if (!unassociated.length) return null;
               return (
                 <div className="person-group-card unassociated-card">
