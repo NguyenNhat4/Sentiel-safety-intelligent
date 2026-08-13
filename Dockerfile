@@ -30,7 +30,11 @@ ENV PATH=/root/.local/bin:$PATH
 RUN useradd -m appuser
 
 # Copy application code
-COPY . .
+COPY backend ./backend
+COPY vision ./vision
+COPY scripts ./scripts
+COPY alembic.ini ./
+COPY models/yolo11n.pt models/ppe_yolov8n.pt ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with correct ownership
@@ -41,6 +45,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    CMD python -c "import json, urllib.request; health=json.load(urllib.request.urlopen('http://localhost:8000/health')); assert health['ready']" || exit 1
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "scripts/production_start.py"]

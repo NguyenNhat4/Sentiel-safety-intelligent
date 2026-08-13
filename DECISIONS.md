@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-13: [Cross-cutting] Docker-local MVP release gate
+- **Choice:** US-18 uses a single non-root FastAPI container that serves the built React artifact, with SQLite data, redacted snapshots and JSONL metrics persisted through the host `data/` mount.
+- **Startup gate:** The container validates the two approved model checksums, writable runtime storage and Alembic head before accepting traffic; production startup never creates schema from ORM metadata or falls back to a second database.
+- **Rollback:** Roll back application code/image independently of the persistent volume; restore a pre-migration data archive when schema compatibility is uncertain.
+
 ## 2026-08-11: [Backend] Keep SQLite as the current MVP default
 - **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
 - **Reason:** The Product Owner explicitly deferred database expansion and chose to continue with SQLite for now. This also lets a new team member run `make setup` and `make run` without provisioning PostgreSQL first.

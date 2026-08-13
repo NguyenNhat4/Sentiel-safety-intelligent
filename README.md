@@ -147,6 +147,16 @@ WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API
 make check
 ```
 
+## Docker MVP local
+
+```bash
+cp .env.production.example .env.production
+make docker-up
+make docker-smoke
+```
+
+Docker Compose giữ database SQLite, snapshot đã redact và JSONL operational metrics trong `data/`; không dùng `docker compose down -v` nếu cần giữ dữ liệu. Tạo backup với `make backup`. Sau `make docker-down`, restore chỉ vào `data/` rỗng bằng `make restore ARCHIVE=backups/<archive>.tar.gz`. Khi rollback code, checkout release/source tag trước đó rồi chạy `make docker-up`; chỉ khôi phục `data/` từ backup tạo trước migration nếu code cũ không tương thích schema mới.
+
 Có thể chạy từng nhóm:
 
 ```bash

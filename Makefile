@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build
+.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -38,6 +38,26 @@ frontend-test:
 
 frontend-build:
 	npm --prefix frontend run build
+
+docker-build:
+	docker compose build
+
+docker-up:
+	@test -f .env.production || cp .env.production.example .env.production
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
+
+docker-smoke:
+	$(VENV_BIN)/python scripts/docker_smoke.py
+
+backup:
+	$(VENV_BIN)/python scripts/backup_data.py
+
+restore:
+	@test -n "$(ARCHIVE)" || (echo "Usage: make restore ARCHIVE=backups/p047-data-...tar.gz" && exit 2)
+	$(VENV_BIN)/python scripts/restore_data.py $(ARCHIVE)
 
 test:
 	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ vision/tests/ -v

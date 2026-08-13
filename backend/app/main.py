@@ -12,6 +12,7 @@ from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
+from backend.app.core.startup_validation import validate_runtime_files
 from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
 
@@ -26,9 +27,12 @@ async def lifespan(app: FastAPI):
         max_bytes=settings.operational_metrics_log_max_bytes,
         backup_count=settings.operational_metrics_log_backup_count,
     )
-    # Auto-create tables in development if DB is reachable
+    app.state.ready = False
+    app.state.runtime_files = {"data_writable": False, "models_verified": False}
+    # Development remains convenient; production schema is only managed by Alembic.
     try:
-        Base.metadata.create_all(bind=engine)
+        if settings.app_env != "production":
+            Base.metadata.create_all(bind=engine)
         if settings.app_env != "production":
             db = SessionLocal()
             try:
@@ -39,7 +43,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
 
+    app.state.runtime_files = validate_runtime_files(settings)
     frame_inference_service.preload_models()
+    app.state.ready = True
     logger.info("SH17 inference models loaded.")
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
@@ -105,10 +111,12 @@ app.mount("/snapshots", StaticFiles(directory=snapshot_dir), name="event-snapsho
 async def health_check():
     return {
         "status": "ok",
+        "ready": bool(getattr(app.state, "ready", False)),
         "env": settings.app_env,
         "service": settings.app_name,
         "database": database_runtime.backend,
         "database_fallback_active": database_runtime.fallback_active,
+        "runtime_files": getattr(app.state, "runtime_files", {}),
     }
 
 

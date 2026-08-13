@@ -141,6 +141,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Closed US-27 documentation by moving the multi-zone implementation specification to `specs/done/` and removing the redundant `specs/backlog/US-27.md` story file; the root context map and current structure now point to the completed spec.
 
 ## In Progress
+- [ ] Complete US-18 Docker-local smoke, backup/restore rehearsal and browser UAT evidence on one release commit.
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
 - [ ] Replace the controlled-demo safety-shirt color heuristic with trained PPE model weights.
 - [ ] Establish ground truth, explicit-missing evidence and benchmark targets for the PPE model before production alerting.
