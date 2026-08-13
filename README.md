@@ -130,6 +130,10 @@ make setup
 make run
 ```
 
+`make setup` creates `.env.development` from `.env.development.example` when it is
+missing. Docker Compose separately reads `.env.production`; start from
+`.env.production.example` and supply deployment-specific values there.
+
 Sau khi chạy:
 
 - Monitor UI: <http://localhost:8000/>

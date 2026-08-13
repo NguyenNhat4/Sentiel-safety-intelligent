@@ -12,7 +12,7 @@ py-setup:
 	uv sync
 
 env-setup:
-	@if [ ! -f .env ]; then cp .env.example .env && echo "Created .env from .env.example"; fi
+	@if [ ! -f .env.development ]; then cp .env.development.example .env.development && echo "Created .env.development from .env.development.example"; fi
 
 db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/python scripts/bootstrap_legacy_sqlite.py

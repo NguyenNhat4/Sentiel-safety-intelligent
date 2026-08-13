@@ -66,7 +66,9 @@ class Settings(BaseSettings):
     person_model_path: str = "models/yolo11n.pt"
     ppe_model_path: str = "models/ppe_yolov8n.pt"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Local commands load development defaults. Production receives its values from
+    # Docker Compose's `.env.production` env_file, which takes precedence.
+    model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
     # Violate frame least confidence threshold for PPE & Danger Zone detection
 
     def validate_snapshot_storage(self) -> None:

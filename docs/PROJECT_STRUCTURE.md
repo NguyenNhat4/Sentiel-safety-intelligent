@@ -174,6 +174,8 @@ P-047/
 │   ├── test_startup_validation.py
 │   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
+├── .env.development.example # Development environment template for `make setup`
+├── .env.production.example  # Production Docker Compose environment template
 ├── requirements.docker.txt # Production-only, CPU/headless Python dependency set
 └── README.md
 ```

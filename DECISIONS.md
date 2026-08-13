@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-13: [Backend] Separate development and production environment files
+- **Choice:** Local settings load `.env.development`, created by `make setup` from `.env.development.example`; Docker Compose injects `.env.production` for production.
+- **Reason:** Local SQLite defaults and production deployment credentials/runtime constraints must not share one mutable environment file.
+- **Compatibility:** Environment variables passed by the process still take precedence, so managed deployments can continue to provide configuration without a file.
+
 ## 2026-08-13: [Cross-cutting] Docker runtime has an explicit headless dependency set
 - **Reason:** Installing the general development requirements and all Ultralytics optional runtime dependencies made the local production image unnecessarily large and installed both GUI and headless OpenCV wheels.
 - **Choice:** `requirements.docker.txt` contains only production dependencies. Docker installs CPU-only PyTorch and installs Ultralytics without its optional GUI, plotting and dataframe dependencies; the explicitly required headless OpenCV runtime remains.
