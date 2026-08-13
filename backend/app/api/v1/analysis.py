@@ -11,6 +11,7 @@ from backend.app.schemas.analysis import (
 from backend.app.services.analysis_service import AnalysisService
 from backend.app.services.frame_inference_service import InvalidFrameError, StaleFrameError, frame_inference_service
 from backend.app.services.monitoring_zone_service import MonitoringZoneGeometryError, MonitoringZoneService
+from backend.app.services.ppe_requirement_service import PpeRequirementService
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 analysis_service = AnalysisService()
@@ -55,7 +56,8 @@ async def infer_frame(request: FrameInferenceRequest, db: Session = Depends(get_
                     status_code=409,
                     detail={"code": "zone_revision_conflict"},
                 )
-        return frame_inference_service.infer(request)
+        requirements = PpeRequirementService(db).get(request.camera_id, request.zone_id)
+        return frame_inference_service.infer(request, requirements=requirements)
     except InvalidFrameError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except StaleFrameError as exc:

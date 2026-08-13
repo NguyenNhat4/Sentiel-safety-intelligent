@@ -4,9 +4,11 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
+import pytest
 
 from backend.app.api.v1.analysis import frame_inference_service
 from backend.app.schemas.analysis import FrameInferenceRequest
+from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 
 
 def jpeg_bytes(width=160, height=120):
@@ -14,6 +16,23 @@ def jpeg_bytes(width=160, height=120):
     encoded, buffer = cv2.imencode(".jpg", frame)
     assert encoded
     return buffer.tobytes()
+
+
+@pytest.fixture(autouse=True)
+def use_stubbed_vision_observations(monkeypatch):
+    """Keep analysis rule tests independent from the installed vision model."""
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_ppe_observer",
+        lambda frame, people: [
+            {
+                "hat": {"status": "unknown", "confidence": None},
+                "vest": {"status": "unknown", "confidence": None},
+            }
+            for _ in people
+        ],
+    )
 
 
 def jpeg_data_url(width=160, height=120):
@@ -189,6 +208,19 @@ def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch)
         frame_inference_service,
         "_detect_people",
         lambda frame: [(40, 10, 40, 90, 0.91)],
+    )
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_requirement_loader",
+        lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            is_configured=False,
+            updated_at=None,
+        ),
     )
     result = frame_inference_service.infer(
         FrameInferenceRequest(

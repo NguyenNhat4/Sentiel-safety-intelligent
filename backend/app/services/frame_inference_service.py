@@ -72,7 +72,12 @@ class FrameInferenceService:
             self._violation_tracker.occurrence_context(occurrence_id) == expected for occurrence_id in occurrence_ids
         )
 
-    def infer(self, request: FrameInferenceRequest) -> FrameInferenceResponse:
+    def infer(
+        self,
+        request: FrameInferenceRequest,
+        *,
+        requirements: PpeRequirementResponse | None = None,
+    ) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
         now = time.monotonic()
         if (
@@ -115,7 +120,7 @@ class FrameInferenceService:
             else:
                 observations = vision_result
                 detections = []
-        requirements = self._requirement_loader(request.camera_id, request.zone_id)
+        requirements = requirements or self._requirement_loader(request.camera_id, request.zone_id)
         people = []
         rule_people = []
         for index, (x, y, box_width, box_height, confidence, track_id) in enumerate(detected_people):

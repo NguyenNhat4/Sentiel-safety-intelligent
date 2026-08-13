@@ -25,6 +25,7 @@ from backend.app.services.monitoring_zone_service import (
     MonitoringZoneService,
     validate_zone_geometry,
 )
+from backend.app.services.ppe_requirement_service import PpeRequirementService
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +221,8 @@ async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depen
             )
             started_at = time.perf_counter()
             try:
-                result = await asyncio.to_thread(frame_inference_service.infer, request)
+                requirements = PpeRequirementService(db).get(request.camera_id, request.zone_id)
+                result = await asyncio.to_thread(frame_inference_service.infer, request, requirements=requirements)
             except InvalidFrameError as exc:
                 await send_inference_error(websocket, "invalid_frame", str(exc))
                 continue

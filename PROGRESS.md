@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-13: [Backend] Analysis PPE requirement loading uses the request database session
+- Frame inference REST and WebSocket paths now load the active PPE profile through their injected SQLAlchemy session, so test database overrides and runtime database selection are respected.
+- Added Alembic's OS-aware `path_separator` setting to remove the deprecated legacy path parsing warning.
+
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
