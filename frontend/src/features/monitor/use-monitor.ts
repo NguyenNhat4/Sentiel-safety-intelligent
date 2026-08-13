@@ -27,6 +27,12 @@ const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
 };
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
+export type HumanReviewTone = "normal" | "critical" | "warning" | "unknown";
+
+export interface HumanReviewState {
+  tone: HumanReviewTone;
+  message: string;
+}
 
 export interface MonitorView {
   violation: boolean;
@@ -37,6 +43,7 @@ export interface MonitorView {
   eventStatus: string;
   confidenceLabel: string;
   confidenceWidth: string;
+  humanReviewTone?: HumanReviewTone;
   zoneRule: RuleView;
   machineRule: RuleView;
   ppeRule: RuleView;
@@ -51,6 +58,7 @@ const initialView = (machineRunning = true): MonitorView => ({
   eventStatus: "CHƯA CÓ SỰ KIỆN ĐƯỢC LƯU",
   confidenceLabel: "READY",
   confidenceWidth: "12%",
+  humanReviewTone: "normal",
   zoneRule: {yes: null, text: "Chưa phát hiện", badge: "—"},
   machineRule: {
     yes: machineRunning,
@@ -191,6 +199,7 @@ export function useMonitor() {
     setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
     const violation = result.result === "violate";
+    const humanReview = buildHumanReviewState(result);
     setView(current => ({
       ...current,
       violation,
@@ -199,6 +208,8 @@ export function useMonitor() {
       alertSummary: violation ? current.alertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
       zoneRule: {yes: inside, text: inside ? "Trong vùng nguy hiểm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
       ppeRule: buildPpeRule(result),
+      humanReviewTone: humanReview.tone,
+      reviewMessage: humanReview.message,
     }));
     if (!result.review_required) session.current.violationLatched = false;
     if (!result.review_required || session.current.violationLatched) return;
@@ -219,7 +230,8 @@ export function useMonitor() {
       reviewMessage: "Khung hình đang chờ cán bộ an toàn xác minh",
       eventStatus: "Đang chờ xác minh · chưa lưu",
       confidenceLabel: "VIOLATE",
-      confidenceWidth: "100%"
+      confidenceWidth: "100%",
+      humanReviewTone: "critical",
     }));
     freezeAtViolationFrame(result);
   }
@@ -701,6 +713,27 @@ export function buildPpeRule(result: InferenceResult): RuleView {
   );
   if (hasUnknown) return {yes: null, text: `Đang kiểm tra ${requiredLabels.join(", ")}`, badge: "CHECK"};
   return {yes: true, text: `Đủ PPE: ${requiredLabels.join(", ")}`, badge: "OK"};
+}
+
+export function buildHumanReviewState(result: InferenceResult): HumanReviewState {
+  if (result.people.some(person => person.inside_zone)) {
+    return {tone: "critical", message: "Người đã đi vào vùng cấm · cần xử lý ngay"};
+  }
+
+  if (result.people.some(person => person.missing_required_ppe.length > 0)) {
+    return {tone: "warning", message: "Phát hiện người thiếu mũ hoặc áo theo quy định"};
+  }
+
+  const required = result.rule.ppe_requirements;
+  const hasUnknownPpe = result.people.some(person =>
+    (required.hat_required && person.ppe.hat.status === "unknown")
+    || (required.vest_required && person.ppe.vest.status === "unknown"),
+  );
+  if (hasUnknownPpe) {
+    return {tone: "unknown", message: "Không xác định được PPE · cần người review"};
+  }
+
+  return {tone: "normal", message: "Không có cảnh báo · người đã đủ mũ và áo theo quy định"};
 }
 
 export function buildEventPayload(

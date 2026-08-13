@@ -134,7 +134,7 @@ export function AlertPanel({
 
       {snapshot && <img className="snapshot visible" src={snapshot} alt="Khung hình cần xác minh" />}
 
-      <div className="escalation">
+      <div className={`escalation ${view.humanReviewTone ?? "normal"}`} aria-live="polite">
         <div><span>⌁</span><p><small>HUMAN IN THE LOOP</small><strong>{view.reviewMessage}</strong></p></div>
         <div className="timer"><strong>{timer}</strong><small>Chờ xác nhận</small></div>
       </div>

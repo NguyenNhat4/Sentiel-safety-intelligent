@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventBatchPayload, buildEventPayload, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
+import {buildEventBatchPayload, buildEventPayload, buildHumanReviewState, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -91,6 +91,25 @@ describe("review event payload", () => {
       {zone_id: "left", occurrence_ids: ["7aedf540-36da-4cf8-bb9b-8cd7aeab460d"]},
       {zone_id: "right", occurrence_ids: ["9a2c2d52-73ce-4a35-8a27-e5052925e17c"]},
     ]);
+  });
+});
+
+describe("Human-in-the-Loop alert states", () => {
+  const base: InferenceResult = {
+    type: "inference_result", frame_id: 1, video_time: 0, result: "normal", review_required: false, people: [],
+    rule: {
+      person_inside_zone: false, machine_state: "running", ppe_profile: "hat_vest_v1", camera_id: "uploaded_video", zone_id: "zone_01",
+      ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: true}, ppe_alert: false,
+    },
+  };
+  const person = {bbox: [0, 0, 10, 20] as [number, number, number, number], confidence: 0.9, inside_zone: false,
+    ppe: {hat: {status: "present" as const, confidence: 0.9}, vest: {status: "present" as const, confidence: 0.9}}, missing_required_ppe: [] as Array<"hat" | "vest">};
+
+  it("prioritizes forbidden-zone entry, then missing PPE, then an unknown PPE review", () => {
+    expect(buildHumanReviewState({...base, people: [{...person, inside_zone: true}]}).tone).toBe("critical");
+    expect(buildHumanReviewState({...base, people: [{...person, missing_required_ppe: ["hat"]}]}).tone).toBe("warning");
+    expect(buildHumanReviewState({...base, people: [{...person, ppe: {...person.ppe, vest: {status: "unknown", confidence: null}}}]}).tone).toBe("unknown");
+    expect(buildHumanReviewState({...base, people: [person]}).tone).toBe("normal");
   });
 });
 
