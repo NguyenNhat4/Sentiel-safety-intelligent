@@ -16,11 +16,12 @@ FROM python:3.11-slim AS python-builder
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements.docker.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --prefix=/install torch torchvision \
+    python -m pip install --no-cache-dir --no-compile --prefix=/install torch torchvision \
         --index-url https://download.pytorch.org/whl/cpu && \
-    python -m pip install --prefix=/install -r requirements.txt
+    python -m pip install --no-cache-dir --no-compile --prefix=/install -r requirements.docker.txt && \
+    python -m pip install --no-cache-dir --no-compile --prefix=/install --no-deps 'ultralytics>=8.3.0'
 
 # ---- Stage 3: Production ----
 FROM python:3.11-slim

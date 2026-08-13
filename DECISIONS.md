@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-13: [Cross-cutting] Docker runtime has an explicit headless dependency set
+- **Reason:** Installing the general development requirements and all Ultralytics optional runtime dependencies made the local production image unnecessarily large and installed both GUI and headless OpenCV wheels.
+- **Choice:** `requirements.docker.txt` contains only production dependencies. Docker installs CPU-only PyTorch and installs Ultralytics without its optional GUI, plotting and dataframe dependencies; the explicitly required headless OpenCV runtime remains.
+- **Constraint:** Docker image changes must pass the black-box Docker smoke check, including real model loading, before use.
+
 ## 2026-08-13: [Cross-cutting] Docker-local MVP release gate
 - **Choice:** US-18 uses a single non-root FastAPI container that serves the built React artifact, with SQLite data, redacted snapshots and JSONL metrics persisted through the host `data/` mount.
 - **Startup gate:** The container validates the two approved model checksums, writable runtime storage and Alembic head before accepting traffic; production startup never creates schema from ORM metadata or falls back to a second database.

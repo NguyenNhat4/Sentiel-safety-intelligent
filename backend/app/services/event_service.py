@@ -16,6 +16,12 @@ from backend.app.integrations.ppe_vision import (
     SnapshotPerson,
     get_ppe_vision_adapter,
 )
+from backend.app.integrations.snapshot_storage import (
+    FilesystemSnapshotStorage,
+    SnapshotStorage,
+    SnapshotStorageError,
+    create_snapshot_storage,
+)
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
@@ -46,11 +52,15 @@ class EventService:
         snapshot_redactor: SnapshotRedactor | None = None,
         snapshot_annotator: SnapshotAnnotator | None = None,
         snapshot_dir: Path | None = None,
+        snapshot_storage: SnapshotStorage | None = None,
     ):
         self.db = db
         self._snapshot_redactor = snapshot_redactor or self._default_snapshot_redactor
         self._snapshot_annotator = snapshot_annotator or self._default_snapshot_annotator
         self._snapshot_dir = snapshot_dir or Path(__file__).resolve().parents[3] / "data" / "snapshots"
+        self._snapshot_storage = snapshot_storage or (
+            FilesystemSnapshotStorage(self._snapshot_dir) if snapshot_dir else self._default_snapshot_storage()
+        )
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
         occurrence_ids = [str(value) for value in event_in.occurrence_ids]
@@ -89,7 +99,7 @@ class EventService:
         except IntegrityError as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             existing = self._events_for_occurrences(occurrence_ids)
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
                 return existing[0]
@@ -97,7 +107,7 @@ class EventService:
         except Exception as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
 
@@ -147,7 +157,7 @@ class EventService:
         except IntegrityError as exc:
             self.db.rollback()
             if snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             existing = self._events_for_occurrences(occurrence_ids)
             retried = self._matching_batch_retry(existing, batch_in)
             if retried is not None:
@@ -156,7 +166,7 @@ class EventService:
         except Exception as exc:
             self.db.rollback()
             if snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             raise EventPersistenceError("Could not save the event batch to the database") from exc
         return batch_id, snapshot_path, events
 
@@ -254,15 +264,11 @@ class EventService:
         if not success:
             raise EventPrivacyError("Privacy processing could not encode the redacted snapshot")
 
-        self._snapshot_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"event-{uuid.uuid4().hex}.jpg"
-        snapshot_file = self._snapshot_dir / filename
         try:
-            snapshot_file.write_bytes(redacted_bytes.tobytes())
-        except OSError as exc:
-            snapshot_file.unlink(missing_ok=True)
+            key = self._snapshot_storage.put(redacted_bytes.tobytes())
+        except SnapshotStorageError as exc:
             raise EventPersistenceError("Could not persist the redacted snapshot") from exc
-        return f"/snapshots/{filename}"
+        return f"/snapshots/{Path(key).name}"
 
     @staticmethod
     def _default_snapshot_redactor(frame: np.ndarray) -> PrivacyRedactionResult:
@@ -280,8 +286,17 @@ class EventService:
 
         return get_ppe_vision_adapter(get_settings().ppe_model_path).annotate_snapshot(frame, people, detections)
 
-    def _snapshot_file(self, snapshot_path: str) -> Path:
-        return self._snapshot_dir / Path(snapshot_path).name
+    def _delete_snapshot(self, snapshot_path: str) -> None:
+        try:
+            self._snapshot_storage.delete(f"snapshots/{Path(snapshot_path).name}")
+        except SnapshotStorageError:
+            pass
+
+    @staticmethod
+    def _default_snapshot_storage() -> SnapshotStorage:
+        from backend.app.core.config import get_settings
+
+        return create_snapshot_storage(get_settings())
 
     def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()

@@ -24,9 +24,11 @@ def _sha256(path: Path) -> str:
 def validate_runtime_files(settings: Settings) -> dict[str, bool]:
     """Fail before serving traffic when runtime files are missing or corrupt."""
     data_dir = Path(settings.operational_metrics_log_path).parent
+    settings.validate_snapshot_storage()
     snapshot_dir = Path(settings.snapshot_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    if settings.snapshot_storage_backend == "filesystem":
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
     probe = data_dir / ".startup-write-probe"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink()

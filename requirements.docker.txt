@@ -1,0 +1,33 @@
+# Production-only dependencies used by the Docker image.
+#
+# Keep development tools in requirements.txt. Ultralytics is installed separately
+# in Dockerfile with --no-deps so its GUI OpenCV, plotting and dataframe extras
+# cannot replace the smaller headless runtime set below.
+
+# Web application
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.0
+
+# Computer vision runtime
+numpy>=2.0.0
+opencv-python-headless>=4.10.0
+pillow>=7.1.2
+pyyaml>=5.3.1
+requests>=2.23.0
+psutil>=5.8.0
+filelock>=3.16.1
+ultralytics-thop>=2.1.6
+
+# AI safety-agent runtime
+langchain>=0.3.0
+langchain-openai>=0.3.0
+langgraph>=0.2.0
+
+# Persistence
+sqlalchemy>=2.0.0
+alembic>=1.14.0
+psycopg2-binary>=2.9.0
+boto3>=1.35.0

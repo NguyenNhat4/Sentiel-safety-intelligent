@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
     snapshot_dir: str = "data/snapshots"
+    snapshot_storage_backend: Literal["filesystem", "s3"] = "filesystem"
+    snapshot_storage_bucket: str = ""
+    snapshot_storage_endpoint_url: str = ""
+    snapshot_storage_region: str = "auto"
+    snapshot_storage_access_key_id: str = ""
+    snapshot_storage_secret_access_key: str = ""
     operational_metrics_log_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     operational_metrics_log_backup_count: int = Field(default=6, ge=1, le=30)
     operational_metrics_max_scan_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
@@ -62,6 +68,22 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     # Violate frame least confidence threshold for PPE & Danger Zone detection
+
+    def validate_snapshot_storage(self) -> None:
+        if self.snapshot_storage_backend != "s3":
+            return
+        missing = [
+            name
+            for name, value in (
+                ("SNAPSHOT_STORAGE_BUCKET", self.snapshot_storage_bucket),
+                ("SNAPSHOT_STORAGE_ENDPOINT_URL", self.snapshot_storage_endpoint_url),
+                ("SNAPSHOT_STORAGE_ACCESS_KEY_ID", self.snapshot_storage_access_key_id),
+                ("SNAPSHOT_STORAGE_SECRET_ACCESS_KEY", self.snapshot_storage_secret_access_key),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"S3 snapshot storage requires {', '.join(missing)}")
 
 
 @lru_cache

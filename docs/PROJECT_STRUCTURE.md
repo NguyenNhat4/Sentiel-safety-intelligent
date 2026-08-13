@@ -174,6 +174,7 @@ P-047/
 │   ├── test_startup_validation.py
 │   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
+├── requirements.docker.txt # Production-only, CPU/headless Python dependency set
 └── README.md
 ```
 

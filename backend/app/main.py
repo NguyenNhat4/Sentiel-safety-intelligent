@@ -3,9 +3,9 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.router import api_router
@@ -13,6 +13,7 @@ from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
 from backend.app.core.startup_validation import validate_runtime_files
+from backend.app.integrations.snapshot_storage import SnapshotStorageError, create_snapshot_storage
 from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
 
@@ -102,9 +103,18 @@ async def record_http_metrics(request: Request, call_next):
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 frontend_dist_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-snapshot_dir = Path(settings.snapshot_dir)
-snapshot_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/snapshots", StaticFiles(directory=snapshot_dir), name="event-snapshots")
+
+
+@app.get("/snapshots/{filename}", include_in_schema=False)
+async def get_snapshot(filename: str):
+    """Serve a redacted snapshot from the configured private storage backend."""
+    if Path(filename).name != filename or not filename.endswith(".jpg"):
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    try:
+        content = create_snapshot_storage(settings).get(f"snapshots/{filename}")
+    except SnapshotStorageError as exc:
+        raise HTTPException(status_code=404, detail="Snapshot not found") from exc
+    return Response(content=content, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app.get("/health", tags=["Health Check"])
