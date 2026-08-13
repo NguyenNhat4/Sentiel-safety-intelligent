@@ -1,25 +1,30 @@
 # Models (YOLO & PPE Weights)
 
-Thư mục này chứa các file trọng số mô hình AI (Model Weights / Checkpoints) được sử dụng cho phễu Computer Vision và phễu suy luận vi phạm an toàn.
+Thư mục này chứa các checkpoint được pin và quản lý bằng Git LFS. Runtime hiện hành dùng hai model độc lập: YOLO11n cho person canonical và YOLO11m Safety cho PPE.
 
-## Các mô hình được cấu hình
+## Checkpoint runtime
 
-1. **`models/yolo11n.pt`**:
-   - Mô hình YOLO11 Nano baseline dùng để phát hiện con người (`person`, class 0) trong khung hình video.
-   - Được gọi mặc định bởi `FrameInferenceService` trong Backend.
+1. **`models/yolo11n.pt`**
+   - YOLO11 Nano baseline phát hiện `person` cho bounding box canonical, `foot_point`, zone rule và ByteTrack.
    - SHA-256: `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1`.
-   - Cần bổ sung provenance/version chính xác trước khi phát hành production; checksum này chỉ xác định artifact hiện có trong repository.
+   - Provenance/version production của artifact cũ này vẫn cần được khóa trước pilot.
 
-2. **`models/ppe_yolov8n.pt`**:
-   - Model YOLOv8 Nano từ release `v1` của dự án SH17.
-   - Nguồn: `https://github.com/ahmadmughees/SH17dataset/releases/download/v1/yolo8n.pt`.
-   - SHA-256: `5449f62bd7cf30c01c7fd138db2729a38abcb4d5120449773fba475d54f30b62`.
-   - Giấy phép dataset/repository: CC BY-NC-SA 4.0; cần rà soát quyền sử dụng model cho mục đích thương mại trước khi phát hành.
-   - Class mapping được đọc tĩnh từ checkpoint: `person`, `ear`, `ear-mufs`, `face`, `face-guard`, `face-mask`, `foot`, `tool`, `glasses`, `gloves`, `helmet`, `hands`, `head`, `medical-suit`, `shoes`, `safety-suit`, `safety-vest` (class `0` đến `16` theo thứ tự).
+2. **`models/yolo11m_safety.pt`**
+   - Repository: `wesjos/Yolo-hard-hat-safety-vest`.
+   - Revision pin: `95ffeeb1e0897d60564c811ace5935bcd43d982b`.
+   - File: `yolo11m_safety.pt`, kích thước `121046621` bytes.
+   - SHA-256: `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`.
+   - Giấy phép khai báo trên model card: Apache-2.0.
+   - Runtime đã smoke-test: Python 3.14, Ultralytics 8.4.115, PyTorch 2.13.0, CPU. CUDA vẫn phải được benchmark riêng trên máy triển khai.
+   - Mapping nguồn chính xác trong checkpoint là `{0: hat, 1: nohat, 2: novest, 3: person, 4: vest}`. Startup kiểm tra toàn bộ mapping này và fail nếu khác.
+   - Profile public `hat_vest_v1` chỉ chạy/chấp nhận source ID `0`, `3`, `4`, rồi chỉ phát hành `hat`, một `person` canonical và `vest`. `nohat`/`novest` không đi qua contract; backend tự suy luận qualified absence cho requirement đang bật.
+   - Model được gọi đúng một lần mỗi frame. Detection `person` của checkpoint này chỉ hỗ trợ association; YOLO11n vẫn là nguồn person canonical duy nhất cho rule/tracking và payload.
 
-`ppe_yolov8n.pt` nhận diện sự hiện diện của PPE, không có class `missing_*`. Vì vậy checkpoint này chưa tự đáp ứng semantics US-07 “thiếu PPE rõ ràng”; pipeline cần ghép PPE với từng người và chỉ kết luận thiếu sau khi áp dụng ngưỡng/logic đã được kiểm chứng. Không được suy diễn khả năng nhận diện chỉ từ tên file.
+## Artifact đã retire
+
+`models/ppe_yolov8n.pt` là checkpoint SH17 cũ, SHA-256 `5449f62bd7cf30c01c7fd138db2729a38abcb4d5120449773fba475d54f30b62`. US-28 đã loại artifact này khỏi cấu hình, startup, inference, privacy và annotation runtime. File chỉ còn để bảo toàn lịch sử/release có kiểm soát và không được xem là dependency đang hoạt động.
 
 ## Lưu ý về Git
 
-- Các file `.pt` bị ignore mặc định và chỉ được thêm có chủ đích.
-- Hai checkpoint trong thư mục này được Git LFS quản lý theo `.gitattributes`; không commit trực tiếp binary vào Git object database.
+- Các file `.pt` bị ignore mặc định; checkpoint runtime mới được allowlist rõ ràng trong `.gitignore`.
+- Checkpoint trong thư mục này được Git LFS quản lý theo `.gitattributes`, không lưu trực tiếp vào Git object database.

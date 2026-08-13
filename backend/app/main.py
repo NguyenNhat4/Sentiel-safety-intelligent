@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Could not connect to database on startup: {e}")
 
     frame_inference_service.preload_models()
-    logger.info("SH17 inference models loaded.")
+    logger.info("YOLO11 person and hat/vest inference models loaded.")
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield

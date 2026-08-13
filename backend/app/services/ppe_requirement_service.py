@@ -33,6 +33,8 @@ class PpeRequirementPersistenceError(RuntimeError):
 
 
 class PpeRequirementService:
+    PROFILE = "hat_vest_v1"
+
     def __init__(self, db: Session) -> None:
         self._db = db
 
@@ -42,13 +44,13 @@ class PpeRequirementService:
             return PpeRequirementResponse(
                 camera_id=camera_id,
                 zone_id=zone_id,
-                helmet_required=False,
-                safety_glasses_required=False,
-                gloves_required=False,
+                profile=self.PROFILE,
+                hat_required=False,
+                vest_required=False,
                 is_configured=False,
                 updated_at=None,
             )
-        return PpeRequirementResponse.model_validate(requirement)
+        return self._response(requirement)
 
     def save(
         self,
@@ -62,14 +64,13 @@ class PpeRequirementService:
                 requirement = PpeRequirement(camera_id=camera_id, zone_id=zone_id)
                 self._db.add(requirement)
 
-            requirement.helmet_required = update.helmet_required
-            requirement.safety_glasses_required = update.safety_glasses_required
-            requirement.gloves_required = update.gloves_required
+            requirement.hat_required = update.hat_required
+            requirement.vest_required = update.vest_required
             self._db.commit()
         except SQLAlchemyError as exc:
             self._db.rollback()
             raise PpeRequirementPersistenceError("Could not save PPE requirements") from exc
-        return PpeRequirementResponse.model_validate(requirement)
+        return self._response(requirement)
 
     def count(self) -> int:
         return self._db.scalar(select(func.count()).select_from(PpeRequirement)) or 0
@@ -80,4 +81,15 @@ class PpeRequirementService:
                 PpeRequirement.camera_id == camera_id,
                 PpeRequirement.zone_id == zone_id,
             )
+        )
+
+    def _response(self, requirement: PpeRequirement) -> PpeRequirementResponse:
+        return PpeRequirementResponse(
+            camera_id=requirement.camera_id,
+            zone_id=requirement.zone_id,
+            profile=self.PROFILE,
+            hat_required=requirement.hat_required,
+            vest_required=requirement.vest_required,
+            is_configured=True,
+            updated_at=requirement.updated_at,
         )

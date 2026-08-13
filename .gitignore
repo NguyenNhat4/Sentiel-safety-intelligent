@@ -63,3 +63,4 @@ out/
 .ai-log/archive/
 # Local model weights downloaded by the inference baseline
 *.pt
+!models/yolo11m_safety.pt

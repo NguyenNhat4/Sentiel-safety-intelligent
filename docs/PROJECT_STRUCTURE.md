@@ -30,7 +30,8 @@ P-047/
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── person_tracking.py # Adapter to session-isolated ByteTrack
-│   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
+│   │   │   ├── ppe_vision.py # Cached adapter to YOLO11m Safety PPE facade
+│   │   │   └── privacy_vision.py # Model-independent fail-closed snapshot privacy adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
@@ -65,7 +66,8 @@ P-047/
 │   │       ├── 20260807_01_add_event_occurrences.py
 │   │       ├── 20260811_01_add_authentication_schema.py
 │   │       ├── 20260811_02_add_forced_password_change.py
-│   │       └── 20260811_03_add_monitoring_zones.py
+│   │       ├── 20260811_03_add_monitoring_zones.py
+│   │       └── 20260813_01_migrate_ppe_profile_hat_vest.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -74,13 +76,14 @@ P-047/
 │       ├── test_frame_inference_ppe.py
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
+│       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
 │       ├── test_violation_tracking.py
 │       └── test_statistics.py
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
-│   ├── api.py           # Public PPE, redaction and session-tracking facades
-│   ├── pipeline.py      # Pure identity redaction and person-head fallback logic
+│   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
+│   ├── pipeline.py      # Pure person-head redaction and post-redaction annotation
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       ├── test_api.py
@@ -123,8 +126,9 @@ P-047/
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
-│   ├── ppe_yolov8n.pt  # SH17 YOLOv8n PPE-presence checkpoint
-│   └── yolo11n.pt      # Person-detection baseline checkpoint
+│   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
+│   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
+│   └── yolo11n.pt      # Canonical person-detection baseline checkpoint
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
@@ -142,7 +146,8 @@ P-047/
 │   │   ├── US-07-SPEC.md
 │   │   ├── US-08-SPEC.md
 │   │   ├── US-12.md
-│   │   └── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
+│   │   ├── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
+│   │   └── US-28.md     # Completed YOLO11m Safety hat/vest cutover specification
 │   └── backlog/         # Remaining MVP and advanced user stories
 │       ├── README.md
 │       └── US-09.md ... US-26.md

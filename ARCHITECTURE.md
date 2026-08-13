@@ -5,7 +5,7 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 
 ## Mục tiêu và ràng buộc
 
-- Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ/kính/găng và xâm nhập vùng nguy hiểm.
+- Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ bảo hộ/áo phản quang và xâm nhập vùng nguy hiểm.
 - Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập chỉ là critical khi chính máy của vùng đó đang chạy. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
 - Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
 - Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.

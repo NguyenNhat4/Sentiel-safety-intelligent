@@ -53,14 +53,13 @@ class PpeObservation(BaseModel):
 
 
 class PersonPpeObservations(BaseModel):
-    helmet: PpeObservation
-    safety_glasses: PpeObservation
-    gloves: PpeObservation
+    hat: PpeObservation
+    vest: PpeObservation
 
 
 class ModelDetection(BaseModel):
-    class_id: int = Field(..., ge=0, le=16)
-    class_name: str = Field(..., min_length=1)
+    class_id: Literal[0, 3, 4]
+    class_name: Literal["hat", "person", "vest"]
     bbox: list[int] = Field(..., min_length=4, max_length=4)
     confidence: float = Field(..., ge=0.0, le=1.0)
     person_index: int | None = Field(default=None, ge=0)
@@ -85,9 +84,8 @@ class PersonDetection(BaseModel):
     foot_point: list[int]
     inside_zone: bool
     zone_memberships: list[ZoneMembership] = Field(default_factory=list)
-    safety_shirt: bool
     ppe: PersonPpeObservations
-    missing_required_ppe: list[Literal["helmet", "safety_glasses", "gloves"]] = Field(default_factory=list)
+    missing_required_ppe: list[Literal["hat", "vest"]] = Field(default_factory=list)
     active_violations: list[ActiveViolation] = Field(default_factory=list)
 
 

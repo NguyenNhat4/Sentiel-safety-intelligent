@@ -9,22 +9,21 @@ describe("review event payload", () => {
     result: "violate", review_required: true, snapshot_data: "data:image/jpeg;base64,AA==",
     people: [{
       track_id: 7,
-      bbox: [0, 0, 10, 20], confidence: 0.9, inside_zone: true, safety_shirt: false,
+      bbox: [0, 0, 10, 20], confidence: 0.9, inside_zone: true,
       ppe: {
-        helmet: {status: "unknown", confidence: null},
-        safety_glasses: {status: "unknown", confidence: null},
-        gloves: {status: "unknown", confidence: null},
+        hat: {status: "unknown", confidence: null},
+        vest: {status: "unknown", confidence: null},
       },
       missing_required_ppe: [],
       active_violations: [{occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "zone_intrusion", is_new: true}],
     }],
     detections: [{
-      class_id: 1, class_name: "helmet", bbox: [2, 3, 8, 9], confidence: 0.8, person_index: 0,
+      class_id: 0, class_name: "hat", bbox: [2, 3, 8, 9], confidence: 0.8, person_index: 0,
     }],
     rule: {
-      person_inside_zone: true, machine_state: "running", safety_shirt_required: true,
+      person_inside_zone: true, machine_state: "running", ppe_profile: "hat_vest_v1",
       camera_id: "uploaded_video", zone_id: "zone_01",
-      ppe_requirements: {helmet_required: false, safety_glasses_required: false, gloves_required: false},
+      ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false},
       ppe_alert: false,
     }
   };
@@ -52,7 +51,7 @@ describe("review event payload", () => {
         ...pending.people[0],
         active_violations: [
           ...pending.people[0].active_violations!,
-          {occurrence_id: "9a2c2d52-73ce-4a35-8a27-e5052925e17c", rule_key: "missing_ppe:helmet", is_new: false},
+          {occurrence_id: "9a2c2d52-73ce-4a35-8a27-e5052925e17c", rule_key: "missing_ppe:hat", is_new: false},
         ],
       }],
     };
@@ -60,16 +59,16 @@ describe("review event payload", () => {
       .toEqual(["7aedf540-36da-4cf8-bb9b-8cd7aeab460d"]);
   });
 
-  it("uses configured PPE states instead of the legacy safety-shirt heuristic", () => {
+  it("uses configured hat-and-vest states", () => {
     expect(buildPpeRule(pending)).toEqual({yes: null, text: "Không yêu cầu PPE", badge: "OFF"});
-    const helmetRequired = {
+    const hatRequired = {
       ...pending,
       rule: {
         ...pending.rule,
-        ppe_requirements: {helmet_required: true, safety_glasses_required: false, gloves_required: false},
+        ppe_requirements: {profile: "hat_vest_v1" as const, hat_required: true, vest_required: false},
       },
     };
-    expect(buildPpeRule(helmetRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ", badge: "CHECK"});
+    expect(buildPpeRule(hatRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ bảo hộ", badge: "CHECK"});
   });
 
   it("partitions a grouped review into one event per zone", () => {

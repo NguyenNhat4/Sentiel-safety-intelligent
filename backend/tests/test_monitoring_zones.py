@@ -35,9 +35,9 @@ def _no_ppe_requirements(camera_id: str, zone_id: str) -> PpeRequirementResponse
     return PpeRequirementResponse(
         camera_id=camera_id,
         zone_id=zone_id,
-        helmet_required=False,
-        safety_glasses_required=False,
-        gloves_required=False,
+        profile="hat_vest_v1",
+        hat_required=False,
+        vest_required=False,
         is_configured=False,
         updated_at=None,
     )
@@ -124,9 +124,8 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
         nonlocal observer_calls
         observer_calls += 1
         present = {
-            "helmet": {"status": "present", "confidence": 0.9},
-            "safety_glasses": {"status": "present", "confidence": 0.9},
-            "gloves": {"status": "present", "confidence": 0.9},
+            "hat": {"status": "present", "confidence": 0.9},
+            "vest": {"status": "present", "confidence": 0.9},
         }
         return [present for _ in people]
 
@@ -139,8 +138,6 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
             (140, 10, 20, 40, 0.95, 2),
         ],
     )
-    monkeypatch.setattr(service, "_has_safety_shirt", lambda *args: True)
-
     result = service.infer(
         FrameInferenceRequest(
             image_data=_jpeg_data_url(),

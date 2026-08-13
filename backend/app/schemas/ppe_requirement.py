@@ -1,12 +1,13 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, StrictBool
 
 
 class PpeRequirementUpdate(BaseModel):
-    helmet_required: StrictBool
-    safety_glasses_required: StrictBool
-    gloves_required: StrictBool
+    profile: Literal["hat_vest_v1"]
+    hat_required: StrictBool
+    vest_required: StrictBool
 
     model_config = ConfigDict(extra="forbid")
 

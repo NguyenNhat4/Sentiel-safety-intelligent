@@ -10,16 +10,12 @@ import numpy as np
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.integrations.ppe_vision import (
-    ModelDetection,
-    PrivacyRedactionResult,
-    SnapshotPerson,
-    get_ppe_vision_adapter,
-)
+from backend.app.integrations.privacy_vision import get_privacy_vision_adapter
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
 from backend.app.schemas.event import EventBatchCreate, EventCreate, EventUpdate
+from vision.api import ModelDetection, PrivacyRedactionResult, SnapshotPerson
 
 
 class EventPersistenceError(RuntimeError):
@@ -30,7 +26,7 @@ class EventPrivacyError(RuntimeError):
     pass
 
 
-SnapshotRedactor = Callable[[np.ndarray], PrivacyRedactionResult]
+SnapshotRedactor = Callable[[np.ndarray, list[SnapshotPerson]], PrivacyRedactionResult]
 SnapshotAnnotator = Callable[[np.ndarray, list[SnapshotPerson], list[ModelDetection]], np.ndarray]
 
 
@@ -236,17 +232,18 @@ class EventService:
             raise ValueError("snapshot_data could not be decoded as an image")
 
         try:
-            redaction = self._snapshot_redactor(frame)
+            people = [
+                {
+                    "bbox": person.bbox,
+                    "confidence": person.confidence,
+                    "inside_zone": person.inside_zone,
+                }
+                for person in snapshot_people
+            ]
+            redaction = self._snapshot_redactor(frame, people)
             annotated = self._snapshot_annotator(
                 redaction["image"],
-                [
-                    {
-                        "bbox": person.bbox,
-                        "confidence": person.confidence,
-                        "inside_zone": person.inside_zone,
-                    }
-                    for person in snapshot_people
-                ],
+                people,
                 [detection.model_dump() for detection in snapshot_detections],
             )
             success, redacted_bytes = cv2.imencode(".jpg", annotated)
@@ -266,10 +263,11 @@ class EventService:
         return f"/snapshots/{filename}"
 
     @staticmethod
-    def _default_snapshot_redactor(frame: np.ndarray) -> PrivacyRedactionResult:
-        from backend.app.core.config import get_settings
-
-        return get_ppe_vision_adapter(get_settings().ppe_model_path).redact_snapshot(frame)
+    def _default_snapshot_redactor(
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+    ) -> PrivacyRedactionResult:
+        return get_privacy_vision_adapter().redact_snapshot(frame, people)
 
     @staticmethod
     def _default_snapshot_annotator(
@@ -277,9 +275,7 @@ class EventService:
         people: list[SnapshotPerson],
         detections: list[ModelDetection],
     ) -> np.ndarray:
-        from backend.app.core.config import get_settings
-
-        return get_ppe_vision_adapter(get_settings().ppe_model_path).annotate_snapshot(frame, people, detections)
+        return get_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
 
     def _snapshot_file(self, snapshot_path: str) -> Path:
         return self._snapshot_dir / Path(snapshot_path).name

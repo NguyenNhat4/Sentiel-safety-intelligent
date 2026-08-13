@@ -97,9 +97,8 @@ Tọa độ polygon nên chuẩn hóa về `[0, 1]` để không phụ thuộc �
     {
       "start_ms": 0,
       "end_ms": 18000,
-      "helmet": "present",
-      "glasses": "missing",
-      "gloves": "present"
+      "hat": "present",
+      "vest": "missing"
     }
   ],
   "boxes": [

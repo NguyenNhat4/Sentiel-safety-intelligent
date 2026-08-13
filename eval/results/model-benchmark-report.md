@@ -2,41 +2,43 @@
 
 ## Scope
 
-Đo tốc độ khi một frame đi qua tuần tự hai model giống flow inference hiện tại:
+Đo smoke latency khi một frame đi qua tuần tự hai model giống flow US-28:
 
 1. `models/yolo11n.pt` — detect người.
-2. `models/ppe_yolov8n.pt` — detect PPE/object.
+2. `models/yolo11m_safety.pt` — chạy source class `[0, 3, 4]` tương ứng `hat`, `person`, `vest`.
 
-Input là `data/test.mp4`, kích thước frame `1280 × 720`.
+Input là ảnh regression local `640 × 640`; thiết bị CPU, Python 3.14, Ultralytics 8.4.115 và PyTorch 2.13.0. Đây là smoke benchmark của cutover, không thay thế final evaluation US-13.
 
 ## Command
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
   --pipeline \
-  --warmup 5 \
-  --iterations 30 \
-  --frames 30
+  --source runs/detect/predict/0_jpg.rf.645d920fa4e6fea3a11538f2e809d7d7.jpg \
+  --warmup 2 \
+  --iterations 5 \
+  --frames 1 \
+  --device cpu
 ```
 
 ## Result
 
 | Metric | Result |
 |---|---:|
-| Warmup | 5 frames |
-| Measured | 30 frames |
-| Mean latency | **94.25 ms/frame** |
-| P50 latency | **93.92 ms/frame** |
-| P95 latency | **96.30 ms/frame** |
-| P99 latency | **105.75 ms/frame** |
-| Throughput | **10.61 FPS** |
+| Warmup | 2 frames |
+| Measured | 5 frames |
+| Mean latency | **477.46 ms/frame** |
+| P50 latency | **472.20 ms/frame** |
+| P95 latency | **504.02 ms/frame** |
+| P99 latency | **504.60 ms/frame** |
+| Throughput | **2.09 FPS** |
 | Confidence threshold | `0.35` |
 
 ## Interpretation
 
-- Model pipeline có khả năng xử lý khoảng `10.61 FPS` trong điều kiện benchmark hiện tại.
-- Frontend hiện lấy mẫu khoảng `2 FPS` (`0.5 giây/frame`), vì vậy inference model chưa phải nút thắt tốc độ trong flow hiện tại.
-- Một frame chạy qua cả hai model mất trung bình khoảng `94 ms`, chưa đến `0.1 giây`.
+- Smoke run đạt khoảng `2.09 FPS` trên CPU và xấp xỉ cadence frontend `2 FPS`; CPU là ranh giới hiệu năng chặt, không có headroom đáng kể.
+- Kết quả xác nhận pipeline chỉ gọi mỗi model một lần/frame với class filter runtime, nhưng mẫu 5 lần không đủ để đặt SLO.
+- Trước pilot phải chạy lại trên video calibration/final US-13, đủ sample và đúng CPU/GPU mục tiêu để chốt P50/P95, throughput, precision/recall và false alarm.
 
 ## Measurement boundary
 

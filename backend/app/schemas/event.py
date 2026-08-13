@@ -33,7 +33,7 @@ class EventCreate(EventBase):
     snapshot_detections: list[ModelDetection] = Field(
         default_factory=list,
         exclude=True,
-        description="SH17 detections used only to annotate the persisted snapshot",
+        description="Hat/person/vest detections used only to annotate the persisted snapshot",
     )
 
 

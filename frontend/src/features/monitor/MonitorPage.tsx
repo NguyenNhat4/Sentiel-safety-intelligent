@@ -131,7 +131,7 @@ export function MonitorPage() {
 
       <div className="activity-strip">
         <div><span className="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
-        <span>MULTI ZONE</span><span className="medium-pill">PPE RULES GIỮ NGUYÊN</span>
+        <span>MULTI ZONE</span><span className="medium-pill">PPE · HAT / VEST</span>
         <span>{state.flowStatus}</span>
         <button onClick={actions.openFilePicker}>Bắt đầu bằng video →</button>
       </div>

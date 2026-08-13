@@ -16,7 +16,7 @@ def test_create_and_get_event(client):
         "event_type": "missing_ppe",
         "severity": "high",
         "privacy_blurred": True,
-        "details": {"track_id": 1, "missing": ["helmet"]},
+        "details": {"track_id": 1, "missing": ["hat"]},
     }
     response = client.post("/api/v1/events", json=payload)
     assert response.status_code == 201

@@ -7,7 +7,7 @@ import pytest
 from backend.app.models.event import SafetyEvent
 from backend.app.schemas.event import EventCreate, EventUpdate
 from backend.app.services.event_service import EventPersistenceError, EventPrivacyError, EventService
-from vision.pipeline import PrivacyRedactionError, redact_identity_regions
+from vision.pipeline import PrivacyRedactionError, redact_person_head_regions
 
 
 def _patterned_frame() -> np.ndarray:
@@ -25,33 +25,37 @@ def _snapshot_data(frame: np.ndarray) -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(encoded.tobytes()).decode()}"
 
 
-def _redact_person_head(frame: np.ndarray):
-    return redact_identity_regions(
-        frame,
-        [
-            {
-                "class_id": 0,
-                "class_name": "person",
-                "bbox": [20, 10, 80, 90],
-                "confidence": 0.9,
-                "person_index": None,
-            }
-        ],
-    )
+def _redact_person_head(frame: np.ndarray, people):
+    return redact_person_head_regions(frame, people)
 
 
 def _event_input(snapshot_data: str | None = None) -> EventCreate:
-    return EventCreate.model_validate(
-        {
-            "zone_id": "zone_01",
-            "camera_id": "cam_01",
-            "event_type": "zone_intrusion",
-            "severity": "high",
-            "status": "acknowledged",
-            "acknowledged_by": "Safety Officer",
-            "snapshot_data": snapshot_data,
-        }
-    )
+    payload = {
+        "zone_id": "zone_01",
+        "camera_id": "cam_01",
+        "event_type": "zone_intrusion",
+        "severity": "high",
+        "status": "acknowledged",
+        "acknowledged_by": "Safety Officer",
+        "snapshot_data": snapshot_data,
+    }
+    if snapshot_data:
+        payload["snapshot_people"] = [_snapshot_person()]
+    return EventCreate.model_validate(payload)
+
+
+def _snapshot_person() -> dict:
+    return {
+        "bbox": [20, 10, 80, 90],
+        "confidence": 0.9,
+        "foot_point": [50, 90],
+        "inside_zone": True,
+        "ppe": {
+            "hat": {"status": "missing", "confidence": None},
+            "vest": {"status": "unknown", "confidence": None},
+        },
+        "missing_required_ppe": ["hat"],
+    }
 
 
 def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_session, tmp_path):
@@ -65,6 +69,7 @@ def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_s
             "status": "acknowledged",
             "acknowledged_by": "Safety Officer",
             "snapshot_data": _snapshot_data(frame),
+            "snapshot_people": [_snapshot_person()],
             "privacy_blurred": False,
             "snapshot_path": "/snapshots/client-supplied.jpg",
         }
@@ -93,25 +98,11 @@ def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, 
             "status": "acknowledged",
             "acknowledged_by": "Safety Officer",
             "snapshot_data": _snapshot_data(frame),
-            "snapshot_people": [
-                {
-                    "bbox": [20, 10, 80, 90],
-                    "confidence": 0.9,
-                    "foot_point": [50, 90],
-                    "inside_zone": True,
-                    "safety_shirt": False,
-                    "ppe": {
-                        "helmet": {"status": "missing", "confidence": None},
-                        "safety_glasses": {"status": "unknown", "confidence": None},
-                        "gloves": {"status": "unknown", "confidence": None},
-                    },
-                    "missing_required_ppe": ["helmet"],
-                }
-            ],
+            "snapshot_people": [_snapshot_person()],
             "snapshot_detections": [
                 {
-                    "class_id": 1,
-                    "class_name": "helmet",
+                    "class_id": 0,
+                    "class_name": "hat",
                     "bbox": [25, 15, 45, 35],
                     "confidence": 0.8,
                     "person_index": 0,
@@ -142,8 +133,8 @@ def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, 
         "people": [{"bbox": [20, 10, 80, 90], "confidence": 0.9, "inside_zone": True}],
         "detections": [
             {
-                "class_id": 1,
-                "class_name": "helmet",
+                "class_id": 0,
+                "class_name": "hat",
                 "bbox": [25, 15, 45, 35],
                 "confidence": 0.8,
                 "person_index": 0,
@@ -155,7 +146,7 @@ def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, 
 
 
 def test_privacy_failure_creates_neither_event_nor_snapshot(db_session, tmp_path):
-    def fail_redaction(_: np.ndarray):
+    def fail_redaction(_: np.ndarray, people):
         raise PrivacyRedactionError("no candidate")
 
     service = EventService(db_session, snapshot_redactor=fail_redaction, snapshot_dir=tmp_path)

@@ -42,13 +42,11 @@ export interface PersonDetection {
   foot_point?: [number, number];
   inside_zone: boolean;
   zone_memberships?: ZoneMembership[];
-  safety_shirt: boolean;
   ppe: {
-    helmet: PpeObservation;
-    safety_glasses: PpeObservation;
-    gloves: PpeObservation;
+    hat: PpeObservation;
+    vest: PpeObservation;
   };
-  missing_required_ppe: Array<"helmet" | "safety_glasses" | "gloves">;
+  missing_required_ppe: Array<"hat" | "vest">;
   active_violations?: ActiveViolation[];
 }
 
@@ -77,8 +75,8 @@ export interface PpeObservation {
 }
 
 export interface ModelDetection {
-  class_id: number;
-  class_name: string;
+  class_id: 0 | 3 | 4;
+  class_name: "hat" | "person" | "vest";
   bbox: [number, number, number, number];
   confidence: number;
   person_index: number | null;
@@ -87,7 +85,7 @@ export interface ModelDetection {
 export interface InferenceRule {
   person_inside_zone: boolean;
   machine_state: MachineState;
-  safety_shirt_required: boolean;
+  ppe_profile: "hat_vest_v1";
   camera_id: string;
   zone_id: string;
   ppe_requirements: PpeRequirementUpdate;
@@ -171,9 +169,9 @@ export interface EventPayload {
 }
 
 export interface PpeRequirementUpdate {
-  helmet_required: boolean;
-  safety_glasses_required: boolean;
-  gloves_required: boolean;
+  profile: "hat_vest_v1";
+  hat_required: boolean;
+  vest_required: boolean;
 }
 
 export interface PpeRequirement extends PpeRequirementUpdate {

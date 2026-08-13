@@ -14,7 +14,7 @@ import numpy as np
 
 DEFAULT_SOURCE = "data/test.mp4"
 DEFAULT_MODEL = "models/yolo11n.pt"
-DEFAULT_PPE_MODEL = "models/ppe_yolov8n.pt"
+DEFAULT_PPE_MODEL = "models/yolo11m_safety.pt"
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -156,8 +156,8 @@ def benchmark_pipeline(
         predict_options["device"] = device
 
     def run(frame: np.ndarray) -> None:
-        person_model.predict(frame, **predict_options)
-        ppe_model.predict(frame, **predict_options)
+        person_model.predict(frame, classes=[0], **predict_options)
+        ppe_model.predict(frame, classes=[0, 3, 4], **predict_options)
 
     for index in range(warmup):
         run(frames[index % len(frames)])
@@ -182,6 +182,7 @@ def benchmark_pipeline(
         latencies_ms=latencies_ms,
     )
     report["pipeline"] = [str(person_model_path), str(ppe_model_path)]
+    report["pipeline_classes"] = [[0], [0, 3, 4]]
     return report
 
 

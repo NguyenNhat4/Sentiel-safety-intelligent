@@ -23,9 +23,14 @@ To benchmark the PPE model and save machine-readable output:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
-  --model models/ppe_yolov8n.pt \
+  --model models/yolo11m_safety.pt \
   --output data/model-benchmark.json
 ```
+
+Pipeline mode matches US-28 runtime filtering: person YOLO11n uses class `[0]`, and
+YOLO11m Safety uses source classes `[0, 3, 4]` (`hat`, `person`, `vest`) exactly once
+per frame. Single-model mode deliberately measures all checkpoint classes unless a
+future CLI option states otherwise.
 
 The report includes mean/min/max/P50/P95/P99 latency in milliseconds and throughput in FPS.
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing

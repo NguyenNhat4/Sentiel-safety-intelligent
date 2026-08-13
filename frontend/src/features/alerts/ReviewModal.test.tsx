@@ -56,19 +56,17 @@ describe("ReviewModal", () => {
         onClose={vi.fn()}
         snapshot="data:image/jpeg;base64,1234"
         people={[{
-          bbox: [10, 15, 80, 90], confidence: 0.9, inside_zone: true, safety_shirt: false,
+          bbox: [10, 15, 80, 90], confidence: 0.9, inside_zone: true,
           ppe: {
-            helmet: {status: "unknown", confidence: null},
-            safety_glasses: {status: "unknown", confidence: null},
-            gloves: {status: "unknown", confidence: null},
+            hat: {status: "unknown", confidence: null},
+            vest: {status: "unknown", confidence: null},
           },
           missing_required_ppe: [],
         }]}
         detections={[
-          {class_id: 10, class_name: "helmet", bbox: [20, 20, 50, 50], confidence: 0.8, person_index: 0},
-          {class_id: 9, class_name: "gloves", bbox: [25, 25, 45, 45], confidence: 0.8, person_index: 0},
-          {class_id: 7, class_name: "tool", bbox: [30, 30, 60, 60], confidence: 0.8, person_index: 0},
-          {class_id: 0, class_name: "person", bbox: [10, 15, 80, 90], confidence: 0.9, person_index: 0},
+          {class_id: 0, class_name: "hat", bbox: [20, 20, 50, 50], confidence: 0.8, person_index: 0},
+          {class_id: 4, class_name: "vest", bbox: [25, 25, 45, 45], confidence: 0.8, person_index: 0},
+          {class_id: 3, class_name: "person", bbox: [10, 15, 80, 90], confidence: 0.9, person_index: 0},
         ]}
         timer="00:12"
         reviewSaving={false}

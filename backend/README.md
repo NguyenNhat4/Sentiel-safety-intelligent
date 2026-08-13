@@ -30,14 +30,14 @@ The baseline uses two transports with separate responsibilities:
 
 US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
 
-US-07 adds a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
+The versioned `hat_vest_v1` profile uses a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
 
 ```http
 GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns helmet, safety-glasses and gloves requirements; a missing record materializes as three OFF values with `is_configured=false`. PUT requires all three strict booleans and atomically saves them. The current configuration UI uses `uploaded_video` and `zone_01`. The PPE adapter returns all 17 SH17 detections plus per-person PPE observations through `vision.api`. Backend derives `missing` only when a person meets the confidence/association guard and has no associated required PPE detection.
+GET returns `profile`, `hat_required` and `vest_required`; a missing record materializes as two OFF values with `is_configured=false`. PUT requires the exact profile plus both strict booleans and rejects legacy/extra fields. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
@@ -81,7 +81,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/PPE objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** SH17 class `0` detects people; the same checkpoint detects all PPE/object classes. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** YOLO11n supplies canonical people and ByteTrack; YOLO11m Safety supplies the three selected source classes while only its `hat`/`vest` detections feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
@@ -146,20 +146,28 @@ The backend returns one correlated JSON result for each accepted JPEG:
       "confidence": 0.91,
       "foot_point": [477, 610],
       "inside_zone": true,
-      "safety_shirt": false
+      "ppe": {
+        "hat": {"status": "missing", "confidence": null},
+        "vest": {"status": "present", "confidence": 0.88}
+      },
+      "missing_required_ppe": ["hat"]
     }
+  ],
+  "detections": [
+    {"class_id": 3, "class_name": "person", "bbox": [420, 115, 535, 610], "confidence": 0.91, "person_index": 0},
+    {"class_id": 4, "class_name": "vest", "bbox": [438, 250, 520, 510], "confidence": 0.88, "person_index": 0}
   ],
   "snapshot_data": "data:image/jpeg;base64,...",
   "rule": {
     "person_inside_zone": true,
     "machine_state": "running",
-    "safety_shirt_required": true,
+    "ppe_profile": "hat_vest_v1",
     "camera_id": "uploaded_video",
     "zone_id": "zone_01",
     "ppe_requirements": {
-      "helmet_required": true,
-      "safety_glasses_required": false,
-      "gloves_required": false
+      "profile": "hat_vest_v1",
+      "hat_required": true,
+      "vest_required": true
     },
     "ppe_alert": false
   }
@@ -170,14 +178,14 @@ The backend returns one correlated JSON result for each accepted JPEG:
 |---|---|
 | `frame_id`, `video_time` | Copied from `frame_meta` so the frontend can match the result to the analyzed frame. |
 | `people` | Every person detected by YOLO; an empty array means no person was detected. |
-| `detections` | Additive list of every SH17 model detection: `class_id`, `class_name`, original-frame `bbox`, confidence and nullable `person_index`. It can be non-empty even when `people` is empty. |
+| `detections` | Typed list limited to canonical `person` plus YOLO11m Safety `hat`/`vest`: class ID/name, original-frame `bbox`, confidence and nullable `person_index`. It can contain unassociated PPE when `people` is empty. |
 | `track_id` | ByteTrack association ID scoped to one monitoring session; it is not a personal identity. |
 | `active_violations` | Per-track rule occurrences. Only `is_new=true` opens a new review candidate. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |
 | `confidence` | YOLO's confidence that the detection is a person. |
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
 | `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
-| `safety_shirt` | Baseline high-visibility-shirt heuristic; supplementary metadata, not the zone-intrusion trigger. |
+| `ppe`, `missing_required_ppe` | Per-person `hat`/`vest` observations and only the currently required items that passed qualified-absence guards. |
 | `review_required` | `true` when the machine is running and at least one foot point is inside, or when a required PPE is `missing` for a qualified person. The frontend pauses only for this value. |
 | `result` | `violate` when `review_required=true`; otherwise `normal`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
@@ -263,9 +271,9 @@ Example confirmed violation:
 }
 ```
 
-`EventService` validates and decodes `snapshot_data`, invokes the shared SH17 facade, and writes only the returned redacted JPEG under `data/snapshots`. It accepts additive transient `snapshot_people` and `snapshot_detections` fields from the same reviewed frame, then draws their person and SH17 boxes only **after** redaction and before JPEG encoding; these fields are excluded from event persistence/response. It sets `privacy_blurred=true` itself only after redaction succeeds, stores the `/snapshots/...` path in the event row, then commits the database record. A client-provided `privacy_blurred` or `snapshot_path` is ignored for compatibility and cannot bypass this gate. Reviewed records receive `acknowledged_at` on the server.
+`EventService` validates and decodes `snapshot_data`, then calls the privacy adapter independently from PPE inference. It accepts transient `snapshot_people` and `snapshot_detections` from the reviewed frame, redacts first, and only then draws canonical person plus `hat`/`vest` boxes before JPEG encoding; these fields are excluded from event persistence/response. It writes only the processed JPEG under `data/snapshots`, sets `privacy_blurred=true` itself, then commits the event. Client-provided privacy/path values cannot bypass this gate.
 
-The US-12 MVP policy blurs every `face`, `face-guard`, `face-mask` and `head` detected by SH17. Each `person` without one of those identity detections receives a conservative blur over the top 40% of its bounding box. If SH17 returns neither an identity region nor a person, processing fails closed: no snapshot is written and no reviewed event is created.
+The prototype privacy policy blurs the top 40% of every canonical person box. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. This policy does not load the retired SH17 checkpoint or add privacy classes to the PPE contract.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
 

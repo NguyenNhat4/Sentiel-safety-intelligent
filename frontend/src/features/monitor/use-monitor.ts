@@ -21,9 +21,9 @@ const SAMPLE_INTERVAL_SECONDS = 0.1;
 const JPEG_QUALITY = 0.82;
 const PREVIEW_CANDIDATES = [0.05, 0.5, 1, 2, 3, 4, 5, 7, 10];
 const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
-  helmet_required: false,
-  safety_glasses_required: false,
-  gloves_required: false,
+  profile: "hat_vest_v1",
+  hat_required: false,
+  vest_required: false,
 };
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
@@ -662,7 +662,7 @@ export function useMonitor() {
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
       zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
       latestPeople, latestDetections, peopleCount: latestPeople.length,
-      ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
+      ppeRequirementCount: Number(activePpeRequirements.hat_required) + Number(activePpeRequirements.vest_required),
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
@@ -684,19 +684,18 @@ export function useMonitor() {
 export function buildPpeRule(result: InferenceResult): RuleView {
   const requirements = result.rule.ppe_requirements;
   const requiredLabels = [
-    requirements.helmet_required ? "mũ" : null,
-    requirements.safety_glasses_required ? "kính" : null,
-    requirements.gloves_required ? "găng" : null,
+    requirements.hat_required ? "mũ bảo hộ" : null,
+    requirements.vest_required ? "áo phản quang" : null,
   ].filter((label): label is string => label !== null);
   if (!requiredLabels.length) return {yes: null, text: "Không yêu cầu PPE", badge: "OFF"};
 
   const missing = [...new Set(result.people.flatMap(person => person.missing_required_ppe))];
-  const ppeLabel: Record<string, string> = {helmet: "mũ", safety_glasses: "kính", gloves: "găng"};
+  const ppeLabel: Record<string, string> = {hat: "mũ bảo hộ", vest: "áo phản quang"};
   if (missing.length) return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
 
   const hasUnknown = result.people.some(person =>
     requiredLabels.some(label => {
-      const item = label === "mũ" ? "helmet" : label === "kính" ? "safety_glasses" : "gloves";
+      const item = label === "mũ bảo hộ" ? "hat" : "vest";
       return person.ppe[item].status === "unknown";
     }),
   );

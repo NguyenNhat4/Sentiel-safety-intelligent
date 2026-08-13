@@ -7,10 +7,10 @@ interface PpeBadge {
   tone: PpeBadgeTone;
 }
 
-const DISPLAYED_PPE_CLASS_NAMES = new Set(["helmet", "glasses", "gloves", "safety-vest"]);
+const DISPLAYED_PPE_CLASS_NAMES = new Set(["hat", "vest"]);
 
 /**
- * Returns whether a SH17 model detection belongs in operator-facing PPE displays.
+ * Returns whether a hat/vest model detection belongs in operator-facing PPE displays.
  * Person boxes are rendered from the typed people collection to avoid duplicates.
  */
 export function isDisplayedPpeDetection(className: string): boolean {
@@ -47,31 +47,10 @@ export function getDetectionColor(className: string, personIndex?: number | null
     return insideZone ? "#ff4940" : "#22c55e";
   }
   switch (name) {
-    case "helmet":
-    case "head":
+    case "hat":
       return "#f59e0b";
-    case "glasses":
-    case "safety_glasses":
-    case "face":
-    case "face-guard":
-    case "face-mask":
-      return "#8b5cf6";
-    case "gloves":
-    case "hands":
-    case "hand":
-      return "#10b981";
-    case "shoes":
-    case "foot":
-      return "#3b82f6";
-    case "safety-suit":
-    case "safety-vest":
-    case "medical-suit":
+    case "vest":
       return "#ec4899";
-    case "ear":
-    case "ear-mufs":
-      return "#06b6d4";
-    case "tool":
-      return "#eab308";
     default:
       return personIndex !== null && personIndex !== undefined ? "#a855f7" : "#3b82f6";
   }
@@ -178,9 +157,8 @@ export function requiredPpeBadges(
   requirements: PpeRequirementUpdate,
 ): PpeBadge[] {
   const ppe = [
-    ["helmet_required", "helmet", "MŨ"],
-    ["safety_glasses_required", "safety_glasses", "KÍNH"],
-    ["gloves_required", "gloves", "GĂNG"],
+    ["hat_required", "hat", "MŨ"],
+    ["vest_required", "vest", "ÁO"],
   ] as const;
 
   const badges: PpeBadge[] = [];

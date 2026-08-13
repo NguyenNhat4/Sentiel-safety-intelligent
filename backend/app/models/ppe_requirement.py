@@ -17,9 +17,8 @@ class PpeRequirement(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     camera_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     zone_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    helmet_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    safety_glasses_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    gloves_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    hat_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    vest_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

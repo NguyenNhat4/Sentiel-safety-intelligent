@@ -10,7 +10,7 @@ Nhân sự an toàn khó theo dõi liên tục nhiều khu vực có máy dập,
 
 Hệ thống hướng tới:
 
-- Phát hiện người và PPE bắt buộc: mũ, kính và găng bảo hộ.
+- Phát hiện người và PPE bắt buộc theo profile `hat_vest_v1`: mũ bảo hộ và áo phản quang.
 - Xác định người đi vào polygon vùng nguy hiểm.
 - Chỉ đánh giá xâm nhập là critical khi máy đang chạy.
 - Hiển thị cảnh báo gần realtime và chuyển trường hợp mơ hồ cho con người.
@@ -44,12 +44,13 @@ Baseline đang hoạt động gồm:
 - FastAPI phục vụ REST, WebSocket và production frontend build.
 - Upload video local, tạo/lưu nhiều vùng bốn điểm không chồng nhau và trạng thái máy riêng cho từng vùng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
+- YOLO11m Safety checkpoint đã pin cho detection/association `person`, `hat`, `vest`; rule PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
 - SQLite là mặc định hiện tại cho MVP/local/test; PostgreSQL vẫn được hỗ trợ qua cấu hình `DATABASE_URL` cho môi trường triển khai sau khi được xác thực.
 - Đăng nhập bằng session lưu phía server với đúng ba role và workspace phù hợp.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm benchmark/calibration production-ready cho model hat/vest, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -89,6 +90,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
 | Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/done/US-27-MULTI-ZONE-SPEC.md) |
+| Đặc tả US-28 YOLO11m Safety hat/vest | [US-28 YOLO11m Safety Specification](specs/done/US-28.md) |
 | Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |

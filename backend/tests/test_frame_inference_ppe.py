@@ -44,17 +44,16 @@ def test_required_explicitly_missing_ppe_requests_review():
         person_model_path="unused.pt",
         ppe_observer=lambda frame, people: [
             {
-                "helmet": PpeObservation(status="missing", confidence=0.91),
-                "safety_glasses": PpeObservation(status="unknown", confidence=None),
-                "gloves": PpeObservation(status="present", confidence=0.88),
+                "hat": PpeObservation(status="missing", confidence=0.91),
+                "vest": PpeObservation(status="present", confidence=0.88),
             }
         ],
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
             camera_id=camera_id,
             zone_id=zone_id,
-            helmet_required=True,
-            safety_glasses_required=False,
-            gloves_required=False,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
             updated_at=None,
         ),
     )
@@ -62,9 +61,9 @@ def test_required_explicitly_missing_ppe_requests_review():
 
     result = service.infer(request())
 
-    assert result.people[0].ppe.helmet.status == "missing"
-    assert result.people[0].missing_required_ppe == ["helmet"]
-    assert result.rule["ppe_requirements"]["helmet_required"] is True
+    assert result.people[0].ppe.hat.status == "missing"
+    assert result.people[0].missing_required_ppe == ["hat"]
+    assert result.rule["ppe_requirements"]["hat_required"] is True
     assert result.review_required is True
     assert result.result == "violate"
 
@@ -74,17 +73,16 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
         person_model_path="unused.pt",
         ppe_observer=lambda frame, people: [
             {
-                "helmet": PpeObservation(status="missing", confidence=0.91),
-                "safety_glasses": PpeObservation(status="unknown", confidence=None),
-                "gloves": PpeObservation(status="unknown", confidence=None),
+                "hat": PpeObservation(status="missing", confidence=0.91),
+                "vest": PpeObservation(status="unknown", confidence=None),
             }
         ],
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
             camera_id=camera_id,
             zone_id=zone_id,
-            helmet_required=False,
-            safety_glasses_required=False,
-            gloves_required=False,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
             updated_at=None,
         ),
     )
@@ -92,27 +90,26 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
 
     result = service.infer(request())
 
-    assert result.people[0].ppe.helmet.status == "missing"
+    assert result.people[0].ppe.hat.status == "missing"
     assert result.people[0].missing_required_ppe == []
     assert result.review_required is False
     assert result.result == "normal"
 
 
-def test_qualified_absence_of_required_helmet_creates_alert_and_exposes_all_detections():
+def test_qualified_absence_of_required_hat_creates_alert_and_exposes_all_detections():
     service = FrameInferenceService(
         person_model_path="unused.pt",
         ppe_observer=lambda frame, people: {
             "people": [
                 {
-                    "helmet": PpeObservation(status="unknown", confidence=None),
-                    "safety_glasses": PpeObservation(status="unknown", confidence=None),
-                    "gloves": PpeObservation(status="unknown", confidence=None),
+                    "hat": PpeObservation(status="unknown", confidence=None),
+                    "vest": PpeObservation(status="unknown", confidence=None),
                 }
             ],
             "detections": [
                 {
-                    "class_id": 7,
-                    "class_name": "tool",
+                    "class_id": 4,
+                    "class_name": "vest",
                     "bbox": [90, 20, 120, 70],
                     "confidence": 0.79,
                     "person_index": None,
@@ -122,9 +119,9 @@ def test_qualified_absence_of_required_helmet_creates_alert_and_exposes_all_dete
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
             camera_id=camera_id,
             zone_id=zone_id,
-            helmet_required=True,
-            safety_glasses_required=False,
-            gloves_required=False,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
             updated_at=None,
         ),
     )
@@ -132,24 +129,23 @@ def test_qualified_absence_of_required_helmet_creates_alert_and_exposes_all_dete
 
     result = service.infer(request())
 
-    assert result.people[0].ppe.helmet.status == "missing"
-    assert result.people[0].ppe.helmet.confidence is None
-    assert result.people[0].missing_required_ppe == ["helmet"]
-    assert result.detections[0].class_id == 7
-    assert result.detections[0].class_name == "tool"
+    assert result.people[0].ppe.hat.status == "missing"
+    assert result.people[0].ppe.hat.confidence is None
+    assert result.people[0].missing_required_ppe == ["hat"]
+    assert result.detections[0].class_id == 4
+    assert result.detections[0].class_name == "vest"
     assert result.detections[0].person_index is None
     assert result.review_required is True
 
 
-def test_low_confidence_person_without_helmet_remains_unknown():
+def test_low_confidence_person_without_hat_remains_unknown():
     service = FrameInferenceService(
         person_model_path="unused.pt",
         ppe_observer=lambda frame, people: {
             "people": [
                 {
-                    "helmet": PpeObservation(status="unknown", confidence=None),
-                    "safety_glasses": PpeObservation(status="unknown", confidence=None),
-                    "gloves": PpeObservation(status="unknown", confidence=None),
+                    "hat": PpeObservation(status="unknown", confidence=None),
+                    "vest": PpeObservation(status="unknown", confidence=None),
                 }
             ],
             "detections": [],
@@ -157,9 +153,9 @@ def test_low_confidence_person_without_helmet_remains_unknown():
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
             camera_id=camera_id,
             zone_id=zone_id,
-            helmet_required=True,
-            safety_glasses_required=False,
-            gloves_required=False,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
             updated_at=None,
         ),
     )
@@ -167,7 +163,7 @@ def test_low_confidence_person_without_helmet_remains_unknown():
 
     result = service.infer(request())
 
-    assert result.people[0].ppe.helmet.status == "unknown"
+    assert result.people[0].ppe.hat.status == "unknown"
     assert result.people[0].missing_required_ppe == []
     assert result.review_required is False
 
@@ -178,21 +174,28 @@ def test_frame_without_zone_still_returns_person_and_detection_boxes():
         ppe_observer=lambda frame, people: {
             "people": [
                 {
-                    "helmet": PpeObservation(status="present", confidence=0.9),
-                    "safety_glasses": PpeObservation(status="unknown", confidence=None),
-                    "gloves": PpeObservation(status="unknown", confidence=None),
+                    "hat": PpeObservation(status="present", confidence=0.9),
+                    "vest": PpeObservation(status="unknown", confidence=None),
                 }
             ],
             "detections": [
                 {
-                    "class_id": 10,
-                    "class_name": "helmet",
+                    "class_id": 0,
+                    "class_name": "hat",
                     "bbox": [45, 15, 65, 35],
                     "confidence": 0.9,
                     "person_index": 0,
                 }
             ],
         },
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        ),
     )
     service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
     no_zone = request().model_copy(update={"zone_points": []})
@@ -201,7 +204,7 @@ def test_frame_without_zone_still_returns_person_and_detection_boxes():
 
     assert result.people[0].inside_zone is False
     assert result.people[0].bbox == [40, 10, 80, 90]
-    assert result.detections[0].class_name == "helmet"
+    assert result.detections[0].class_name == "hat"
 
 
 def test_fewer_observations_than_people_safely_handled():
@@ -211,9 +214,9 @@ def test_fewer_observations_than_people_safely_handled():
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
             camera_id=camera_id,
             zone_id=zone_id,
-            helmet_required=False,
-            safety_glasses_required=False,
-            gloves_required=False,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
             updated_at=None,
         ),
     )
@@ -222,5 +225,5 @@ def test_fewer_observations_than_people_safely_handled():
     result = service.infer(request())
 
     assert len(result.people) == 2
-    assert result.people[0].ppe.helmet.status == "missing"
-    assert result.people[1].ppe.helmet.status == "missing"
+    assert result.people[0].ppe.hat.status == "missing"
+    assert result.people[1].ppe.hat.status == "missing"

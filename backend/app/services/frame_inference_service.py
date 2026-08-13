@@ -23,7 +23,6 @@ from backend.app.schemas.analysis import (
 from backend.app.schemas.monitoring_zone import MonitoringZone
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.monitoring_zone_service import validate_zone_geometry
-from backend.app.services.ppe_requirement_service import PpeStatus, should_alert_for_missing_ppe
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
 from backend.app.services.violation_tracking_service import ViolationTrackingService
 
@@ -117,14 +116,12 @@ class FrameInferenceService:
                 for zone in active_zones
             ]
             inside_zone = any(item.inside for item in memberships)
-            safety_shirt = self._has_safety_shirt(frame, x, y, box_width, box_height)
             obs_data = (
                 observations[index]
                 if index < len(observations)
                 else {
-                    "helmet": {"status": "unknown", "confidence": None},
-                    "safety_glasses": {"status": "unknown", "confidence": None},
-                    "gloves": {"status": "unknown", "confidence": None},
+                    "hat": {"status": "unknown", "confidence": None},
+                    "vest": {"status": "unknown", "confidence": None},
                 }
             )
             ppe = self._derive_missing_ppe(
@@ -142,7 +139,6 @@ class FrameInferenceService:
                     foot_point=foot_point,
                     inside_zone=inside_zone,
                     zone_memberships=memberships,
-                    safety_shirt=safety_shirt,
                     ppe=ppe,
                     missing_required_ppe=[],
                 )
@@ -235,15 +231,15 @@ class FrameInferenceService:
             rule={
                 "person_inside_zone": person_inside_zone,
                 "machine_state": primary_machine_state,
-                "safety_shirt_required": True,
+                "ppe_profile": requirements.profile,
                 "camera_id": request.camera_id,
                 "zone_id": primary_zone_id,
                 "zone_revision": request.zone_revision,
                 "zone_results": zone_results,
                 "ppe_requirements": {
-                    "helmet_required": requirements.helmet_required,
-                    "safety_glasses_required": requirements.safety_glasses_required,
-                    "gloves_required": requirements.gloves_required,
+                    "profile": requirements.profile,
+                    "hat_required": requirements.hat_required,
+                    "vest_required": requirements.vest_required,
                 },
                 "ppe_alert": decision.ppe_alert,
             },
@@ -303,31 +299,6 @@ class FrameInferenceService:
     def _track_people(self, session_id: str, frame: np.ndarray):
         return self._person_tracker.track(session_id, frame)
 
-    def _missing_required_ppe(
-        self,
-        ppe: PersonPpeObservations,
-        requirements: PpeRequirementResponse,
-        *,
-        person_confidence: float,
-        association_is_valid: bool,
-    ) -> list[str]:
-        fields = (
-            ("helmet", requirements.helmet_required, ppe.helmet),
-            ("safety_glasses", requirements.safety_glasses_required, ppe.safety_glasses),
-            ("gloves", requirements.gloves_required, ppe.gloves),
-        )
-        return [
-            name
-            for name, required, observation in fields
-            if should_alert_for_missing_ppe(
-                required=required,
-                status=PpeStatus(observation.status),
-                person_confidence=person_confidence,
-                threshold=self._missing_ppe_threshold,
-                association_is_valid=association_is_valid,
-            )
-        ]
-
     @staticmethod
     def _load_requirements(camera_id: str, zone_id: str) -> PpeRequirementResponse:
         from backend.app.core.database import SessionLocal
@@ -358,32 +329,6 @@ class FrameInferenceService:
 
             self._person_model = YOLO(str(model_path))
         return self._person_model
-
-    @staticmethod
-    def _has_safety_shirt(
-        frame: np.ndarray,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-    ) -> bool:
-        frame_height, frame_width = frame.shape[:2]
-        x1 = max(0, x + int(width * 0.18))
-        x2 = min(frame_width, x + int(width * 0.82))
-        y1 = max(0, y + int(height * 0.2))
-        y2 = min(frame_height, y + int(height * 0.62))
-        torso = frame[y1:y2, x1:x2]
-        if torso.size == 0:
-            return False
-
-        hsv = cv2.cvtColor(torso, cv2.COLOR_BGR2HSV)
-        high_visibility = cv2.inRange(
-            hsv,
-            np.array([12, 80, 90], dtype=np.uint8),
-            np.array([95, 255, 255], dtype=np.uint8),
-        )
-        visible_ratio = cv2.countNonZero(high_visibility) / high_visibility.size
-        return visible_ratio >= 0.08
 
     @staticmethod
     def _decode_frame(image_data: str) -> np.ndarray:

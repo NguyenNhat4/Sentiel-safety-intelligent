@@ -44,9 +44,9 @@ describe("InferenceClient", () => {
       type: "inference_result", frame_id: 7, video_time: 2.5,
       result: "normal", review_required: false, people: [],
       rule: {
-        person_inside_zone: false, machine_state: "running", safety_shirt_required: true,
+        person_inside_zone: false, machine_state: "running", ppe_profile: "hat_vest_v1",
         camera_id: "uploaded_video", zone_id: "zone_01",
-        ppe_requirements: {helmet_required: false, safety_glasses_required: false, gloves_required: false},
+        ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false},
         ppe_alert: false,
       }
     };

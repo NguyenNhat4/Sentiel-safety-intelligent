@@ -23,9 +23,9 @@ function mockAuthenticatedSession(): void {
     if (url.includes("/ppe-requirements/")) return jsonResponse({
       camera_id: "uploaded_video",
       zone_id: "zone_01",
-      helmet_required: false,
-      safety_glasses_required: false,
-      gloves_required: false,
+      profile: "hat_vest_v1",
+      hat_required: false,
+      vest_required: false,
       is_configured: false,
       updated_at: null
     });
@@ -64,9 +64,9 @@ describe("Sentinel authentication", () => {
         return jsonResponse({
           camera_id: "uploaded_video",
           zone_id: "zone_01",
-          helmet_required: false,
-          safety_glasses_required: false,
-          gloves_required: false,
+          profile: "hat_vest_v1",
+          hat_required: false,
+          vest_required: false,
           is_configured: false,
           updated_at: null
         });
@@ -205,9 +205,9 @@ describe("Sentinel React application", () => {
       if (url.includes("/ppe-requirements/")) return jsonResponse({
         camera_id: "uploaded_video",
         zone_id: "zone_01",
-        helmet_required: false,
-        safety_glasses_required: false,
-        gloves_required: false,
+        profile: "hat_vest_v1",
+        hat_required: false,
+        vest_required: false,
         is_configured: false,
         updated_at: null,
       });

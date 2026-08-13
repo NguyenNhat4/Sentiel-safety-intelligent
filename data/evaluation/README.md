@@ -9,7 +9,7 @@ approved storage và chỉ tham chiếu bằng URI/checksum trong manifest.
 1. Sao chép `shooting-sheet-template.csv`, điền mỗi video dự định quay và lưu bản làm
    việc ngoài Git.
 2. Sau khi quay, sao chép `ground-truth-template.json` cho từng video và điền đáp án
-   do con người quan sát.
+   `hat`/`vest` do con người quan sát theo profile `hat_vest_v1`.
 3. Sao chép `manifest-template.json`, khai báo video, URI lưu trữ, checksum và split.
 4. Kiểm tra manifest bằng:
 

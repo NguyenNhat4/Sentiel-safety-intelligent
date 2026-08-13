@@ -115,7 +115,7 @@ def test_tracks_and_rules_have_independent_occurrences():
     service = ViolationTrackingService()
     result = service.evaluate(
         "session-a",
-        {4: {"zone_intrusion", "missing_ppe:helmet"}, 9: {"zone_intrusion"}},
+        {4: {"zone_intrusion", "missing_ppe:hat"}, 9: {"zone_intrusion"}},
         {4, 9},
         now=0.0,
     )
