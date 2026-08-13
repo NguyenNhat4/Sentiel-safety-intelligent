@@ -49,6 +49,42 @@ def test_ppe_facade_exposes_only_canonical_person_hat_and_vest():
     assert model.calls == 1
 
 
+def test_stateless_safety_analysis_uses_model_person_as_canonical_in_one_call():
+    class FakeBox:
+        def __init__(self, class_id: int, bbox: list[int], confidence: float) -> None:
+            self.cls = np.array([class_id])
+            self.conf = np.array([confidence])
+            self.xyxy = np.array([bbox])
+            self.id = None
+
+    class FakeModel:
+        names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
+
+        def __init__(self):
+            self.calls = []
+
+        def predict(self, frame, **kwargs):
+            self.calls.append(kwargs)
+            result = type("Result", (), {})()
+            result.names = self.names
+            result.boxes = [
+                FakeBox(3, [10, 10, 40, 90], 0.92),
+                FakeBox(4, [15, 35, 35, 75], 0.84),
+            ]
+            return [result]
+
+    facade = PpeVisionFacade("unused.pt")
+    model = FakeModel()
+    facade._model = model
+
+    result = facade.analyze(np.zeros((100, 100, 3), dtype=np.uint8), None, now=0.0)
+
+    assert result["canonical_people"] == [(10, 10, 30, 80, 0.92, 1)]
+    assert result["people"][0]["vest"] == {"status": "present", "confidence": 0.84}
+    assert [item["class_name"] for item in result["detections"]] == ["person", "vest"]
+    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.35, "verbose": False}]
+
+
 def test_ppe_facade_keeps_unassociated_hat_when_no_person_is_detected():
     class FakeBox:
         cls = np.array([0])

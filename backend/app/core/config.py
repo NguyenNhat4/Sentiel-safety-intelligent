@@ -56,7 +56,6 @@ class Settings(BaseSettings):
     # Video & Model paths
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
-    person_model_path: str = "models/yolo11n.pt"
     ppe_model_path: str = "models/yolo11m_safety.pt"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

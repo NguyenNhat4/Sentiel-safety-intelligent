@@ -1,23 +1,22 @@
 # Benchmark scripts
 
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
-It defaults to the repository test video and the dedicated person model:
+It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py
 ```
 
-To simulate the frontend/backend flow where every frame runs person detection followed by PPE
-detection, use `--pipeline`:
+To match the frontend/backend flow where one call returns person, hat and vest, use `--pipeline`:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
   --pipeline --warmup 5 --iterations 30 --frames 30
 ```
 
-The pipeline result is the combined latency and FPS for both models on one frame. It excludes
-video decoding and WebSocket/network time, but includes both Ultralytics preprocessing, inference,
-and postprocessing calls.
+The pipeline result is latency and FPS for the single YOLO11m Safety call on one frame. It excludes
+video decoding and WebSocket/network time, but includes Ultralytics preprocessing, inference and
+postprocessing.
 
 To benchmark the PPE model and save machine-readable output:
 
@@ -27,10 +26,10 @@ PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
   --output data/model-benchmark.json
 ```
 
-Pipeline mode matches US-28 runtime filtering: person YOLO11n uses class `[0]`, and
-YOLO11m Safety uses source classes `[0, 3, 4]` (`hat`, `person`, `vest`) exactly once
-per frame. Single-model mode deliberately measures all checkpoint classes unless a
-future CLI option states otherwise.
+Pipeline mode matches runtime filtering: YOLO11m Safety uses source classes `[0, 3, 4]`
+(`hat`, `person`, `vest`) exactly once per frame. Class `3` supplies canonical people
+for tracking and zone rules. Single-model mode deliberately measures all checkpoint
+classes unless a future CLI option states otherwise.
 
 The report includes mean/min/max/P50/P95/P99 latency in milliseconds and throughput in FPS.
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing

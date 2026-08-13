@@ -3,6 +3,7 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- Runtime frame inference now uses only `models/yolo11m_safety.pt`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest; YOLO11n is no longer loaded or called.
 - Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
 - New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
 - The current MVP and two-command developer workflow default to SQLite. PostgreSQL remains supported through an explicit `DATABASE_URL`; runtime fallback and `/health` backend reporting from `develop2` are preserved.
@@ -13,7 +14,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - The baseline upload → four-point zone → binary WebSocket inference → foot-point zone review → event save flow is implemented.
 - FastAPI serves the React production build at `/` and provides REST plus WebSocket APIs.
 - Frontend uses React 19, TypeScript, Vite, typed feature boundaries, and a tested transport layer.
-- Python static checks, focused backend/vision tests, frontend lint/type-check/unit/component tests, and production build pass for US-28.
+- Python static checks, focused single-model backend/vision tests, frontend lint/type-check/unit/component tests, and production build pass; full `make check` remains blocked by the documented Python 3.14 test hang.
 - US-28 is implemented with pinned `yolo11m_safety.pt`, exact source-mapping validation, one-call-per-frame class filter `[0,3,4]`, and public `hat_vest_v1` observations for the fixed `uploaded_video` / `zone_01` pair.
 - Backend US-07 follows the approved flat layered layout (`api`, `models`, `schemas`, `services`, `integrations`); the temporary `backend/app/modules` tree has been removed.
 - Inference `rule` now echoes `ppe_profile=hat_vest_v1` plus persisted `hat_required`/`vest_required` values in REST and WebSocket responses.
@@ -30,7 +31,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - The US-27 feature branch is merged with `origin/develop2` at `9c0141c`; auth, operational metrics and multi-zone routes coexist, and Alembic now advances linearly through auth `20260811_01`, forced-password `20260811_02` and monitoring-zones `20260811_03`.
 - Backend now persists lightweight operational request, inference, and WebSocket outcome metrics to rotated JSONL and exposes bounded aggregates at `GET /api/v1/operational-metrics`.
 - `make setup` and `make run` now run versioned Alembic upgrades, so a new SQLite database is created at the current schema automatically.
-- US-28 two-command smoke passed: `make setup` completed, `make run` loaded both checkpoints and served `/health` plus the `hat_vest_v1` PPE requirement response successfully.
+- Single-checkpoint two-command smoke passed: `make setup` completed, `make run` preloaded YOLO11m Safety, and `/health` returned `200` with SQLite selected.
 - A separate read-only “Quan sát hệ thống” page now displays JSONL operational request, latency, inference, and error aggregates.
 
 ## Completed
@@ -60,16 +61,17 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added the idempotent `make db-upgrade` target to the standard setup/run flow; verified a new SQLite database reaches the current Alembic revision.
 
 ### Vision
+- [x] [Vision] Consolidated canonical person detection, ByteTrack and hat/vest observation into one YOLO11m Safety call per frame; retired YOLO11n from runtime configuration and preload without changing REST/WebSocket semantics.
 - [x] Pinned `wesjos/Yolo-hard-hat-safety-vest/yolo11m_safety.pt` at revision `95ffeeb1e0897d60564c811ace5935bcd43d982b`, SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`, under Git LFS.
-- [x] Added full five-source-class startup validation, selected only `hat/person/vest`, used PPE-person boxes only to support canonical-person association, and verified a real-model CPU inference smoke run.
-- [x] Updated the reproducible pipeline benchmark to YOLO11n + YOLO11m Safety with runtime class filters; CPU smoke measured P50 472.20 ms and P95 504.02 ms on one 640×640 regression image.
+- [x] Added full five-source-class startup validation, selected only `hat/person/vest`, promoted Safety class `3` to canonical person, and verified a real-model CPU inference smoke run.
+- [x] [Historical baseline] Recorded the superseded YOLO11n + YOLO11m Safety pipeline at P50 472.20 ms and P95 504.02 ms; the benchmark script now measures the single-model runtime.
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
-- [x] Fixed person false positives caused by using the SH17 PPE checkpoint as the person detector; frame inference now uses the dedicated YOLO11 person checkpoint while SH17 remains responsible for PPE/object observations.
+- [x] [Historical baseline, superseded] Separated YOLO11 person detection from the retired SH17 PPE checkpoint before the later single-YOLO11m Safety cutover.
 - [x] Added SH17 identity redaction for face/head classes with a conservative 40%-of-person-head fallback and pure-CV synthetic-image tests.
 - [x] Added pure-CV post-redaction JPEG annotation for reviewed person and SH17 bounding boxes, preserving the input frame and skipping duplicate SH17 `person` boxes.
-- [x] Added `scripts/benchmark_model.py` to measure YOLO latency (mean/P50/P95/P99) and inference throughput using `data/test.mp4` by default, including a combined person+PPE pipeline mode.
-- [x] Added `eval/results/model-benchmark-report.md` with the combined person+PPE benchmark result and measurement boundaries.
-- [x] Added a session-isolated ByteTrack facade with TTL cleanup and a real-model runtime smoke check.
+- [x] Added `scripts/benchmark_model.py` to measure YOLO latency (mean/P50/P95/P99) and inference throughput using `data/test.mp4` by default, including the current unified person+PPE runtime mode.
+- [x] Added `eval/results/model-benchmark-report.md` with the historical combined two-model benchmark result and measurement boundaries.
+- [x] Integrated session-isolated ByteTrack state and TTL cleanup into the unified YOLO11m Safety facade.
 
 ### Frontend
 - [x] Replaced PPE controls, typed payloads, rule summaries, Canvas/list/review overlays and component tests with the two-item `hat_vest_v1` profile.

@@ -81,7 +81,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** YOLO11n supplies canonical people and ByteTrack; YOLO11m Safety supplies the three selected source classes while only its `hat`/`vest` detections feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 

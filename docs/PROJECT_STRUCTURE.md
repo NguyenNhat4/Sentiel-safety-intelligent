@@ -29,8 +29,7 @@ P-047/
 │   │   │   └── operational_metrics.py # Rotated privacy-safe JSONL writer
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
-│   │   │   ├── person_tracking.py # Adapter to session-isolated ByteTrack
-│   │   │   ├── ppe_vision.py # Cached adapter to YOLO11m Safety PPE facade
+│   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
 │   │   │   └── privacy_vision.py # Model-independent fail-closed snapshot privacy adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
@@ -128,7 +127,7 @@ P-047/
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
 │   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
-│   └── yolo11n.pt      # Canonical person-detection baseline checkpoint
+│   └── yolo11n.pt      # Retired person baseline retained for controlled history
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)

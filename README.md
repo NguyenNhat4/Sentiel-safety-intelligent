@@ -44,7 +44,7 @@ Baseline đang hoạt động gồm:
 - FastAPI phục vụ REST, WebSocket và production frontend build.
 - Upload video local, tạo/lưu nhiều vùng bốn điểm không chồng nhau và trạng thái máy riêng cho từng vùng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
-- YOLO11m Safety checkpoint đã pin cho detection/association `person`, `hat`, `vest`; rule PPE công khai chỉ dùng `hat`/`vest`.
+- Một YOLO11m Safety checkpoint đã pin chạy `person`, `hat`, `vest` đúng một lần mỗi frame; `person` là nguồn canonical cho tracking/zone, còn rule PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
 - SQLite là mặc định hiện tại cho MVP/local/test; PostgreSQL vẫn được hỗ trợ qua cấu hình `DATABASE_URL` cho môi trường triển khai sau khi được xác thực.

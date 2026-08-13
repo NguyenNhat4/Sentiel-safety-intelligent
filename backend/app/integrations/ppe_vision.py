@@ -3,11 +3,11 @@ from functools import cache
 
 import numpy as np
 
-from vision.api import PpeVisionFacade, PpeVisionResult
+from vision.api import PpeVisionFacade, PpeVisionResult, SafetyVisionResult
 
 
 class PpeVisionAdapter:
-    """Backend-facing adapter for the public PPE vision facade."""
+    """Backend adapter for unified person/tracking/PPE Safety inference."""
 
     def __init__(self, model_path: str) -> None:
         self._facade = PpeVisionFacade(model_path)
@@ -18,6 +18,14 @@ class PpeVisionAdapter:
         people: list[tuple[int, int, int, int, float]],
     ) -> PpeVisionResult:
         return self._facade.observe(frame, people)
+
+    def analyze(
+        self,
+        frame: np.ndarray,
+        monitoring_session_id: str | None,
+        now: float,
+    ) -> SafetyVisionResult:
+        return self._facade.analyze(frame, monitoring_session_id, now=now)
 
     def preload(self) -> None:
         self._facade.preload()
@@ -33,3 +41,5 @@ PpeObserver = Callable[
     [np.ndarray, list[tuple[int, int, int, int, float]]],
     PpeVisionResult,
 ]
+
+SafetyVisionAnalyzer = Callable[[np.ndarray, str | None, float], SafetyVisionResult]

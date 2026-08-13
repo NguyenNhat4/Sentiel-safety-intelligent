@@ -258,3 +258,11 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Migration:** Add `hat_required` and `vest_required`, map historical `helmet_required` to `hat_required`, default vest OFF, and retain the legacy columns plus all event/occurrence rows for audit. Old event details are never rewritten.
 - **Privacy:** Remove SH17 from privacy. A separate adapter deterministically blurs the upper 40% of every canonical person box in memory, then annotates and persists. Missing candidates or processing errors fail closed. This is a prototype safeguard; a benchmarked dedicated face provider remains a pilot/production gate.
 - **Constraint:** Qualified absence remains a deterministic backend inference and requires US-13 calibration/final evaluation before non-demo use. CUDA/device latency and face-redaction recall are not claimed by this cutover.
+
+## 2026-08-13: [Vision] Use YOLO11m Safety as the single runtime detector
+- **Supersedes:** The 2026-08-10 dedicated-person-checkpoint decision and the YOLO11n canonical-person constraint in the US-28 cutover decision; both remain as history.
+- **Authorization:** The Product Owner explicitly requested removal of YOLO11n from runtime and selected `models/yolo11m_safety.pt` as the sole detector.
+- **Choice:** Run source classes `[0, 3, 4]` exactly once per frame. Class `3` supplies canonical person boxes for foot points, zone evaluation, privacy candidates and ByteTrack; classes `0`/`4` supply hat/vest observations associated to those same people.
+- **Compatibility:** Preserve current REST/WebSocket/Pydantic/TypeScript fields, class IDs, tracking IDs, occurrence lifecycle, multi-zone behavior, rule semantics and `redact → annotate → persist` ordering. The change is internal model routing, not a wire-contract change.
+- **Runtime:** Remove `person_model_path` and do not preload or call `models/yolo11n.pt`. Per-session model instances may exist to isolate ByteTrack state, but every instance uses the same pinned YOLO11m Safety artifact and each frame has one model call.
+- **Constraint:** This cutover does not claim improved accuracy. Person/hat/vest precision, recall, association, tracking stability and target-device latency must be re-evaluated through US-13 before pilot/production use.

@@ -7,8 +7,11 @@ from uuid import uuid4
 import cv2
 import numpy as np
 
-from backend.app.integrations.person_tracking import PersonTrackingAdapter
-from backend.app.integrations.ppe_vision import PpeObserver, get_ppe_vision_adapter
+from backend.app.integrations.ppe_vision import (
+    PpeObserver,
+    SafetyVisionAnalyzer,
+    get_ppe_vision_adapter,
+)
 from backend.app.schemas.analysis import (
     ActiveViolation as ActiveViolationSchema,
 )
@@ -40,7 +43,8 @@ class FrameInferenceService:
 
     def __init__(
         self,
-        person_model_path: str | None = None,
+        model_path: str | None = None,
+        vision_analyzer: SafetyVisionAnalyzer | None = None,
         ppe_observer: PpeObserver | None = None,
         requirement_loader: Callable[[str, str], PpeRequirementResponse] | None = None,
         missing_ppe_threshold: float = 0.5,
@@ -48,21 +52,19 @@ class FrameInferenceService:
         from backend.app.core.config import get_settings
 
         settings = get_settings()
-        ppe_model_path = settings.ppe_model_path
-        self._person_model_path = person_model_path or settings.person_model_path
-        self._person_model = None
-        adapter = get_ppe_vision_adapter(ppe_model_path)
+        self._model_path = model_path or settings.ppe_model_path
+        self._fallback_model = None
+        adapter = get_ppe_vision_adapter(self._model_path)
+        self._vision_analyzer = vision_analyzer or (adapter.analyze if ppe_observer is None else None)
         self._ppe_observer = ppe_observer or adapter.observe
-        self._ppe_preloader = adapter.preload if ppe_observer is None else lambda: None
+        self._model_preloader = adapter.preload if vision_analyzer is None and ppe_observer is None else lambda: None
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
-        self._person_tracker = PersonTrackingAdapter(person_model_path or self._person_model_path)
         self._violation_tracker = ViolationTrackingService()
 
     def preload_models(self) -> None:
-        self._load_person_model()
-        self._ppe_preloader()
+        self._model_preloader()
 
     def occurrences_belong_to_zone(self, session_id: str, zone_id: str, occurrence_ids: list[str]) -> bool:
         expected = (session_id, f"zone_intrusion:{zone_id}")
@@ -92,17 +94,27 @@ class FrameInferenceService:
             for zone in active_zones
         }
 
-        if request.monitoring_session_id is None:
-            detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
-        else:
-            detected_people = self._track_people(str(request.monitoring_session_id), frame)
-        vision_result = self._ppe_observer(frame, [person[:5] for person in detected_people])
-        if isinstance(vision_result, dict) and "people" in vision_result:
+        if self._vision_analyzer is not None:
+            vision_result = self._vision_analyzer(
+                frame,
+                str(request.monitoring_session_id) if request.monitoring_session_id is not None else None,
+                now,
+            )
+            detected_people = vision_result["canonical_people"]
             observations = vision_result["people"]
             detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
         else:
-            observations = vision_result
-            detections = []
+            if request.monitoring_session_id is None:
+                detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
+            else:
+                detected_people = self._track_people(str(request.monitoring_session_id), frame)
+            vision_result = self._ppe_observer(frame, [person[:5] for person in detected_people])
+            if isinstance(vision_result, dict) and "people" in vision_result:
+                observations = vision_result["people"]
+                detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+            else:
+                observations = vision_result
+                detections = []
         requirements = self._requirement_loader(request.camera_id, request.zone_id)
         people = []
         rule_people = []
@@ -297,7 +309,7 @@ class FrameInferenceService:
         return PersonPpeObservations.model_validate(values)
 
     def _track_people(self, session_id: str, frame: np.ndarray):
-        return self._person_tracker.track(session_id, frame)
+        return [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
 
     @staticmethod
     def _load_requirements(camera_id: str, zone_id: str) -> PpeRequirementResponse:
@@ -308,27 +320,27 @@ class FrameInferenceService:
             return PpeRequirementService(db).get(camera_id, zone_id)
 
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
-        model = self._load_person_model()
+        model = self._load_fallback_model()
 
-        results = model.predict(frame, classes=[0], conf=0.35, verbose=False)
+        results = model.predict(frame, classes=[3], conf=0.35, verbose=False)
         people = []
         for box in results[0].boxes:
             x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
             people.append((x1, y1, x2 - x1, y2 - y1, float(box.conf[0])))
         return people
 
-    def _load_person_model(self):
-        if self._person_model is None:
+    def _load_fallback_model(self):
+        if self._fallback_model is None:
             from pathlib import Path
 
             from ultralytics import YOLO
 
-            model_path = Path(self._person_model_path)
+            model_path = Path(self._model_path)
             if not model_path.exists() and Path(model_path.name).exists():
                 model_path = Path(model_path.name)
 
-            self._person_model = YOLO(str(model_path))
-        return self._person_model
+            self._fallback_model = YOLO(str(model_path))
+        return self._fallback_model
 
     @staticmethod
     def _decode_frame(image_data: str) -> np.ndarray:

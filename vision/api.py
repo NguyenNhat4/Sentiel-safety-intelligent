@@ -14,67 +14,7 @@ from vision.pipeline import (
     redact_person_head_regions,
 )
 
-TrackedPerson = tuple[int, int, int, int, float, int]
-
-
-class PersonTrackingFacade:
-    """Keeps one Ultralytics ByteTrack instance per monitoring session."""
-
-    def __init__(
-        self,
-        model_path: str,
-        *,
-        session_ttl_seconds: float = 300.0,
-        model_factory: Callable[[str], Any] | None = None,
-    ) -> None:
-        self._model_path = model_path
-        self._session_ttl_seconds = session_ttl_seconds
-        self._model_factory = model_factory
-        self._sessions: dict[str, tuple[Any, float]] = {}
-
-    def track(self, session_id: str, frame: np.ndarray, *, now: float) -> list[TrackedPerson]:
-        self._expire(now)
-        session = self._sessions.get(session_id)
-        if session is None:
-            model = self._create_model()
-        else:
-            model = session[0]
-        self._sessions[session_id] = (model, now)
-
-        result = model.track(
-            frame,
-            persist=True,
-            tracker="bytetrack.yaml",
-            classes=[0],
-            conf=0.35,
-            verbose=False,
-        )[0]
-        people: list[TrackedPerson] = []
-        for box in result.boxes:
-            if box.id is None:
-                continue
-            x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
-            people.append((x1, y1, x2 - x1, y2 - y1, float(box.conf[0]), int(box.id[0].item())))
-        return people
-
-    def end_session(self, session_id: str) -> None:
-        self._sessions.pop(session_id, None)
-
-    def _create_model(self) -> Any:
-        if self._model_factory is not None:
-            return self._model_factory(self._model_path)
-        from ultralytics import YOLO
-
-        return YOLO(str(Path(self._model_path)))
-
-    def _expire(self, now: float) -> None:
-        expired = [
-            session_id
-            for session_id, (_, last_seen) in self._sessions.items()
-            if now - last_seen >= self._session_ttl_seconds
-        ]
-        for session_id in expired:
-            self._sessions.pop(session_id, None)
+CanonicalPerson = tuple[int, int, int, int, float, int]
 
 
 class PpeObservationValue(TypedDict):
@@ -92,8 +32,12 @@ class PpeVisionResult(TypedDict):
     detections: list[ModelDetection]
 
 
+class SafetyVisionResult(PpeVisionResult):
+    canonical_people: list[CanonicalPerson]
+
+
 class PpeVisionFacade:
-    """Returns PPE-presence observations without applying safety rules."""
+    """Runs the single Safety checkpoint for canonical people, tracking and PPE."""
 
     SOURCE_CLASS_NAMES = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
     EXPOSED_CLASS_NAMES = frozenset({"hat", "person", "vest"})
@@ -104,11 +48,47 @@ class PpeVisionFacade:
         model_path: str,
         confidence_threshold: float = 0.35,
         person_confidence_threshold: float = 0.5,
+        session_ttl_seconds: float = 300.0,
+        model_factory: Callable[[str], Any] | None = None,
     ) -> None:
         self._model_path = model_path
         self._confidence_threshold = confidence_threshold
         self._person_confidence_threshold = person_confidence_threshold
+        self._session_ttl_seconds = session_ttl_seconds
+        self._model_factory = model_factory
         self._model = None
+        self._sessions: dict[str, tuple[Any, float]] = {}
+
+    def analyze(
+        self,
+        frame: np.ndarray,
+        monitoring_session_id: str | None,
+        now: float,
+    ) -> SafetyVisionResult:
+        """Return canonical people and PPE from one model call for this frame."""
+        if monitoring_session_id is None:
+            result = self._load_model().predict(
+                frame,
+                classes=[0, 3, 4],
+                conf=self._confidence_threshold,
+                verbose=False,
+            )[0]
+            return self._safety_result(result, require_track_ids=False)
+
+        self._expire_sessions(now)
+        session = self._sessions.get(monitoring_session_id)
+        model = self._create_model() if session is None else session[0]
+        self._validate_model_classes(model.names)
+        self._sessions[monitoring_session_id] = (model, now)
+        result = model.track(
+            frame,
+            persist=True,
+            tracker="bytetrack.yaml",
+            classes=[0, 3, 4],
+            conf=self._confidence_threshold,
+            verbose=False,
+        )[0]
+        return self._safety_result(result, require_track_ids=True)
 
     def observe(
         self,
@@ -134,6 +114,72 @@ class PpeVisionFacade:
 
     def preload(self) -> None:
         self._load_model()
+
+    def end_session(self, monitoring_session_id: str) -> None:
+        self._sessions.pop(monitoring_session_id, None)
+
+    def _safety_result(self, result: Any, *, require_track_ids: bool) -> SafetyVisionResult:
+        self._validate_model_classes(result.names)
+        canonical_people: list[CanonicalPerson] = []
+        ppe_boxes: list[tuple[int, str, list[int], float]] = []
+
+        for box in result.boxes:
+            class_id = int(box.cls[0])
+            class_name = str(result.names[class_id]).lower()
+            if class_name not in self.EXPOSED_CLASS_NAMES:
+                continue
+            x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())
+            confidence = float(box.conf[0])
+            if class_name == "person":
+                track_id = self._box_track_id(box)
+                if require_track_ids and track_id is None:
+                    continue
+                canonical_people.append(
+                    (
+                        x1,
+                        y1,
+                        x2 - x1,
+                        y2 - y1,
+                        confidence,
+                        track_id or len(canonical_people) + 1,
+                    )
+                )
+            else:
+                ppe_boxes.append((class_id, class_name, [x1, y1, x2, y2], confidence))
+
+        people_without_tracks = [person[:5] for person in canonical_people]
+        observations = [self._unknown_observations() for _ in canonical_people]
+        detections = self._canonical_people(people_without_tracks)
+        for class_id, class_name, bbox, confidence in ppe_boxes:
+            x1, y1, x2, y2 = bbox
+            person_index = self._person_containing(
+                (x1 + x2) / 2,
+                (y1 + y2) / 2,
+                people_without_tracks,
+            )
+            detections.append(
+                {
+                    "class_id": class_id,
+                    "class_name": class_name,
+                    "bbox": bbox,
+                    "confidence": confidence,
+                    "person_index": person_index,
+                }
+            )
+            if person_index is None:
+                continue
+            current = observations[person_index][class_name]
+            if current["confidence"] is None or confidence > current["confidence"]:
+                observations[person_index][class_name] = {
+                    "status": "present",
+                    "confidence": confidence,
+                }
+
+        return {
+            "canonical_people": canonical_people,
+            "people": observations,
+            "detections": detections,
+        }
 
     def _detect_ppe(
         self,
@@ -181,11 +227,32 @@ class PpeVisionFacade:
 
     def _load_model(self):
         if self._model is None:
-            from ultralytics import YOLO
-
-            self._model = YOLO(str(Path(self._model_path)))
+            self._model = self._create_model()
         self._validate_model_classes(self._model.names)
         return self._model
+
+    def _create_model(self) -> Any:
+        if self._model_factory is not None:
+            return self._model_factory(self._model_path)
+        from ultralytics import YOLO
+
+        return YOLO(str(Path(self._model_path)))
+
+    def _expire_sessions(self, now: float) -> None:
+        expired = [
+            session_id
+            for session_id, (_, last_seen) in self._sessions.items()
+            if now - last_seen >= self._session_ttl_seconds
+        ]
+        for session_id in expired:
+            self._sessions.pop(session_id, None)
+
+    @staticmethod
+    def _box_track_id(box: Any) -> int | None:
+        if getattr(box, "id", None) is None:
+            return None
+        value = box.id[0]
+        return int(value.item() if hasattr(value, "item") else value)
 
     @staticmethod
     def _unknown_observations() -> PersonPpeObservations:

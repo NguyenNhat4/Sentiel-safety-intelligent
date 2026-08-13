@@ -2,7 +2,7 @@
 
 ## Scope
 
-Đo smoke latency khi một frame đi qua tuần tự hai model giống flow US-28:
+Baseline lịch sử: đo smoke latency khi một frame đi qua tuần tự hai model theo flow US-28 trước cutover single-model:
 
 1. `models/yolo11n.pt` — detect người.
 2. `models/yolo11m_safety.pt` — chạy source class `[0, 3, 4]` tương ứng `hat`, `person`, `vest`.
