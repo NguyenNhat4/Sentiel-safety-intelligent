@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
+    snapshot_dir: str = "data/snapshots"
     operational_metrics_log_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     operational_metrics_log_backup_count: int = Field(default=6, ge=1, le=30)
     operational_metrics_max_scan_bytes: int = Field(default=10 * 1024 * 1024, gt=0)

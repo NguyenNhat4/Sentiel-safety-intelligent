@@ -102,7 +102,7 @@ async def record_http_metrics(request: Request, call_next):
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 frontend_dist_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-snapshot_dir = Path(__file__).resolve().parents[2] / "data" / "snapshots"
+snapshot_dir = Path(settings.snapshot_dir)
 snapshot_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/snapshots", StaticFiles(directory=snapshot_dir), name="event-snapshots")
 

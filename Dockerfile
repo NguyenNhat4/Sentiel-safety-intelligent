@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ---- Stage 1: Build the React frontend ----
 FROM node:22-slim AS frontend-builder
 
@@ -15,16 +17,19 @@ FROM python:3.11-slim AS python-builder
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --prefix=/install torch torchvision \
+        --index-url https://download.pytorch.org/whl/cpu && \
+    python -m pip install --prefix=/install -r requirements.txt
 
 # ---- Stage 3: Production ----
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy installed packages from the Python dependency stage
-COPY --from=python-builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Copy dependencies into the system site-packages so the non-root runtime user
+# can import them.
+COPY --from=python-builder /install /usr/local
 
 # Security: run as non-root user
 RUN useradd -m appuser
@@ -47,4 +52,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD python -c "import json, urllib.request; health=json.load(urllib.request.urlopen('http://localhost:8000/health')); assert health['ready']" || exit 1
 
-CMD ["python", "scripts/production_start.py"]
+CMD ["python", "-m", "scripts.production_start"]

@@ -22,10 +22,12 @@ def test_validate_runtime_files_accepts_approved_models(tmp_path, monkeypatch):
             person_model_path=str(person),
             ppe_model_path=str(ppe),
             operational_metrics_log_path="data/operational-metrics.jsonl",
+            snapshot_dir="runtime/snapshots",
         )
     )
 
     assert result == {"data_writable": True, "models_verified": True}
+    assert (tmp_path / "runtime" / "snapshots").is_dir()
 
 
 def test_validate_runtime_files_rejects_missing_model(tmp_path, monkeypatch):

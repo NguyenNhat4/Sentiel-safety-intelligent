@@ -4,7 +4,21 @@ from __future__ import annotations
 
 import argparse
 import tarfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+
+def _validate_members(members: list[tarfile.TarInfo], target_dir: Path) -> None:
+    archive_root = target_dir.name
+    for member in members:
+        member_path = PurePosixPath(member.name)
+        if (
+            member_path.is_absolute()
+            or ".." in member_path.parts
+            or not member_path.parts
+            or member_path.parts[0] != archive_root
+            or not (member.isdir() or member.isfile())
+        ):
+            raise SystemExit("Archive contains an unsafe or unexpected path")
 
 
 def main() -> None:
@@ -19,10 +33,8 @@ def main() -> None:
     args.target_dir.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(args.archive, "r:gz") as archive:
         members = archive.getmembers()
-        root = args.target_dir.parent.resolve()
-        if any(not (root / member.name).resolve().is_relative_to(root) for member in members):
-            raise SystemExit("Archive contains an unsafe path")
-        archive.extractall(root, members, filter="data")
+        _validate_members(members, args.target_dir)
+        archive.extractall(args.target_dir.parent, members)
     print(f"Restored {args.archive} to {args.target_dir}")
 
 
