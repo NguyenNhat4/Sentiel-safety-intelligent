@@ -43,7 +43,6 @@ docker-build:
 	docker compose build
 
 docker-up:
-	@test -f .env.production || cp .env.production.example .env.production
 	docker compose up -d --build
 
 docker-down:

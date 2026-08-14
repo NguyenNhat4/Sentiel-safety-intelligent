@@ -34,12 +34,11 @@ async def lifespan(app: FastAPI):
     try:
         if settings.app_env != "production":
             Base.metadata.create_all(bind=engine)
-        if settings.app_env != "production":
-            db = SessionLocal()
-            try:
-                AuthService(db).seed_demo_users()
-            finally:
-                db.close()
+        db = SessionLocal()
+        try:
+            AuthService(db).seed_demo_users()
+        finally:
+            db.close()
         logger.info("Database tables verified/created successfully using %s.", database_runtime.backend)
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")

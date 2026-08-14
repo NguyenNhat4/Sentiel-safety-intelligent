@@ -1,4 +1,4 @@
-"""Container entrypoint: validate files, migrate, then start one production worker."""
+"""Container entrypoint: validate files and start one production worker."""
 
 from __future__ import annotations
 
@@ -19,9 +19,10 @@ def main() -> None:
         raise RuntimeError("Production container requires DATABASE_FALLBACK_ENABLED=false")
 
     validate_runtime_files(settings)
-    bootstrap_legacy_sqlite(settings.database_url)
-    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
-    subprocess.run([sys.executable, "-m", "alembic", "current", "--check-heads"], check=True)
+    if settings.run_db_migrations_on_start:
+        bootstrap_legacy_sqlite(settings.database_url)
+        subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
+        subprocess.run([sys.executable, "-m", "alembic", "current", "--check-heads"], check=True)
     os.execvp(
         "uvicorn",
         ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", str(settings.app_port)],

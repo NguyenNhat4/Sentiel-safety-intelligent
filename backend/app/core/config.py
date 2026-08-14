@@ -1,15 +1,15 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     # App
     app_name: str = "PPE & Danger Zone Safety Monitoring System API"
-    app_env: Literal["development", "production", "test"] = "development"
-    app_port: int = Field(default=8000, ge=1, le=65535)
+    app_env: Literal["development", "production", "test"] = "production"
+    app_port: int = Field(default=8000, ge=1, le=65535, validation_alias=AliasChoices("APP_PORT", "PORT"))
     app_host: str = "0.0.0.0"
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # Database Settings
     database_url: str = "sqlite:///./data/safety_events.db"
     database_fallback_enabled: bool = True
+    run_db_migrations_on_start: bool = True
     database_fallback_url: str = "sqlite:///./data/safety_events.db"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
     database_pool_pre_ping: bool = False
@@ -66,8 +67,8 @@ class Settings(BaseSettings):
     person_model_path: str = "models/yolo11n.pt"
     ppe_model_path: str = "models/ppe_yolov8n.pt"
 
-    # Local commands load development defaults. Production receives its values from
-    # Docker Compose's `.env.production` env_file, which takes precedence.
+    # Local commands load development defaults. Docker and managed platforms pass
+    # production settings as process environment variables.
     model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
     # Violate frame least confidence threshold for PPE & Danger Zone detection
 
