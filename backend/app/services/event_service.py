@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -204,13 +205,8 @@ class EventService:
     def _events_for_occurrences(self, occurrence_ids: list[str]) -> list[SafetyEvent]:
         if not occurrence_ids:
             return []
-        return (
-            self.db.query(SafetyEvent)
-            .join(EventOccurrence)
-            .filter(EventOccurrence.occurrence_id.in_(occurrence_ids))
-            .distinct()
-            .all()
-        )
+        matching_event_ids = select(EventOccurrence.event_id).where(EventOccurrence.occurrence_id.in_(occurrence_ids))
+        return self.db.query(SafetyEvent).filter(SafetyEvent.id.in_(matching_event_ids)).all()
 
     def has_persisted_occurrences(self, occurrence_ids: list[str]) -> bool:
         return bool(self._events_for_occurrences(occurrence_ids))

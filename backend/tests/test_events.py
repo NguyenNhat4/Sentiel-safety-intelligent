@@ -1,6 +1,10 @@
 import time
 from uuid import uuid4
 
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Query
+
+from backend.app.services.event_service import EventService
 from backend.app.services.frame_inference_service import frame_inference_service
 
 
@@ -100,6 +104,21 @@ def test_occurrence_cannot_be_reused_for_a_conflicting_event(client):
         json={**original, "event_type": "missing_ppe", "severity": "critical"},
     )
     assert conflict.status_code == 409
+
+
+def test_occurrence_lookup_avoids_postgresql_distinct_over_json(db_session, monkeypatch):
+    compiled_statements: list[str] = []
+    original_all = Query.all
+
+    def record_postgresql_statement(query):
+        compiled_statements.append(str(query.statement.compile(dialect=postgresql.dialect())))
+        return original_all(query)
+
+    monkeypatch.setattr(Query, "all", record_postgresql_statement)
+
+    assert EventService(db_session)._events_for_occurrences([str(uuid4())]) == []
+    assert len(compiled_statements) == 1
+    assert "SELECT DISTINCT" not in compiled_statements[0].upper()
 
 
 def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client):
