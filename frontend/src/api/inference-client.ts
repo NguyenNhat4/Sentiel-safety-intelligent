@@ -4,6 +4,8 @@ import {inferenceWebSocketUrls, setBackendFromSocket} from "./config";
 interface LegacyConfiguration {
   zone_points: ZonePoint[];
   machine_state: MachineState;
+  camera_id?: string;
+  zone_id?: string;
   monitoring_session_id: string;
 }
 

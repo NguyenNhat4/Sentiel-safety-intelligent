@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-13: [Frontend] Upload video per selected monitoring area
+- **Choice:** A browser-local uploaded video belongs only to the selected danger area (`zone_id`). Switching areas swaps to that area's own video or an empty video state, and inference uses the existing legacy single-zone WebSocket configuration for that selected area only.
+- **Reason:** The operator requires each displayed Vùng/Khu vực to have an independent video workflow rather than evaluating one uploaded video against every configured area.
+- **Compatibility:** Stored zone collections and the multi-zone WebSocket contract remain supported for existing clients. Uploaded browser videos remain transient and are not persisted or shared between areas.
+
 ## 2026-08-11: [Backend] Keep SQLite as the current MVP default
 - **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
 - **Reason:** The Product Owner explicitly deferred database expansion and chose to continue with SQLite for now. This also lets a new team member run `make setup` and `make run` without provisioning PostgreSQL first.
