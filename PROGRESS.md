@@ -7,6 +7,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Development configuration is now isolated in `.env.development`, while Docker Compose injects `.env.production` for production runtime.
 - Docker production dependencies use a separate headless runtime set, excluding development tools and unneeded Ultralytics GUI/plotting/dataframe dependencies to reduce the shipped image size.
 - The production Docker image installs CPU-only PyTorch/torchvision wheels and reuses a BuildKit pip cache, avoiding unnecessary Triton/CUDA downloads on CPU deployments.
+- `scripts/test_snapshot_bucket.py` verifies a configured S3-compatible snapshot bucket with a write/read/checksum/delete probe; the current local `.env.production` endpoint returned `EndpointConnectionError` during its write probe, so managed-environment endpoint and network configuration still require correction.
 - Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
 - New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
 - The current MVP and two-command developer workflow default to SQLite. PostgreSQL remains supported through an explicit `DATABASE_URL`; runtime fallback and `/health` backend reporting from `develop2` are preserved.

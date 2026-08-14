@@ -153,6 +153,7 @@ P-047/
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
+│   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check
 │   ├── backup_data.py # Timestamped archive of persistent Docker data
 │   ├── restore_data.py # Safe restore into empty persistent Docker data
 │   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums
