@@ -100,6 +100,7 @@ export function useMonitor() {
   const [zoneRevision, setZoneRevision] = useState(0);
   const zoneRevisionRef = useRef(0);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const selectedZoneIdRef = useRef<string | null>(null);
   const [drawingZoneId, setDrawingZoneId] = useState<string | null>(null);
   const [newDraftZoneId, setNewDraftZoneId] = useState<string | null>(null);
   const [zoneSaving, setZoneSaving] = useState(false);
@@ -129,7 +130,7 @@ export function useMonitor() {
   const [zoneDisabled, setZoneDisabled] = useState(true);
   const [flowStatus, setFlowStatus] = useState("Sẵn sàng");
   const [toast, setToast] = useState<string>();
-  const videoUrl = useRef<string | undefined>(undefined);
+  const videosByZone = useRef(new Map<string, {name: string; url: string}>());
   const session = useRef<SessionState>({
     running: false,
     frameSequence: 0,
@@ -147,9 +148,10 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zones: appliedZonesRef.current,
-        zone_revision: zoneRevisionRef.current,
+        zone_points: selectedZoneForInference(appliedZonesRef.current, selectedZoneIdRef.current),
+        machine_state: selectedMachineState(appliedZonesRef.current, selectedZoneIdRef.current),
         camera_id: "uploaded_video",
+        zone_id: selectedZoneIdRef.current ?? "zone_01",
         monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
@@ -157,6 +159,10 @@ export function useMonitor() {
     });
   }
   const client = clientRef.current;
+
+  useEffect(() => {
+    selectedZoneIdRef.current = selectedZoneId;
+  }, [selectedZoneId]);
 
   const updateZones = useCallback((nextZones: MonitoringZone[]) => {
     zonesRef.current = nextZones;
@@ -281,18 +287,21 @@ export function useMonitor() {
 
   useEffect(() => () => {
     client.close();
-    if (videoUrl.current) URL.revokeObjectURL(videoUrl.current);
+    videosByZone.current.forEach(video => URL.revokeObjectURL(video.url));
   }, [client]);
 
   function handleVideoSelection(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     const video = videoRef.current;
-    if (!file || !video) return;
+    const zoneId = selectedZoneId;
+    if (!file || !video || !zoneId) return;
     client.close();
     video.pause();
-    if (videoUrl.current) URL.revokeObjectURL(videoUrl.current);
-    videoUrl.current = URL.createObjectURL(file);
-    video.src = videoUrl.current;
+    const previous = videosByZone.current.get(zoneId);
+    if (previous) URL.revokeObjectURL(previous.url);
+    const zoneVideo = {name: file.name, url: URL.createObjectURL(file)};
+    videosByZone.current.set(zoneId, zoneVideo);
+    video.src = zoneVideo.url;
     video.load();
     Object.assign(session.current, {
       running: false, lastHandledFrame: -1, lastSampleTime: -1,
@@ -312,9 +321,39 @@ export function useMonitor() {
     setPlaybackDisabled(true);
     setZoneDisabled(true);
     setPlaybackLabel("▶ Phát video");
-    setFlowStatus(zonesRef.current.length ? "Đã khôi phục cấu hình vùng" : "Chờ tạo vùng");
+    setFlowStatus(`${zonesRef.current.find(zone => zone.zone_id === zoneId)?.display_name ?? "Vùng"} · đang tải video`);
     setView(initialView(machineRunningRef.current));
-    showToast("Video đã sẵn sàng. Bấm Tạo vùng nếu cần thêm khu vực nguy hiểm.");
+    showToast("Video đã được gắn với vùng đang chọn.");
+  }
+
+  function switchSelectedZone(zoneId: string): void {
+    if (zoneId === selectedZoneId) return;
+    if (session.current.running) stopRealtimeInference();
+    else client.close();
+    setSelectedZoneId(zoneId);
+    setSelectedPoint(null);
+    setLatestPeople([]);
+    setLatestDetections([]);
+    setPreviewSrc(undefined);
+    setStageReady(false);
+    setPlaybackDisabled(true);
+    setZoneDisabled(true);
+    const video = videoRef.current;
+    const zoneVideo = videosByZone.current.get(zoneId);
+    const zone = zonesRef.current.find(item => item.zone_id === zoneId);
+    setView(initialView(zone?.machine_state === "running"));
+    if (!video || !zoneVideo) {
+      video?.removeAttribute("src");
+      setFileLabel(`${zone?.display_name ?? "Vùng"} chưa có video`);
+      setVideoMeta("CHỌN VIDEO ĐỂ BẮT ĐẦU");
+      setFlowStatus(`${zone?.display_name ?? "Vùng"} chưa có video`);
+      return;
+    }
+    video.src = zoneVideo.url;
+    video.load();
+    setFileLabel(zoneVideo.name);
+    setVideoMeta("ĐANG TẢI VIDEO");
+    setFlowStatus(`${zone?.display_name ?? "Vùng"} · đang tải video`);
   }
 
   function handleLoadedMetadata(): void {
@@ -680,7 +719,7 @@ export function useMonitor() {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
       resetZone, createZone, cancelZoneCreation, deleteSelectedZone, saveZones,
-      selectZone: (zoneId: string) => { setSelectedZoneId(zoneId); setSelectedPoint(null); },
+      selectZone: switchSelectedZone,
       updateSelectedZoneName: (displayName: string) => selectedZoneId
         && updateZone(selectedZoneId, zone => ({...zone, display_name: displayName})),
       toggleSelectedZoneEnabled: () => selectedZoneId
@@ -829,6 +868,15 @@ function useReviewTimer(startedAt: number | null): string {
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+}
+
+function selectedZoneForInference(zones: MonitoringZone[], selectedZoneId: string | null): ZonePoint[] {
+  const zone = zones.find(item => item.zone_id === selectedZoneId);
+  return zone?.enabled && zone.points.length === 4 ? zone.points : [];
+}
+
+function selectedMachineState(zones: MonitoringZone[], selectedZoneId: string | null): "running" | "stopped" {
+  return zones.find(item => item.zone_id === selectedZoneId)?.machine_state ?? "stopped";
 }
 
 export type MonitorRefs = {

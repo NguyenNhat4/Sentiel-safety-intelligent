@@ -4,6 +4,10 @@
 - The Human-in-the-Loop panel now prioritizes red for a person in a forbidden zone, orange for missing configured PPE, yellow for required PPE that cannot be determined, and green/no-alert messaging when detected people have all required PPE.
 - Added focused UI-state coverage for the alert priority; frontend type-check, lint, tests, and production build pass.
 
+## 2026-08-13: [Frontend] Video upload is scoped to the selected monitoring area
+- Browser-local video uploads are now retained by selected `zone_id`; selecting another area shows only that area's video or an empty state.
+- Live inference uses the selected area's polygon and machine state through the compatible single-zone WebSocket configuration, rather than evaluating the selected video's frames against every saved area.
+
 ## 2026-08-13: [Backend] Analysis PPE requirement loading uses the request database session
 - Frame inference REST and WebSocket paths now load the active PPE profile through their injected SQLAlchemy session, so test database overrides and runtime database selection are respected.
 - Added Alembic's OS-aware `path_separator` setting to remove the deprecated legacy path parsing warning.

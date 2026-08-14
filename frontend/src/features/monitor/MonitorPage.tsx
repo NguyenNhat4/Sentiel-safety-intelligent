@@ -25,7 +25,7 @@ export function MonitorPage() {
           <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy của vùng đang chọn" disabled={!state.selectedZone} onClick={actions.toggleMachine}><span /></button>
         </div>
         <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
-        <button className="secondary-btn" onClick={actions.openFilePicker}>＋ Tải video</button>
+        <button className="secondary-btn" disabled={!state.selectedZone} onClick={actions.openFilePicker}>＋ Tải video</button>
         <button className="secondary-btn" disabled={state.playbackDisabled} onClick={() => void actions.handlePlayback()}>{state.playbackLabel}</button>
         <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
       </div>
