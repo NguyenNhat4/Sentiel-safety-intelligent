@@ -18,19 +18,22 @@ WORKDIR /app
 
 COPY requirements.docker.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --no-cache-dir --no-compile --prefix=/install torch torchvision \
-        --index-url https://download.pytorch.org/whl/cpu && \
-    python -m pip install --no-cache-dir --no-compile --prefix=/install -r requirements.docker.txt && \
-    python -m pip install --no-cache-dir --no-compile --prefix=/install --no-deps 'ultralytics>=8.3.0'
+    python -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch==2.9.1+cpu torchvision==0.24.1+cpu && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
+        -r requirements.docker.txt && \
+    /opt/venv/bin/python -c "import torch, torchvision; from ultralytics import YOLO; print(torch.__version__, torchvision.__version__, YOLO.__name__)"
 
 # ---- Stage 3: Production ----
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy dependencies into the system site-packages so the non-root runtime user
-# can import them.
-COPY --from=python-builder /install /usr/local
+# Copy the resolved virtual environment as the runtime Python environment.
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # Security: run as non-root user
 RUN useradd -m appuser
