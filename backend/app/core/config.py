@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # Database Settings
     database_url: str = "sqlite:///./data/safety_events.db"
-    database_fallback_enabled: bool = True
+    database_fallback_enabled: bool = False
     run_db_migrations_on_start: bool = True
     database_fallback_url: str = "sqlite:///./data/safety_events.db"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)

@@ -59,3 +59,27 @@ def test_tracking_uses_bytetrack_and_persists_within_a_session():
     assert len(models) == 2
     assert models[0].calls[0]["persist"] is True
     assert models[0].calls[0]["tracker"] == "bytetrack.yaml"
+
+
+def test_tracking_preload_initializes_the_first_session_model_and_tracker_dependencies():
+    models = []
+    tracker_dependency_loads = []
+
+    def factory(_path):
+        model = FakeModel()
+        models.append(model)
+        return model
+
+    facade = PersonTrackingFacade(
+        "unused.pt",
+        model_factory=factory,
+        tracker_dependency_loader=lambda: tracker_dependency_loads.append(True),
+    )
+
+    facade.preload()
+
+    assert len(models) == 1
+    assert tracker_dependency_loads == [True]
+
+    facade.track("session-a", np.zeros((100, 100, 3), dtype=np.uint8), now=0.0)
+    assert len(models) == 1

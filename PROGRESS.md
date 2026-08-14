@@ -3,6 +3,7 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- `/health` now reaches `ready=true` only after person, PPE, and ByteTrack inference startup warm-up succeeds; a missing tracker dependency fails startup instead of the first WebSocket frame.
 - Development configuration is now isolated in `.env.development`, while Docker Compose injects `.env.production` for production runtime.
 - Docker production dependencies use a separate headless runtime set, excluding development tools and unneeded Ultralytics GUI/plotting/dataframe dependencies to reduce the shipped image size.
 - The production Docker image installs CPU-only PyTorch/torchvision wheels and reuses a BuildKit pip cache, avoiding unnecessary Triton/CUDA downloads on CPU deployments.

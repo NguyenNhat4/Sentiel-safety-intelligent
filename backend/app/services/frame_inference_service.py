@@ -64,6 +64,7 @@ class FrameInferenceService:
     def preload_models(self) -> None:
         self._load_person_model()
         self._ppe_preloader()
+        self._person_tracker.preload()
 
     def occurrences_belong_to_zone(self, session_id: str, zone_id: str, occurrence_ids: list[str]) -> bool:
         expected = (session_id, f"zone_intrusion:{zone_id}")

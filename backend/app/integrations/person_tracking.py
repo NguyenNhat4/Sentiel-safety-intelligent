@@ -13,3 +13,6 @@ class PersonTrackingAdapter:
 
     def track(self, session_id: str, frame: np.ndarray) -> list[TrackedPerson]:
         return self._facade.track(session_id, frame, now=time.monotonic())
+
+    def preload(self) -> None:
+        self._facade.preload()

@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-14: [Vision/Backend] Readiness requires all inference paths to warm successfully
+- **Choice:** Before `app.state.ready` becomes true, startup loads the person detector, the PPE detector, and a first session-isolated ByteTrack model, while importing the tracker dependency path.
+- **Reason:** ByteTrack previously created its model and imported `lap` only on the first WebSocket frame, allowing health to appear ready before production inference failed.
+- **Constraint:** Any checkpoint or tracker dependency failure aborts startup before the application accepts traffic. `lap` must be baked into the production image; Ultralytics must not install it at runtime under the non-root service user.
+
 ## 2026-08-13: [Backend] Separate development and production environment files
 - **Choice:** Local settings load `.env.development`, created by `make setup` from `.env.development.example`; Docker Compose injects `.env.production` for production.
 - **Reason:** Local SQLite defaults and production deployment credentials/runtime constraints must not share one mutable environment file.
