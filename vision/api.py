@@ -26,17 +26,21 @@ class PersonTrackingFacade:
         *,
         session_ttl_seconds: float = 300.0,
         model_factory: Callable[[str], Any] | None = None,
+        tracker_dependency_loader: Callable[[], None] | None = None,
     ) -> None:
         self._model_path = model_path
         self._session_ttl_seconds = session_ttl_seconds
         self._model_factory = model_factory
+        self._tracker_dependency_loader = tracker_dependency_loader or self._load_tracker_dependencies
         self._sessions: dict[str, tuple[Any, float]] = {}
+        self._preloaded_model: Any | None = None
 
     def track(self, session_id: str, frame: np.ndarray, *, now: float) -> list[TrackedPerson]:
         self._expire(now)
         session = self._sessions.get(session_id)
         if session is None:
-            model = self._create_model()
+            model = self._preloaded_model or self._create_model()
+            self._preloaded_model = None
         else:
             model = session[0]
         self._sessions[session_id] = (model, now)
@@ -60,12 +64,22 @@ class PersonTrackingFacade:
     def end_session(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
 
+    def preload(self) -> None:
+        """Load the first person model and ByteTrack dependencies before traffic."""
+        if self._preloaded_model is None:
+            self._preloaded_model = self._create_model()
+        self._tracker_dependency_loader()
+
     def _create_model(self) -> Any:
         if self._model_factory is not None:
             return self._model_factory(self._model_path)
         from ultralytics import YOLO
 
         return YOLO(str(Path(self._model_path)))
+
+    @staticmethod
+    def _load_tracker_dependencies() -> None:
+        from ultralytics.trackers import BYTETracker  # noqa: F401
 
     def _expire(self, now: float) -> None:
         expired = [
