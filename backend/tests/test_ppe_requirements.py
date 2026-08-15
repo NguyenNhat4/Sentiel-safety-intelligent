@@ -28,6 +28,9 @@ def test_missing_requirement_defaults_to_off_without_creating_a_record(db_sessio
     assert requirement.vest_required is False
     assert requirement.is_configured is False
     assert requirement.updated_at is None
+    assert requirement.helmet_required is False
+    assert requirement.safety_glasses_required is False
+    assert requirement.gloves_required is False
     assert service.count() == 0
 
 
@@ -56,6 +59,9 @@ def test_save_upserts_one_shared_requirement(db_session):
     assert first.is_configured is True
     assert second.hat_required is False
     assert second.vest_required is False
+    assert second.helmet_required is False
+    assert second.safety_glasses_required is False
+    assert second.gloves_required is False
     assert second.updated_at is not None
     assert service.count() == 1
 
@@ -107,6 +113,9 @@ async def test_get_api_returns_default_off(db_session):
         "vest_required": False,
         "is_configured": False,
         "updated_at": None,
+        "helmet_required": False,
+        "safety_glasses_required": False,
+        "gloves_required": False,
     }
 
 
@@ -157,6 +166,36 @@ async def test_put_api_saves_and_returns_shared_requirement(db_session):
 def test_put_api_rejects_invalid_input(validator, payload):
     with pytest.raises(ValidationError):
         validator.validate_python(payload)
+
+
+def test_legacy_put_payload_maps_helmet_to_hat_and_requires_vest():
+    update = TypeAdapter(PpeRequirementUpdate).validate_python(
+        {
+            "helmet_required": True,
+            "safety_glasses_required": True,
+            "gloves_required": False,
+        }
+    )
+
+    assert update.model_dump() == {
+        "profile": "hat_vest_v1",
+        "hat_required": True,
+        "vest_required": True,
+    }
+
+
+def test_put_api_rejects_mixed_legacy_and_current_payloads():
+    with pytest.raises(ValidationError):
+        TypeAdapter(PpeRequirementUpdate).validate_python(
+            {
+                "profile": "hat_vest_v1",
+                "hat_required": True,
+                "vest_required": False,
+                "helmet_required": True,
+                "safety_glasses_required": False,
+                "gloves_required": False,
+            }
+        )
 
 
 @pytest.mark.parametrize(

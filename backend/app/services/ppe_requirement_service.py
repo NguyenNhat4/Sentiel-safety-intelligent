@@ -49,6 +49,9 @@ class PpeRequirementService:
                 vest_required=False,
                 is_configured=False,
                 updated_at=None,
+                helmet_required=False,
+                safety_glasses_required=False,
+                gloves_required=False,
             )
         return self._response(requirement)
 
@@ -92,4 +95,7 @@ class PpeRequirementService:
             vest_required=requirement.vest_required,
             is_configured=True,
             updated_at=requirement.updated_at,
+            helmet_required=requirement.hat_required,
+            safety_glasses_required=False,
+            gloves_required=False,
         )

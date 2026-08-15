@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-15: [Backend] Temporary PPE request compatibility bridge for stale browser bundles
+- **Supersedes:** The `PUT`-validation portion of the 2026-08-13 PPE cutover decision that rejected every legacy payload.
+- **Choice:** Keep `hat_vest_v1` canonical for persisted configuration and inference, while accepting only the complete former three-boolean request shape. Map `helmet_required` to `hat_required`, default `vest_required=false`, and return read-only legacy aliases so an already-loaded old browser can finish its load/save cycle.
+- **Constraint:** Mixed, partial, unknown-profile and extra payloads still return `422`; glasses and gloves do not become model observations, requirements or alerts. Remove the bridge only after the deployed frontend bundle is confirmed current.
+
 ## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
 - **Choice:** Compose loads `.env.development`, then overrides only the database runtime to its disposable PostgreSQL service and starts it with migrations enabled after database health succeeds.
 - **Reason:** Local container validation must not contact the developer-configured database, while CORS, S3 and other non-database configuration remain aligned with development.

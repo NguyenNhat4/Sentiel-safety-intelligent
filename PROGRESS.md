@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-15: [Backend] Bridge stale PPE browser payloads to the hat/vest contract
+- `PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}` now accepts the complete former helmet/glasses/gloves boolean payload as a temporary compatibility path, mapping helmet to hat and defaulting vest OFF.
+- Canonical `hat_vest_v1` persistence and inference remain unchanged; GET includes read-only aliases so an old browser can load and save without 422. Focused contract tests cover legacy mapping and reject mixed payloads.
+
 ## 2026-08-15: [Cross-cutting] Isolate Docker Compose test database
 - `docker-compose.yml` loads `.env.development` and starts a dedicated disposable PostgreSQL service; only `DATABASE_URL` is redirected away from the developer-configured database.
 - Once the database healthcheck succeeds, the container runs migrations, starts in development mode, and idempotently seeds demo users; remaining application variables still come from `.env.development`.
