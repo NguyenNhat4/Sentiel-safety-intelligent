@@ -3,6 +3,7 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- `/health` is now ready only when runtime models are initialized, the selected database is live PostgreSQL (not SQLite fallback), and the configured S3 bucket answers `HeadBucket`; degraded responses identify the unavailable dependency without exposing provider details or credentials.
 - `/health` now reaches `ready=true` only after person, PPE, and ByteTrack inference startup warm-up succeeds; a missing tracker dependency fails startup instead of the first WebSocket frame.
 - Development configuration is now isolated in `.env.development`, while Docker Compose injects `.env.production` for production runtime.
 - Docker production dependencies use a separate headless runtime set, excluding development tools and unneeded Ultralytics GUI/plotting/dataframe dependencies to reduce the shipped image size.

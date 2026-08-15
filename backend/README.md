@@ -21,7 +21,7 @@ PostgreSQL from `DATABASE_URL` is the primary database. If it is unreachable dur
 
 PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minute connection recycling. `DATABASE_POOL_PRE_PING` defaults to `false` so a warm connection checkout does not add a database round-trip to every request. Enable it only for a provider that repeatedly drops idle sessions. ORM sessions keep loaded values after commit, avoiding an automatic response-time reload; explicit queries remain the source of truth for subsequent requests.
 
-`/health` reports `ready=true` only after startup has loaded the person-detection and PPE checkpoints and warmed the first ByteTrack model, including its tracking dependencies. If a weight file or required tracker package cannot load, startup fails before the service accepts traffic; it must be fixed in the image and redeployed rather than installed at runtime.
+`/health` reports `ready=true` only after startup has loaded the person-detection and PPE checkpoints, warmed the first ByteTrack model, and a live PostgreSQL `SELECT 1` plus S3 `HeadBucket` both succeed. Its additive `dependencies.postgresql` and `dependencies.snapshot_storage` fields identify the failed dependency with a safe reason code; they never expose URLs, provider messages or credentials. If a weight file or required tracker package cannot load, startup fails before the service accepts traffic; it must be fixed in the image and redeployed rather than installed at runtime. `Settings` reads `.env.production` when that file exists; on Railway, the same names must be configured as service Variables because the file is excluded from the image.
 
 ## Frontend–Backend Interaction
 

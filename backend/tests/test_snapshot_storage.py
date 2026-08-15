@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from backend.app.core.config import Settings
 from backend.app.integrations.snapshot_storage import (
     FilesystemSnapshotStorage,
+    S3SnapshotStorage,
     SnapshotStorageError,
     create_snapshot_storage,
 )
@@ -33,6 +34,24 @@ def test_s3_storage_requires_complete_runtime_configuration():
 
     with pytest.raises(ValueError, match="SNAPSHOT_STORAGE_BUCKET"):
         create_snapshot_storage(settings)
+
+
+def test_s3_storage_readiness_uses_head_bucket_without_writing_an_object():
+    class Client:
+        def __init__(self):
+            self.calls = []
+
+        def head_bucket(self, **kwargs):
+            self.calls.append(kwargs["Bucket"])
+
+    client = Client()
+    storage = object.__new__(S3SnapshotStorage)
+    storage._bucket = "redacted-snapshots"
+    storage._client = client
+
+    storage.check_connection()
+
+    assert client.calls == ["redacted-snapshots"]
 
 
 @pytest.mark.asyncio

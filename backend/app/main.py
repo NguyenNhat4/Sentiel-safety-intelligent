@@ -10,10 +10,15 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
-from backend.app.core.database import Base, SessionLocal, database_runtime, engine
+from backend.app.core.database import Base, SessionLocal, check_database_connection, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
 from backend.app.core.startup_validation import validate_runtime_files
-from backend.app.integrations.snapshot_storage import SnapshotStorageError, create_snapshot_storage
+from backend.app.integrations.snapshot_storage import (
+    SnapshotStorageError,
+    check_snapshot_storage_connection,
+    create_snapshot_storage,
+)
+from backend.app.schemas.health import DependencyReadiness, HealthResponse
 from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
 
@@ -116,17 +121,43 @@ async def get_snapshot(filename: str):
     return Response(content=content, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
-@app.get("/health", tags=["Health Check"])
-async def health_check():
-    return {
-        "status": "ok",
-        "ready": bool(getattr(app.state, "ready", False)),
-        "env": settings.app_env,
-        "service": settings.app_name,
-        "database": database_runtime.backend,
-        "database_fallback_active": database_runtime.fallback_active,
-        "runtime_files": getattr(app.state, "runtime_files", {}),
-    }
+def _dependency_readiness(check, unavailable_reason: str) -> DependencyReadiness:
+    try:
+        check()
+    except Exception:
+        return DependencyReadiness(ready=False, reason=unavailable_reason)
+    return DependencyReadiness(ready=True)
+
+
+@app.get("/health", response_model=HealthResponse, tags=["Health Check"])
+async def health_check() -> HealthResponse:
+    if database_runtime.backend != "postgresql" or database_runtime.fallback_active:
+        postgresql = DependencyReadiness(ready=False, reason="postgresql_required")
+    else:
+        postgresql = _dependency_readiness(
+            lambda: check_database_connection(engine),
+            "connection_failed",
+        )
+
+    if settings.snapshot_storage_backend != "s3":
+        snapshot_storage = DependencyReadiness(ready=False, reason="s3_required")
+    else:
+        snapshot_storage = _dependency_readiness(
+            lambda: check_snapshot_storage_connection(settings),
+            "connection_failed",
+        )
+
+    ready = bool(getattr(app.state, "ready", False)) and postgresql.ready and snapshot_storage.ready
+    return HealthResponse(
+        status="ok" if ready else "degraded",
+        ready=ready,
+        env=settings.app_env,
+        service=settings.app_name,
+        database=database_runtime.backend,
+        database_fallback_active=database_runtime.fallback_active,
+        dependencies={"postgresql": postgresql, "snapshot_storage": snapshot_storage},
+        runtime_files=getattr(app.state, "runtime_files", {}),
+    )
 
 
 @app.get("/", include_in_schema=False)

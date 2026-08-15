@@ -269,3 +269,8 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** The frame-inference service had a dedicated `person_model_path` configuration (`models/yolo11n.pt`) but accidentally defaulted it to the SH17 PPE model path. PPE/object checkpoints can produce false person detections on background objects, so person localization and PPE observation use separate model responsibilities.
 - **Choice:** `FrameInferenceService` uses `settings.person_model_path` for `_detect_people()` unless an explicit constructor override is supplied. `PpeVisionFacade` continues to use `settings.ppe_model_path` for SH17 detections and PPE association.
 - **Constraint:** This fixes model routing, not model quality. Thresholds and NMS must be benchmarked against labeled factory footage before production alerting.
+
+## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
+- **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
+- **Choice:** Keep the existing `/health` endpoint and `ready` field, but make `ready=true` require initialized runtime files/models, a live `SELECT 1` through the selected PostgreSQL engine without SQLite fallback, and S3 `HeadBucket`. Add typed per-dependency readiness fields with only stable reason codes.
+- **Constraint:** The response must not expose database URLs, S3 endpoints, provider exception text, or credentials. `.env.production` is read when present; managed deployment must provide the same values as environment variables because the file is excluded from the image.

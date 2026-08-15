@@ -41,6 +41,7 @@ P-047/
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
 │   │   │   ├── event.py
+│   │   │   ├── health.py # Typed public /health dependency-readiness response
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py

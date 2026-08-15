@@ -18,6 +18,8 @@ class SnapshotStorage(Protocol):
 
     def delete(self, key: str) -> None: ...
 
+    def check_connection(self) -> None: ...
+
 
 def new_snapshot_key() -> str:
     return f"snapshots/{uuid.uuid4().hex}.jpg"
@@ -48,6 +50,12 @@ class FilesystemSnapshotStorage:
             self._path(key).unlink(missing_ok=True)
         except OSError as exc:
             raise SnapshotStorageError("Could not delete the redacted snapshot") from exc
+
+    def check_connection(self) -> None:
+        try:
+            self._directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise SnapshotStorageError("Could not access the snapshot directory") from exc
 
     def _path(self, key: str) -> Path:
         name = Path(key).name
@@ -91,6 +99,12 @@ class S3SnapshotStorage:
         except Exception as exc:
             raise SnapshotStorageError("Could not delete the redacted snapshot") from exc
 
+    def check_connection(self) -> None:
+        try:
+            self._client.head_bucket(Bucket=self._bucket)
+        except Exception as exc:
+            raise SnapshotStorageError("Could not connect to the snapshot bucket") from exc
+
 
 def create_snapshot_storage(settings) -> SnapshotStorage:
     settings.validate_snapshot_storage()
@@ -103,3 +117,8 @@ def create_snapshot_storage(settings) -> SnapshotStorage:
         access_key_id=settings.snapshot_storage_access_key_id,
         secret_access_key=settings.snapshot_storage_secret_access_key,
     )
+
+
+def check_snapshot_storage_connection(settings) -> None:
+    """Verify the configured storage is reachable without reading snapshot content."""
+    create_snapshot_storage(settings).check_connection()
