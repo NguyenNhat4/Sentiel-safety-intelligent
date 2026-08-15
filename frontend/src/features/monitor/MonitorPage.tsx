@@ -21,7 +21,7 @@ export function MonitorPage() {
           <span>⌄</span>
         </div>
         <div className="machine-control">
-          <div><small>VÙNG ĐANG CHỌN</small><strong>{state.selectedZone ? (state.machineRunning ? "Đang hoạt động" : "Đã dừng") : "Chưa chọn vùng"}</strong></div>
+          <div><small> TRẠNG THÁI MÁY</small><strong>{state.selectedZone ? (state.machineRunning ? "Đang hoạt động" : "Đã dừng") : "Chưa chọn vùng"}</strong></div>
           <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy của vùng đang chọn" disabled={!state.selectedZone} onClick={actions.toggleMachine}><span /></button>
         </div>
         <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
