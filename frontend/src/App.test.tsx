@@ -155,6 +155,32 @@ describe("Sentinel React application", () => {
     expect(screen.getByText("Chưa chọn vùng")).toBeInTheDocument();
   });
 
+  it("rewinds an uploaded video so the same file can be replayed after it ends", async () => {
+    mockAuthenticatedSession();
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:uploaded-video"),
+      revokeObjectURL: vi.fn(),
+    });
+    const {container} = render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const video = container.querySelector("video") as HTMLVideoElement;
+    Object.defineProperties(video, {
+      videoWidth: {value: 1280},
+      videoHeight: {value: 720},
+      duration: {value: 20},
+      currentTime: {value: 20, writable: true},
+    });
+    vi.spyOn(video, "load").mockImplementation(() => undefined);
+    fireEvent.change(input, {target: {files: [new File(["video"], "shift.mp4", {type: "video/mp4"})]}});
+    fireEvent.loadedMetadata(video);
+    fireEvent.ended(video);
+
+    expect(video.currentTime).toBe(0);
+    expect(screen.getByRole("button", {name: "↻ Phát lại"})).toBeEnabled();
+  });
+
   it("creates points only after the explicit Tạo vùng action", async () => {
     mockAuthenticatedSession();
     const {container} = render(<App />);

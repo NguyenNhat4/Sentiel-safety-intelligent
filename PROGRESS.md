@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-15: [Frontend] Replay the uploaded video without selecting it again
+- When the uploaded video ends, the monitor preserves its existing browser object URL, captures the final preview frame, rewinds to `0`, and enables the **Phát lại** control.
+- A UI regression test verifies that ending an uploaded video leaves the replay control enabled and reuses the same video rather than requiring a second file selection.
+
 ## 2026-08-15: [Frontend] Explain concrete reasons in the HITL review pop-up
 - The review title, summary and pending-review message now derive from the inference result: each affected person’s missing required hat/vest and each active danger-zone entry are named explicitly. A combined PPE and zone violation displays both reasons rather than a generic zone-only message.
 
