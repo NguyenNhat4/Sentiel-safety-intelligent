@@ -10,7 +10,7 @@ Nhân sự an toàn khó theo dõi liên tục nhiều khu vực có máy dập,
 
 Hệ thống hướng tới:
 
-- Phát hiện người và PPE bắt buộc: mũ, kính và găng bảo hộ.
+- Phát hiện người và PPE bắt buộc theo profile `hat_vest_v1`: mũ bảo hộ và áo phản quang.
 - Xác định người đi vào polygon vùng nguy hiểm.
 - Chỉ đánh giá xâm nhập là critical khi máy đang chạy.
 - Hiển thị cảnh báo gần realtime và chuyển trường hợp mơ hồ cho con người.
@@ -31,7 +31,7 @@ Hệ thống hướng tới:
 
 Dự án đang phát triển theo hai giai đoạn:
 
-1. Đóng MVP với video/ảnh mô phỏng, PPE, vùng nguy hiểm, HITL, privacy, event log, authentication và dashboard cơ bản.
+1. Đóng MVP với video/ảnh mô phỏng, nhiều vùng nguy hiểm trên một stream, PPE, HITL, privacy, event log, authentication và dashboard cơ bản.
 2. Giao bản nâng cao trong 5 tuần với khu vực/ca, confidence triage, escalation, dashboard quản trị, báo cáo và cloud operations.
 
 Camera nhà máy thật, PLC, tự động dừng máy và xử lý đồng thời nhiều stream không thuộc phạm vi đã cam kết. Xem [Problem Statement](docs/project-problem-statement.md), [PRD](specs/PRD.md) và [User Story Backlog](specs/USER_STORIES_LIST.md) để biết phạm vi chính xác.
@@ -42,14 +42,15 @@ Baseline đang hoạt động gồm:
 
 - React 19 + TypeScript + Vite cho giao diện monitor.
 - FastAPI phục vụ REST, WebSocket và production frontend build.
-- Upload video local, vẽ vùng bốn điểm và trạng thái máy chạy/dừng.
+- Upload video local, tạo/lưu nhiều vùng bốn điểm không chồng nhau và trạng thái máy riêng cho từng vùng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
+- Một YOLO11m Safety checkpoint đã pin chạy `person`, `hat`, `vest` đúng một lần mỗi frame; `person` là nguồn canonical cho tracking/zone, còn rule PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
-- PostgreSQL là database chính; SQLite chỉ là fallback local/test có kiểm soát.
+- SQLite là mặc định hiện tại cho MVP/local/test; PostgreSQL vẫn được hỗ trợ qua cấu hình `DATABASE_URL` cho môi trường triển khai sau khi được xác thực.
 - Đăng nhập bằng session lưu phía server với đúng ba role và workspace phù hợp.
 
-Các khoảng trống quan trọng gồm PPE model mũ/kính/găng production-ready, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống quan trọng gồm benchmark/calibration production-ready cho model hat/vest, face detector đã benchmark cho production, authorization đầy đủ trên API nghiệp vụ, zone/shift CRUD, escalation và reporting. Tracking/dedup US-08, authentication persistence và PostgreSQL migration baseline đã được tích hợp. Trạng thái mới nhất luôn nằm trong [PROGRESS.md](PROGRESS.md).
 
 ## Kiến trúc tóm tắt
 
@@ -88,6 +89,9 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
+| Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/done/US-27-MULTI-ZONE-SPEC.md) |
+| Đặc tả US-28 YOLO11m Safety hat/vest | [US-28 YOLO11m Safety Specification](specs/done/US-28.md) |
+| Kế hoạch và task đang hoạt động | [Implementation Plan](tasks/plan.md) và [Task List](tasks/todo.md) |
 | Xem công việc đã làm và bước tiếp theo | [PROGRESS.md](PROGRESS.md) |
 | Xem quyết định đã chốt | [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow của AI/contributor | [AGENTS.md](AGENTS.md) |
@@ -128,6 +132,10 @@ make setup
 make run
 ```
 
+`make setup` creates `.env.development` from `.env.development.example` when it is
+missing. Docker Compose separately reads `.env.production`; start from
+`.env.production.example` and supply deployment-specific values there.
+
 Sau khi chạy:
 
 - Monitor UI: <http://localhost:8000/>
@@ -144,6 +152,16 @@ WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API
 ```bash
 make check
 ```
+
+## Docker Compose smoke
+
+```bash
+make setup
+make docker-up
+make docker-smoke
+```
+
+Docker Compose nạp `.env.development`, nhưng luôn override `DATABASE_URL` sang PostgreSQL disposable `db` nội bộ để kiểm tra không chạm database developer cấu hình trong file. Sau khi `db` healthy, entrypoint chạy Alembic migration rồi FastAPI khởi động ở development mode và seed demo users idempotent. Các biến còn lại, gồm CORS và S3, lấy từ `.env.development`; dùng credentials development/staging, không dùng credentials production. Khi rollback code, checkout release/source tag trước đó rồi chạy `make docker-up`; chỉ rollback dữ liệu bằng backup đã tạo trước migration nếu schema cũ không tương thích.
 
 Có thể chạy từng nhóm:
 

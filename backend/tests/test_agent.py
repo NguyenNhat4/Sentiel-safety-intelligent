@@ -1,6 +1,6 @@
 def test_agent_chat_endpoint(client):
     payload = {
-        "message": "What should I do if a worker enters Zone 01 without a helmet?",
+        "message": "What should I do if a worker enters Zone 01 without a hat?",
         "context": {
             "event_type": "missing_ppe",
             "zone_id": "zone_01",

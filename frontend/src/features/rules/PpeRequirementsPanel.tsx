@@ -10,9 +10,9 @@ interface PpeRequirementsPanelProps {
 type LoadState = "loading" | "loaded" | "loadError";
 
 const EMPTY_REQUIREMENT: PpeRequirementUpdate = {
-  helmet_required: false,
-  safety_glasses_required: false,
-  gloves_required: false
+  profile: "hat_vest_v1",
+  hat_required: false,
+  vest_required: false
 };
 
 export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelProps) {
@@ -45,7 +45,7 @@ export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelPro
     return () => { active = false; };
   }, [cameraId, reloadKey, zoneId]);
 
-  const update = useCallback((key: keyof PpeRequirementUpdate, value: boolean) => {
+  const update = useCallback((key: "hat_required" | "vest_required", value: boolean) => {
     setDraft(current => ({...current, [key]: value}));
     setError(undefined);
     setMessage(undefined);
@@ -91,12 +91,10 @@ export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelPro
         <p>Chỉ cảnh báo loại đang bật khi model phát hiện thiếu.</p>
       </div>
       <div className="ppe-requirement-switches">
-        <RequirementSwitch label="Yêu cầu mũ" checked={draft.helmet_required} disabled={saving}
-          onChange={checked => update("helmet_required", checked)} />
-        <RequirementSwitch label="Yêu cầu kính" checked={draft.safety_glasses_required} disabled={saving}
-          onChange={checked => update("safety_glasses_required", checked)} />
-        <RequirementSwitch label="Yêu cầu găng" checked={draft.gloves_required} disabled={saving}
-          onChange={checked => update("gloves_required", checked)} />
+        <RequirementSwitch label="Yêu cầu mũ bảo hộ" checked={draft.hat_required} disabled={saving}
+          onChange={checked => update("hat_required", checked)} />
+        <RequirementSwitch label="Yêu cầu áo phản quang" checked={draft.vest_required} disabled={saving}
+          onChange={checked => update("vest_required", checked)} />
       </div>
       <div className="ppe-requirement-actions">
         <div className="ppe-save-status" aria-live="polite">
@@ -133,16 +131,16 @@ function RequirementSwitch({label, checked, disabled, onChange}: RequirementSwit
 
 function toUpdate(requirement: PpeRequirement): PpeRequirementUpdate {
   return {
-    helmet_required: requirement.helmet_required,
-    safety_glasses_required: requirement.safety_glasses_required,
-    gloves_required: requirement.gloves_required
+    profile: requirement.profile,
+    hat_required: requirement.hat_required,
+    vest_required: requirement.vest_required
   };
 }
 
 function sameRequirement(left: PpeRequirementUpdate, right: PpeRequirementUpdate): boolean {
-  return left.helmet_required === right.helmet_required
-    && left.safety_glasses_required === right.safety_glasses_required
-    && left.gloves_required === right.gloves_required;
+  return left.profile === right.profile
+    && left.hat_required === right.hat_required
+    && left.vest_required === right.vest_required;
 }
 
 function errorMessage(error: unknown, fallback: string): string {

@@ -3,32 +3,31 @@ from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
 
 
-def person(*, inside_zone: bool = False, helmet: str = "present") -> RulePersonObservation:
+def person(*, inside_zone: bool = False, hat: str = "present", vest: str = "present") -> RulePersonObservation:
     return RulePersonObservation(
         confidence=0.9,
         inside_zone=inside_zone,
         ppe=PersonPpeObservations(
-            helmet=PpeObservation(status=helmet, confidence=None if helmet == "missing" else 0.9),
-            safety_glasses=PpeObservation(status="unknown", confidence=None),
-            gloves=PpeObservation(status="unknown", confidence=None),
+            hat=PpeObservation(status=hat, confidence=None if hat == "missing" else 0.9),
+            vest=PpeObservation(status=vest, confidence=None if vest == "missing" else 0.9),
         ),
     )
 
 
-def requirements(*, helmet_required: bool = False) -> PpeRequirementResponse:
+def requirements(*, hat_required: bool = False, vest_required: bool = False) -> PpeRequirementResponse:
     return PpeRequirementResponse(
         camera_id="uploaded_video",
         zone_id="zone_01",
-        helmet_required=helmet_required,
-        safety_glasses_required=False,
-        gloves_required=False,
+        profile="hat_vest_v1",
+        hat_required=hat_required,
+        vest_required=vest_required,
         updated_at=None,
     )
 
 
 def test_returns_normal_when_observations_match_configured_rules():
     result = SafetyRuleEngine().evaluate(
-        people=[person()], requirements=requirements(helmet_required=True), machine_state="running", zone_active=False
+        people=[person()], requirements=requirements(hat_required=True), machine_state="running", zone_active=False
     )
 
     assert result.outcome == "normal"
@@ -37,15 +36,27 @@ def test_returns_normal_when_observations_match_configured_rules():
 
 def test_returns_violate_and_review_for_required_missing_ppe():
     result = SafetyRuleEngine().evaluate(
-        people=[person(helmet="missing")],
-        requirements=requirements(helmet_required=True),
+        people=[person(hat="missing")],
+        requirements=requirements(hat_required=True),
         machine_state="stopped",
         zone_active=False,
     )
 
     assert result.outcome == "violate"
     assert result.review_required is True
-    assert result.missing_required_ppe == [["helmet"]]
+    assert result.missing_required_ppe == [["hat"]]
+
+
+def test_evaluates_hat_and_vest_independently_for_multiple_people():
+    result = SafetyRuleEngine().evaluate(
+        people=[person(hat="missing"), person(vest="missing")],
+        requirements=requirements(hat_required=True, vest_required=True),
+        machine_state="stopped",
+        zone_active=False,
+    )
+
+    assert result.missing_required_ppe == [["hat"], ["vest"]]
+    assert result.ppe_alert is True
 
 
 def test_returns_violate_for_person_in_active_zone_while_machine_runs():

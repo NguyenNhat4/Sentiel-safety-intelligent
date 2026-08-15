@@ -19,9 +19,8 @@
         {
           "start_ms": 0,
           "end_ms": 20000,
-          "helmet": "present",
-          "glasses": "present",
-          "gloves": "present"
+          "hat": "present",
+          "vest": "present"
         }
       ],
       "boxes": [

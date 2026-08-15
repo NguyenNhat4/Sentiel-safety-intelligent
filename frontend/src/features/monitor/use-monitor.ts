@@ -1,25 +1,29 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import type {ChangeEvent, PointerEvent as ReactPointerEvent, RefObject} from "react";
 import {InferenceClient} from "../../api/inference-client";
-import {saveReviewedEvent} from "../../api/events";
+import {saveReviewedEvent, saveReviewedEventBatch} from "../../api/events";
+import {loadMonitoringZones, saveMonitoringZones} from "../../api/monitoring-zones";
 import type {
+  EventBatchPayload,
   EventPayload,
   InferenceResult,
   ModelDetection,
+  MonitoringZone,
   PersonDetection,
   PpeRequirementUpdate,
   ReviewStatus,
   ZonePoint,
 } from "../../types";
-import {drawOverlay, findPointAt, normalizedPointerPosition} from "./canvas";
+import {drawOverlay, normalizedPointerPosition} from "./canvas";
+import {createZoneDraft, findZonePointAt, zoneGeometryConflict} from "./zone-editor";
 
 const SAMPLE_INTERVAL_SECONDS = 0.1;
 const JPEG_QUALITY = 0.82;
 const PREVIEW_CANDIDATES = [0.05, 0.5, 1, 2, 3, 4, 5, 7, 10];
 const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
-  helmet_required: false,
-  safety_glasses_required: false,
-  gloves_required: false,
+  profile: "hat_vest_v1",
+  hat_required: false,
+  vest_required: false,
 };
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
@@ -82,8 +86,16 @@ export function useMonitor() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const captureRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
-  const zonePointsRef = useRef<ZonePoint[]>([]);
+  const [zones, setZones] = useState<MonitoringZone[]>([]);
+  const zonesRef = useRef<MonitoringZone[]>([]);
+  const appliedZonesRef = useRef<MonitoringZone[]>([]);
+  const [zoneRevision, setZoneRevision] = useState(0);
+  const zoneRevisionRef = useRef(0);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [drawingZoneId, setDrawingZoneId] = useState<string | null>(null);
+  const [newDraftZoneId, setNewDraftZoneId] = useState<string | null>(null);
+  const [zoneSaving, setZoneSaving] = useState(false);
+  const [zoneHydrated, setZoneHydrated] = useState(false);
   const [latestPeople, setLatestPeople] = useState<PersonDetection[]>([]);
   const [latestDetections, setLatestDetections] = useState<ModelDetection[]>([]);
   const [activePpeRequirements, setActivePpeRequirements] = useState<PpeRequirementUpdate>(
@@ -91,7 +103,7 @@ export function useMonitor() {
   );
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const draggingPoint = useRef<number | null>(null);
-  const [selectingZone, setSelectingZone] = useState(false);
+  const draggingZoneId = useRef<string | null>(null);
   const [machineRunning, setMachineRunning] = useState(true);
   const machineRunningRef = useRef(true);
   const [pendingViolation, setPendingViolation] = useState<InferenceResult | null>(null);
@@ -127,8 +139,9 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zone_points: zonePointsRef.current.length === 4 ? zonePointsRef.current : [],
-        machine_state: machineRunningRef.current ? "running" : "stopped",
+        zones: appliedZonesRef.current,
+        zone_revision: zoneRevisionRef.current,
+        camera_id: "uploaded_video",
         monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
@@ -137,10 +150,14 @@ export function useMonitor() {
   }
   const client = clientRef.current;
 
-  const updateZonePoints = useCallback((points: ZonePoint[]) => {
-    zonePointsRef.current = points;
-    setZonePoints(points);
+  const updateZones = useCallback((nextZones: MonitoringZone[]) => {
+    zonesRef.current = nextZones;
+    setZones(nextZones);
   }, []);
+
+  const updateZone = useCallback((zoneId: string, change: (zone: MonitoringZone) => MonitoringZone) => {
+    updateZones(zonesRef.current.map(zone => zone.zone_id === zoneId ? change(zone) : zone));
+  }, [updateZones]);
 
   const stopRealtimeInference = useCallback(() => {
     session.current.running = false;
@@ -212,8 +229,37 @@ export function useMonitor() {
 
   useEffect(() => {
     const canvas = overlayRef.current;
-    if (canvas) drawOverlay(canvas, zonePoints, latestPeople, latestDetections, selectedPoint, activePpeRequirements);
-  }, [activePpeRequirements, latestDetections, latestPeople, selectedPoint, zonePoints]);
+    if (canvas) drawOverlay(
+      canvas,
+      zones,
+      latestPeople,
+      latestDetections,
+      selectedZoneId,
+      selectedPoint,
+      activePpeRequirements,
+    );
+  }, [activePpeRequirements, latestDetections, latestPeople, selectedPoint, selectedZoneId, zones]);
+
+  useEffect(() => {
+    let active = true;
+    loadMonitoringZones("uploaded_video")
+      .then(collection => {
+        if (!active) return;
+        appliedZonesRef.current = collection.zones;
+        zoneRevisionRef.current = collection.revision;
+        setZoneRevision(collection.revision);
+        updateZones(collection.zones);
+        setSelectedZoneId(collection.zones[0]?.zone_id ?? null);
+        setZoneHydrated(true);
+      })
+      .catch(error => {
+        if (active) {
+          setZoneHydrated(true);
+          showToast(error instanceof Error ? error.message : "Không thể tải cấu hình vùng");
+        }
+      });
+    return () => { active = false; };
+  }, [showToast, updateZones]);
 
   useEffect(() => {
     if (!toast) return;
@@ -241,7 +287,6 @@ export function useMonitor() {
       violationLatched: false, previewReady: false, previewCandidateIndex: 0,
       frameSequence: 0, monitoringSessionId: crypto.randomUUID()
     });
-    updateZonePoints([]);
     setLatestPeople([]);
     setLatestDetections([]);
     setSelectedPoint(null);
@@ -255,9 +300,9 @@ export function useMonitor() {
     setPlaybackDisabled(true);
     setZoneDisabled(true);
     setPlaybackLabel("▶ Phát video");
-    setFlowStatus("Chờ cấu hình vùng");
+    setFlowStatus(zonesRef.current.length ? "Đã khôi phục cấu hình vùng" : "Chờ tạo vùng");
     setView(initialView(machineRunningRef.current));
-    showToast("Video đã sẵn sàng. Hãy chọn 4 điểm cho vùng nguy hiểm.");
+    showToast("Video đã sẵn sàng. Bấm Tạo vùng nếu cần thêm khu vực nguy hiểm.");
   }
 
   function handleLoadedMetadata(): void {
@@ -269,8 +314,8 @@ export function useMonitor() {
     overlay.height = capture.height = video.videoHeight;
     setStageReady(true);
     setPlaybackDisabled(false);
+    setZoneDisabled(false);
     setVideoMeta(`${video.videoWidth} × ${video.videoHeight} · ${formatTime(video.duration)}`);
-    setSelectingZone(true);
     seekPreviewCandidate();
   }
 
@@ -327,7 +372,6 @@ export function useMonitor() {
       return;
     }
     session.current.previewReady = true;
-    setSelectingZone(false);
     setPreviewSrc(undefined);
     setSelectedPoint(null);
     setPlaybackLabel("■ Dừng video");
@@ -415,8 +459,7 @@ export function useMonitor() {
   function stopPreviewPlayback(): void {
     stopRealtimeInference();
     capturePausedFrame();
-    setSelectingZone(true);
-    setFlowStatus("Chọn hoặc điều chỉnh 4 điểm");
+    setFlowStatus("Video đã dừng · có thể chỉnh vùng");
   }
 
   function handleEnded(): void {
@@ -427,67 +470,159 @@ export function useMonitor() {
   }
 
   function toggleMachine(): void {
-    const running = !machineRunningRef.current;
+    const selected = zonesRef.current.find(zone => zone.zone_id === selectedZoneId);
+    const running = selected ? selected.machine_state !== "running" : !machineRunningRef.current;
     machineRunningRef.current = running;
     setMachineRunning(running);
+    if (selected) updateZone(selected.zone_id, zone => ({...zone, machine_state: running ? "running" : "stopped"}));
     setView(current => ({
       ...current,
-      machineRule: {yes: running, text: running ? "Machine A đang chạy" : "Machine A đã dừng", badge: running ? "ON" : "OFF"}
+      machineRule: {yes: running, text: running ? "Vùng đang chạy" : "Vùng đã dừng", badge: running ? "ON" : "OFF"}
     }));
-    client.updateConfiguration();
   }
 
   function resetZone(): void {
-    stopRealtimeInference();
-    updateZonePoints([]);
+    if (!selectedZoneId) return;
+    updateZone(selectedZoneId, zone => ({...zone, points: []}));
     setSelectedPoint(null);
-    setSelectingZone(true);
-    setFlowStatus("Chờ cấu hình vùng");
+    setDrawingZoneId(selectedZoneId);
+    setFlowStatus("Vẽ lại vùng · 0/4");
   }
 
-  function toggleZoneEditing(): void {
-    if (!videoRef.current?.paused) {
-      stopPreviewPlayback();
-      setSelectingZone(true);
+  function createZone(): void {
+    if (drawingZoneId) return;
+    if (!videoRef.current?.paused) stopPreviewPlayback();
+    const draft = createZoneDraft(zonesRef.current);
+    updateZones([...zonesRef.current, draft]);
+    setSelectedZoneId(draft.zone_id);
+    setNewDraftZoneId(draft.zone_id);
+    setDrawingZoneId(draft.zone_id);
+    setSelectedPoint(null);
+    setFlowStatus(`${draft.display_name} · 0/4`);
+  }
+
+  function cancelZoneCreation(): void {
+    if (!newDraftZoneId) return;
+    updateZones(zonesRef.current.filter(zone => zone.zone_id !== newDraftZoneId));
+    setNewDraftZoneId(null);
+    setDrawingZoneId(null);
+    setSelectedZoneId(appliedZonesRef.current[0]?.zone_id ?? null);
+    setSelectedPoint(null);
+    setFlowStatus("Đã hủy tạo vùng");
+  }
+
+  function deleteSelectedZone(): void {
+    if (zoneSaving) return;
+    const selectedIndex = zonesRef.current.findIndex(zone => zone.zone_id === selectedZoneId);
+    if (selectedIndex === -1) return;
+
+    const selected = zonesRef.current[selectedIndex];
+    const confirmed = window.confirm(
+      `Xóa "${selected.display_name}" khỏi cấu hình đang chỉnh sửa? Bấm Lưu cấu hình vùng để cập nhật database.`
+    );
+    if (!confirmed) return;
+
+    const remaining = zonesRef.current
+      .filter(zone => zone.zone_id !== selected.zone_id)
+      .map((zone, order) => ({...zone, order}));
+    const nextSelectedZoneId = remaining[Math.min(selectedIndex, remaining.length - 1)]?.zone_id ?? null;
+
+    updateZones(remaining);
+    setSelectedZoneId(nextSelectedZoneId);
+    if (newDraftZoneId === selected.zone_id) setNewDraftZoneId(null);
+    setDrawingZoneId(null);
+    setSelectedPoint(null);
+    draggingPoint.current = null;
+    draggingZoneId.current = null;
+    setFlowStatus(`Đã xóa ${selected.display_name} trên UI · chưa lưu`);
+    showToast(`Đã xóa ${selected.display_name} trên UI. Bấm Lưu cấu hình vùng để cập nhật database.`);
+  }
+
+  async function saveZones(): Promise<void> {
+    const incomplete = zonesRef.current.find(zone => zone.points.length !== 4);
+    if (incomplete) {
+      showToast(`${incomplete.display_name} cần đủ 4 điểm trước khi lưu.`);
       return;
     }
-    setSelectingZone(current => !current);
+    const conflict = zoneGeometryConflict(zonesRef.current);
+    if (conflict) {
+      showToast(`Các vùng đang xung đột: ${conflict[0]}, ${conflict[1]}`);
+      return;
+    }
+    setZoneSaving(true);
+    try {
+      const collection = await saveMonitoringZones("uploaded_video", zoneRevisionRef.current, zonesRef.current);
+      appliedZonesRef.current = collection.zones;
+      zoneRevisionRef.current = collection.revision;
+      setZoneRevision(collection.revision);
+      updateZones(collection.zones);
+      setNewDraftZoneId(null);
+      setDrawingZoneId(null);
+      client.updateConfiguration();
+      setFlowStatus(`Đã lưu ${collection.zones.length} vùng · revision ${collection.revision}`);
+      showToast("Đã lưu cấu hình vùng.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Không thể lưu cấu hình vùng");
+    } finally {
+      setZoneSaving(false);
+    }
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLCanvasElement>): void {
     const video = videoRef.current;
-    if (!selectingZone || !video?.videoWidth || !video.paused) return;
+    if (!video?.videoWidth || !video.paused) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const position = normalizedPointerPosition(event.clientX, event.clientY, rect);
-    const hit = findPointAt(zonePointsRef.current, position, rect);
+    const hit = findZonePointAt(zonesRef.current, position, rect);
     if (hit !== null) {
-      setSelectedPoint(hit);
-      draggingPoint.current = hit;
+      setSelectedZoneId(hit.zoneId);
+      setSelectedPoint(hit.pointIndex);
+      draggingPoint.current = hit.pointIndex;
+      draggingZoneId.current = hit.zoneId;
       event.currentTarget.setPointerCapture?.(event.pointerId);
-    } else if (zonePointsRef.current.length < 4) {
-      updateZonePoints([...zonePointsRef.current, position]);
-      setSelectedPoint(zonePointsRef.current.length - 1);
-    } else setSelectedPoint(null);
-    setFlowStatus(zonePointsRef.current.length === 4 ? "Zone sẵn sàng · inference realtime" : "Zone tùy chọn · detection vẫn chạy khi phát video");
+      return;
+    }
+    if (!drawingZoneId) {
+      setSelectedPoint(null);
+      return;
+    }
+    const drawing = zonesRef.current.find(zone => zone.zone_id === drawingZoneId);
+    if (!drawing || drawing.points.length >= 4) return;
+    const points = [...drawing.points, position];
+    updateZone(drawingZoneId, zone => ({...zone, points}));
+    setSelectedPoint(points.length - 1);
+    if (points.length === 4) {
+      setDrawingZoneId(null);
+      setNewDraftZoneId(null);
+    }
+    setFlowStatus(`${drawing.display_name} · ${points.length}/4${points.length === 4 ? " · sẵn sàng lưu" : ""}`);
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>): void {
-    if (draggingPoint.current === null) return;
-    const points = [...zonePointsRef.current];
-    points[draggingPoint.current] = normalizedPointerPosition(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
-    updateZonePoints(points);
+    if (draggingPoint.current === null || !draggingZoneId.current) return;
+    const pointIndex = draggingPoint.current;
+    updateZone(draggingZoneId.current, zone => {
+      const points = [...zone.points];
+      points[pointIndex] = normalizedPointerPosition(
+        event.clientX,
+        event.clientY,
+        event.currentTarget.getBoundingClientRect(),
+      );
+      return {...zone, points};
+    });
   }
 
   function handlePointerUp(event: ReactPointerEvent<HTMLCanvasElement>): void {
     if (draggingPoint.current !== null) event.currentTarget.releasePointerCapture?.(event.pointerId);
     draggingPoint.current = null;
+    draggingZoneId.current = null;
   }
 
   function deleteSelectedPoint(): void {
-    if (selectedPoint === null) return;
-    updateZonePoints(zonePointsRef.current.filter((_, index) => index !== selectedPoint));
+    if (selectedPoint === null || !selectedZoneId) return;
+    updateZone(selectedZoneId, zone => ({...zone, points: zone.points.filter((_, index) => index !== selectedPoint)}));
     setSelectedPoint(null);
-    setSelectingZone(true);
+    setDrawingZoneId(selectedZoneId);
     setFlowStatus("Chờ đủ 4 điểm");
   }
 
@@ -496,7 +631,9 @@ export function useMonitor() {
     if (!pending) return;
     setReviewSaving(true);
     try {
-      await saveReviewedEvent(buildEventPayload(status, pending, zonePointsRef.current, machineRunningRef.current));
+      const batch = buildEventBatchPayload(status, pending, appliedZonesRef.current);
+      if (batch) await saveReviewedEventBatch(batch);
+      else await saveReviewedEvent(buildEventPayload(status, pending, [], machineRunningRef.current));
       pendingViolationRef.current = null;
       setPendingViolation(null);
       setIsReviewModalOpen(false);
@@ -512,22 +649,31 @@ export function useMonitor() {
     }
   }
 
-  const selectedPointPosition = selectedPoint === null ? undefined : zonePoints[selectedPoint];
+  const selectedZone = zones.find(zone => zone.zone_id === selectedZoneId);
+  const selectedPointPosition = selectedPoint === null ? undefined : selectedZone?.points[selectedPoint];
   const timer = useReviewTimer(reviewStartedAt);
 
   return {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
-      zonePoints, selectingZone, machineRunning, pendingViolation, isReviewModalOpen, reviewSaving, view,
+      zones, zoneRevision, zoneHydrated, selectedZoneId, selectedZone, drawingZoneId, newDraftZoneId, zoneSaving,
+      machineRunning: selectedZone ? selectedZone.machine_state === "running" : machineRunning,
+      pendingViolation, isReviewModalOpen, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
       zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
       latestPeople, latestDetections, peopleCount: latestPeople.length,
-      ppeRequirementCount: Object.values(activePpeRequirements).filter(Boolean).length,
+      ppeRequirementCount: Number(activePpeRequirements.hat_required) + Number(activePpeRequirements.vest_required),
     },
     actions: {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
-      resetZone, toggleZoneEditing, handlePointerDown, handlePointerMove,
+      resetZone, createZone, cancelZoneCreation, deleteSelectedZone, saveZones,
+      selectZone: (zoneId: string) => { setSelectedZoneId(zoneId); setSelectedPoint(null); },
+      updateSelectedZoneName: (displayName: string) => selectedZoneId
+        && updateZone(selectedZoneId, zone => ({...zone, display_name: displayName})),
+      toggleSelectedZoneEnabled: () => selectedZoneId
+        && updateZone(selectedZoneId, zone => ({...zone, enabled: !zone.enabled})),
+      handlePointerDown, handlePointerMove,
       handlePointerUp, deleteSelectedPoint, review,
       openReviewModal: () => setIsReviewModalOpen(true),
       closeReviewModal: () => setIsReviewModalOpen(false),
@@ -538,19 +684,18 @@ export function useMonitor() {
 export function buildPpeRule(result: InferenceResult): RuleView {
   const requirements = result.rule.ppe_requirements;
   const requiredLabels = [
-    requirements.helmet_required ? "mũ" : null,
-    requirements.safety_glasses_required ? "kính" : null,
-    requirements.gloves_required ? "găng" : null,
+    requirements.hat_required ? "mũ bảo hộ" : null,
+    requirements.vest_required ? "áo phản quang" : null,
   ].filter((label): label is string => label !== null);
   if (!requiredLabels.length) return {yes: null, text: "Không yêu cầu PPE", badge: "OFF"};
 
   const missing = [...new Set(result.people.flatMap(person => person.missing_required_ppe))];
-  const ppeLabel: Record<string, string> = {helmet: "mũ", safety_glasses: "kính", gloves: "găng"};
+  const ppeLabel: Record<string, string> = {hat: "mũ bảo hộ", vest: "áo phản quang"};
   if (missing.length) return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
 
   const hasUnknown = result.people.some(person =>
     requiredLabels.some(label => {
-      const item = label === "mũ" ? "helmet" : label === "kính" ? "safety_glasses" : "gloves";
+      const item = label === "mũ bảo hộ" ? "hat" : "vest";
       return person.ppe[item].status === "unknown";
     }),
   );
@@ -589,6 +734,49 @@ export function buildEventPayload(
       people: pending.people,
       zone_points: zonePoints
     }
+  };
+}
+
+export function buildEventBatchPayload(
+  status: ReviewStatus,
+  pending: InferenceResult,
+  zones: MonitoringZone[],
+): EventBatchPayload | null {
+  if (!pending.monitoring_session_id) return null;
+  const occurrencesByZone = new Map<string, string[]>();
+  pending.people.forEach(person => {
+    person.active_violations?.forEach(violation => {
+      if (!violation.is_new || !violation.zone_id || !violation.rule_key.startsWith("zone_intrusion:")) return;
+      const ids = occurrencesByZone.get(violation.zone_id) ?? [];
+      if (!ids.includes(violation.occurrence_id)) ids.push(violation.occurrence_id);
+      occurrencesByZone.set(violation.zone_id, ids);
+    });
+  });
+  if (!occurrencesByZone.size) return null;
+  const byId = new Map(zones.map(zone => [zone.zone_id, zone]));
+  return {
+    monitoring_session_id: pending.monitoring_session_id,
+    camera_id: "uploaded_video",
+    status,
+    acknowledged_by: "Safety Officer",
+    snapshot_data: pending.snapshot_data,
+    snapshot_people: pending.people,
+    snapshot_detections: pending.detections ?? [],
+    events: [...occurrencesByZone.entries()]
+      .sort((left, right) => (byId.get(left[0])?.order ?? 0) - (byId.get(right[0])?.order ?? 0))
+      .map(([zoneId, occurrenceIds]) => ({
+        zone_id: zoneId,
+        event_type: "zone_intrusion" as const,
+        severity: "critical",
+        occurrence_ids: occurrenceIds,
+        details: {
+          review_result: status === "acknowledged" ? "actual_violation" : "normal",
+          machine_state: byId.get(zoneId)?.machine_state ?? "running",
+          video_timestamp_seconds: pending.video_time,
+          people: pending.people,
+          zone_points: byId.get(zoneId)?.points ?? [],
+        },
+      })),
   };
 }
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from vision.pipeline import PrivacyRedactionError, annotate_snapshot, redact_identity_regions
+from vision.pipeline import PrivacyRedactionError, annotate_snapshot, redact_person_head_regions
 
 
 def _patterned_frame() -> np.ndarray:
@@ -13,9 +13,9 @@ def _patterned_frame() -> np.ndarray:
     return frame
 
 
-def detection(class_name: str, bbox: list[int]) -> dict:
+def detection(class_name: str, bbox: list[int], class_id: int = 0) -> dict:
     return {
-        "class_id": 0,
+        "class_id": class_id,
         "class_name": class_name,
         "bbox": bbox,
         "confidence": 0.9,
@@ -26,7 +26,10 @@ def detection(class_name: str, bbox: list[int]) -> dict:
 def test_person_head_fallback_redacts_a_person_without_a_detected_face():
     frame = _patterned_frame()
 
-    result = redact_identity_regions(frame, [detection("person", [20, 10, 80, 90])])
+    result = redact_person_head_regions(
+        frame,
+        [{"bbox": [20, 10, 80, 90], "confidence": 0.9, "inside_zone": False}],
+    )
 
     assert result["used_person_fallback"] is True
     assert result["redacted_regions"] == [[20, 10, 80, 42]]
@@ -34,29 +37,27 @@ def test_person_head_fallback_redacts_a_person_without_a_detected_face():
     assert np.array_equal(result["image"][42:90, 20:80], frame[42:90, 20:80])
 
 
-def test_detected_identity_regions_for_multiple_people_are_all_redacted():
+def test_multiple_canonical_people_are_all_redacted():
     frame = _patterned_frame()
-    detections = [
-        detection("person", [10, 10, 50, 90]),
-        detection("face", [20, 18, 40, 38]),
-        detection("person", [65, 10, 110, 90]),
-        detection("head", [75, 16, 100, 42]),
+    people = [
+        {"bbox": [10, 10, 50, 90], "confidence": 0.9, "inside_zone": False},
+        {"bbox": [65, 10, 110, 90], "confidence": 0.9, "inside_zone": True},
     ]
 
-    result = redact_identity_regions(frame, detections)
+    result = redact_person_head_regions(frame, people)
 
-    assert result["used_person_fallback"] is False
-    assert result["redacted_regions"] == [[20, 18, 40, 38], [75, 16, 100, 42]]
-    assert not np.array_equal(result["image"][18:38, 20:40], frame[18:38, 20:40])
-    assert not np.array_equal(result["image"][16:42, 75:100], frame[16:42, 75:100])
+    assert result["used_person_fallback"] is True
+    assert result["redacted_regions"] == [[10, 10, 50, 42], [65, 10, 110, 42]]
+    assert not np.array_equal(result["image"][10:42, 10:50], frame[10:42, 10:50])
+    assert not np.array_equal(result["image"][10:42, 65:110], frame[10:42, 65:110])
 
 
 def test_snapshot_without_a_redaction_candidate_fails_closed():
-    with pytest.raises(PrivacyRedactionError, match="no face, head, or person"):
-        redact_identity_regions(_patterned_frame(), [detection("tool", [20, 10, 80, 90])])
+    with pytest.raises(PrivacyRedactionError, match="no canonical person"):
+        redact_person_head_regions(_patterned_frame(), [])
 
 
-def test_snapshot_annotation_draws_person_and_sh17_boxes_without_mutating_input():
+def test_snapshot_annotation_draws_person_and_hat_boxes_without_mutating_input():
     frame = np.zeros((100, 120, 3), dtype=np.uint8)
 
     annotated = annotate_snapshot(
@@ -64,7 +65,7 @@ def test_snapshot_annotation_draws_person_and_sh17_boxes_without_mutating_input(
         [{"bbox": [10, 20, 40, 90], "confidence": 0.9, "inside_zone": True}],
         [
             detection("person", [0, 0, 5, 5]),
-            detection("helmet", [60, 30, 90, 60]),
+            detection("hat", [60, 30, 90, 60]),
         ],
     )
 

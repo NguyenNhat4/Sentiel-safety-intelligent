@@ -19,26 +19,54 @@ export interface ZonePoint {
   y: number;
 }
 
+export interface MonitoringZone {
+  zone_id: string;
+  display_name: string;
+  points: ZonePoint[];
+  machine_state: MachineState;
+  enabled: boolean;
+  order: number;
+}
+
+export interface MonitoringZoneCollection {
+  camera_id: string;
+  revision: number;
+  zones: MonitoringZone[];
+  updated_at: string | null;
+}
+
 export interface PersonDetection {
   track_id?: number;
   bbox: [number, number, number, number];
   confidence: number;
   foot_point?: [number, number];
   inside_zone: boolean;
-  safety_shirt: boolean;
+  zone_memberships?: ZoneMembership[];
   ppe: {
-    helmet: PpeObservation;
-    safety_glasses: PpeObservation;
-    gloves: PpeObservation;
+    hat: PpeObservation;
+    vest: PpeObservation;
   };
-  missing_required_ppe: Array<"helmet" | "safety_glasses" | "gloves">;
+  missing_required_ppe: Array<"hat" | "vest">;
   active_violations?: ActiveViolation[];
 }
 
 export interface ActiveViolation {
   occurrence_id: string;
   rule_key: string;
+  zone_id?: string | null;
   is_new: boolean;
+}
+
+export interface ZoneMembership {
+  zone_id: string;
+  inside: boolean;
+}
+
+export interface ZoneResult {
+  zone_id: string;
+  machine_state: MachineState;
+  person_inside_zone: boolean;
+  violation: boolean;
 }
 
 export interface PpeObservation {
@@ -47,8 +75,8 @@ export interface PpeObservation {
 }
 
 export interface ModelDetection {
-  class_id: number;
-  class_name: string;
+  class_id: 0 | 3 | 4;
+  class_name: "hat" | "person" | "vest";
   bbox: [number, number, number, number];
   confidence: number;
   person_index: number | null;
@@ -57,11 +85,13 @@ export interface ModelDetection {
 export interface InferenceRule {
   person_inside_zone: boolean;
   machine_state: MachineState;
-  safety_shirt_required: boolean;
+  ppe_profile: "hat_vest_v1";
   camera_id: string;
   zone_id: string;
   ppe_requirements: PpeRequirementUpdate;
   ppe_alert: boolean;
+  zone_revision?: number | null;
+  zone_results?: ZoneResult[];
 }
 
 export interface InferenceResult {
@@ -95,6 +125,32 @@ export interface SafetyEvent {
   };
   monitoring_session_id?: string | null;
   occurrence_ids?: string[];
+  batch_id?: string | null;
+}
+
+export interface EventBatchItem {
+  zone_id: string;
+  event_type: "zone_intrusion";
+  severity: string;
+  occurrence_ids: string[];
+  details: Record<string, unknown>;
+}
+
+export interface EventBatchPayload {
+  monitoring_session_id: string;
+  camera_id: string;
+  status: ReviewStatus;
+  acknowledged_by: string;
+  snapshot_data?: string;
+  snapshot_people?: PersonDetection[];
+  snapshot_detections?: ModelDetection[];
+  events: EventBatchItem[];
+}
+
+export interface EventBatchResponse {
+  batch_id: string;
+  snapshot_path?: string | null;
+  events: SafetyEvent[];
 }
 
 export interface EventPayload {
@@ -113,9 +169,9 @@ export interface EventPayload {
 }
 
 export interface PpeRequirementUpdate {
-  helmet_required: boolean;
-  safety_glasses_required: boolean;
-  gloves_required: boolean;
+  profile: "hat_vest_v1";
+  hat_required: boolean;
+  vest_required: boolean;
 }
 
 export interface PpeRequirement extends PpeRequirementUpdate {

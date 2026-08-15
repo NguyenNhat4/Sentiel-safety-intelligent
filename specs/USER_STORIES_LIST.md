@@ -149,7 +149,7 @@
 - Phụ thuộc: US-07, US-08, US-09
 - Acceptance criteria:
   - Nguồn nghiệm thu chính là custom dataset do dự án tự tạo trong bối cảnh mô phỏng có sự đồng ý của người tham gia; public dataset chỉ được dùng bổ sung để regression hoặc tham khảo, không thay thế final evaluation set.
-  - Custom dataset bao phủ người không vi phạm, thiếu riêng/tổ hợp mũ, kính và găng, zone entry khi máy ON/OFF, ra khỏi zone rồi tái xâm nhập, mất track ngắn/che khuất và nhiều người có trạng thái khác nhau.
+  - Custom dataset bao phủ người không vi phạm, thiếu riêng/tổ hợp mũ bảo hộ và áo phản quang, zone entry khi máy ON/OFF, ra khỏi zone rồi tái xâm nhập, mất track ngắn/che khuất và nhiều người có trạng thái khác nhau.
   - Ground truth được phiên bản hóa bằng manifest và checksum, gồm video/scenario ID, split, person bbox/track, trạng thái PPE `present`/`missing`/`unknown` theo người, polygon zone, machine-state timeline, khoảng violation occurrence và expected review outcome; raw media không được commit trực tiếp nếu chưa có storage/quyền truy cập phù hợp.
   - Dataset được chia theo video/scenario thành calibration và final evaluation; final evaluation được khóa trước benchmark và không được dùng để chọn model, threshold hoặc chỉnh rule.
   - Báo cáo có precision/recall cho person, từng loại PPE và zone occurrence; false-alarm rate theo định nghĩa đã duyệt; latency end-to-end p50/p95; đồng thời nêu hardware, model/checksum, threshold, dataset version, kích thước mẫu, failure cases và giới hạn của prototype.
@@ -171,7 +171,7 @@
   - Chấp nhận định dạng ảnh/giới hạn dung lượng được cấu hình và từ chối input không hợp lệ.
   - Kết quả dùng cùng detection/rule contract với video và hiển thị bounding box, PPE có/thiếu, confidence và severity.
   - Chỉ lưu event khi người dùng xác nhận; snapshot lưu trữ phải được làm mờ.
-  - Có test ảnh không người, một/nhiều người, thiếu mũ/kính/găng, zone violation và file lỗi.
+  - Có test ảnh không người, một/nhiều người, thiếu mũ/áo phản quang, zone violation và file lỗi.
 - Task:
   1. Tái sử dụng frame inference pipeline cho image endpoint.
   2. Xây upload/result/review UI và contract validation.
@@ -247,7 +247,7 @@
 - Ưu tiên / trạng thái: **P0 / Chưa làm đầy đủ**
 - Phụ thuộc: US-01 đến US-13, US-16 đến US-18, US-20, US-24
 - Acceptance criteria:
-  - UAT bao phủ đăng nhập/phân quyền, video/ảnh, thiếu mũ/kính/găng, zone-entry khi máy ON/OFF, false alarm, dedup, privacy failure và reconnect.
+  - UAT bao phủ đăng nhập/phân quyền, video/ảnh, thiếu mũ/áo phản quang, zone-entry khi máy ON/OFF, false alarm, dedup, privacy failure và reconnect.
   - `make check`, migration test, production build và deploy smoke test đạt trên cùng release commit.
   - PRD traceability matrix, metric evidence, known limitations, runbook demo và rollback được bàn giao.
   - Không còn defect P0; defect P1 phải có quyết định chấp thuận bằng văn bản.
@@ -256,13 +256,96 @@
   2. Chạy full regression, sửa defect release-blocking và ghi evidence.
   3. Chốt release candidate, demo rehearsal và biên bản nghiệm thu MVP.
 
+### US-27 — Giám sát nhiều vùng nguy hiểm trên một video
+
+> Với vai trò cán bộ an toàn, tôi muốn cấu hình và theo dõi nhiều vùng nguy hiểm trên cùng một video, mỗi vùng có trạng thái máy riêng, để giám sát đồng thời nhiều máy hoặc khu vực trong một khung hình.
+
+- Ưu tiên / trạng thái: **P0 / Đã triển khai, chờ browser UAT cuối MVP**
+- Phụ thuộc: US-02, US-04, US-08, US-09
+- Acceptance criteria:
+  - Một monitoring session của video `uploaded_video` hỗ trợ số lượng vùng không có giới hạn nghiệp vụ cố định; mỗi vùng có `zone_id` ổn định, tên hiển thị, đúng bốn điểm chuẩn hóa, trạng thái `running`/`stopped` và cờ bật/tắt.
+  - UI có đúng một nút **Tạo vùng** làm entrypoint tạo mới. Chỉ sau khi bấm nút, Canvas mới vào chế độ vẽ và nhận bốn click tạo polygon draft; click Canvas ở trạng thái bình thường không được tự tạo vùng. Draft chỉ có hiệu lực sau khi lưu thành công và được khôi phục từ backend khi tải lại trang.
+  - Các polygon active không được giao nhau, chạm biên/đỉnh hoặc chứa nhau; backend từ chối toàn bộ cấu hình không hợp lệ. Mỗi person trả membership theo từng vùng và `review_required=true` khi có ít nhất một occurrence mới của `zone_intrusion:{zone_id}` trong vùng đang chạy.
+  - Tracking không reset khi cấu hình vùng thay đổi trong cùng monitoring session; dedup và re-arm được quản lý độc lập theo session, track và `zone_id`.
+  - Một frame có vi phạm mới tại nhiều vùng mở một review tổng hợp; xác nhận được lưu nguyên tử thành event riêng cho từng vùng, dùng chung snapshot đã làm mờ và không làm mất occurrence nào.
+  - Contract mới là additive: client một vùng hiện tại tiếp tục hoạt động trong giai đoạn tương thích; field scalar cũ chỉ là summary và client đa vùng dùng `zones`, `zone_memberships` và `zone_results`.
+  - Existing person/PPE inference tiếp tục chạy đúng một lần cho mỗi frame bất kể số vùng; US-27 không thay đổi model, cấu hình, rule, cảnh báo, UI hoặc persistence PPE hiện hành.
+  - Có unit, contract, component và end-to-end test cho 0/1/nhiều vùng không giới hạn bằng hằng số, vùng stopped/running hỗn hợp, từ chối giao/chạm/chứa polygon, nhiều người, reconfigure, reconnect, dedup, batch review và payload không hợp lệ.
+- Task:
+  1. [x] Khóa phạm vi: không giới hạn số vùng ở cấp sản phẩm, cấm vùng giao/chạm/chứa nhau, grouped review/event theo vùng và không thay đổi PPE.
+  2. [x] Thiết kế persistence/migration và REST collection cho cấu hình vùng theo `camera_id`, có revision để chống ghi đè cấu hình mới hơn.
+  3. [x] Mở rộng WebSocket/REST inference, rule engine và occurrence key để trả kết quả theo từng vùng mà chỉ chạy model một lần mỗi frame.
+  4. [x] Xây zone editor đa vùng với nút **Tạo vùng**, drawing mode bốn điểm, Canvas overlay, trạng thái draft/lưu và typed transport trên frontend.
+  5. [x] Thêm atomic event-batch persistence, regression contract cũ và automated contract/component tests; browser UAT bằng video nhiều vùng nằm ở release gate.
+
+### US-28 — Thay SH17 bằng `wesjos/Yolo-hard-hat-safety-vest`
+
+> Cập nhật sau implementation (2026-08-13): quyết định Product Owner mới hơn đã chọn `yolo11m_safety.pt` làm detector runtime duy nhất. Class `person` ID `3` thay YOLO11 cho person canonical/ByteTrack/zone và cùng call `[0,3,4]` trả `hat`/`vest`; các boundary hai-model bên dưới được giữ như lịch sử phạm vi ban đầu của US-28.
+
+> Với vai trò cán bộ an toàn, tôi muốn hệ thống dùng model `wesjos/Yolo-hard-hat-safety-vest` với đúng ba lớp `person`, `hat` và `vest`, để phát hiện mũ và áo phản quang theo một model PPE phù hợp với phạm vi prototype.
+
+- Ưu tiên / trạng thái: **P0 / Đã triển khai cho prototype; US-13 final evaluation vẫn là production gate**
+- Owner chính: `vision`; thay đổi contract/rule là công việc phối hợp `backend` và `frontend`.
+- Phụ thuộc: US-03, US-04, US-07, US-08, US-12, US-13 và US-27.
+- Thay thế có kiểm soát: model SH17 chỉ bị thay ở luồng PPE/object detection và annotation liên quan. Person detector YOLO11 hiện hành vẫn là nguồn chuẩn cho `foot_point`, zone rule và ByteTrack; việc thay luôn YOLO11 bằng class `person` của model mới là một quyết định riêng, không nằm trong US này.
+
+#### Phạm vi model và semantics
+
+- Artifact được pin từ nguồn `wesjos/Yolo-hard-hat-safety-vest` bằng revision, file weight, SHA-256, giấy phép, provenance và device/runtime đã kiểm chứng. Chưa đủ các bằng chứng này thì backend không được bật model trong môi trường dùng chung.
+- Adapter vision chỉ phát hành ba `class_name` chính xác: `person`, `hat`, `vest`. Khởi động hoặc inference phải fail rõ ràng nếu metadata/class mapping của checkpoint không đúng; không đổi tên, đoán thêm lớp, hoặc ánh xạ lớp không rõ nghĩa vào luật an toàn.
+- Model mới chạy tối đa một lần cho mỗi frame để lấy PPE/object observations. YOLO11 person detection và ByteTrack hiện hành tiếp tục chạy một lần theo flow US-03/US-08; association phải gắn `hat`/`vest` của model mới vào đúng person canonical trước khi backend áp rule.
+- Khi hai model cùng trả `person`, REST/WebSocket chỉ phát hành một person canonical từ YOLO11 để không tạo box, `foot_point` hoặc `track_id` trùng. `person` của model PPE chỉ là tín hiệu hỗ trợ association và không được thay thế person canonical trong US này.
+- Sau cutover, SH17 không được nạp, gọi hoặc trả qua REST/WebSocket/canvas/snapshot annotation. Artifact SH17 chỉ có thể còn trong lịch sử release hoặc backup đã kiểm soát, không phải dependency runtime.
+
+#### Hành vi PPE mới
+
+- Profile PPE mới chỉ có hai requirement: `hat_required` và `vest_required`; cả hai mặc định OFF cho camera–zone mới.
+- `people[].ppe` trong contract PPE mới chỉ gồm `hat` và `vest`, mỗi mục có `status` là `present`, `missing` hoặc `unknown`, cùng confidence nullable. `missing_required_ppe` chỉ chứa `hat` và/hoặc `vest`.
+- `hat` hoặc `vest` chỉ là `missing` khi person đạt ngưỡng confidence, association hợp lệ và không có detection PPE tương ứng. Requirement OFF không tạo alert nhưng không tắt inference.
+- Rule key mới là `missing_ppe:hat` và `missing_ppe:vest`; occurrence/dedup theo US-08 tiếp tục hoạt động độc lập theo person, track và rule. Event cũ chứa `missing_ppe:helmet`, `missing_ppe:safety_glasses` hoặc `missing_ppe:gloves` chỉ được đọc như audit lịch sử, không bị đổi hoặc xóa.
+- Kính và găng không còn là capability, requirement hoặc alert của profile mới. Không được trả `unknown` cho chúng để giả vờ model vẫn hỗ trợ; UI, rule, metric và dữ liệu mới phải thể hiện rõ chúng không thuộc profile `hat`/`vest`.
+
+#### Contract, persistence và UI
+
+- Đây là thay đổi có chủ ý từ profile PPE ba loại của US-07 sang profile hai loại. Trước khi code, Product Owner phải phê duyệt versioned REST/WebSocket/Pydantic/TypeScript contract và migration cấu hình; không được âm thầm xóa hay đổi nghĩa field hiện hành.
+- Contract PPE phiên bản mới trả detection chỉ có `person`, `hat`, `vest`; person PPE chỉ có `hat`, `vest`; rule echo đúng hai requirement đã persist. Client profile cũ phải được migrate có kiểm soát hoặc nhận lỗi version rõ ràng, không được tiếp tục tạo alert kính/găng bằng output model mới.
+- Migration phải giữ nguyên `ppe_requirements`, event, occurrence và audit lịch sử. `helmet_required` có thể được đề xuất map sang `hat_required` sau khi Product Owner xác nhận tương đương ngữ nghĩa; `safety_glasses_required` và `gloves_required` phải bị retire cho rule mới nhưng vẫn giữ được lịch sử.
+- Frontend chỉ hiển thị box/list/badge cho `person`, `hat`, `vest`, có hai công tắc **Mũ bảo hộ** và **Áo phản quang** cùng luồng lưu cấu hình rõ ràng. Nhãn box giữ nguyên tên model `hat`/`vest`; text UI tiếng Việt có thể diễn giải tương ứng.
+- Zone intrusion, multi-zone, `foot_point`, `track_id`, grouped review và event batch không đổi semantics. PPE model mới không được làm model/tracker chạy lặp theo số zone.
+
+#### Privacy bắt buộc
+
+- Model ba lớp không có `face`, `face-guard`, `face-mask` hoặc `head`, vì vậy không thể thay thế detector làm mờ danh tính của US-12.
+- Trước khi bật lưu snapshot cho review/event bằng profile mới, phải có một redaction provider độc lập, được pin và benchmark riêng, hoặc một phương án redaction được Product Owner phê duyệt. Provider này không được làm xuất hiện lớp privacy trong public PPE contract.
+- Pipeline vẫn bắt buộc `redact → annotate → persist`, xử lý ảnh thô chỉ trong memory và fail-closed: redaction lỗi hoặc không đủ candidate theo policy thì không được lưu event/snapshot. Không được giữ SH17 chỉ để lách yêu cầu thay model mà không ghi rõ provider privacy riêng.
+
+#### Acceptance criteria
+
+- Model artifact, revision, checksum, license/provenance, exact class mapping ba lớp và startup validation được ghi trong `models/README.md`; checkpoint sai mapping không thể khởi động inference PPE.
+- Mọi REST/WebSocket result của profile mới chỉ có detection `person`, `hat`, `vest`; lớp lạ, dữ liệu rỗng, confidence thấp và không có person đều có response an toàn, typed và được test.
+- Requirement, rule engine, occurrence key, event detail và UI chỉ hỗ trợ `hat`/`vest`; ON/OFF × present/missing/unknown, một/nhiều person, một/nhiều PPE, PPE không associate và retry/dedup đều vượt test.
+- Person detection, `foot_point`, zone ON/OFF, multi-zone, ByteTrack, reconnect và grouped review của US-03/04/08/27 vượt regression; model PPE mới chỉ được gọi một lần mỗi frame, không theo số zone.
+- Migration giữ event/audit và cấu hình lịch sử đọc được; contract version/profile cũ không thể âm thầm tạo alert kính/găng sau cutover.
+- Snapshot privacy vẫn được redact, annotate và persist theo US-12 bằng provider đã được xác nhận; test gồm không có candidate, một/nhiều identity region, lỗi redactor và cleanup transaction.
+- US-13 có dataset/calibration/final evaluation cho person, `hat`, `vest`, qualified absence, association, zone occurrence và tracking; báo cáo nêu model revision/checksum, threshold, precision/recall, false alarm và latency p50/p95 trước khi dùng ngoài demo.
+- `make check`, focused vision/backend/frontend tests, migration upgrade/downgrade và smoke test `make setup` rồi `make run` đều đạt trên Python được hỗ trợ.
+
+#### Task
+
+1. [x] Xác minh model card/artifact `wesjos/Yolo-hard-hat-safety-vest`, pin revision/weight/checksum/license, kiểm tra chính xác ba lớp và thêm model registry/runtime startup validation.
+2. [x] Thay adapter SH17 bằng facade vision chỉ phát hành observation `person`/`hat`/`vest`; cập nhật association với person canonical, threshold/configuration và benchmark một lần inference PPE mỗi frame.
+3. [x] Chốt và phê duyệt contract PPE version mới, migration từ profile helmet/glasses/gloves sang hat/vest, compatibility/retirement policy và audit retention trước khi sửa API hoặc database.
+4. [x] Cập nhật deterministic PPE rule, occurrence keys, persistence/API/wire types và frontend requirement controls, detection list, canvas/review overlay theo profile hai loại.
+5. [x] Thay dependency redaction SH17 bằng provider privacy độc lập hoặc phương án đã được duyệt; giữ fail-closed, in-memory redaction, annotation sau redaction và cleanup.
+6. [x] Mở rộng template US-13 sang `hat`/`vest`, chạy focused vision/backend/frontend, migration, privacy và CPU smoke benchmark. Final custom-dataset evaluation, browser UAT và target-device benchmark tiếp tục là gate bắt buộc trước pilot/production.
+
 ### Cổng nghiệm thu MVP cuối tuần hiện tại
 
-- Core flow chạy trọn vẹn sau đăng nhập đúng vai trò: tải video hoặc ảnh → mô tả/confirm rule → vẽ vùng → person + mũ/kính/găng + track → áp trạng thái máy/vùng → HITL → snapshot blur → event/audit → dashboard.
+- Core flow chạy trọn vẹn sau đăng nhập đúng vai trò: tải video hoặc ảnh → mô tả/confirm rule → tạo một hoặc nhiều vùng → person + mũ/áo phản quang + track → áp trạng thái máy theo vùng → HITL → snapshot blur → event/audit → dashboard.
 - Một vi phạm liên tục chỉ tạo một event; false alarm được lưu để đo; không lưu snapshot chưa làm mờ.
 - Precision, recall, false-alarm rate và latency có báo cáo tái lập.
 - `make check`, production build, migration, deploy smoke test và UAT đạt trên cùng release commit.
-- US-20 và US-24 đạt acceptance criteria trong MVP; US-19 được Product Owner nghiệm thu và là điểm bắt đầu kế hoạch nâng cao 5 tuần.
+- US-20, US-24 và US-27 đạt acceptance criteria trong MVP; US-19 được Product Owner nghiệm thu và là điểm bắt đầu kế hoạch nâng cao 5 tuần.
 
 ## 4. User story nâng cao trong 5 tuần tiếp theo
 

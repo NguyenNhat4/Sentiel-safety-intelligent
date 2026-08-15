@@ -13,10 +13,11 @@ class ActiveViolation:
 @dataclass
 class _Occurrence:
     occurrence_id: str
-    active: bool = True
+    active: bool = False
     absent_frames: int = 0
     lost_frames: int = 0
     cooldown_until: float = 0.0
+    consecutive_frames: int = 0
 
 
 class ViolationTrackingService:
@@ -25,12 +26,16 @@ class ViolationTrackingService:
     def __init__(
         self,
         *,
+        activation_frames: int = 1,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
         session_ttl_seconds: float = 300.0,
         track_handoff_max_distance: float = 0.12,
     ) -> None:
+        if activation_frames < 1:
+            raise ValueError("activation_frames must be at least 1")
+        self._activation_frames = activation_frames
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
@@ -71,19 +76,34 @@ class ViolationTrackingService:
         for key in observed_keys:
             _, track_id, rule_key = key
             occurrence = self._occurrences.get(key)
-            is_new = occurrence is None or (not occurrence.active and now >= occurrence.cooldown_until)
-            if is_new:
+            if occurrence is None:
                 occurrence = _Occurrence(occurrence_id=str(uuid4()))
                 self._occurrences[key] = occurrence
-            else:
+            if occurrence.active:
+                is_new = False
+            elif now < occurrence.cooldown_until:
                 occurrence.active = True
+                is_new = False
+            else:
+                if occurrence.cooldown_until > 0:
+                    occurrence = _Occurrence(occurrence_id=str(uuid4()))
+                    self._occurrences[key] = occurrence
+                occurrence.consecutive_frames += 1
+                is_new = occurrence.consecutive_frames >= self._activation_frames
+                if is_new:
+                    occurrence.active = True
+                else:
+                    continue
             occurrence.absent_frames = 0
             occurrence.lost_frames = 0
             output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
 
         for key, occurrence in list(self._occurrences.items()):
             existing_session, track_id, _ = key
-            if existing_session != session_id or key in observed_keys or not occurrence.active:
+            if existing_session != session_id or key in observed_keys:
+                continue
+            if not occurrence.active:
+                occurrence.consecutive_frames = 0
                 continue
             if track_id not in present_tracks:
                 occurrence.lost_frames += 1
@@ -108,11 +128,18 @@ class ViolationTrackingService:
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
+    def occurrence_context(self, occurrence_id: str) -> tuple[str, str] | None:
+        for (session_id, _track_id, rule_key), occurrence in self._occurrences.items():
+            if occurrence.occurrence_id == occurrence_id:
+                return session_id, rule_key
+        return None
+
     def _clear(self, occurrence: _Occurrence, now: float) -> None:
         occurrence.active = False
         occurrence.absent_frames = 0
         occurrence.lost_frames = 0
         occurrence.cooldown_until = now + self._cooldown_seconds
+        occurrence.consecutive_frames = 0
 
     def _handoff_nearby_tracks(
         self,

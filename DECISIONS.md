@@ -2,6 +2,42 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-15: [Backend] Debounce safety alerts across consecutive frames
+- **Choice:** `VIOLATION_FRAME` defaults to `4`; a track/rule occurrence opens only after that many consecutive observed frames. A missing observed frame resets a pending occurrence, while existing exit, lost-track grace and cooldown semantics continue after an alert has opened.
+- **Reason:** One-frame detector flicker must not pause the operator video or create an alert candidate.
+- **Constraint:** The debounce is session-local and applies only when `monitoring_session_id` is present. Stateless REST inference has no safe cross-request identity and therefore cannot establish consecutive frames.
+
+## 2026-08-15: [Backend] Temporary PPE request compatibility bridge for stale browser bundles
+- **Supersedes:** The `PUT`-validation portion of the 2026-08-13 PPE cutover decision that rejected every legacy payload.
+- **Choice:** Keep `hat_vest_v1` canonical for persisted configuration and inference, while accepting only the complete former three-boolean request shape. Map `helmet_required` to `hat_required`, require `vest_required=true`, and return read-only legacy aliases so an already-loaded old browser can finish its load/save cycle.
+- **Constraint:** Mixed, partial, unknown-profile and extra payloads still return `422`; glasses and gloves do not become model observations, requirements or alerts. Remove the bridge only after the deployed frontend bundle is confirmed current.
+
+## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
+- **Choice:** Compose loads `.env.development`, then overrides only the database runtime to its disposable PostgreSQL service and starts it with migrations enabled after database health succeeds.
+- **Reason:** Local container validation must not contact the developer-configured database, while CORS, S3 and other non-database configuration remain aligned with development.
+- **Constraint:** The container entrypoint accepts development mode for this isolated Compose stack so FastAPI seeds demo users; production mode remains strict. Existing `.env.development` files must set `PPE_MODEL_PATH=models/yolo11m_safety.pt`; do not place production storage credentials in that file.
+
+## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
+- **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
+- **Choice:** Keep the existing `/health` endpoint and `ready` field, but make `ready=true` require initialized runtime files/models, a live `SELECT 1` through the selected PostgreSQL engine without SQLite fallback, and S3 `HeadBucket`. Add typed per-dependency readiness fields with only stable reason codes.
+- **Constraint:** The response must not expose database URLs, S3 endpoints, provider exception text, or credentials.
+
+## 2026-08-11: [Backend] Keep SQLite as the current MVP default
+- **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
+- **Reason:** The Product Owner explicitly deferred database expansion and chose to continue with SQLite for now. This also lets a new team member run `make setup` and `make run` without provisioning PostgreSQL first.
+- **Constraint:** Keep Alembic revisions portable across SQLite and PostgreSQL; do not introduce a second persistence implementation or remove the PostgreSQL runtime path.
+
+## 2026-08-11: [Cross-cutting] Expand one monitoring video to multiple danger zones
+- **Context:** The running baseline has one fixed `zone_01`, one polygon and one machine toggle, so it cannot represent multiple machines or danger areas visible in the same frame.
+- **Choice:** Add US-27 for multiple four-point zones on one `uploaded_video` monitoring session. Each zone has a stable `zone_id`, display name, enabled state and independent simulated `running`/`stopped` state. Detection/tracking runs once per frame; backend evaluates every active polygon afterward.
+- **Safety semantics:** Zone intrusion occurrences use `zone_intrusion:{zone_id}` and are deduplicated independently. Active polygons must be spatially disjoint: intersection, boundary/vertex contact and containment are rejected atomically because the current boundary-inclusive foot-point rule would otherwise make zone ownership ambiguous. One grouped HITL review may cover multiple distinct zones, while persistence keeps one event per zone in an atomic batch so audit/statistics remain attributable.
+- **Compatibility:** Extend REST/WebSocket responses with zone collections, memberships and zone results. Preserve the scalar one-zone contract and `POST /api/v1/events` during a documented compatibility period; new clients must not infer multi-zone safety decisions from scalar summary fields.
+- **MVP boundary:** One video/stream at a time, no fixed product-level zone-count limit, simulated machine state only. Generic HTTP/WebSocket payload-size and runtime safety controls still apply, but they must not encode a business rule such as `max_zones`. PLC and multi-stream are not part of US-27.
+- **PPE boundary:** US-27 does not modify PPE. The installed SH17 checkpoint, whole-frame `uploaded_video/zone_01` requirements, qualified-absence rule, alerts, UI and persistence retain their current behavior. Per-zone PPE requires a separate story and decision.
+- **Creation workflow:** The monitor exposes one explicit **Tạo vùng** button. It creates and selects one draft, then enables four-point Canvas drawing; ordinary Canvas clicks never create a zone. A second draft cannot start until the current draft is completed or cancelled.
+- **Implementation:** The saved collection is an optimistic-revision REST resource; WebSocket/REST multi-zone inference accepts only the saved revision. Grouped review uses `event-batches`, one shared redacted snapshot and one event per zone in a single transaction. The legacy scalar inference and single-event routes remain available.
+- **Gate:** Product Owner approved Phase 1 and requested implementation. The US-27 code slice is complete; release/browser UAT remains part of final MVP verification. No PPE behavior was changed.
+
 ## 2026-08-11: [Frontend] Separate read-only operations view
 - **Choice:** Add a dedicated “Quan sát hệ thống” navigation view for operational JSONL aggregates, separate from the safety monitor and violation history.
 - **Reason:** Operational health needs an at-a-glance interface without exposing raw logs or distracting the Safety Officer's active monitoring workflow.
@@ -233,3 +269,20 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** The frame-inference service had a dedicated `person_model_path` configuration (`models/yolo11n.pt`) but accidentally defaulted it to the SH17 PPE model path. PPE/object checkpoints can produce false person detections on background objects, so person localization and PPE observation use separate model responsibilities.
 - **Choice:** `FrameInferenceService` uses `settings.person_model_path` for `_detect_people()` unless an explicit constructor override is supplied. `PpeVisionFacade` continues to use `settings.ppe_model_path` for SH17 detections and PPE association.
 - **Constraint:** This fixes model routing, not model quality. Thresholds and NMS must be benchmarked against labeled factory footage before production alerting.
+
+## 2026-08-13: [Cross-cutting] Cut over PPE to the versioned YOLO11m hat/vest profile
+- **Supersedes:** Runtime portions of the 2026-08-06/08 SH17 PPE, three-requirement, all-class display and SH17 privacy decisions. Historical events and those decision entries remain unchanged as audit history.
+- **Authorization:** The Product Owner explicitly requested completion of US-28 with `wesjos/Yolo-hard-hat-safety-vest/yolo11m_safety.pt`, authorizing the breaking PPE boundary change.
+- **Model choice:** Pin revision `95ffeeb1e0897d60564c811ace5935bcd43d982b` and SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`. Validate the checkpoint's five source labels exactly, run only IDs `0`, `3`, `4`, and publish only canonical `person`, `hat`, `vest`. YOLO11n remains the sole canonical person/tracking/zone source; the PPE model's person output only supports association.
+- **Contract choice:** Require profile `hat_vest_v1`; replace helmet/glasses/gloves and heuristic shirt fields with `hat_required`, `vest_required`, per-person `hat`/`vest`, and rule keys `missing_ppe:hat`/`missing_ppe:vest`. Reject missing, legacy, unknown-profile and extra PUT fields rather than silently translating a current client.
+- **Migration:** Add `hat_required` and `vest_required`, map historical `helmet_required` to `hat_required`, default vest OFF, and retain the legacy columns plus all event/occurrence rows for audit. Old event details are never rewritten.
+- **Privacy:** Remove SH17 from privacy. A separate adapter deterministically blurs the upper 40% of every canonical person box in memory, then annotates and persists. Missing candidates or processing errors fail closed. This is a prototype safeguard; a benchmarked dedicated face provider remains a pilot/production gate.
+- **Constraint:** Qualified absence remains a deterministic backend inference and requires US-13 calibration/final evaluation before non-demo use. CUDA/device latency and face-redaction recall are not claimed by this cutover.
+
+## 2026-08-13: [Vision] Use YOLO11m Safety as the single runtime detector
+- **Supersedes:** The 2026-08-10 dedicated-person-checkpoint decision and the YOLO11n canonical-person constraint in the US-28 cutover decision; both remain as history.
+- **Authorization:** The Product Owner explicitly requested removal of YOLO11n from runtime and selected `models/yolo11m_safety.pt` as the sole detector.
+- **Choice:** Run source classes `[0, 3, 4]` exactly once per frame. Class `3` supplies canonical person boxes for foot points, zone evaluation, privacy candidates and ByteTrack; classes `0`/`4` supply hat/vest observations associated to those same people.
+- **Compatibility:** Preserve current REST/WebSocket/Pydantic/TypeScript fields, class IDs, tracking IDs, occurrence lifecycle, multi-zone behavior, rule semantics and `redact → annotate → persist` ordering. The change is internal model routing, not a wire-contract change.
+- **Runtime:** Remove `person_model_path` and do not preload or call `models/yolo11n.pt`. Per-session model instances may exist to isolate ByteTrack state, but every instance uses the same pinned YOLO11m Safety artifact and each frame has one model call.
+- **Constraint:** This cutover does not claim improved accuracy. Person/hat/vest precision, recall, association, tracking stability and target-device latency must be re-evaluated through US-13 before pilot/production use.

@@ -51,6 +51,7 @@ def test_unreachable_primary_raises_when_fallback_is_disabled(monkeypatch):
 
 def test_postgresql_engine_reuses_warm_connections_without_pre_ping(monkeypatch):
     captured = {}
+    monkeypatch.setattr(database.settings, "database_pool_pre_ping", False)
 
     def capture_create_engine(url, **kwargs):
         captured.update(url=url, **kwargs)

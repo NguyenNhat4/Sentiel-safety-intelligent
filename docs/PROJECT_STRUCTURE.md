@@ -17,6 +17,7 @@ P-047/
 │   │   │   │   ├── analysis.py    # Video stream analysis orchestration
 │   │   │   │   ├── auth.py        # Authentication and system-admin account APIs
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── monitoring_zones.py # Revisioned per-camera zone collection
 │   │   │   │   ├── operational_metrics.py # Read-only JSONL operational metrics aggregate
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
@@ -25,19 +26,23 @@ P-047/
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
 │   │   │   ├── database.py
-│   │   │   └── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   ├── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   └── startup_validation.py # Production model and writable-volume validation
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
-│   │   │   ├── person_tracking.py # Adapter to session-isolated ByteTrack
-│   │   │   └── ppe_vision.py # Cached adapter to public SH17 PPE/redaction facade
+│   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
+│   │   │   └── privacy_vision.py # Model-independent fail-closed snapshot privacy adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
+│   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
 │   │   │   ├── event.py
+│   │   │   ├── health.py # Typed public /health dependency-readiness response
+│   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
@@ -47,6 +52,7 @@ P-047/
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
@@ -60,21 +66,25 @@ P-047/
 │   │       ├── 20260806_01_add_ppe_requirements.py
 │   │       ├── 20260807_01_add_event_occurrences.py
 │   │       ├── 20260811_01_add_authentication_schema.py
-│   │       └── 20260811_02_add_forced_password_change.py
+│   │       ├── 20260811_02_add_forced_password_change.py
+│   │       ├── 20260811_03_add_monitoring_zones.py
+│   │       └── 20260813_01_migrate_ppe_profile_hat_vest.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
+│       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
+│       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
 │       ├── test_violation_tracking.py
 │       └── test_statistics.py
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
-│   ├── api.py           # Public PPE, redaction and session-tracking facades
-│   ├── pipeline.py      # Pure identity redaction and person-head fallback logic
+│   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
+│   ├── pipeline.py      # Pure person-head redaction and post-redaction annotation
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       ├── test_api.py
@@ -84,13 +94,14 @@ P-047/
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── auth.ts   # Authentication/account transport
+│   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
 │   │   │   ├── statistics.ts # Area-dashboard statistics transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
-│   │   │   ├── monitor/ # Video, zone, Canvas and frame sampling
+│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page
@@ -116,8 +127,9 @@ P-047/
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
-│   ├── ppe_yolov8n.pt  # SH17 YOLOv8n PPE-presence checkpoint
-│   └── yolo11n.pt      # Person-detection baseline checkpoint
+│   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
+│   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
+│   └── yolo11n.pt      # Retired person baseline retained for controlled history
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
@@ -134,13 +146,22 @@ P-047/
 │   │   ├── README.md
 │   │   ├── US-07-SPEC.md
 │   │   ├── US-08-SPEC.md
-│   │   └── US-12.md
+│   │   ├── US-12.md
+│   │   ├── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
+│   │   └── US-28.md     # Completed YOLO11m Safety hat/vest cutover specification
 │   └── backlog/         # Remaining MVP and advanced user stories
-│       └── README.md
+│       ├── README.md
+│       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
-│   └── benchmark_model.py
-│   └── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── benchmark_model.py
+│   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── production_start.py # Docker preflight, migration and one-worker startup
+│   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
+│   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check
+│   ├── backup_data.py # Timestamped archive of persistent Docker data
+│   ├── restore_data.py # Safe restore into empty persistent Docker data
+│   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums
 ├── eval/                # Evaluation reports and benchmark results
 │   └── results/
 │       ├── report.md
@@ -154,11 +175,14 @@ P-047/
 ├── DECISIONS.md         # Single project-wide design decision log
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
-├── scripts/             # Explicit utility entrypoints, including dataset validation
-│   └── validate_us13_dataset.py
 ├── tests/                # Cross-cutting and automation tests
-│   └── test_bootstrap_legacy_sqlite.py
+│   ├── test_bootstrap_legacy_sqlite.py
+│   ├── test_startup_validation.py
+│   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
+├── .env.development.example # Development environment template for `make setup`
+├── .env.production.example  # Production Docker Compose environment template
+├── requirements.docker.txt # Production-only, CPU/headless Python dependency set
 └── README.md
 ```
 

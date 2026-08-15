@@ -7,19 +7,15 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.integrations.ppe_vision import (
-    ModelDetection,
-    PrivacyRedactionResult,
-    SnapshotPerson,
-    get_ppe_vision_adapter,
-)
+from backend.app.integrations.privacy_vision import get_privacy_vision_adapter
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
-from backend.app.schemas.event import EventCreate, EventUpdate
+from backend.app.schemas.event import EventBatchCreate, EventCreate, EventUpdate
+from vision.api import ModelDetection, PrivacyRedactionResult, SnapshotPerson
 
 
 class EventPersistenceError(RuntimeError):
@@ -30,7 +26,7 @@ class EventPrivacyError(RuntimeError):
     pass
 
 
-SnapshotRedactor = Callable[[np.ndarray], PrivacyRedactionResult]
+SnapshotRedactor = Callable[[np.ndarray, list[SnapshotPerson]], PrivacyRedactionResult]
 SnapshotAnnotator = Callable[[np.ndarray, list[SnapshotPerson], list[ModelDetection]], np.ndarray]
 
 
@@ -101,16 +97,110 @@ class EventService:
             raise EventPersistenceError("Could not save the event to the database") from exc
         return db_event
 
+    def create_batch(self, batch_in: EventBatchCreate) -> tuple[str, str | None, list[SafetyEvent]]:
+        occurrence_ids = [str(value) for item in batch_in.events for value in item.occurrence_ids]
+        existing = self._events_for_occurrences(occurrence_ids)
+        retried = self._matching_batch_retry(existing, batch_in)
+        if retried is not None:
+            return retried
+        if existing:
+            raise EventConflictError("One or more occurrences already belong to another event")
+
+        snapshot_path = None
+        if batch_in.snapshot_data:
+            snapshot_path = self._save_snapshot(
+                batch_in.snapshot_data,
+                batch_in.snapshot_people,
+                batch_in.snapshot_detections,
+            )
+        batch_id = self._batch_id(occurrence_ids)
+        now = datetime.now(UTC)
+        events: list[SafetyEvent] = []
+        for item in batch_in.events:
+            event = SafetyEvent(
+                zone_id=item.zone_id,
+                camera_id=batch_in.camera_id,
+                event_type=item.event_type,
+                severity=item.severity,
+                snapshot_path=snapshot_path,
+                privacy_blurred=snapshot_path is not None,
+                details=item.details,
+                status=batch_in.status,
+                acknowledged_by=batch_in.acknowledged_by,
+                acknowledged_at=now,
+                timestamp=now,
+                monitoring_session_id=str(batch_in.monitoring_session_id),
+                batch_id=batch_id,
+            )
+            event.occurrences = [EventOccurrence(occurrence_id=str(value)) for value in item.occurrence_ids]
+            event.batch_id = batch_id
+            self.db.add(event)
+            events.append(event)
+        try:
+            self.db.commit()
+            for event in events:
+                self.db.refresh(event)
+        except IntegrityError as exc:
+            self.db.rollback()
+            if snapshot_path:
+                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+            existing = self._events_for_occurrences(occurrence_ids)
+            retried = self._matching_batch_retry(existing, batch_in)
+            if retried is not None:
+                return retried
+            raise EventConflictError("One or more occurrences already belong to another event") from exc
+        except Exception as exc:
+            self.db.rollback()
+            if snapshot_path:
+                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+            raise EventPersistenceError("Could not save the event batch to the database") from exc
+        return batch_id, snapshot_path, events
+
+    @staticmethod
+    def _matching_batch_retry(
+        events: list[SafetyEvent], batch_in: EventBatchCreate
+    ) -> tuple[str, str | None, list[SafetyEvent]] | None:
+        if len(events) != len(batch_in.events) or not events:
+            return None
+        by_zone = {event.zone_id.casefold(): event for event in events}
+        if len(by_zone) != len(events):
+            return None
+        for item in batch_in.events:
+            event = by_zone.get(item.zone_id.casefold())
+            if event is None or (
+                set(event.occurrence_ids) != {str(value) for value in item.occurrence_ids}
+                or event.camera_id != batch_in.camera_id
+                or event.event_type != item.event_type
+                or event.severity != item.severity
+                or event.status != batch_in.status
+                or event.monitoring_session_id != str(batch_in.monitoring_session_id)
+            ):
+                return None
+        ordered = [by_zone[item.zone_id.casefold()] for item in batch_in.events]
+        batch_id = EventService._batch_id([str(value) for item in batch_in.events for value in item.occurrence_ids])
+        for event in ordered:
+            event.batch_id = batch_id
+        return batch_id, ordered[0].snapshot_path, ordered
+
+    @staticmethod
+    def _batch_id(occurrence_ids: list[str]) -> str:
+        stable_key = "p047:event-batch:" + ",".join(sorted(occurrence_ids))
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, stable_key))
+
     def _events_for_occurrences(self, occurrence_ids: list[str]) -> list[SafetyEvent]:
         if not occurrence_ids:
             return []
-        return (
-            self.db.query(SafetyEvent)
-            .join(EventOccurrence)
-            .filter(EventOccurrence.occurrence_id.in_(occurrence_ids))
-            .distinct()
-            .all()
-        )
+        try:
+            return (
+                self.db.query(SafetyEvent)
+                .filter(SafetyEvent.occurrences.any(EventOccurrence.occurrence_id.in_(occurrence_ids)))
+                .all()
+            )
+        except SQLAlchemyError as exc:
+            raise EventPersistenceError("Could not query event occurrences from the database") from exc
+
+    def has_persisted_occurrences(self, occurrence_ids: list[str]) -> bool:
+        return bool(self._events_for_occurrences(occurrence_ids))
 
     @staticmethod
     def _matches_retry(event: SafetyEvent, event_in: EventCreate, occurrence_ids: list[str]) -> bool:
@@ -142,17 +232,18 @@ class EventService:
             raise ValueError("snapshot_data could not be decoded as an image")
 
         try:
-            redaction = self._snapshot_redactor(frame)
+            people = [
+                {
+                    "bbox": person.bbox,
+                    "confidence": person.confidence,
+                    "inside_zone": person.inside_zone,
+                }
+                for person in snapshot_people
+            ]
+            redaction = self._snapshot_redactor(frame, people)
             annotated = self._snapshot_annotator(
                 redaction["image"],
-                [
-                    {
-                        "bbox": person.bbox,
-                        "confidence": person.confidence,
-                        "inside_zone": person.inside_zone,
-                    }
-                    for person in snapshot_people
-                ],
+                people,
                 [detection.model_dump() for detection in snapshot_detections],
             )
             success, redacted_bytes = cv2.imencode(".jpg", annotated)
@@ -172,10 +263,11 @@ class EventService:
         return f"/snapshots/{filename}"
 
     @staticmethod
-    def _default_snapshot_redactor(frame: np.ndarray) -> PrivacyRedactionResult:
-        from backend.app.core.config import get_settings
-
-        return get_ppe_vision_adapter(get_settings().ppe_model_path).redact_snapshot(frame)
+    def _default_snapshot_redactor(
+        frame: np.ndarray,
+        people: list[SnapshotPerson],
+    ) -> PrivacyRedactionResult:
+        return get_privacy_vision_adapter().redact_snapshot(frame, people)
 
     @staticmethod
     def _default_snapshot_annotator(
@@ -183,9 +275,7 @@ class EventService:
         people: list[SnapshotPerson],
         detections: list[ModelDetection],
     ) -> np.ndarray:
-        from backend.app.core.config import get_settings
-
-        return get_ppe_vision_adapter(get_settings().ppe_model_path).annotate_snapshot(frame, people, detections)
+        return get_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
 
     def _snapshot_file(self, snapshot_path: str) -> Path:
         return self._snapshot_dir / Path(snapshot_path).name

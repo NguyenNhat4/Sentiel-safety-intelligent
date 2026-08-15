@@ -48,9 +48,8 @@ class SafetyRuleEngine:
 
     def _missing_for_person(self, person: RulePersonObservation, requirements: PpeRequirementResponse) -> list[str]:
         items = (
-            ("helmet", requirements.helmet_required, person.ppe.helmet),
-            ("safety_glasses", requirements.safety_glasses_required, person.ppe.safety_glasses),
-            ("gloves", requirements.gloves_required, person.ppe.gloves),
+            ("hat", requirements.hat_required, person.ppe.hat),
+            ("vest", requirements.vest_required, person.ppe.vest),
         )
         return [
             name

@@ -1,10 +1,20 @@
-import type {ModelDetection, PersonDetection, PpeRequirementUpdate, ZonePoint} from "../../types";
+import type {ModelDetection, MonitoringZone, PersonDetection, PpeRequirementUpdate, ZonePoint} from "../../types";
 
 type PpeBadgeTone = "present" | "missing" | "unknown";
 
 interface PpeBadge {
   label: string;
   tone: PpeBadgeTone;
+}
+
+const DISPLAYED_PPE_CLASS_NAMES = new Set(["hat", "vest"]);
+
+/**
+ * Returns whether a hat/vest model detection belongs in operator-facing PPE displays.
+ * Person boxes are rendered from the typed people collection to avoid duplicates.
+ */
+export function isDisplayedPpeDetection(className: string): boolean {
+  return DISPLAYED_PPE_CLASS_NAMES.has(className.toLowerCase().trim());
 }
 
 export function normalizedPointerPosition(
@@ -37,31 +47,10 @@ export function getDetectionColor(className: string, personIndex?: number | null
     return insideZone ? "#ff4940" : "#22c55e";
   }
   switch (name) {
-    case "helmet":
-    case "head":
+    case "hat":
       return "#f59e0b";
-    case "glasses":
-    case "safety_glasses":
-    case "face":
-    case "face-guard":
-    case "face-mask":
-      return "#8b5cf6";
-    case "gloves":
-    case "hands":
-    case "hand":
-      return "#10b981";
-    case "shoes":
-    case "foot":
-      return "#3b82f6";
-    case "safety-suit":
-    case "safety-vest":
-    case "medical-suit":
+    case "vest":
       return "#ec4899";
-    case "ear":
-    case "ear-mufs":
-      return "#06b6d4";
-    case "tool":
-      return "#eab308";
     default:
       return personIndex !== null && personIndex !== undefined ? "#a855f7" : "#3b82f6";
   }
@@ -69,18 +58,25 @@ export function getDetectionColor(className: string, personIndex?: number | null
 
 export function drawOverlay(
   canvas: HTMLCanvasElement,
-  points: ZonePoint[],
+  zones: MonitoringZone[],
   people: PersonDetection[],
   detections: ModelDetection[],
+  selectedZoneId: string | null,
   selectedPoint: number | null,
   ppeRequirements: PpeRequirementUpdate
 ): void {
   const context = canvas.getContext("2d");
   if (!context) return;
   context.clearRect(0, 0, canvas.width, canvas.height);
-  drawZone(context, canvas, points, selectedPoint);
+  zones.forEach((zone, index) => drawZone(
+    context,
+    canvas,
+    zone,
+    index,
+    zone.zone_id === selectedZoneId ? selectedPoint : null,
+  ));
   people.forEach((person, index) => drawPerson(context, person, ppeRequirements, index));
-  detections.forEach(detection => drawDetection(context, detection));
+  detections.filter(detection => isDisplayedPpeDetection(detection.class_name)).forEach(detection => drawDetection(context, detection));
 }
 
 export function detectionLabel(detection: ModelDetection): string {
@@ -101,10 +97,14 @@ function drawDetection(context: CanvasRenderingContext2D, detection: ModelDetect
 function drawZone(
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  points: ZonePoint[],
+  zone: MonitoringZone,
+  zoneIndex: number,
   selectedPoint: number | null
 ): void {
+  const points = zone.points;
   if (!points.length) return;
+  const colors = ["#f4cc2f", "#48bfe3", "#f28482", "#90be6d", "#c77dff", "#ff9f1c"];
+  const color = colors[zoneIndex % colors.length];
   context.beginPath();
   points.forEach((point, index) => {
     const x = point.x * canvas.width;
@@ -112,12 +112,20 @@ function drawZone(
     if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
   });
   if (points.length === 4) context.closePath();
-  context.fillStyle = "rgba(247, 215, 77, .20)";
-  context.strokeStyle = "#f4cc2f";
+  context.fillStyle = `${color}33`;
+  context.strokeStyle = color;
   context.lineWidth = 3;
+  context.setLineDash(zone.machine_state === "running" ? [] : [9, 6]);
+  context.globalAlpha = zone.enabled ? 1 : 0.45;
   if (points.length === 4) context.fill();
   context.stroke();
-  points.forEach((point, index) => drawZonePoint(context, canvas, point, index, selectedPoint));
+  points.forEach((point, index) => drawZonePoint(context, canvas, point, index, selectedPoint, color));
+  const anchor = points[0];
+  context.fillStyle = color;
+  context.font = "bold 13px Manrope";
+  context.fillText(`${zone.display_name} · ${zone.machine_state === "running" ? "RUN" : "STOP"}`, anchor.x * canvas.width, Math.max(15, anchor.y * canvas.height - 10));
+  context.setLineDash([]);
+  context.globalAlpha = 1;
 }
 
 function drawZonePoint(
@@ -125,13 +133,14 @@ function drawZonePoint(
   canvas: HTMLCanvasElement,
   point: ZonePoint,
   index: number,
-  selectedPoint: number | null
+  selectedPoint: number | null,
+  color: string,
 ): void {
   const x = point.x * canvas.width;
   const y = point.y * canvas.height;
   context.beginPath();
   context.arc(x, y, 7, 0, Math.PI * 2);
-  context.fillStyle = "#f4cc2f";
+  context.fillStyle = color;
   context.fill();
   if (selectedPoint === index) {
     context.strokeStyle = "#fff";
@@ -148,9 +157,8 @@ export function requiredPpeBadges(
   requirements: PpeRequirementUpdate,
 ): PpeBadge[] {
   const ppe = [
-    ["helmet_required", "helmet", "MŨ"],
-    ["safety_glasses_required", "safety_glasses", "KÍNH"],
-    ["gloves_required", "gloves", "GĂNG"],
+    ["hat_required", "hat", "MŨ"],
+    ["vest_required", "vest", "ÁO"],
   ] as const;
 
   const badges: PpeBadge[] = [];

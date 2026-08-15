@@ -37,12 +37,12 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 ## Runtime Flow
 
-1. Load the shared default-OFF PPE requirements for `uploaded_video` and `zone_01`; edits remain draft until **Lưu cấu hình** succeeds.
+1. Load the versioned `hat_vest_v1` default-OFF requirements for `uploaded_video` and `zone_01`; edits remain draft until **Lưu cấu hình** succeeds.
 2. Select a local video; it remains in the browser.
 3. Select up to four normalized zone points. Points can be dragged, deleted, or reset while paused; only four points activate zone evaluation.
 4. Play to open `/api/v1/ws/inference` and receive detections regardless of zone state.
 5. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
-6. Draw returned person boxes, foot points và mọi SH17 model detection trong source-video coordinates.
+6. Draw returned canonical person boxes, foot points, and YOLO11m Safety detections `hat`/`vest` in source-video coordinates; only `person`, `hat`, `vest` exist in the new detection contract.
 7. Pause only when `review_required=true`, seek back to that inference result's `video_time`, wait for the browser to render it, then capture the full native video frame for review.
 8. Keep that stopped-frame candidate and its detection coordinates in memory until the Safety Officer confirms it or marks it as a false alarm.
 9. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.

@@ -30,71 +30,37 @@ class PrivacyRedactionError(RuntimeError):
     """Raised when a snapshot cannot be safely redacted."""
 
 
-_IDENTITY_CLASS_NAMES = frozenset({"face", "face-guard", "face-mask", "head"})
 _PERSON_CLASS_NAME = "person"
 _PERSON_HEAD_HEIGHT_RATIO = 0.4
 _PERSON_NORMAL_COLOR = (94, 197, 34)
 _PERSON_VIOLATION_COLOR = (64, 73, 255)
 _DETECTION_COLORS = {
-    "helmet": (11, 158, 245),
-    "head": (11, 158, 245),
-    "glasses": (246, 92, 139),
-    "safety_glasses": (246, 92, 139),
-    "face": (246, 92, 139),
-    "face-guard": (246, 92, 139),
-    "face-mask": (246, 92, 139),
-    "gloves": (129, 185, 16),
-    "hands": (129, 185, 16),
-    "hand": (129, 185, 16),
-    "shoes": (246, 130, 59),
-    "foot": (246, 130, 59),
-    "safety-suit": (153, 72, 236),
-    "safety-vest": (153, 72, 236),
-    "medical-suit": (153, 72, 236),
-    "ear": (212, 182, 6),
-    "ear-mufs": (212, 182, 6),
-    "tool": (8, 179, 234),
+    "hat": (11, 158, 245),
+    "vest": (153, 72, 236),
 }
 _DEFAULT_DETECTION_COLOR = (246, 130, 59)
 
 
-def redact_identity_regions(
+def redact_person_head_regions(
     frame: np.ndarray,
-    detections: list[ModelDetection],
+    people: list[SnapshotPerson],
 ) -> PrivacyRedactionResult:
-    """Blur identity detections and conservatively cover heads of unmatched people.
+    """Conservatively blur the top 40% of every canonical person box.
 
-    The input frame is never mutated. A frame with no usable direct identity region
-    or person fallback is rejected so callers cannot persist it by accident.
+    The input frame is never mutated. A frame with no usable canonical person box is
+    rejected so callers cannot persist it by accident. This privacy path is independent
+    from the PPE checkpoint and therefore cannot regress when that model changes.
     """
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise PrivacyRedactionError("snapshot must be a three-channel image")
 
     height, width = frame.shape[:2]
-    identity_regions = [
-        region
-        for detection in detections
-        if detection["class_name"].lower() in _IDENTITY_CLASS_NAMES
-        if (region := _bounded_region(detection["bbox"], width, height)) is not None
-    ]
     person_regions = [
-        region
-        for detection in detections
-        if detection["class_name"].lower() == _PERSON_CLASS_NAME
-        if (region := _bounded_region(detection["bbox"], width, height)) is not None
+        region for person in people if (region := _bounded_region(person["bbox"], width, height)) is not None
     ]
-
-    regions = list(identity_regions)
-    used_person_fallback = False
-    for person_region in person_regions:
-        if any(_center_is_inside(region, person_region) for region in identity_regions):
-            continue
-        regions.append(_person_head_region(person_region))
-        used_person_fallback = True
-
-    unique_regions = _unique_regions(regions)
+    unique_regions = _unique_regions([_person_head_region(region) for region in person_regions])
     if not unique_regions:
-        raise PrivacyRedactionError("no face, head, or person region was available for redaction")
+        raise PrivacyRedactionError("no canonical person region was available for redaction")
 
     redacted = frame.copy()
     for x1, y1, x2, y2 in unique_regions:
@@ -108,7 +74,7 @@ def redact_identity_regions(
     return {
         "image": redacted,
         "redacted_regions": unique_regions,
-        "used_person_fallback": used_person_fallback,
+        "used_person_fallback": True,
     }
 
 
@@ -117,7 +83,7 @@ def annotate_snapshot(
     people: list[SnapshotPerson],
     detections: list[ModelDetection],
 ) -> np.ndarray:
-    """Draw the reviewed frame's person and SH17 detection boxes after redaction."""
+    """Draw canonical person and three-class profile boxes after redaction."""
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise ValueError("snapshot must be a three-channel image")
 
@@ -152,12 +118,6 @@ def _bounded_region(bbox: list[int], width: int, height: int) -> list[int] | Non
     if bounded[2] <= bounded[0] or bounded[3] <= bounded[1]:
         return None
     return bounded
-
-
-def _center_is_inside(region: list[int], person_region: list[int]) -> bool:
-    center_x = (region[0] + region[2]) / 2
-    center_y = (region[1] + region[3]) / 2
-    return person_region[0] <= center_x <= person_region[2] and person_region[1] <= center_y <= person_region[3]
 
 
 def _person_head_region(person_region: list[int]) -> list[int]:

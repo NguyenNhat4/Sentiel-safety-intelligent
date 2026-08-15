@@ -51,6 +51,14 @@ class SafetyEvent(Base):
     def occurrence_ids(self) -> list[str]:
         return [occurrence.occurrence_id for occurrence in self.occurrences]
 
+    @property
+    def batch_id(self) -> str | None:
+        return getattr(self, "_transient_batch_id", None)
+
+    @batch_id.setter
+    def batch_id(self, value: str | None) -> None:
+        self._transient_batch_id = value
+
 
 class EventOccurrence(Base):
     __tablename__ = "event_occurrences"

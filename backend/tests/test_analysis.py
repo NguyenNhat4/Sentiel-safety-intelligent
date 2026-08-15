@@ -4,9 +4,11 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
+import pytest
 
 from backend.app.api.v1.analysis import frame_inference_service
 from backend.app.schemas.analysis import FrameInferenceRequest
+from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 
 
 def jpeg_bytes(width=160, height=120):
@@ -14,6 +16,23 @@ def jpeg_bytes(width=160, height=120):
     encoded, buffer = cv2.imencode(".jpg", frame)
     assert encoded
     return buffer.tobytes()
+
+
+@pytest.fixture(autouse=True)
+def use_stubbed_vision_observations(monkeypatch):
+    """Keep analysis rule tests independent from the installed vision model."""
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_ppe_observer",
+        lambda frame, people: [
+            {
+                "hat": {"status": "unknown", "confidence": None},
+                "vest": {"status": "unknown", "confidence": None},
+            }
+            for _ in people
+        ],
+    )
 
 
 def jpeg_data_url(width=160, height=120):
@@ -52,7 +71,10 @@ def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    data = response.json()
+    assert data["status"] in {"ok", "degraded"}
+    assert isinstance(data["ready"], bool)
+    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage"}
 
 
 def test_frontend_is_served(client):
@@ -115,16 +137,11 @@ def test_frame_inference_returns_normal_without_people(client, monkeypatch):
     assert response.json()["people"] == []
 
 
-def test_frame_inference_violates_for_person_without_shirt(client, monkeypatch):
+def test_frame_inference_violates_for_person_inside_zone(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",
         lambda frame: [(40, 10, 40, 90, 0.91)],
-    )
-    monkeypatch.setattr(
-        frame_inference_service,
-        "_has_safety_shirt",
-        lambda frame, x, y, width, height: False,
     )
     response = client.post(
         "/api/v1/analysis/frame",
@@ -144,20 +161,14 @@ def test_frame_inference_violates_for_person_without_shirt(client, monkeypatch):
     assert body["result"] == "violate"
     assert body["review_required"] is True
     assert body["people"][0]["inside_zone"] is True
-    assert body["people"][0]["safety_shirt"] is False
     assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
 
 
-def test_frame_inference_violates_for_zone_entry_with_shirt(client, monkeypatch):
+def test_frame_inference_violates_for_zone_entry(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",
         lambda frame: [(40, 10, 40, 90, 0.91)],
-    )
-    monkeypatch.setattr(
-        frame_inference_service,
-        "_has_safety_shirt",
-        lambda frame, x, y, width, height: True,
     )
     response = client.post(
         "/api/v1/analysis/frame",
@@ -203,8 +214,16 @@ def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch)
     )
     monkeypatch.setattr(
         frame_inference_service,
-        "_has_safety_shirt",
-        lambda frame, x, y, width, height: True,
+        "_requirement_loader",
+        lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            is_configured=False,
+            updated_at=None,
+        ),
     )
     result = frame_inference_service.infer(
         FrameInferenceRequest(
@@ -245,11 +264,6 @@ def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
         "_track_people",
         lambda session_id, frame: [(40, 60, 40, 50, 0.91, 7)],
     )
-    monkeypatch.setattr(
-        frame_inference_service,
-        "_has_safety_shirt",
-        lambda frame, x, y, width, height: True,
-    )
     upper_zone = [
         {"x": 0.1, "y": 0.05},
         {"x": 0.9, "y": 0.05},
@@ -267,11 +281,6 @@ def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
 
 def test_inference_websocket_requests_review_for_person_inside_zone(client, monkeypatch):
     monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [(40, 10, 40, 90, 0.91, 7)])
-    monkeypatch.setattr(
-        frame_inference_service,
-        "_has_safety_shirt",
-        lambda frame, x, y, width, height: True,
-    )
     with client.websocket_connect("/api/v1/ws/inference") as websocket:
         configure_inference_websocket(websocket)
         body = send_inference_websocket_frame(websocket)
@@ -324,8 +333,6 @@ def test_inference_websocket_rejects_invalid_jpeg(client):
 
 def test_inference_websocket_deduplicates_a_continuous_violation(client, monkeypatch):
     monkeypatch.setattr(frame_inference_service, "_track_people", lambda session_id, frame: [(40, 10, 40, 90, 0.91, 7)])
-    monkeypatch.setattr(frame_inference_service, "_has_safety_shirt", lambda *args: True)
-
     with client.websocket_connect("/api/v1/ws/inference") as websocket:
         configure_inference_websocket(websocket)
         first = send_inference_websocket_frame(websocket, frame_id=1)

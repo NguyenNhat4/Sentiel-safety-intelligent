@@ -4,9 +4,11 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
+from backend.app.core.database import get_db
 from backend.app.core.operational_metrics import record_operational_event
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
@@ -18,6 +20,12 @@ from backend.app.services.frame_inference_service import (
     StaleFrameError,
     frame_inference_service,
 )
+from backend.app.services.monitoring_zone_service import (
+    MonitoringZoneGeometryError,
+    MonitoringZoneService,
+    validate_zone_geometry,
+)
+from backend.app.services.ppe_requirement_service import PpeRequirementService
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +80,7 @@ async def send_inference_error(websocket: WebSocket, code: str, message: str) ->
 
 
 @router.websocket("/ws/inference")
-async def websocket_inference_endpoint(websocket: WebSocket):
+async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     """Run sampled browser-frame inference over a persistent WebSocket."""
     await websocket.accept()
     record_operational_event("websocket_connection_opened", route="/api/v1/ws/inference", outcome="connected")
@@ -96,6 +104,29 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                 try:
                     if message_type == "configure":
                         candidate = InferenceWebSocketConfigure.model_validate(payload)
+                        if candidate.zones is not None:
+                            try:
+                                validate_zone_geometry(candidate.zones)
+                            except MonitoringZoneGeometryError as exc:
+                                await send_inference_error(
+                                    websocket,
+                                    "zone_geometry_conflict",
+                                    f"Conflicting zones: {', '.join(exc.zone_ids)}",
+                                )
+                                continue
+                            persisted = MonitoringZoneService(db).get(candidate.camera_id)
+                            candidate_zones = [
+                                zone.model_dump(mode="json")
+                                for zone in sorted(candidate.zones, key=lambda item: item.order)
+                            ]
+                            persisted_zones = [zone.model_dump(mode="json") for zone in persisted.zones]
+                            if candidate.zone_revision != persisted.revision or candidate_zones != persisted_zones:
+                                await send_inference_error(
+                                    websocket,
+                                    "zone_revision_conflict",
+                                    "Monitoring zone configuration is not the saved revision",
+                                )
+                                continue
                         if (
                             configuration is not None
                             and candidate.monitoring_session_id != configuration.monitoring_session_id
@@ -113,12 +144,13 @@ async def websocket_inference_endpoint(websocket: WebSocket):
                         configuration = candidate
                         active_inference_sessions.add(candidate_session)
                         pending_frame = None
-                        await websocket.send_json(
-                            {
-                                "type": "configured",
-                                "monitoring_session_id": str(configuration.monitoring_session_id),
-                            }
-                        )
+                        configured = {
+                            "type": "configured",
+                            "monitoring_session_id": str(configuration.monitoring_session_id),
+                        }
+                        if configuration.zones is not None:
+                            configured["zone_revision"] = configuration.zone_revision
+                        await websocket.send_json(configured)
                     elif message_type == "frame_meta":
                         if configuration is None:
                             await send_inference_error(
@@ -167,18 +199,30 @@ async def websocket_inference_endpoint(websocket: WebSocket):
             frame_meta = pending_frame
             pending_frame = None
             image_data = f"data:image/jpeg;base64,{base64.b64encode(frame_bytes).decode()}"
+            configuration_fields = (
+                {
+                    "zones": configuration.zones,
+                    "zone_revision": configuration.zone_revision,
+                    "camera_id": configuration.camera_id,
+                }
+                if configuration.zones is not None
+                else {
+                    "zone_points": configuration.zone_points,
+                    "machine_state": configuration.machine_state,
+                    "camera_id": configuration.camera_id,
+                    "zone_id": configuration.zone_id,
+                }
+            )
             request = FrameInferenceRequest(
                 image_data=image_data,
-                zone_points=configuration.zone_points,
-                machine_state=configuration.machine_state,
-                camera_id=configuration.camera_id,
-                zone_id=configuration.zone_id,
                 monitoring_session_id=configuration.monitoring_session_id,
                 frame_id=frame_meta.frame_id,
+                **configuration_fields,
             )
             started_at = time.perf_counter()
             try:
-                result = await asyncio.to_thread(frame_inference_service.infer, request)
+                requirements = PpeRequirementService(db).get(request.camera_id, request.zone_id)
+                result = await asyncio.to_thread(frame_inference_service.infer, request, requirements=requirements)
             except InvalidFrameError as exc:
                 await send_inference_error(websocket, "invalid_frame", str(exc))
                 continue

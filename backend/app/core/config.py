@@ -1,15 +1,15 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     # App
     app_name: str = "PPE & Danger Zone Safety Monitoring System API"
-    app_env: Literal["development", "production", "test"] = "development"
-    app_port: int = Field(default=8000, ge=1, le=65535)
+    app_env: Literal["development", "production", "test"] = "production"
+    app_port: int = Field(default=8000, ge=1, le=65535, validation_alias=AliasChoices("APP_PORT", "PORT"))
     app_host: str = "0.0.0.0"
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -17,6 +17,13 @@ class Settings(BaseSettings):
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
+    snapshot_dir: str = "data/snapshots"
+    snapshot_storage_backend: Literal["filesystem", "s3"] = "filesystem"
+    snapshot_storage_bucket: str = ""
+    snapshot_storage_endpoint_url: str = ""
+    snapshot_storage_region: str = "auto"
+    snapshot_storage_access_key_id: str = ""
+    snapshot_storage_secret_access_key: str = ""
     operational_metrics_log_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     operational_metrics_log_backup_count: int = Field(default=6, ge=1, le=30)
     operational_metrics_max_scan_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
@@ -42,8 +49,9 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
     # Database Settings
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/ppe_safety_db"
-    database_fallback_enabled: bool = True
+    database_url: str = "sqlite:///./data/safety_events.db"
+    database_fallback_enabled: bool = False
+    run_db_migrations_on_start: bool = True
     database_fallback_url: str = "sqlite:///./data/safety_events.db"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
     database_pool_pre_ping: bool = False
@@ -56,11 +64,28 @@ class Settings(BaseSettings):
     # Video & Model paths
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
-    person_model_path: str = "models/yolo11n.pt"
-    ppe_model_path: str = "models/ppe_yolov8n.pt"
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    ppe_model_path: str = "models/yolo11m_safety.pt"
+    violation_frame: int = Field(default=4, ge=1, le=60)
+    # Local commands load development defaults. Docker and managed platforms pass
+    # production settings as process environment variables.
+    model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
     # Violate frame least confidence threshold for PPE & Danger Zone detection
+
+    def validate_snapshot_storage(self) -> None:
+        if self.snapshot_storage_backend != "s3":
+            return
+        missing = [
+            name
+            for name, value in (
+                ("SNAPSHOT_STORAGE_BUCKET", self.snapshot_storage_bucket),
+                ("SNAPSHOT_STORAGE_ENDPOINT_URL", self.snapshot_storage_endpoint_url),
+                ("SNAPSHOT_STORAGE_ACCESS_KEY_ID", self.snapshot_storage_access_key_id),
+                ("SNAPSHOT_STORAGE_SECRET_ACCESS_KEY", self.snapshot_storage_secret_access_key),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"S3 snapshot storage requires {', '.join(missing)}")
 
 
 @lru_cache

@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build
+.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -12,7 +12,7 @@ py-setup:
 	uv sync
 
 env-setup:
-	@if [ ! -f .env ]; then cp .env.example .env && echo "Created .env from .env.example"; fi
+	@if [ ! -f .env.development ]; then cp .env.development.example .env.development && echo "Created .env.development from .env.development.example"; fi
 
 db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/python scripts/bootstrap_legacy_sqlite.py
@@ -38,6 +38,25 @@ frontend-test:
 
 frontend-build:
 	npm --prefix frontend run build
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
+
+docker-smoke:
+	$(VENV_BIN)/python scripts/docker_smoke.py
+
+backup:
+	$(VENV_BIN)/python scripts/backup_data.py
+
+restore:
+	@test -n "$(ARCHIVE)" || (echo "Usage: make restore ARCHIVE=backups/p047-data-...tar.gz" && exit 2)
+	$(VENV_BIN)/python scripts/restore_data.py $(ARCHIVE)
 
 test:
 	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ vision/tests/ -v

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from vision.api import PersonTrackingFacade
+from vision.api import PpeVisionFacade
 
 
 class FakeValue:
@@ -15,6 +15,9 @@ class FakeValue:
     def __float__(self):
         return float(self.value)
 
+    def __int__(self):
+        return int(self.value)
+
 
 class FakeRow:
     def __init__(self, values):
@@ -25,22 +28,33 @@ class FakeRow:
 
 
 class FakeBox:
-    def __init__(self, track_id, xyxy):
-        self.id = [FakeValue(track_id)]
+    def __init__(self, class_id, xyxy, *, track_id=None):
+        self.cls = [FakeValue(class_id)]
+        self.id = None if track_id is None else [FakeValue(track_id)]
         self.xyxy = [FakeRow(xyxy)]
         self.conf = [FakeValue(0.9)]
 
 
 class FakeModel:
+    names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
+
     def __init__(self):
         self.calls = []
 
     def track(self, frame, **kwargs):
         self.calls.append(kwargs)
-        return [SimpleNamespace(boxes=[FakeBox(7, [10, 20, 30, 80])])]
+        return [
+            SimpleNamespace(
+                names=self.names,
+                boxes=[
+                    FakeBox(3, [10, 20, 30, 80], track_id=7),
+                    FakeBox(0, [12, 21, 22, 31]),
+                ],
+            )
+        ]
 
 
-def test_tracking_uses_bytetrack_and_persists_within_a_session():
+def test_unified_safety_inference_tracks_people_and_ppe_in_one_call():
     models = []
 
     def factory(_path):
@@ -48,14 +62,23 @@ def test_tracking_uses_bytetrack_and_persists_within_a_session():
         models.append(model)
         return model
 
-    facade = PersonTrackingFacade("unused.pt", model_factory=factory)
+    facade = PpeVisionFacade("unused.pt", model_factory=factory)
     frame = np.zeros((100, 100, 3), dtype=np.uint8)
 
-    first = facade.track("session-a", frame, now=0.0)
-    second = facade.track("session-a", frame, now=0.5)
-    other = facade.track("session-b", frame, now=0.5)
+    first = facade.analyze(frame, "session-a", now=0.0)
+    second = facade.analyze(frame, "session-a", now=0.5)
+    other = facade.analyze(frame, "session-b", now=0.5)
 
-    assert first == second == other == [(10, 20, 20, 60, 0.9, 7)]
+    assert (
+        first["canonical_people"]
+        == second["canonical_people"]
+        == other["canonical_people"]
+        == [(10, 20, 20, 60, 0.9, 7)]
+    )
+    assert first["people"][0]["hat"] == {"status": "present", "confidence": 0.9}
+    assert [item["class_name"] for item in first["detections"]] == ["person", "hat"]
     assert len(models) == 2
     assert models[0].calls[0]["persist"] is True
     assert models[0].calls[0]["tracker"] == "bytetrack.yaml"
+    assert models[0].calls[0]["classes"] == [0, 3, 4]
+    assert len(models[0].calls) == 2

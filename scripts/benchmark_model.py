@@ -13,8 +13,7 @@ import cv2
 import numpy as np
 
 DEFAULT_SOURCE = "data/test.mp4"
-DEFAULT_MODEL = "models/yolo11n.pt"
-DEFAULT_PPE_MODEL = "models/ppe_yolov8n.pt"
+DEFAULT_MODEL = "models/yolo11m_safety.pt"
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -137,8 +136,7 @@ def benchmark(
 
 def benchmark_pipeline(
     *,
-    person_model_path: Path,
-    ppe_model_path: Path,
+    model_path: Path,
     source: Path,
     warmup: int,
     iterations: int,
@@ -149,15 +147,13 @@ def benchmark_pipeline(
     from ultralytics import YOLO
 
     frames = load_frames(source, frame_limit)
-    person_model = YOLO(str(person_model_path))
-    ppe_model = YOLO(str(ppe_model_path))
+    model = YOLO(str(model_path))
     predict_options: dict[str, Any] = {"conf": confidence, "verbose": False}
     if device != "auto":
         predict_options["device"] = device
 
     def run(frame: np.ndarray) -> None:
-        person_model.predict(frame, **predict_options)
-        ppe_model.predict(frame, **predict_options)
+        model.predict(frame, classes=[0, 3, 4], **predict_options)
 
     for index in range(warmup):
         run(frames[index % len(frames)])
@@ -172,7 +168,7 @@ def benchmark_pipeline(
         latencies_ms.append((time.perf_counter_ns() - started) / 1_000_000)
 
     report = summarize(
-        model=f"{person_model_path} + {ppe_model_path}",
+        model=str(model_path),
         source=source,
         frames=frames,
         warmup=warmup,
@@ -181,15 +177,19 @@ def benchmark_pipeline(
         device=device,
         latencies_ms=latencies_ms,
     )
-    report["pipeline"] = [str(person_model_path), str(ppe_model_path)]
+    report["pipeline"] = [str(model_path)]
+    report["pipeline_classes"] = [[0, 3, 4]]
     return report
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=Path(DEFAULT_MODEL))
-    parser.add_argument("--pipeline", action="store_true", help="Run person and PPE models sequentially per frame.")
-    parser.add_argument("--ppe-model", type=Path, default=Path(DEFAULT_PPE_MODEL))
+    parser.add_argument(
+        "--pipeline",
+        action="store_true",
+        help="Match runtime with one Safety model call for person, hat and vest.",
+    )
     parser.add_argument("--source", type=Path, default=Path(DEFAULT_SOURCE))
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--iterations", type=int, default=30)
@@ -211,12 +211,10 @@ def main() -> None:
         raise SystemExit(f"Source not found: {args.source}")
 
     if args.pipeline:
-        for model_path in (args.model, args.ppe_model):
-            if not model_path.exists():
-                raise SystemExit(f"Model not found: {model_path}")
+        if not args.model.exists():
+            raise SystemExit(f"Model not found: {args.model}")
         result = benchmark_pipeline(
-            person_model_path=args.model,
-            ppe_model_path=args.ppe_model,
+            model_path=args.model,
             source=args.source,
             warmup=args.warmup,
             iterations=args.iterations,

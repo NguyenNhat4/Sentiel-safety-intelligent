@@ -49,6 +49,11 @@ def _verify_connection(candidate: Engine) -> None:
         connection.execute(text("SELECT 1"))
 
 
+def check_database_connection(candidate: Engine) -> None:
+    """Run a lightweight query through the currently selected database engine."""
+    _verify_connection(candidate)
+
+
 def create_database_runtime(primary_url: str, fallback_url: str, fallback_enabled: bool) -> DatabaseRuntime:
     primary = _create_engine(primary_url)
     try:

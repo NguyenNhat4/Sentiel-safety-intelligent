@@ -1,6 +1,6 @@
 import {useState} from "react";
 import type {ModelDetection, PersonDetection} from "../../types";
-import {getDetectionColor} from "../monitor/canvas";
+import {getDetectionColor, isDisplayedPpeDetection} from "../monitor/canvas";
 
 interface SnapshotOverlayProps {
   snapshot: string;
@@ -38,7 +38,7 @@ export function SnapshotOverlay({snapshot, people = [], detections = []}: Snapsh
               thickness={3}
             />
           ))}
-          {detections.filter(detection => detection.class_name.toLowerCase() !== "person").map((detection, index) => (
+          {detections.filter(detection => isDisplayedPpeDetection(detection.class_name)).map((detection, index) => (
             <SnapshotBox
               key={`detection-${index}`}
               bbox={detection.bbox}
