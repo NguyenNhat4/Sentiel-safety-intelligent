@@ -56,3 +56,25 @@ def test_production_start_skips_migrations_when_the_deployment_job_owns_them(mon
         production_start.main()
 
     assert commands == []
+
+
+def test_container_start_allows_development_mode_for_the_compose_seed_database(monkeypatch):
+    monkeypatch.setattr(
+        production_start,
+        "get_settings",
+        lambda: SimpleNamespace(
+            app_env="development",
+            database_fallback_enabled=False,
+            run_db_migrations_on_start=False,
+            app_port=8000,
+        ),
+    )
+    monkeypatch.setattr(production_start, "validate_runtime_files", lambda settings: None)
+    monkeypatch.setattr(
+        production_start.os,
+        "execvp",
+        lambda executable, arguments: (_ for _ in ()).throw(SystemExit()),
+    )
+
+    with pytest.raises(SystemExit):
+        production_start.main()

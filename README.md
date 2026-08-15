@@ -153,15 +153,15 @@ WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API
 make check
 ```
 
-## Docker MVP local
+## Docker Compose smoke
 
 ```bash
-cp .env.production.example .env.production
+make setup
 make docker-up
 make docker-smoke
 ```
 
-Docker Compose giữ database SQLite, snapshot đã redact và JSONL operational metrics trong `data/`; không dùng `docker compose down -v` nếu cần giữ dữ liệu. Tạo backup với `make backup`. Sau `make docker-down`, restore chỉ vào `data/` rỗng bằng `make restore ARCHIVE=backups/<archive>.tar.gz`. Khi rollback code, checkout release/source tag trước đó rồi chạy `make docker-up`; chỉ khôi phục `data/` từ backup tạo trước migration nếu code cũ không tương thích schema mới.
+Docker Compose nạp `.env.development`, nhưng luôn override `DATABASE_URL` sang PostgreSQL disposable `db` nội bộ để kiểm tra không chạm database developer cấu hình trong file. Sau khi `db` healthy, entrypoint chạy Alembic migration rồi FastAPI khởi động ở development mode và seed demo users idempotent. Các biến còn lại, gồm CORS và S3, lấy từ `.env.development`; dùng credentials development/staging, không dùng credentials production. Khi rollback code, checkout release/source tag trước đó rồi chạy `make docker-up`; chỉ rollback dữ liệu bằng backup đã tạo trước migration nếu schema cũ không tương thích.
 
 Có thể chạy từng nhóm:
 

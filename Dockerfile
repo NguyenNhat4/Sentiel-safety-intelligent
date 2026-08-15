@@ -43,7 +43,7 @@ COPY backend ./backend
 COPY vision ./vision
 COPY scripts ./scripts
 COPY alembic.ini ./
-COPY models/yolo11n.pt models/ppe_yolov8n.pt ./models/
+COPY models/yolo11m_safety.pt ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with correct ownership

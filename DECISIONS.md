@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
+- **Choice:** Compose loads `.env.development`, then overrides only the database runtime to its disposable PostgreSQL service and starts it with migrations enabled after database health succeeds.
+- **Reason:** Local container validation must not contact the developer-configured database, while CORS, S3 and other non-database configuration remain aligned with development.
+- **Constraint:** The container entrypoint accepts development mode for this isolated Compose stack so FastAPI seeds demo users; production mode remains strict. Existing `.env.development` files must set `PPE_MODEL_PATH=models/yolo11m_safety.pt`; do not place production storage credentials in that file.
+
 ## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
 - **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
 - **Choice:** Keep the existing `/health` endpoint and `ready` field, but make `ready=true` require initialized runtime files/models, a live `SELECT 1` through the selected PostgreSQL engine without SQLite fallback, and S3 `HeadBucket`. Add typed per-dependency readiness fields with only stable reason codes.

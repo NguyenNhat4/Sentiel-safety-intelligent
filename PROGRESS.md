@@ -1,5 +1,13 @@
 # Project Progress
 
+## 2026-08-15: [Cross-cutting] Isolate Docker Compose test database
+- `docker-compose.yml` loads `.env.development` and starts a dedicated disposable PostgreSQL service; only `DATABASE_URL` is redirected away from the developer-configured database.
+- Once the database healthcheck succeeds, the container runs migrations, starts in development mode, and idempotently seeds demo users; remaining application variables still come from `.env.development`.
+
+## 2026-08-15: [Vision/Backend] Restore single YOLO11m Safety deployment artifact
+- Production image, Compose and hosted environment examples now use only the pinned `models/yolo11m_safety.pt`; startup verifies its approved SHA-256 before serving traffic.
+- Removed stale `PERSON_MODEL_PATH`, YOLO11n and SH17 PPE artifact wiring from the active deployment path, preventing a wrongly named checkpoint from reaching inference.
+
 ## 2026-08-13: [Backend] Analysis PPE requirement loading uses the request database session
 - Frame inference REST and WebSocket paths now load the active PPE profile through their injected SQLAlchemy session, so test database overrides and runtime database selection are respected.
 - Added Alembic's OS-aware `path_separator` setting to remove the deprecated legacy path parsing warning.

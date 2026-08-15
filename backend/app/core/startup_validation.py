@@ -8,8 +8,7 @@ from pathlib import Path
 from backend.app.core.config import Settings
 
 REQUIRED_MODEL_CHECKSUMS = {
-    "yolo11n.pt": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
-    "ppe_yolov8n.pt": "5449f62bd7cf30c01c7fd138db2729a38abcb4d5120449773fba475d54f30b62",
+    "yolo11m_safety.pt": "f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece",
 }
 
 
@@ -33,7 +32,7 @@ def validate_runtime_files(settings: Settings) -> dict[str, bool]:
     probe.write_text("ok", encoding="utf-8")
     probe.unlink()
 
-    model_paths = (Path(settings.person_model_path), Path(settings.ppe_model_path))
+    model_paths = (Path(settings.ppe_model_path),)
     for model_path in model_paths:
         expected = REQUIRED_MODEL_CHECKSUMS.get(model_path.name)
         if expected is None:

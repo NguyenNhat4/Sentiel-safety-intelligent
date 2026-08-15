@@ -16,8 +16,7 @@ eval/
 !requirements.txt
 data/
 models/*
-!models/yolo11n.pt
-!models/ppe_yolov8n.pt
+!models/yolo11m_safety.pt
 .dockerignore
 Dockerfile
 docker-compose.yml

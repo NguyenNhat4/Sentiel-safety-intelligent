@@ -13,9 +13,9 @@ from scripts.bootstrap_legacy_sqlite import bootstrap_legacy_sqlite
 
 def main() -> None:
     settings = get_settings()
-    if settings.app_env != "production":
-        raise RuntimeError("Container startup requires APP_ENV=production")
-    if settings.database_fallback_enabled:
+    if settings.app_env not in {"development", "production"}:
+        raise RuntimeError("Container startup requires APP_ENV=development or APP_ENV=production")
+    if settings.app_env == "production" and settings.database_fallback_enabled:
         raise RuntimeError("Production container requires DATABASE_FALLBACK_ENABLED=false")
 
     validate_runtime_files(settings)

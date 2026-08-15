@@ -65,7 +65,6 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
-
     # Local commands load development defaults. Docker and managed platforms pass
     # production settings as process environment variables.
     model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
