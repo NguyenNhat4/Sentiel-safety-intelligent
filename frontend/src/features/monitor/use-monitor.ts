@@ -466,8 +466,12 @@ export function useMonitor() {
   function handleEnded(): void {
     session.current.running = false;
     client.close();
-    setPlaybackLabel("↻ Phát lại");
     capturePausedFrame();
+    const video = videoRef.current;
+    if (video) video.currentTime = 0;
+    setPlaybackLabel("↻ Phát lại");
+    setPlaybackDisabled(false);
+    setFlowStatus("Video đã kết thúc · bấm Phát lại để chạy lại cùng video");
   }
 
   function toggleMachine(): void {
