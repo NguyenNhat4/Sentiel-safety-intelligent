@@ -207,16 +207,17 @@ export function useMonitor() {
     const video = videoRef.current;
     video?.pause();
     client.close();
+    const reviewCopy = buildReviewCopy(result);
     setPlaybackLabel("▶ Tiếp tục");
     setPlaybackDisabled(true);
     setFlowStatus("Chờ xác minh");
     setView(current => ({
       ...current,
       violation: true,
-      alertTitle: "Người vào vùng cấm khi máy đang chạy",
+      alertTitle: reviewCopy.title,
       severity: "VIOLATE",
-      alertSummary: "Video đã dừng tại frame phát hiện người trong vùng. Hãy xác nhận vi phạm thực tế hoặc bình thường / báo sai.",
-      reviewMessage: "Khung hình đang chờ cán bộ an toàn xác minh",
+      alertSummary: reviewCopy.summary,
+      reviewMessage: reviewCopy.reviewMessage,
       eventStatus: "Đang chờ xác minh · chưa lưu",
       confidenceLabel: "VIOLATE",
       confidenceWidth: "100%"
@@ -701,6 +702,49 @@ export function buildPpeRule(result: InferenceResult): RuleView {
   );
   if (hasUnknown) return {yes: null, text: `Đang kiểm tra ${requiredLabels.join(", ")}`, badge: "CHECK"};
   return {yes: true, text: `Đủ PPE: ${requiredLabels.join(", ")}`, badge: "OK"};
+}
+
+export function buildReviewCopy(result: InferenceResult): {
+  title: string;
+  summary: string;
+  reviewMessage: string;
+} {
+  const ppeLabels: Record<"hat" | "vest", string> = {
+    hat: "mũ bảo hộ",
+    vest: "áo phản quang",
+  };
+  const ppeReasons = result.people.flatMap((person, index) => {
+    if (!person.missing_required_ppe.length) return [];
+    return `Người #${index + 1} thiếu ${person.missing_required_ppe.map(item => ppeLabels[item]).join(", ")}`;
+  });
+  const activeZones = result.rule.zone_results?.filter(zone => zone.violation) ?? [];
+  const zoneReasons = activeZones.length
+    ? activeZones.map(zone => `Vùng cấm "${zone.zone_id}" có người khi máy đang chạy`)
+    : result.rule.person_inside_zone && result.rule.machine_state === "running"
+      ? ["Có người trong vùng cấm khi máy đang chạy"]
+      : [];
+  const reasons = [...ppeReasons, ...zoneReasons];
+
+  if (!reasons.length) {
+    return {
+      title: "Cần xác minh vi phạm an toàn",
+      summary: "Rule an toàn đã kích hoạt nhưng chưa có lý do chi tiết từ frame. Hãy xác minh thủ công.",
+      reviewMessage: "Khung hình đang chờ cán bộ an toàn xác minh",
+    };
+  }
+  const hasPpeViolation = ppeReasons.length > 0;
+  const hasZoneViolation = zoneReasons.length > 0;
+  const title = hasPpeViolation && hasZoneViolation
+    ? "Thiếu PPE và vào vùng cấm khi máy đang chạy"
+    : hasPpeViolation
+      ? "Thiếu PPE bắt buộc"
+      : "Người vào vùng cấm khi máy đang chạy";
+
+  return {
+    title,
+    summary: `${reasons.join(". ")}. Video đã dừng để xác minh vi phạm thực tế hoặc báo sai.`,
+    reviewMessage: `${reasons.length} lỗi cần xác minh: ${reasons.join("; ")}`,
+  };
 }
 
 export function buildEventPayload(

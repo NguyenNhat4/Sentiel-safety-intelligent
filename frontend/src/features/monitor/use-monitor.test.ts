@@ -1,6 +1,12 @@
 import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventBatchPayload, buildEventPayload, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
+import {
+  buildEventBatchPayload,
+  buildEventPayload,
+  buildPpeRule,
+  buildReviewCopy,
+  captureVideoSnapshot,
+} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -69,6 +75,30 @@ describe("review event payload", () => {
       },
     };
     expect(buildPpeRule(hatRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ bảo hộ", badge: "CHECK"});
+  });
+
+  it("states the concrete PPE and danger-zone reasons in the review popup", () => {
+    const copy = buildReviewCopy({
+      ...pending,
+      people: [{
+        ...pending.people[0],
+        missing_required_ppe: ["hat", "vest"],
+        active_violations: [
+          {occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "missing_ppe:hat", is_new: true},
+          {occurrence_id: "2bc8258f-85a2-420a-a566-cba7c7c79fe6", rule_key: "zone_intrusion", is_new: true},
+        ],
+      }],
+      rule: {
+        ...pending.rule,
+        ppe_alert: true,
+        zone_results: [{zone_id: "zone_01", machine_state: "running", person_inside_zone: true, violation: true}],
+      },
+    });
+
+    expect(copy.title).toBe("Thiếu PPE và vào vùng cấm khi máy đang chạy");
+    expect(copy.summary).toContain("Người #1 thiếu mũ bảo hộ, áo phản quang");
+    expect(copy.summary).toContain('Vùng cấm "zone_01" có người khi máy đang chạy');
+    expect(copy.reviewMessage).toContain("2 lỗi cần xác minh");
   });
 
   it("partitions a grouped review into one event per zone", () => {

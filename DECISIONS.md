@@ -286,3 +286,8 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Compatibility:** Preserve current REST/WebSocket/Pydantic/TypeScript fields, class IDs, tracking IDs, occurrence lifecycle, multi-zone behavior, rule semantics and `redact → annotate → persist` ordering. The change is internal model routing, not a wire-contract change.
 - **Runtime:** Remove `person_model_path` and do not preload or call `models/yolo11n.pt`. Per-session model instances may exist to isolate ByteTrack state, but every instance uses the same pinned YOLO11m Safety artifact and each frame has one model call.
 - **Constraint:** This cutover does not claim improved accuracy. Person/hat/vest precision, recall, association, tracking stability and target-device latency must be re-evaluated through US-13 before pilot/production use.
+
+## 2026-08-15: [Backend] Aggregate rule follows per-person hat/vest and active-zone truth table
+- **Reason:** The operator rule matrix must give the same result for one or more detected people, while preserving independent hat/vest requirements and the machine-state safety gate.
+- **Choice:** Report `violate` when any detected person is missing a PPE item currently required for that camera-zone, or when any detected person enters an active danger zone while its machine is `running`. No detected person is `normal`; a zone entry while `stopped` is `normal` unless an independent PPE rule is violated.
+- **Compatibility:** The REST/WebSocket result fields are unchanged. `PpeRequirementResponse` continues to emit legacy GET aliases; when a canonical caller omits them, `helmet_required` is derived from `hat_required` and the retired glasses/gloves aliases remain `false`.

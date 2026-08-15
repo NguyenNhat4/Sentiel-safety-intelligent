@@ -32,8 +32,15 @@ class PpeRequirementResponse(PpeRequirementUpdate):
     zone_id: str
     is_configured: bool = True
     updated_at: datetime | None
-    helmet_required: bool
-    safety_glasses_required: bool
-    gloves_required: bool
+    helmet_required: bool = False
+    safety_glasses_required: bool = False
+    gloves_required: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def populate_legacy_read_aliases(self):
+        """Keep GET response aliases additive without requiring callers to supply them."""
+        if "helmet_required" not in self.model_fields_set:
+            self.helmet_required = self.hat_required
+        return self

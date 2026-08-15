@@ -1,5 +1,12 @@
 # Project Progress
 
+## 2026-08-15: [Frontend] Explain concrete reasons in the HITL review pop-up
+- The review title, summary and pending-review message now derive from the inference result: each affected person’s missing required hat/vest and each active danger-zone entry are named explicitly. A combined PPE and zone violation displays both reasons rather than a generic zone-only message.
+
+## 2026-08-15: [Backend] Lock hat/vest and danger-zone rule truth table
+- Added deterministic regression coverage for required hat/vest, zero or multiple detected people, and danger-zone entry while the machine is running. A violation is raised when any detected person lacks a required PPE item or enters an active danger zone while the machine is running.
+- Restored the additive legacy GET aliases on `PpeRequirementResponse`: callers of the canonical `hat_vest_v1` response no longer need to supply legacy fields, while `helmet_required` continues to mirror `hat_required`.
+
 ## 2026-08-15: [Backend] Smooth violation alerts with four consecutive frames
 - Added `VIOLATION_FRAME=4` to development and production environment templates. The session-local tracker now opens a review only after four consecutive observations of the same track/rule; any non-violating frame resets the pending sequence.
 

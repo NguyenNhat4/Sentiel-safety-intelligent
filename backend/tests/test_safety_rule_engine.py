@@ -1,3 +1,5 @@
+import pytest
+
 from backend.app.schemas.analysis import PersonPpeObservations, PpeObservation
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
@@ -66,3 +68,41 @@ def test_returns_violate_for_person_in_active_zone_while_machine_runs():
 
     assert result.outcome == "violate"
     assert result.person_inside_zone is True
+
+
+@pytest.mark.parametrize(
+    ("hat_required", "vest_required", "people", "machine_state", "zone_active", "expected_outcome"),
+    [
+        # Required PPE is present: machine state alone does not create a violation.
+        (True, True, [person()], "running", False, "normal"),
+        (True, True, [person()], "stopped", False, "normal"),
+        # Each required PPE item is evaluated independently.
+        (True, False, [person(hat="missing")], "running", False, "violate"),
+        (False, True, [person(vest="missing")], "running", False, "violate"),
+        (True, True, [person(hat="missing", vest="missing")], "running", False, "violate"),
+        # No detected person means there is no PPE or zone violation.
+        (True, True, [], "running", False, "normal"),
+        # Any person can trigger the aggregate result.
+        (True, True, [person(), person(hat="missing")], "running", False, "violate"),
+        # Zone entry is a violation only while the machine is running.
+        (False, False, [person(inside_zone=True)], "running", True, "violate"),
+        (False, False, [person(inside_zone=True)], "stopped", True, "normal"),
+    ],
+)
+def test_evaluates_hat_vest_zone_and_person_count_truth_table(
+    hat_required,
+    vest_required,
+    people,
+    machine_state,
+    zone_active,
+    expected_outcome,
+):
+    result = SafetyRuleEngine().evaluate(
+        people=people,
+        requirements=requirements(hat_required=hat_required, vest_required=vest_required),
+        machine_state=machine_state,
+        zone_active=zone_active,
+    )
+
+    assert result.outcome == expected_outcome
+    assert result.review_required is (expected_outcome == "violate")
