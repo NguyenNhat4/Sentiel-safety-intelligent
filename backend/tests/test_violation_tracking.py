@@ -15,6 +15,29 @@ def test_continuous_violation_emits_one_occurrence():
     UUID(first[4][0].occurrence_id)
 
 
+def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
+    service = ViolationTrackingService(activation_frames=4)
+
+    for frame in range(1, 4):
+        pending = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=float(frame))
+        assert pending[4] == []
+
+    opened = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=4.0)
+
+    assert opened[4][0].is_new is True
+
+
+def test_interrupted_pending_violation_must_restart_its_consecutive_frame_count():
+    service = ViolationTrackingService(activation_frames=4)
+    for frame in range(1, 4):
+        service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=float(frame))
+    service.evaluate("session-a", {4: set()}, {4}, now=4.0)
+
+    for frame in range(5, 8):
+        pending = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=float(frame))
+        assert pending[4] == []
+
+
 def test_violation_rearms_only_after_confirmed_exit_and_cooldown():
     service = ViolationTrackingService(exit_confirm_frames=2, cooldown_seconds=2.0)
     first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]

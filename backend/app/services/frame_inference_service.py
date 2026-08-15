@@ -61,7 +61,7 @@ class FrameInferenceService:
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
-        self._violation_tracker = ViolationTrackingService()
+        self._violation_tracker = ViolationTrackingService(activation_frames=settings.violation_frame)
 
     def preload_models(self) -> None:
         self._model_preloader()

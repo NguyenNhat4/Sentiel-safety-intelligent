@@ -23,7 +23,7 @@ class PpeRequirementUpdate(BaseModel):
         return {
             "profile": "hat_vest_v1",
             "hat_required": value["helmet_required"],
-            "vest_required": False,
+            "vest_required": True,
         }
 
 

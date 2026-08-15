@@ -1,7 +1,10 @@
 # Project Progress
 
+## 2026-08-15: [Backend] Smooth violation alerts with four consecutive frames
+- Added `VIOLATION_FRAME=4` to development and production environment templates. The session-local tracker now opens a review only after four consecutive observations of the same track/rule; any non-violating frame resets the pending sequence.
+
 ## 2026-08-15: [Backend] Bridge stale PPE browser payloads to the hat/vest contract
-- `PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}` now accepts the complete former helmet/glasses/gloves boolean payload as a temporary compatibility path, mapping helmet to hat and defaulting vest OFF.
+- `PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}` now accepts the complete former helmet/glasses/gloves boolean payload as a temporary compatibility path, mapping helmet to hat and requiring vest.
 - Canonical `hat_vest_v1` persistence and inference remain unchanged; GET includes read-only aliases so an old browser can load and save without 422. Focused contract tests cover legacy mapping and reject mixed payloads.
 
 ## 2026-08-15: [Cross-cutting] Isolate Docker Compose test database

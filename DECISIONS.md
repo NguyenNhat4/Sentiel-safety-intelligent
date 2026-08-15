@@ -2,9 +2,14 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-15: [Backend] Debounce safety alerts across consecutive frames
+- **Choice:** `VIOLATION_FRAME` defaults to `4`; a track/rule occurrence opens only after that many consecutive observed frames. A missing observed frame resets a pending occurrence, while existing exit, lost-track grace and cooldown semantics continue after an alert has opened.
+- **Reason:** One-frame detector flicker must not pause the operator video or create an alert candidate.
+- **Constraint:** The debounce is session-local and applies only when `monitoring_session_id` is present. Stateless REST inference has no safe cross-request identity and therefore cannot establish consecutive frames.
+
 ## 2026-08-15: [Backend] Temporary PPE request compatibility bridge for stale browser bundles
 - **Supersedes:** The `PUT`-validation portion of the 2026-08-13 PPE cutover decision that rejected every legacy payload.
-- **Choice:** Keep `hat_vest_v1` canonical for persisted configuration and inference, while accepting only the complete former three-boolean request shape. Map `helmet_required` to `hat_required`, default `vest_required=false`, and return read-only legacy aliases so an already-loaded old browser can finish its load/save cycle.
+- **Choice:** Keep `hat_vest_v1` canonical for persisted configuration and inference, while accepting only the complete former three-boolean request shape. Map `helmet_required` to `hat_required`, require `vest_required=true`, and return read-only legacy aliases so an already-loaded old browser can finish its load/save cycle.
 - **Constraint:** Mixed, partial, unknown-profile and extra payloads still return `422`; glasses and gloves do not become model observations, requirements or alerts. Remove the bridge only after the deployed frontend bundle is confirmed current.
 
 ## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
