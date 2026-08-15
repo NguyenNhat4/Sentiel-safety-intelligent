@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
+- **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
+- **Choice:** Keep the existing `/health` endpoint and `ready` field, but make `ready=true` require initialized runtime files/models, a live `SELECT 1` through the selected PostgreSQL engine without SQLite fallback, and S3 `HeadBucket`. Add typed per-dependency readiness fields with only stable reason codes.
+- **Constraint:** The response must not expose database URLs, S3 endpoints, provider exception text, or credentials.
+
 ## 2026-08-11: [Backend] Keep SQLite as the current MVP default
 - **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
 - **Reason:** The Product Owner explicitly deferred database expansion and chose to continue with SQLite for now. This also lets a new team member run `make setup` and `make run` without provisioning PostgreSQL first.

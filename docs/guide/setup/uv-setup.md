@@ -12,7 +12,7 @@ Dự án P-047 sử dụng **`uv`** làm công cụ quản lý môi trường �
 
 ## 🚀 Quick Start cho Cán Bộ / Thành Viên Mới
 
-Để khởi tạo toàn bộ môi trường (Python virtualenv + dependencies + frontend npm dependencies + `.env`), bạn chỉ cần đứng ở thư mục gốc của repository và chạy 1 lệnh duy nhất:
+Để khởi tạo toàn bộ môi trường (Python virtualenv + dependencies + frontend npm dependencies + `.env.development`), bạn chỉ cần đứng ở thư mục gốc của repository và chạy 1 lệnh duy nhất:
 
 ```bash
 make setup
@@ -21,7 +21,7 @@ make setup
 Lệnh này sẽ tự động:
 1. Chạy `uv sync` để tạo môi trường `.venv` và cài đặt đúng các phiên bản gói từ `pyproject.toml` và `uv.lock`.
 2. Chạy `npm --prefix frontend ci` để cài đặt dependencies cho phân hệ React Frontend.
-3. Tạo file cấu hình môi trường `.env` từ `.env.example` (nếu chưa có).
+3. Tạo file cấu hình môi trường `.env.development` từ `.env.development.example` (nếu chưa có). Docker Compose dùng `.env.production` riêng.
 
 ---
 

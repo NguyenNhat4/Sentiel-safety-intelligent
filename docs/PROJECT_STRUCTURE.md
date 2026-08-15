@@ -26,7 +26,8 @@ P-047/
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
 │   │   │   ├── database.py
-│   │   │   └── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   ├── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   └── startup_validation.py # Production model and writable-volume validation
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
@@ -40,6 +41,7 @@ P-047/
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
 │   │   │   ├── event.py
+│   │   │   ├── health.py # Typed public /health dependency-readiness response
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
@@ -154,6 +156,11 @@ P-047/
 │   ├── README.md
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── production_start.py # Docker preflight, migration and one-worker startup
+│   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
+│   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check
+│   ├── backup_data.py # Timestamped archive of persistent Docker data
+│   ├── restore_data.py # Safe restore into empty persistent Docker data
 │   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums
 ├── eval/                # Evaluation reports and benchmark results
 │   └── results/
@@ -170,8 +177,12 @@ P-047/
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
 ├── tests/                # Cross-cutting and automation tests
 │   ├── test_bootstrap_legacy_sqlite.py
+│   ├── test_startup_validation.py
 │   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
+├── .env.development.example # Development environment template for `make setup`
+├── .env.production.example  # Production Docker Compose environment template
+├── requirements.docker.txt # Production-only, CPU/headless Python dependency set
 └── README.md
 ```
 

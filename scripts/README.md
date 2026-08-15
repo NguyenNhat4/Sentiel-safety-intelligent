@@ -39,3 +39,13 @@ inside Ultralytics are included. Run the same command on the same hardware when 
 SQLite schema that predates Alembic, writes a timestamped `.bak` backup beside the database,
 adds the missing occurrence migration column, and stamps the known schema revision. New and
 already-versioned databases are unchanged; PostgreSQL is never bootstrapped by this script.
+
+`production_start.py` is the Docker entrypoint. It validates the approved model artifacts and
+persistent data mount, safely adopts a recognized legacy SQLite database, upgrades Alembic to
+head, verifies that head, then starts one Uvicorn worker. `docker_smoke.py` checks a running
+local MVP; `backup_data.py` archives `data/` for the Docker-local backup runbook.
+`restore_data.py` restores an archive only into an empty data directory after Compose is stopped.
+
+`test_snapshot_bucket.py` loads `.env.production` and checks the configured S3-compatible
+snapshot storage by uploading a generated 1×1 JPEG, reading it back with a checksum comparison,
+then deleting it. To test exact bytes from a local file instead, provide `--file path/to/file`.

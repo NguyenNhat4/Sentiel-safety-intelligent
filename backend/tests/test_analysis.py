@@ -71,7 +71,10 @@ def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    data = response.json()
+    assert data["status"] in {"ok", "degraded"}
+    assert isinstance(data["ready"], bool)
+    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage"}
 
 
 def test_frontend_is_served(client):

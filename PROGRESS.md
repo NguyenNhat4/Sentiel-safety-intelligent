@@ -7,6 +7,7 @@
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
 ## Current State
+- `/health` is ready only when runtime models are initialized, the selected database is live PostgreSQL (not SQLite fallback), and the configured S3 bucket answers `HeadBucket`; degraded responses identify the unavailable dependency without exposing provider details or credentials.
 - Runtime frame inference now uses only `models/yolo11m_safety.pt`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest; YOLO11n is no longer loaded or called.
 - Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
 - New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.

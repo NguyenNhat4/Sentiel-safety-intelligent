@@ -132,6 +132,10 @@ make setup
 make run
 ```
 
+`make setup` creates `.env.development` from `.env.development.example` when it is
+missing. Docker Compose separately reads `.env.production`; start from
+`.env.production.example` and supply deployment-specific values there.
+
 Sau khi chạy:
 
 - Monitor UI: <http://localhost:8000/>
@@ -148,6 +152,16 @@ WebSocket không xuất hiện trong Swagger vì OpenAPI chỉ mô tả HTTP API
 ```bash
 make check
 ```
+
+## Docker MVP local
+
+```bash
+cp .env.production.example .env.production
+make docker-up
+make docker-smoke
+```
+
+Docker Compose giữ database SQLite, snapshot đã redact và JSONL operational metrics trong `data/`; không dùng `docker compose down -v` nếu cần giữ dữ liệu. Tạo backup với `make backup`. Sau `make docker-down`, restore chỉ vào `data/` rỗng bằng `make restore ARCHIVE=backups/<archive>.tar.gz`. Khi rollback code, checkout release/source tag trước đó rồi chạy `make docker-up`; chỉ khôi phục `data/` từ backup tạo trước migration nếu code cũ không tương thích schema mới.
 
 Có thể chạy từng nhóm:
 
