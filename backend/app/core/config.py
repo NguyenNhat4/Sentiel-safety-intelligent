@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     model_name: str = "gpt-4o-mini"
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
+    # Telegram alert delivery
+    telegram_bot_token: str = ""
+    telegram_request_timeout_seconds: float = Field(default=5.0, ge=1.0, le=30.0)
+
     # Database Settings
     database_url: str = "sqlite:///./data/safety_events.db"
     database_fallback_enabled: bool = True
@@ -57,6 +61,7 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
+    ppe_alert_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     # Violate frame least confidence threshold for PPE & Danger Zone detection

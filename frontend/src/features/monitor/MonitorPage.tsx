@@ -30,7 +30,7 @@ export function MonitorPage() {
         <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
       </div>
 
-      <PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />
+      <PpeRequirementsPanel cameraId="uploaded_video" zoneId={state.selectedZoneId ?? "zone_01"} />
 
       <section className="zone-manager" aria-label="Cấu hình vùng nguy hiểm">
         <div className="zone-manager-head">
@@ -77,6 +77,10 @@ export function MonitorPage() {
             <p>{state.videoMeta}</p>
             <button onClick={actions.resetZone} disabled={!state.selectedZone} title="Vẽ lại vùng đang chọn">↺</button>
           </div>
+          {(state.pendingReviewCounts.critical > 0 || state.pendingReviewCounts.other > 0) && <div className="video-alert-summary" role="status">
+            <strong>{state.pendingReviewCounts.critical} log nghiêm trọng cần review</strong>
+            <span>· {state.pendingReviewCounts.other} log PPE cần review</span>
+          </div>}
           <div className={`camera-scene ${state.stageReady ? "ready" : ""}`}>
             <video ref={refs.videoRef} className="uploaded-media active" preload="auto" playsInline muted
               onLoadedMetadata={actions.handleLoadedMetadata} onSeeked={actions.handleSeeked} onEnded={actions.handleEnded} />
@@ -105,14 +109,10 @@ export function MonitorPage() {
 
         <AlertPanel
           view={state.view}
-          reviewPending={Boolean(state.pendingViolation)}
-          reviewSaving={state.reviewSaving}
+          hitlLogs={state.hitlLogs}
           people={state.latestPeople}
           detections={state.latestDetections}
-          snapshot={state.pendingViolation?.snapshot_data}
-          timer={state.timer}
-          onReview={status => void actions.review(status)}
-          onOpenModal={actions.openReviewModal}
+          onOpenModal={actions.openReviewLog}
         />
       </div>
 

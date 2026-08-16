@@ -28,6 +28,8 @@ The baseline uses two transports with separate responsibilities:
 - WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
 - REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
 
+Reviewed-event and statistics endpoints require a logged-in user. Safety officers and system administrators can record reviews; an area manager receives only events and statistics for their assigned `managed_area_id`. A Telegram alert is queued for that matching manager only when a review is saved as `acknowledged`, never when the AI merely opens a candidate.
+
 US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
 
 The versioned `hat_vest_v1` profile uses a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
@@ -37,7 +39,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns `profile`, `hat_required` and `vest_required`; a missing record materializes as two OFF values with `is_configured=false`. PUT requires the exact profile plus both strict booleans and rejects legacy/extra fields. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
+GET returns `profile`, `hat_required`, `vest_required`, and additive `restricted_area_detection_enabled`; a missing record materializes as all OFF values with `is_configured=false`. PUT accepts the same additive boolean (omitting it keeps compatibility and saves OFF). When the per-zone restricted-area switch is ON, every detected canonical person anywhere in the camera frame opens an immediate critical `restricted_area_person` occurrence, independent of polygon geometry and machine state. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
@@ -276,6 +278,8 @@ Example confirmed violation:
 The prototype privacy policy blurs the top 40% of every canonical person box. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. This policy does not load the retired SH17 checkpoint or add privacy classes to the PPE contract.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
+
+For current per-person reviews, `POST /api/v1/events` includes the session-local `track_id` and uses `(monitoring_session_id, track_id)` as the log identity. A person's missing-hat, missing-vest, restricted-area and zone-intrusion occurrences are accumulated into that single `person_safety_violation` event for the video session; this is tracking, not biometric identity.
 
 ### Recommended production design
 

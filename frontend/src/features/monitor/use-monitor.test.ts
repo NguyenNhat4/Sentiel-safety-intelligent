@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventBatchPayload, buildEventPayload, buildHumanReviewState, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
+import {buildEventBatchPayload, buildEventPayload, buildHitlLogEntries, buildHumanReviewState, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -107,9 +107,56 @@ describe("Human-in-the-Loop alert states", () => {
 
   it("prioritizes forbidden-zone entry, then missing PPE, then an unknown PPE review", () => {
     expect(buildHumanReviewState({...base, people: [{...person, inside_zone: true}]}).tone).toBe("critical");
-    expect(buildHumanReviewState({...base, people: [{...person, missing_required_ppe: ["hat"]}]}).tone).toBe("warning");
+    expect(buildHumanReviewState({...base, people: [{...person, missing_required_ppe: ["hat"]}]}).tone).toBe("unknown");
+    expect(buildHumanReviewState({...base, rule: {...base.rule, ppe_alert: true}, people: [{...person, missing_required_ppe: ["hat"]}]}).tone).toBe("warning");
     expect(buildHumanReviewState({...base, people: [{...person, ppe: {...person.ppe, vest: {status: "unknown", confidence: null}}}]}).tone).toBe("unknown");
     expect(buildHumanReviewState({...base, people: [person]}).tone).toBe("normal");
+  });
+});
+
+describe("Human-in-the-Loop warning logs", () => {
+  it("creates one combined warning per person for all missing PPE items", () => {
+    const result: InferenceResult = {
+      type: "inference_result", frame_id: 1, video_time: 0, result: "violate", review_required: true,
+      people: [{bbox: [0, 0, 10, 20], confidence: 0.9, inside_zone: false, track_id: 9,
+        ppe: {hat: {status: "missing", confidence: null}, vest: {status: "missing", confidence: null}},
+        missing_required_ppe: ["hat", "vest"],
+        active_violations: [
+          {occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "missing_ppe:hat", is_new: true},
+          {occurrence_id: "90494038-ea97-405b-830d-75d0b2613826", rule_key: "missing_ppe:vest", is_new: true},
+        ]}],
+      rule: {person_inside_zone: false, machine_state: "running", ppe_profile: "hat_vest_v1", camera_id: "uploaded_video", zone_id: "zone_01",
+        ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: true}, ppe_alert: true},
+    };
+    const logs = buildHitlLogEntries(result);
+    expect(logs.map(entry => entry.title)).toEqual(["Thiếu mũ bảo hộ và áo phản quang"]);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].reviewResult?.people).toEqual([result.people[0]]);
+  });
+
+  it("keeps hat, vest and zone intrusion in one person event", () => {
+    const result: InferenceResult = {
+      type: "inference_result", frame_id: 2, video_time: 1, result: "violate", review_required: true,
+      monitoring_session_id: "3cddfe85-9428-44d7-afbf-0cd9e5fc0640",
+      people: [{bbox: [0, 0, 10, 20], confidence: 0.9, inside_zone: true, track_id: 9,
+        ppe: {hat: {status: "missing", confidence: null}, vest: {status: "missing", confidence: null}},
+        missing_required_ppe: ["hat", "vest"],
+        active_violations: [
+          {occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "missing_ppe:hat", is_new: true},
+          {occurrence_id: "90494038-ea97-405b-830d-75d0b2613826", rule_key: "missing_ppe:vest", is_new: true},
+          {occurrence_id: "4f6d4ee1-28fd-43a8-b754-736b80fcf742", rule_key: "zone_intrusion:zone_01", zone_id: "zone_01", is_new: true},
+        ]}],
+      rule: {person_inside_zone: true, machine_state: "running", ppe_profile: "hat_vest_v1", camera_id: "uploaded_video", zone_id: "zone_01",
+        ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: true}, ppe_alert: true},
+    };
+
+    const payload = buildEventPayload("acknowledged", result, [], true);
+    expect(payload.track_id).toBe(9);
+    expect(payload.event_type).toBe("person_safety_violation");
+    expect(payload.occurrence_ids).toHaveLength(3);
+    expect(payload.details.violations).toEqual([
+      "missing_ppe:hat", "missing_ppe:vest", "zone_intrusion:zone_01",
+    ]);
   });
 });
 

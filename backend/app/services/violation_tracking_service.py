@@ -28,15 +28,18 @@ class ViolationTrackingService:
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
+        ppe_confirmation_seconds: float = 2.0,
         session_ttl_seconds: float = 300.0,
         track_handoff_max_distance: float = 0.12,
     ) -> None:
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
+        self._ppe_confirmation_seconds = ppe_confirmation_seconds
         self._session_ttl_seconds = session_ttl_seconds
         self._track_handoff_max_distance = track_handoff_max_distance
         self._occurrences: dict[tuple[str, int, str], _Occurrence] = {}
+        self._pending_ppe_since: dict[tuple[str, int, str], float] = {}
         self._track_positions: dict[tuple[str, int], tuple[float, float]] = {}
         self._last_seen: dict[str, float] = {}
         self._last_frame: dict[str, int] = {}
@@ -71,6 +74,11 @@ class ViolationTrackingService:
         for key in observed_keys:
             _, track_id, rule_key = key
             occurrence = self._occurrences.get(key)
+            if occurrence is None and self._requires_ppe_confirmation(rule_key):
+                started_at = self._pending_ppe_since.setdefault(key, now)
+                if now - started_at < self._ppe_confirmation_seconds:
+                    continue
+                self._pending_ppe_since.pop(key, None)
             is_new = occurrence is None or (not occurrence.active and now >= occurrence.cooldown_until)
             if is_new:
                 occurrence = _Occurrence(occurrence_id=str(uuid4()))
@@ -80,6 +88,14 @@ class ViolationTrackingService:
             occurrence.absent_frames = 0
             occurrence.lost_frames = 0
             output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
+
+        # A present/unknown frame before confirmation is evidence against the
+        # candidate, so it must not later become a PPE alert.
+        self._pending_ppe_since = {
+            key: started_at
+            for key, started_at in self._pending_ppe_since.items()
+            if key[0] != session_id or (key in observed_keys and key[1] in present_tracks)
+        }
 
         for key, occurrence in list(self._occurrences.items()):
             existing_session, track_id, _ = key
@@ -104,6 +120,7 @@ class ViolationTrackingService:
 
     def end_session(self, session_id: str) -> None:
         self._occurrences = {key: value for key, value in self._occurrences.items() if key[0] != session_id}
+        self._pending_ppe_since = {key: value for key, value in self._pending_ppe_since.items() if key[0] != session_id}
         self._track_positions = {key: value for key, value in self._track_positions.items() if key[0] != session_id}
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
@@ -128,23 +145,27 @@ class ViolationTrackingService:
         positions: dict[int, tuple[float, float]],
     ) -> None:
         for new_key in sorted(observed_keys):
-            if new_key in self._occurrences:
+            if new_key in self._occurrences or new_key in self._pending_ppe_since:
                 continue
             _, new_track_id, rule_key = new_key
             new_position = positions.get(new_track_id)
             if new_position is None:
                 continue
             candidates: list[tuple[float, tuple[str, int, str]]] = []
-            for old_key, occurrence in self._occurrences.items():
+            candidate_keys = set(self._occurrences) | set(self._pending_ppe_since)
+            for old_key in candidate_keys:
                 old_session_id, old_track_id, old_rule_key = old_key
                 old_position = self._track_positions.get((session_id, old_track_id))
+                occurrence = self._occurrences.get(old_key)
                 if (
                     old_session_id != session_id
                     or old_rule_key != rule_key
                     or old_track_id in present_tracks
-                    or not occurrence.active
-                    or occurrence.lost_frames >= self._lost_grace_frames
                     or old_position is None
+                ):
+                    continue
+                if occurrence is not None and (
+                    not occurrence.active or occurrence.lost_frames >= self._lost_grace_frames
                 ):
                     continue
                 distance = hypot(new_position[0] - old_position[0], new_position[1] - old_position[1])
@@ -153,7 +174,14 @@ class ViolationTrackingService:
             if not candidates:
                 continue
             _, old_key = min(candidates)
-            self._occurrences[new_key] = self._occurrences.pop(old_key)
+            if old_key in self._occurrences:
+                self._occurrences[new_key] = self._occurrences.pop(old_key)
+            else:
+                self._pending_ppe_since[new_key] = self._pending_ppe_since.pop(old_key)
+
+    @staticmethod
+    def _requires_ppe_confirmation(rule_key: str) -> bool:
+        return rule_key.startswith("missing_ppe:")
 
     def _expire(self, now: float) -> None:
         expired = [

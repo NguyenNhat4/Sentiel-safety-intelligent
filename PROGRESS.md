@@ -1,5 +1,28 @@
 # Project Progress
 
+## 2026-08-15: [Cross-cutting] One accumulated event per tracked person
+- Human-in-the-Loop review now isolates the selected tracked person and saves one `person_safety_violation` event containing every observed hat, vest, restricted-area, and zone rule.
+- Later violations for the same `(monitoring_session_id, track_id)` merge into the existing event. Added a portable Alembic uniqueness constraint and focused backend/frontend coverage.
+
+## 2026-08-15: [Cross-cutting] Area log details and resolution workflow
+- Area managers now see individual logs only for their assigned area, can open a log to inspect its snapshot/context, and can mark it **Đã giải quyết** or **Không phải vi phạm**.
+- Backend authorization rejects updates to another area's event. Focused event tests, frontend lint, type-check, and production build pass.
+
+## 2026-08-15: [Cross-cutting] Confirmed violations now reach the correct area manager
+- AI detections no longer notify area managers before Human-in-the-Loop review. A confirmed `acknowledged` event now routes to the manager assigned to its `zone_id`.
+- Area-manager event history and summary statistics are server-filtered to the assigned area; focused backend routing tests and frontend checks pass.
+
+## 2026-08-14: [Frontend] Human-in-the-Loop review no longer pauses live streaming
+- The monitor keeps streaming after a violation, surfaces compact critical/PPE counts above the video, and records the candidate in the Human-in-the-Loop log.
+- Safety officers open the snapshot and review/escalation choices only by selecting a log entry.
+
+## 2026-08-14: [Frontend] PPE configuration follows the selected area
+- The PPE requirement controls now load and save against the selected `zone_id`, matching the inference request for that area instead of always editing `zone_01`.
+
+## 2026-08-14: [Frontend] Human-in-the-Loop records individual PPE warnings
+- Missing required hats and vests now create separate deduplicated Human-in-the-Loop warning entries per detected person and PPE item; zone intrusion entries remain critical.
+- The monitor's rule summary is compact so the right panel has room for the recent warning log.
+
 ## 2026-08-13: [Frontend] Human-in-the-Loop alert tones clarify safety response
 - The Human-in-the-Loop panel now prioritizes red for a person in a forbidden zone, orange for missing configured PPE, yellow for required PPE that cannot be determined, and green/no-alert messaging when detected people have all required PPE.
 - Added focused UI-state coverage for the alert priority; frontend type-check, lint, tests, and production build pass.
@@ -13,6 +36,11 @@
 - Added Alembic's OS-aware `path_separator` setting to remove the deprecated legacy path parsing warning.
 
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
+
+## 2026-08-15: [Cross-cutting] Per-zone restricted-area detection
+- Added the **Vùng cấm** switch beside the selected zone's mũ/áo configuration; its value persists per `camera_id` + `zone_id` and defaults OFF.
+- When enabled, any detected person anywhere in the camera frame creates an immediate critical, red Human-in-the-Loop log, independent of polygon and machine state. Existing hat/vest and polygon intrusion behavior remains unchanged.
+- Added Alembic revision `20260815_02_add_restricted_area_detection.py`; focused backend and frontend tests pass.
 
 ## Current State
 - Runtime frame inference now uses only `models/yolo11m_safety.pt`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest; YOLO11n is no longer loaded or called.
@@ -166,11 +194,16 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Closed US-27 documentation by moving the multi-zone implementation specification to `specs/done/` and removing the redundant `specs/backlog/US-27.md` story file; the root context map and current structure now point to the completed spec.
 
 ## In Progress
+- [x] [Cross-cutting] Added required monitoring-area assignment for new/updated `area_manager` accounts, Telegram username/chat-ID administration, reversible user-schema migration, and non-blocking area-scoped Telegram delivery for newly opened alerts. Delivery remains disabled until `TELEGRAM_BOT_TOKEN` and recipient chat IDs are configured.
+- [x] [Frontend] Changed HITL counting to pending-review logs rather than current-frame violations. Hat, vest and zone occurrences are consolidated into one log per session track/person; reviewed logs remain visible but leave the pending count, and the eight-log display cap was removed.
+- [x] [Frontend] Aligned HITL logs with review context: person cards now use backend `track_id`, each log retains its own inference snapshot/result and opens that exact frame, while the rule-result title is derived from current active zone/PPE occurrences instead of a hard-coded zone-intrusion message.
+- [x] [Cross-cutting] Reduced transient PPE alerts: backend now confirms missing hat/vest for 2.0 continuous seconds per session track before opening a HITL occurrence; a present/unknown frame cancels the candidate, while forbidden-zone intrusion remains immediate. Frontend logs only confirmed occurrences.
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
 - [ ] Establish final ground truth, qualified-absence evidence and benchmark targets for the hat/vest model before production alerting.
 - [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
 ## Known Issues
+- `ppe_alert_confirm_seconds=2.0` is an MVP starting value and must be calibrated using held-out, representative footage before production use.
 - Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - YOLO11m Safety detects presence; backend derives `missing` from qualified absence. Final US-13 ground truth, false-negative/false-alarm evaluation and target-device latency remain release blockers for real alerts.
 - Person-head redaction is a prototype safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.

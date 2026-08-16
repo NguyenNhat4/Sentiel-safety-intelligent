@@ -149,6 +149,30 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
     assert result.result == "normal"
 
 
+def test_restricted_area_detection_alerts_immediately_for_any_detected_person():
+    service = FrameInferenceService(
+        model_path="unused.pt",
+        ppe_observer=lambda frame, people: [],
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            restricted_area_detection_enabled=True,
+            updated_at=None,
+        ),
+    )
+    service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
+
+    result = service.infer(request())
+
+    assert result.result == "violate"
+    assert result.review_required is True
+    assert result.rule["restricted_area_alert"] is True
+    assert result.people[0].active_violations[0].rule_key == "restricted_area_person"
+
+
 def test_qualified_absence_of_required_hat_creates_alert_and_exposes_all_detections():
     service = FrameInferenceService(
         model_path="unused.pt",

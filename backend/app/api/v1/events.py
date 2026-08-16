@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from backend.app.api.dependencies import require_roles
 from backend.app.core.database import get_db
+from backend.app.models.user import User, UserRole
 from backend.app.schemas.event import EventBatchCreate, EventBatchResponse, EventCreate, EventResponse, EventUpdate
+from backend.app.services.alert_notification_service import alert_notification_service
 from backend.app.services.event_service import (
     EventConflictError,
     EventPersistenceError,
@@ -15,7 +18,11 @@ batch_router = APIRouter(prefix="/event-batches", tags=["Safety Events"])
 
 
 @batch_router.post("", response_model=EventBatchResponse, status_code=201)
-async def create_event_batch(batch_in: EventBatchCreate, db: Session = Depends(get_db)):
+async def create_event_batch(
+    batch_in: EventBatchCreate,
+    actor: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN)),
+    db: Session = Depends(get_db),
+):
     from backend.app.services.frame_inference_service import frame_inference_service
 
     service = EventService(db)
@@ -33,6 +40,10 @@ async def create_event_batch(batch_in: EventBatchCreate, db: Session = Depends(g
                         detail="Occurrence does not belong to the requested session and zone",
                     )
         batch_id, snapshot_path, events = service.create_batch(batch_in)
+        if batch_in.status == "acknowledged":
+            alert_notification_service.queue_confirmed_events(
+                db, [event for event in events if getattr(event, "_was_created", False)]
+            )
         return {"batch_id": batch_id, "snapshot_path": snapshot_path, "events": events}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -51,6 +62,7 @@ async def list_events(
     zone_id: str | None = None,
     status: str | None = None,
     event_type: str | None = None,
+    actor: User = Depends(require_roles(UserRole.SYSTEM_ADMIN, UserRole.SAFETY_MANAGER, UserRole.AREA_MANAGER)),
     db: Session = Depends(get_db),
 ):
     """Retrieve safety violation events with filtering."""
@@ -58,7 +70,7 @@ async def list_events(
     return service.get_events(
         skip=skip,
         limit=limit,
-        zone_id=zone_id,
+        zone_id=actor.managed_area_id if actor.role == UserRole.AREA_MANAGER.value else zone_id,
         status=status,
         event_type=event_type,
     )
@@ -67,12 +79,16 @@ async def list_events(
 @router.post("", response_model=EventResponse, status_code=201)
 async def create_event(
     event_in: EventCreate,
+    actor: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Record a new safety violation event."""
     service = EventService(db)
     try:
-        return service.create_event(event_in)
+        event = service.create_event(event_in)
+        if event_in.status == "acknowledged" and getattr(event, "_was_created", False):
+            alert_notification_service.queue_confirmed_events(db, [event])
+        return event
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except EventPrivacyError as exc:
@@ -86,11 +102,14 @@ async def create_event(
 @router.get("/{event_id}", response_model=EventResponse)
 async def get_event(
     event_id: int,
+    actor: User = Depends(require_roles(UserRole.SYSTEM_ADMIN, UserRole.SAFETY_MANAGER, UserRole.AREA_MANAGER)),
     db: Session = Depends(get_db),
 ):
     """Get details of a specific event."""
     service = EventService(db)
     event = service.get_event(event_id)
+    if event and actor.role == UserRole.AREA_MANAGER.value and event.zone_id != actor.managed_area_id:
+        raise HTTPException(status_code=404, detail="Event not found")
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
@@ -100,14 +119,26 @@ async def get_event(
 async def update_event(
     event_id: int,
     event_in: EventUpdate,
+    actor: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN, UserRole.AREA_MANAGER)),
     db: Session = Depends(get_db),
 ):
     """Acknowledge or update status of an event."""
     service = EventService(db)
+    existing = service.get_event(event_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if actor.role == UserRole.AREA_MANAGER.value:
+        if existing.zone_id != actor.managed_area_id:
+            raise HTTPException(status_code=404, detail="Event not found")
+        if event_in.status not in {"resolved", "false_alarm"}:
+            raise HTTPException(
+                status_code=403, detail="Area managers may only resolve or reject their own area events"
+            )
+        event_in.acknowledged_by = actor.full_name
     try:
         updated = service.update_event(event_id, event_in)
     except EventPrivacyError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    if not updated:
-        raise HTTPException(status_code=404, detail="Event not found")
+    if event_in.status == "acknowledged" and existing and existing.status != "acknowledged":
+        alert_notification_service.queue_confirmed_events(db, [updated])
     return updated

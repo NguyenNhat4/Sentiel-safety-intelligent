@@ -1,6 +1,19 @@
 # Project Design Decisions
 
+## 2026-08-15: [Cross-cutting] One violation log per tracked person and video session
+- **Choice:** Confirmed warnings use `(monitoring_session_id, track_id)` as the per-video person-log key. Missing hat, missing vest, restricted-camera presence, and zone intrusion occurrences are accumulated into that one event while the same track remains in the session.
+- **Boundary:** `track_id` remains a temporary ByteTrack association, not a person's identity and not a cross-video or cross-camera identifier. A new video session may create a new log for the same physical person.
+
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
+
+## 2026-08-15: [Cross-cutting] Area managers close only their own routed logs
+- **Choice:** The area workspace presents its scoped events as selectable logs with snapshot and event context. An area manager may set only an event in their assigned area to `resolved` or `false_alarm`.
+- **Reason:** This supports local follow-up without allowing a manager to see or alter another area's incidents, or to change the safety officer's original confirmation flow.
+
+## 2026-08-15: [Cross-cutting] Confirmed violations route by assigned area
+- **Choice:** A notification to an area manager is queued only after a safety manager confirms an event as `acknowledged`. The event's `zone_id` is matched to the manager's `managed_area_id`; the area workspace and statistics API enforce the same scope server-side.
+- **Reason:** An AI candidate is not an official violation. This prevents unverified alerts and information from another area appearing in the manager's workspace.
+- **Reliability:** Idempotent event/batch retries do not queue a second notification.
 
 ## 2026-08-13: [Frontend] Upload video per selected monitoring area
 - **Choice:** A browser-local uploaded video belongs only to the selected danger area (`zone_id`). Switching areas swaps to that area's own video or an empty video state, and inference uses the existing legacy single-zone WebSocket configuration for that selected area only.
@@ -271,3 +284,20 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Compatibility:** Preserve current REST/WebSocket/Pydantic/TypeScript fields, class IDs, tracking IDs, occurrence lifecycle, multi-zone behavior, rule semantics and `redact → annotate → persist` ordering. The change is internal model routing, not a wire-contract change.
 - **Runtime:** Remove `person_model_path` and do not preload or call `models/yolo11n.pt`. Per-session model instances may exist to isolate ByteTrack state, but every instance uses the same pinned YOLO11m Safety artifact and each frame has one model call.
 - **Constraint:** This cutover does not claim improved accuracy. Person/hat/vest precision, recall, association, tracking stability and target-device latency must be re-evaluated through US-13 before pilot/production use.
+
+## 2026-08-14: [Cross-cutting] Confirm missing PPE over time before creating a HITL occurrence
+- **Reason:** A single frame can miss a hat or vest because of blur, occlusion, pose, or weak confidence. Creating a candidate for every such frame overwhelms the operator with false/duplicate HITL logs.
+- **Choice:** Keep zone intrusion immediate. For `missing_ppe:hat` and `missing_ppe:vest`, the backend waits for continuous absence for `ppe_alert_confirm_seconds` (default `2.0`) on the same session track before opening an occurrence. A later present or unknown observation cancels an unconfirmed candidate. Candidate state follows a nearby track handoff, expires with the monitoring session, and never crosses sessions.
+- **Compatibility:** No REST/WebSocket field changes. Responses remain `normal` and have no active PPE violation until confirmation; the frontend logs only backend-confirmed active occurrences.
+- **Calibration:** The default is a conservative MVP starting point, not a production accuracy claim. Tune it against the held-out US-13 footage, balancing false alarms against detection delay.
+
+## 2026-08-15: [Cross-cutting] Area-scoped manager accounts and Telegram alert delivery
+- **Reason:** An `area_manager` account must identify the monitoring area it owns, and newly confirmed safety occurrences must reach the responsible manager outside the browser.
+- **Account contract:** Add nullable `managed_area_id`, `telegram_username` and `telegram_chat_id` fields for backward-compatible historical accounts. New assignments to `area_manager` require an existing saved monitoring area. Telegram username is display identity only; private delivery uses the numeric chat ID.
+- **Delivery:** On a newly opened occurrence, backend routing selects active area managers assigned to that area and queues one consolidated Telegram message per recipient/frame. The provider adapter uses Bot API `sendMessage`; an absent token, unlinked recipient or provider failure never interrupts WebSocket inference or removes the in-app alert.
+- **Operational constraint:** Configure `TELEGRAM_BOT_TOKEN` outside source control. A private recipient must start the bot first and have the resulting chat ID stored on the account.
+
+## 2026-08-15: [Cross-cutting] Per-zone whole-camera restricted-area alert
+- **Reason:** Safety Officers need a simple mode that treats any detected person in a selected camera-zone configuration as an immediate danger alert, without relying on polygon placement or simulated machine state.
+- **Choice:** Add the persisted `restricted_area_detection_enabled` switch to the existing camera-zone safety requirement resource, default OFF. When ON, each detected canonical person opens a deduplicated `restricted_area_person` critical occurrence immediately; the frontend presents it as a red Human-in-the-Loop log.
+- **Compatibility:** The REST/WebSocket additions are additive. Existing configuration writes may omit the new field and save it as OFF. PPE hat/vest rules and polygon intrusion behavior are unchanged.
