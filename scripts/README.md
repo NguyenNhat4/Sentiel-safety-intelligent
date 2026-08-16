@@ -1,5 +1,15 @@
 # Benchmark scripts
 
+`export_safety_model_to_onnx.py` is the controlled conversion path from the approved
+`models/yolo11m_safety.pt` source checkpoint to `models/yolo11m_safety.onnx`, the
+runtime artifact. It uses fixed 640px input and embedded NMS. Run it only for an
+approved source update, then copy its printed SHA-256 into startup validation and
+`models/README.md`:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/export_safety_model_to_onnx.py
+```
+
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 
@@ -22,7 +32,7 @@ To benchmark the PPE model and save machine-readable output:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
-  --model models/yolo11m_safety.pt \
+  --model models/yolo11m_safety.onnx \
   --output data/model-benchmark.json
 ```
 

@@ -128,7 +128,8 @@ P-047/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
-│   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
+│   ├── yolo11m_safety.onnx # Runtime ONNX Safety artifact
+│   ├── yolo11m_safety.pt # Controlled export source for the runtime artifact
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
 ├── docs/                # Problem statement, structure docs, technical guides and documentation index
 │   ├── README.md                    # Documentation catalog
@@ -136,6 +137,7 @@ P-047/
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
+│   ├── onnx-inference.md             # Runtime artifact, reproducibility and verification guide
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
@@ -156,6 +158,7 @@ P-047/
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
 │   ├── benchmark_model.py
+│   ├── export_safety_model_to_onnx.py # Controlled Safety .pt-to-.onnx exporter
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check

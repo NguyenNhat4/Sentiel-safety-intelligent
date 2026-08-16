@@ -44,7 +44,7 @@ Baseline đang hoạt động gồm:
 - FastAPI phục vụ REST, WebSocket và production frontend build.
 - Upload video local, tạo/lưu nhiều vùng bốn điểm không chồng nhau và trạng thái máy riêng cho từng vùng.
 - YOLO person detection, foot-point polygon evaluation và frame inference gần realtime.
-- Một YOLO11m Safety checkpoint đã pin chạy `person`, `hat`, `vest` đúng một lần mỗi frame; `person` là nguồn canonical cho tracking/zone, còn rule PPE công khai chỉ dùng `hat`/`vest`.
+- Một YOLO11m Safety artifact ONNX đã pin chạy `person`, `hat`, `vest` đúng một lần mỗi frame qua ONNX Runtime; `person` là nguồn canonical cho tracking/zone, còn rule PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack gán track ID theo phiên video và backend chống review/event lặp cho cùng occurrence.
 - HITL review, lưu event đã xác nhận với snapshot đã che danh tính, nhật ký snapshot và thống kê baseline.
 - SQLite là mặc định hiện tại cho MVP/local/test; PostgreSQL vẫn được hỗ trợ qua cấu hình `DATABASE_URL` cho môi trường triển khai sau khi được xác thực.
@@ -86,6 +86,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Chuẩn bị và khóa custom dataset cho US-13 | [US-13 Task 2 Dataset Guide](docs/US-13-task2-datapreparation.md) |
 | Dùng template và kiểm tra manifest US-13 | [US-13 evaluation workspace](data/evaluation/README.md) |
 | Hiểu JSONL metrics, API và UI quan sát hệ thống | [Operational Metrics](docs/operational-metrics.md) |
+| Hiểu/tái tạo ONNX runtime model | [ONNX inference guide](docs/onnx-inference.md) |
 | Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đọc contract rule alert và sơ đồ luồng frame | [Frame Alert Rule Contract](docs/alert-rule-contract.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |

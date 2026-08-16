@@ -65,3 +65,5 @@ out/
 # Local model weights downloaded by the inference baseline
 *.pt
 !models/yolo11m_safety.pt
+*.onnx
+!models/yolo11m_safety.onnx

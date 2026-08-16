@@ -2,6 +2,13 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-16: [Vision] Run the pinned Safety detector as ONNX Runtime inference
+- **Supersedes:** The runtime-artifact portion of the YOLO11m Safety decision that loaded `models/yolo11m_safety.pt` directly. The class mapping, one-call-per-frame boundary, public `person`/`hat`/`vest` observations and ByteTrack session semantics remain unchanged.
+- **Choice:** Export the approved PyTorch source checkpoint once to `models/yolo11m_safety.onnx` at fixed 640px input with embedded NMS. Production settings, Docker and startup integrity validation accept only this ONNX artifact. The existing Ultralytics facade loads the `.onnx` file, which selects ONNX Runtime with `CPUExecutionProvider` for prediction and tracking inference.
+- **Reason:** ONNX is the requested portable serving format. Fixed input dimensions and embedded NMS preserve the existing YOLO `Result` boundary while avoiding a second, hand-maintained preprocessing/postprocessing implementation.
+- **Reproducibility:** `scripts/export_safety_model_to_onnx.py` is the controlled exporter. It accepts only the approved source/output paths and prints the SHA-256 to record in startup validation and `models/README.md`. The source `.pt` remains an export-only controlled artifact, never a runtime fallback.
+- **Verification:** Based on the official Ultralytics ONNX export and direct exported-model inference documentation (https://docs.ultralytics.com/modes/export) and ONNX Runtime Python provider API (https://onnxruntime.ai/docs/api/python/api_summary.html). Local smoke loaded the artifact with ONNX Runtime CPUExecutionProvider and returned the exact five-class mapping.
+
 ## 2026-08-16: [Cross-cutting] Alert enabled danger-zone intrusion regardless of machine state
 - **Supersedes:** The running-machine gate for zone alerts recorded in the US-27-era architecture and runtime behavior; its historical specification remains unchanged.
 - **Choice:** A frame violates when any detected person is inside an enabled danger zone, whether its simulated machine state is `running` or `stopped`. Required hat/vest evaluation remains independent and no-person frames remain normal.
@@ -20,7 +27,7 @@ This is the single decision log for the repository. Prefix each entry with its o
 ## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
 - **Choice:** Compose loads `.env.development`, then overrides only the database runtime to its disposable PostgreSQL service and starts it with migrations enabled after database health succeeds.
 - **Reason:** Local container validation must not contact the developer-configured database, while CORS, S3 and other non-database configuration remain aligned with development.
-- **Constraint:** The container entrypoint accepts development mode for this isolated Compose stack so FastAPI seeds demo users; production mode remains strict. Existing `.env.development` files must set `PPE_MODEL_PATH=models/yolo11m_safety.pt`; do not place production storage credentials in that file.
+- **Constraint:** The container entrypoint accepts development mode for this isolated Compose stack so FastAPI seeds demo users; production mode remains strict. Existing `.env.development` files must set the current approved `PPE_MODEL_PATH` documented by the active runtime decision; do not place production storage credentials in that file.
 
 ## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
 - **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
