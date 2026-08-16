@@ -87,6 +87,17 @@ def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_s
     assert not np.array_equal(persisted[10:42, 20:80], frame[10:42, 20:80])
 
 
+def test_default_yunet_adapter_falls_back_and_persists_safely(db_session, tmp_path):
+    event = EventService(db_session, snapshot_dir=tmp_path).create_event(
+        _event_input(_snapshot_data(_patterned_frame()))
+    )
+
+    persisted = cv2.imread(str(tmp_path / event.snapshot_path.rsplit("/", 1)[-1]), cv2.IMREAD_COLOR)
+    assert event.privacy_blurred is True
+    assert persisted is not None
+    assert not np.array_equal(persisted[10:42, 20:80], _patterned_frame()[10:42, 20:80])
+
+
 def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, tmp_path):
     frame = _patterned_frame()
     event_in = EventCreate.model_validate(

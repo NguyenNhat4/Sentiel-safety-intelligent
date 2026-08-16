@@ -21,6 +21,8 @@ PostgreSQL from `DATABASE_URL` is the primary database. Local settings load `.en
 
 PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minute connection recycling. `DATABASE_POOL_PRE_PING` defaults to `false` so a warm connection checkout does not add a database round-trip to every request. Enable it only for a provider that repeatedly drops idle sessions. ORM sessions keep loaded values after commit, avoiding an automatic response-time reload; explicit queries remain the source of truth for subsequent requests.
 
+`/health` reports `ready=true` only after startup has loaded the person-detection and PPE checkpoints, warmed the first ByteTrack model, and a live PostgreSQL `SELECT 1` plus S3 `HeadBucket` both succeed. Its additive `dependencies.postgresql` and `dependencies.snapshot_storage` fields identify the failed dependency with a safe reason code; they never expose URLs, provider messages or credentials. If a weight file or required tracker package cannot load, startup fails before the service accepts traffic; it must be fixed in the image and redeployed rather than installed at runtime. `Settings` reads `.env.production` when that file exists; on Railway, the same names must be configured as service Variables because the file is excluded from the image.
+
 ## Frontend–Backend Interaction
 
 The baseline uses two transports with separate responsibilities:
@@ -28,9 +30,7 @@ The baseline uses two transports with separate responsibilities:
 - WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
 - REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
 
-Reviewed-event and statistics endpoints require a logged-in user. Safety officers and system administrators can record reviews; an area manager receives only events and statistics for their assigned `managed_area_id`. A Telegram alert is queued for that matching manager only when a review is saved as `acknowledged`, never when the AI merely opens a candidate.
-
-US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
+US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision and carries the camera-wide `machine_state` separately; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
 
 The versioned `hat_vest_v1` profile uses a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
 
@@ -39,9 +39,9 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns `profile`, `hat_required`, `vest_required`, and additive `restricted_area_detection_enabled`; a missing record materializes as all OFF values with `is_configured=false`. PUT accepts the same additive boolean (omitting it keeps compatibility and saves OFF). When the per-zone restricted-area switch is ON, every detected canonical person anywhere in the camera frame opens an immediate critical `restricted_area_person` occurrence, independent of polygon geometry and machine state. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
+GET returns canonical `profile`, `hat_required` and `vest_required`; a missing record materializes as two OFF values with `is_configured=false`. It also includes read-only `helmet_required`, `safety_glasses_required=false` and `gloves_required=false` aliases during the temporary legacy-browser bridge. PUT accepts either the exact canonical profile plus both strict booleans, or exactly the former three-field payload (`helmet_required`, `safety_glasses_required`, `gloves_required`); the latter maps helmet to hat and requires vest. Mixed, partial, unknown-profile and extra payloads still return `422`. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public inference detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard, has no associated required PPE detection, and the relevant machine state is `running`.
 
-US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
+US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. `VIOLATION_FRAME` controls how many consecutive observed frames are required before that occurrence opens; it defaults to `4` and a missing observed frame resets the pending count. This debounce requires a monitoring session; stateless REST inference has no cross-request frame history. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
 ```mermaid
 sequenceDiagram
@@ -83,7 +83,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside an enabled configured danger zone?** Zone alerts do not depend on the simulated machine state. One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
@@ -188,8 +188,8 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
 | `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
 | `ppe`, `missing_required_ppe` | Per-person `hat`/`vest` observations and only the currently required items that passed qualified-absence guards. |
-| `review_required` | `true` when the machine is running and at least one foot point is inside, or when a required PPE is `missing` for a qualified person. The frontend pauses only for this value. |
-| `result` | `violate` when `review_required=true`; otherwise `normal`. |
+| `review_required` | `true` when a zone or required-PPE occurrence is newly active. An enabled-zone foot point is sufficient regardless of machine state; PPE can produce an occurrence only while the machine is running. The frontend pauses only for this value. |
+| `result` | `violate` when any detected person is inside an enabled zone or, while the machine is running, lacks a required PPE item; a continuing debounced occurrence can remain `violate` after `review_required` becomes `false`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
 | `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
 
@@ -197,9 +197,10 @@ The current decision is:
 
 ```text
 person_inside_zone = any(person.inside_zone for person in people)
-ppe_alert = any(person.missing_required_ppe for person in people)
-review_required = (person_inside_zone AND machine_state == "running") OR ppe_alert
-result = "violate" if review_required else "normal"
+ppe_alert = machine_state == "running" AND any(person.missing_required_ppe for person in people)
+frame_violation = person_inside_zone OR ppe_alert
+review_required = any(new_occurrence_for_frame_violation)
+result = "violate" if frame_violation else "normal"
 ```
 
 Common outcomes:
@@ -208,10 +209,12 @@ Common outcomes:
 |---|---|---:|---|---:|---:|
 | No person | Running or stopped | — | `normal` | `false` | No |
 | Person outside zone | Running or stopped | `false` | `normal` | `false` | No |
-| Person inside zone | Stopped | `true` | `normal` | `false` | No |
+| Person inside zone | Stopped | `true` | `violate` | `true` when its occurrence first opens | Yes when review is required |
 | Person inside zone | Running | `true` | `violate` | `true` | Yes |
 
-Bounding boxes and `inside_zone` remain available when the machine is stopped; zone-driven review, video pause, and snapshot generation are suppressed. A qualified required-PPE absence still requests review.
+Bounding boxes, `inside_zone`, and zone alerts remain active when the machine is stopped; `machine_state` remains response/audit context. A qualified required-PPE absence also requests review.
+
+When the machine is stopped, PPE observations remain visible but configured PPE requirements are not evaluated and cannot create a PPE alert.
 
 ### Protocol errors
 
@@ -236,7 +239,7 @@ foot_x = (x1 + x2) / 2
 foot_y = y2
 ```
 
-The four normalized zone points are converted to frame pixels. OpenCV `pointPolygonTest` sets `inside_zone=true` when the foot point is on or inside the polygon. Zone review is based on this foot point, not bounding-box overlap. A review, snapshot, and violation are produced only when the foot point is inside while `machine_state` is `running`; bounding boxes remain available while the machine is stopped.
+The four normalized zone points are converted to frame pixels. OpenCV `pointPolygonTest` sets `inside_zone=true` when the foot point is on or inside the polygon. Zone review is based on this foot point, not bounding-box overlap. A foot point inside an enabled zone produces a violation regardless of `machine_state`; the first debounced occurrence produces the review and snapshot.
 
 The REST fallback `POST /api/v1/analysis/frame` remains available and returns the same core `FrameInferenceResponse` without WebSocket correlation fields.
 
@@ -275,11 +278,9 @@ Example confirmed violation:
 
 `EventService` validates and decodes `snapshot_data`, then calls the privacy adapter independently from PPE inference. It accepts transient `snapshot_people` and `snapshot_detections` from the reviewed frame, redacts first, and only then draws canonical person plus `hat`/`vest` boxes before JPEG encoding; these fields are excluded from event persistence/response. It writes only the processed JPEG under `data/snapshots`, sets `privacy_blurred=true` itself, then commits the event. Client-provided privacy/path values cannot bypass this gate.
 
-The prototype privacy policy blurs the top 40% of every canonical person box. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. This policy does not load the retired SH17 checkpoint or add privacy classes to the PPE contract.
+The privacy policy runs OpenCV YuNet once per reviewed snapshot, expands and blurs every detected face, then blurs the top 40% of each canonical person box without an associated face. A YuNet inference error degrades to the same fallback for all people and emits a stable operational warning; a missing/corrupt artifact fails startup. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. YuNet is independent from YOLO11m Safety and does not add privacy classes to the PPE contract.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
-
-For current per-person reviews, `POST /api/v1/events` includes the session-local `track_id` and uses `(monitoring_session_id, track_id)` as the log identity. A person's missing-hat, missing-vest, restricted-area and zone-intrusion occurrences are accumulated into that single `person_safety_violation` event for the video session; this is tracking, not biometric identity.
 
 ### Recommended production design
 

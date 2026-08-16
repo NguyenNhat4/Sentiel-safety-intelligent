@@ -26,7 +26,6 @@ def test_missing_requirement_defaults_to_off_without_creating_a_record(db_sessio
     assert requirement.profile == "hat_vest_v1"
     assert requirement.hat_required is False
     assert requirement.vest_required is False
-    assert requirement.restricted_area_detection_enabled is False
     assert requirement.is_configured is False
     assert requirement.updated_at is None
     assert requirement.helmet_required is False
@@ -65,24 +64,6 @@ def test_save_upserts_one_shared_requirement(db_session):
     assert second.gloves_required is False
     assert second.updated_at is not None
     assert service.count() == 1
-
-
-def test_save_persists_restricted_area_detection_per_zone(db_session):
-    service = PpeRequirementService(db_session)
-
-    saved = service.save(
-        "uploaded_video",
-        "zone_02",
-        PpeRequirementUpdate(
-            profile="hat_vest_v1",
-            hat_required=False,
-            vest_required=False,
-            restricted_area_detection_enabled=True,
-        ),
-    )
-
-    assert saved.restricted_area_detection_enabled is True
-    assert service.get("uploaded_video", "zone_01").restricted_area_detection_enabled is False
 
 
 def test_failed_save_preserves_previous_requirement(db_session, monkeypatch):
@@ -130,7 +111,6 @@ async def test_get_api_returns_default_off(db_session):
         "profile": "hat_vest_v1",
         "hat_required": False,
         "vest_required": False,
-        "restricted_area_detection_enabled": False,
         "is_configured": False,
         "updated_at": None,
         "helmet_required": False,
@@ -201,7 +181,6 @@ def test_legacy_put_payload_maps_helmet_to_hat_and_requires_vest():
         "profile": "hat_vest_v1",
         "hat_required": True,
         "vest_required": True,
-        "restricted_area_detection_enabled": False,
     }
 
 

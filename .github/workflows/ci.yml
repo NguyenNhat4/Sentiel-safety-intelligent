@@ -2,31 +2,155 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
-jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect Docker inputs
+    runs-on: ubuntu-latest
+    outputs:
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - 'requirements.docker.txt'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'alembic.ini'
+              - 'backend/**'
+              - 'frontend/**'
+              - 'vision/**'
+              - 'models/**'
+              - 'scripts/**'
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+  release-source:
+    name: Release source
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Limit the initial release source
+        env:
+          EXPECTED_SOURCE: ${{ vars.INITIAL_RELEASE_SOURCE_BRANCH }}
+          ACTUAL_SOURCE: ${{ github.head_ref }}
+        run: |
+          test -z "$EXPECTED_SOURCE" || test "$ACTUAL_SOURCE" = "$EXPECTED_SOURCE"
+
+  backend-vision-lint:
+    name: Backend and vision lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked Python dependencies
+        run: uv sync --frozen
+      - name: Check Ruff lint and formatting
+        run: |
+          uv run ruff check src/ backend/ vision/
+          uv run ruff format --check src/ backend/ vision/
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+  root-python-tests:
+    name: Root Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked Python dependencies
+        run: uv sync --frozen
+      - name: Run cross-cutting tests
+        run: uv run pytest tests/ -v --tb=short
 
-      - name: Lint with ruff
-        run: ruff check src/ tests/
+  backend-vision-tests:
+    name: Backend and vision tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked Python dependencies
+        run: uv sync --frozen
+      - name: Run backend and vision tests
+        run: uv run pytest backend/tests/ vision/tests/ -v --tb=short
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
-        env:
-          APP_ENV: test
-          OPENAI_API_KEY: test-key
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm --prefix frontend ci
+      - name: Lint frontend
+        run: npm --prefix frontend run lint
+      - name: Type-check frontend
+        run: npm --prefix frontend run type-check
+      - name: Test frontend
+        run: npm --prefix frontend run test
+      - name: Build frontend
+        run: npm --prefix frontend run build
+
+  docker:
+    name: Docker build and publish
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.docker == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and publish production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ github.event_name == 'push' && format('{0}:latest', secrets.DOCKERHUB_IMAGE) || 'p047-ci:latest' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

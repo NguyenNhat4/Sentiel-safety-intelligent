@@ -35,7 +35,7 @@ Baseline hiện có:
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
 - SQLite cho MVP/local/test, PostgreSQL qua `DATABASE_URL` cho môi trường triển khai đã xác thực, và session authentication cho ba role.
 
-Các khoảng trống lớn là benchmark/calibration model, face detector production, authorization nghiệp vụ đầy đủ, zone/shift CRUD, escalation và reporting. Trạng thái mới nhất nằm trong [PROGRESS.md](PROGRESS.md).
+Các khoảng trống lớn là benchmark/calibration trên dữ liệu nhà máy, authorization nghiệp vụ đầy đủ, zone/shift CRUD, escalation và reporting. YuNet production face redaction đã có person fallback fail-closed; trạng thái mới nhất nằm trong [PROGRESS.md](PROGRESS.md).
 
 ```text
 React frontend
@@ -54,6 +54,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Khi cần | Đọc tài liệu/nguồn |
 |---|---|
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
+| Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/CI_CD.md) |
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |

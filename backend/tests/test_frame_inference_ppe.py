@@ -95,13 +95,13 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
 
 
 def test_preload_models_warms_the_unified_safety_model(monkeypatch):
-    service = FrameInferenceService(ppe_observer=lambda frame, people: {"people": [], "detections": []})
+    service = FrameInferenceService(model_path="unused.pt")
     loaded = []
-    monkeypatch.setattr(service, "_model_preloader", lambda: loaded.append("safety"))
+    monkeypatch.setattr(service, "_model_preloader", lambda: loaded.append("unified"))
 
     service.preload_models()
 
-    assert loaded == ["safety"]
+    assert loaded == ["unified"]
 
 
 def test_required_explicitly_missing_ppe_requests_review():
@@ -159,30 +159,6 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
     assert result.people[0].missing_required_ppe == []
     assert result.review_required is False
     assert result.result == "normal"
-
-
-def test_restricted_area_detection_alerts_immediately_for_any_detected_person():
-    service = FrameInferenceService(
-        model_path="unused.pt",
-        ppe_observer=lambda frame, people: [],
-        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
-            camera_id=camera_id,
-            zone_id=zone_id,
-            profile="hat_vest_v1",
-            hat_required=False,
-            vest_required=False,
-            restricted_area_detection_enabled=True,
-            updated_at=None,
-        ),
-    )
-    service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
-
-    result = service.infer(request())
-
-    assert result.result == "violate"
-    assert result.review_required is True
-    assert result.rule["restricted_area_alert"] is True
-    assert result.people[0].active_violations[0].rule_key == "restricted_area_person"
 
 
 def test_qualified_absence_of_required_hat_creates_alert_and_exposes_all_detections():

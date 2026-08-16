@@ -12,6 +12,7 @@ from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, check_database_connection, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
+from backend.app.integrations.privacy_vision import get_configured_privacy_vision_adapter
 from backend.app.integrations.snapshot_storage import (
     SnapshotStorageError,
     check_snapshot_storage_connection,
@@ -49,6 +50,8 @@ async def lifespan(app: FastAPI):
 
     frame_inference_service.preload_models()
     logger.info("Unified YOLO11m Safety person/hat/vest inference model loaded.")
+    get_configured_privacy_vision_adapter().preload()
+    logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
     app.state.ready = True
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")

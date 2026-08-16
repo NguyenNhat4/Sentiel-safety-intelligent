@@ -4,11 +4,11 @@ P-047 là ứng dụng giám sát an toàn PPE và vùng nguy hiểm bằng Comp
 
 ## Yêu cầu
 
-- Python 3.11–3.13 và [uv](https://docs.astral.sh/uv/)
+- Python 3.11 và [uv](https://docs.astral.sh/uv/)
 - Node.js/npm tương thích với `frontend/package-lock.json`
 - Git LFS nếu clone model checkpoint lần đầu
 
-Python 3.14 hiện có thể làm bộ test FastAPI `TestClient` bị treo; hãy dùng phiên bản được hỗ trợ để chạy toàn bộ kiểm tra.
+Python 3.11 là runtime duy nhất được lock, Docker và CI hỗ trợ; `make setup` dùng `.python-version` để chọn đúng runtime.
 
 ## Cài đặt và chạy local
 
@@ -43,6 +43,9 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 | `DATABASE_FALLBACK_ENABLED` | Cho phép fallback database khi PostgreSQL không khả dụng | Giữ `false` cho deployment cần persistence chặt chẽ |
 | `SNAPSHOT_STORAGE_*` | S3-compatible bucket cho snapshot đã redact | Điền bucket, endpoint và credential ở môi trường có S3; không đưa secrets vào tài liệu |
 | `PPE_MODEL_PATH` | Checkpoint an toàn | Phải trỏ đến `models/yolo11m_safety.pt` |
+| `FACE_DETECTOR_MODEL_PATH` | YuNet privacy detector | Phải trỏ đến `models/face_detection_yunet_2023mar.onnx` |
+| `FACE_DETECTOR_SCORE_THRESHOLD` | Ngưỡng face YuNet | Mặc định `0.6`; person không có face sẽ dùng fallback 40% |
+| `FACE_REDACTION_MARGIN_RATIO` | Biên mở rộng face trước blur | Mặc định `0.2` |
 | `VIOLATION_FRAME` | Số frame vi phạm liên tiếp trước khi cảnh báo | Mặc định `4`; một frame không vi phạm sẽ reset pending count |
 | `OPENAI_API_KEY` | Gợi ý AI tùy chọn | Để trống dùng offline safety recommendation |
 
@@ -89,6 +92,10 @@ make docker-smoke
 ```
 
 Compose nạp `.env.development` nhưng dùng PostgreSQL `db` nội bộ disposable, tách biệt với `DATABASE_URL` của developer. Dùng credential development/staging cho smoke test, không dùng credential production.
+
+## CI/CD và release
+
+Pipeline GitHub Actions kiểm tra PR vào `main`, deploy Railway chỉ sau CI xanh và hỗ trợ rollback theo SHA/tag. Thành viên mới cấu hình Environment, Railway Variables, branch protection và vận hành release theo [CI/CD và Railway release](docs/CI_CD.md).
 
 ## Kiểm tra
 

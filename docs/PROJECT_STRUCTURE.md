@@ -8,6 +8,11 @@ Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự 
 
 ```text
 P-047/
+├── .github/             # GitHub Actions CI, Railway deploy/rollback and dependency audit
+│   └── workflows/
+│       ├── ci.yml        # Required PR/main checks and Docker Hub :latest publication
+│       ├── deploy-railway.yml # CI-gated Railway image redeploy and health verification
+│       └── dependency-audit.yml # Non-blocking nightly dependency audit
 ├── alembic.ini          # Alembic entrypoint for backend migrations
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
@@ -31,8 +36,7 @@ P-047/
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
-│   │   │   ├── privacy_vision.py # Model-independent fail-closed snapshot privacy adapter
-│   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
+│   │   │   └── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
@@ -48,7 +52,6 @@ P-047/
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
-│   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
 │   │   │   ├── auth_service.py
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
@@ -70,14 +73,10 @@ P-047/
 │   │       ├── 20260811_01_add_authentication_schema.py
 │   │       ├── 20260811_02_add_forced_password_change.py
 │   │       ├── 20260811_03_add_monitoring_zones.py
-│   │       ├── 20260813_01_migrate_ppe_profile_hat_vest.py
-│   │       ├── 20260814_01_add_user_area_telegram.py
-│   │       ├── 20260815_02_add_restricted_area_detection.py # Per-zone whole-camera person-alert switch
-│   │       └── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
+│   │       └── 20260813_01_migrate_ppe_profile_hat_vest.py
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
-│       ├── test_alert_notifications.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py
@@ -90,10 +89,12 @@ P-047/
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
-│   ├── pipeline.py      # Pure person-head redaction and post-redaction annotation
+│   ├── face_detection.py # Thread-safe OpenCV YuNet provider
+│   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       ├── test_api.py
+│       ├── test_face_detection.py
 │       ├── test_privacy_pipeline.py
 │       └── test_tracking.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
@@ -133,6 +134,7 @@ P-047/
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
+│   ├── face_detection_yunet_2023mar.onnx # Pinned OpenCV YuNet face detector
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
 │   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
@@ -144,6 +146,7 @@ P-047/
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
+│   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
@@ -162,6 +165,7 @@ P-047/
 │       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
+│   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── production_start.py # Docker preflight, migration and one-worker startup

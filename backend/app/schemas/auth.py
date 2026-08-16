@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 from backend.app.models.user import UserRole
 
@@ -21,28 +21,10 @@ class LoginRequest(BaseModel):
 class UserCreate(LoginRequest):
     full_name: str = Field(min_length=1, max_length=120)
     role: UserRole
-    managed_area_id: str | None = Field(default=None, min_length=1, max_length=50)
-    telegram_username: str | None = Field(default=None, min_length=6, max_length=33, pattern=r"^@[A-Za-z0-9_]{5,32}$")
-    telegram_chat_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^-?[0-9]+$")
-
-    @model_validator(mode="after")
-    def require_area_for_area_manager(self):
-        if self.role == UserRole.AREA_MANAGER and not self.managed_area_id:
-            raise ValueError("managed_area_id is required for area_manager")
-        return self
 
 
 class UserRoleUpdate(BaseModel):
     role: UserRole
-    managed_area_id: str | None = Field(default=None, min_length=1, max_length=50)
-    telegram_username: str | None = Field(default=None, min_length=6, max_length=33, pattern=r"^@[A-Za-z0-9_]{5,32}$")
-    telegram_chat_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^-?[0-9]+$")
-
-    @model_validator(mode="after")
-    def require_area_for_area_manager(self):
-        if self.role == UserRole.AREA_MANAGER and not self.managed_area_id:
-            raise ValueError("managed_area_id is required for area_manager")
-        return self
 
 
 class PasswordChangeRequest(BaseModel):
@@ -57,9 +39,6 @@ class AuthUser(BaseModel):
     role: UserRole
     role_label: str
     must_change_password: bool
-    managed_area_id: str | None = None
-    telegram_username: str | None = None
-    telegram_chat_id: str | None = None
 
 
 class LoginResponse(BaseModel):

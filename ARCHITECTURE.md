@@ -53,7 +53,7 @@ Các bất biến an toàn:
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
 machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
-event history. PostgreSQL, PPE/face detector production model, RBAC và các
+event history. PostgreSQL, PPE production model, RBAC và các
 capability nâng cao vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:

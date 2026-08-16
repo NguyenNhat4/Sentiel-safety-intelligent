@@ -35,6 +35,16 @@ The report includes mean/min/max/P50/P95/P99 latency in milliseconds and through
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing
 inside Ultralytics are included. Run the same command on the same hardware when comparing models.
 
+`benchmark_privacy.py` measures the server-side privacy stage: one YuNet call, face/person fallback blur and JPEG encoding. It uses a generated 1280×720 frame by default or the first frame from an image/video:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/benchmark_privacy.py \
+  --input /path/to/authorized-test-image.jpg \
+  --output data/privacy-benchmark.json
+```
+
+The input is treated as one canonical person box so the report also identifies whether YuNet found a face or used the person-head fallback. Do not commit test media containing personal data.
+
 `bootstrap_legacy_sqlite.py` is called by `make db-upgrade`. It recognizes the former local
 SQLite schema that predates Alembic, writes a timestamped `.bak` backup beside the database,
 adds the missing occurrence migration column, and stamps the known schema revision. New and

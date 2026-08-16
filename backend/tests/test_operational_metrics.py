@@ -30,6 +30,22 @@ def test_operational_metrics_writer_emits_allowlisted_jsonl(tmp_path):
     assert "ignored_secret" not in event
 
 
+def test_operational_metrics_writer_accepts_privacy_fallback_warning(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    configure_operational_metrics_logger(log_path, max_bytes=1024, backup_count=1)
+
+    record_operational_event(
+        "privacy_redaction_completed",
+        outcome="person_fallback",
+        error_kind="yunet_inference_failed",
+    )
+
+    event = json.loads(log_path.read_text(encoding="utf-8"))
+    assert event["event_type"] == "privacy_redaction_completed"
+    assert event["outcome"] == "person_fallback"
+    assert event["error_kind"] == "yunet_inference_failed"
+
+
 def test_operational_metrics_summary_skips_malformed_records_and_uses_nearest_rank(tmp_path):
     log_path = tmp_path / "operational-metrics.jsonl"
     timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")

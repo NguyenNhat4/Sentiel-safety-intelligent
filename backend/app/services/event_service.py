@@ -10,7 +10,8 @@ import numpy as np
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.integrations.privacy_vision import get_privacy_vision_adapter
+from backend.app.core.operational_metrics import record_operational_event
+from backend.app.integrations.privacy_vision import get_configured_privacy_vision_adapter
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
@@ -24,6 +25,14 @@ class EventPersistenceError(RuntimeError):
 
 class EventPrivacyError(RuntimeError):
     pass
+
+
+def _privacy_redaction_outcome(redaction: PrivacyRedactionResult) -> str:
+    if redaction["detected_face_count"] and redaction["fallback_person_count"]:
+        return "face_and_person_fallback"
+    if redaction["detected_face_count"]:
+        return "face"
+    return "person_fallback"
 
 
 SnapshotRedactor = Callable[[np.ndarray, list[SnapshotPerson]], PrivacyRedactionResult]
@@ -50,13 +59,9 @@ class EventService:
 
     def create_event(self, event_in: EventCreate) -> SafetyEvent:
         occurrence_ids = [str(value) for value in event_in.occurrence_ids]
-        person_event = self._event_for_track(event_in)
-        if person_event is not None:
-            return self._merge_person_event(person_event, event_in, occurrence_ids)
         existing = self._events_for_occurrences(occurrence_ids)
         if existing:
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
-                existing[0]._was_created = False
                 return existing[0]
             raise EventConflictError("One or more occurrences already belong to another event")
         reviewed = event_in.status in {"acknowledged", "false_alarm"}
@@ -80,7 +85,6 @@ class EventService:
             acknowledged_at=datetime.now(UTC) if reviewed else None,
             timestamp=datetime.now(UTC),
             monitoring_session_id=(str(event_in.monitoring_session_id) if event_in.monitoring_session_id else None),
-            track_id=event_in.track_id,
         )
         self.db.add(db_event)
         for occurrence_id in occurrence_ids:
@@ -93,7 +97,6 @@ class EventService:
                 self._snapshot_file(snapshot_path).unlink(missing_ok=True)
             existing = self._events_for_occurrences(occurrence_ids)
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
-                existing[0]._was_created = False
                 return existing[0]
             raise EventConflictError("One or more occurrences already belong to another event") from exc
         except Exception as exc:
@@ -101,60 +104,13 @@ class EventService:
             if event_in.snapshot_data and snapshot_path:
                 self._snapshot_file(snapshot_path).unlink(missing_ok=True)
             raise EventPersistenceError("Could not save the event to the database") from exc
-        db_event._was_created = True
         return db_event
-
-    def _event_for_track(self, event_in: EventCreate) -> SafetyEvent | None:
-        if event_in.monitoring_session_id is None or event_in.track_id is None:
-            return None
-        return (
-            self.db.query(SafetyEvent)
-            .filter(
-                SafetyEvent.monitoring_session_id == str(event_in.monitoring_session_id),
-                SafetyEvent.track_id == event_in.track_id,
-            )
-            .first()
-        )
-
-    def _merge_person_event(
-        self,
-        event: SafetyEvent,
-        event_in: EventCreate,
-        occurrence_ids: list[str],
-    ) -> SafetyEvent:
-        conflicts = [item for item in self._events_for_occurrences(occurrence_ids) if item.id != event.id]
-        if conflicts:
-            raise EventConflictError("One or more occurrences already belong to another event")
-        existing_ids = set(event.occurrence_ids)
-        for occurrence_id in occurrence_ids:
-            if occurrence_id not in existing_ids:
-                event.occurrences.append(EventOccurrence(occurrence_id=occurrence_id))
-        existing_details = event.details or {}
-        incoming_details = event_in.details or {}
-        violations = sorted(set(existing_details.get("violations", [])) | set(incoming_details.get("violations", [])))
-        event.details = {**existing_details, **incoming_details, "violations": violations}
-        event.status = event_in.status
-        event.acknowledged_by = event_in.acknowledged_by or event.acknowledged_by
-        if event_in.status in {"acknowledged", "false_alarm"}:
-            event.acknowledged_at = datetime.now(UTC)
-        try:
-            self.db.commit()
-        except IntegrityError as exc:
-            self.db.rollback()
-            raise EventConflictError("One or more occurrences already belong to another event") from exc
-        except Exception as exc:
-            self.db.rollback()
-            raise EventPersistenceError("Could not update the person's event") from exc
-        event._was_created = False
-        return event
 
     def create_batch(self, batch_in: EventBatchCreate) -> tuple[str, str | None, list[SafetyEvent]]:
         occurrence_ids = [str(value) for item in batch_in.events for value in item.occurrence_ids]
         existing = self._events_for_occurrences(occurrence_ids)
         retried = self._matching_batch_retry(existing, batch_in)
         if retried is not None:
-            for event in retried[2]:
-                event._was_created = False
             return retried
         if existing:
             raise EventConflictError("One or more occurrences already belong to another event")
@@ -200,8 +156,6 @@ class EventService:
             existing = self._events_for_occurrences(occurrence_ids)
             retried = self._matching_batch_retry(existing, batch_in)
             if retried is not None:
-                for event in retried[2]:
-                    event._was_created = False
                 return retried
             raise EventConflictError("One or more occurrences already belong to another event") from exc
         except Exception as exc:
@@ -209,8 +163,6 @@ class EventService:
             if snapshot_path:
                 self._snapshot_file(snapshot_path).unlink(missing_ok=True)
             raise EventPersistenceError("Could not save the event batch to the database") from exc
-        for event in events:
-            event._was_created = True
         return batch_id, snapshot_path, events
 
     @staticmethod
@@ -270,7 +222,6 @@ class EventService:
             and event.status == event_in.status
             and event.monitoring_session_id
             == (str(event_in.monitoring_session_id) if event_in.monitoring_session_id else None)
-            and event.track_id == event_in.track_id
         )
 
     def _save_snapshot(
@@ -299,6 +250,11 @@ class EventService:
                 for person in snapshot_people
             ]
             redaction = self._snapshot_redactor(frame, people)
+            record_operational_event(
+                "privacy_redaction_completed",
+                outcome=_privacy_redaction_outcome(redaction),
+                error_kind="yunet_inference_failed" if redaction["face_detector_failed"] else None,
+            )
             annotated = self._snapshot_annotator(
                 redaction["image"],
                 people,
@@ -325,7 +281,7 @@ class EventService:
         frame: np.ndarray,
         people: list[SnapshotPerson],
     ) -> PrivacyRedactionResult:
-        return get_privacy_vision_adapter().redact_snapshot(frame, people)
+        return get_configured_privacy_vision_adapter().redact_snapshot(frame, people)
 
     @staticmethod
     def _default_snapshot_annotator(
@@ -333,7 +289,7 @@ class EventService:
         people: list[SnapshotPerson],
         detections: list[ModelDetection],
     ) -> np.ndarray:
-        return get_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
+        return get_configured_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
 
     def _snapshot_file(self, snapshot_path: str) -> Path:
         return self._snapshot_dir / Path(snapshot_path).name

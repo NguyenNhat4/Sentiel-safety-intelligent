@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict
 
 import numpy as np
 
+from vision.face_detection import FaceDetector, YuNetFaceDetector
 from vision.pipeline import (
     ModelDetection,
     PrivacyRedactionResult,
     SnapshotPerson,
     annotate_snapshot,
+    redact_identity_regions,
     redact_person_head_regions,
 )
+
+logger = logging.getLogger(__name__)
 
 CanonicalPerson = tuple[int, int, int, int, float, int]
 
@@ -334,14 +339,49 @@ class PpeVisionFacade:
 
 
 class PrivacyRedactionFacade:
-    """Redacts identity from canonical person boxes without loading a PPE model."""
+    """Redacts YuNet faces with a per-person conservative fallback."""
 
-    @staticmethod
+    def __init__(
+        self,
+        model_path: str | None = None,
+        *,
+        score_threshold: float = 0.6,
+        face_margin_ratio: float = 0.2,
+        face_detector: FaceDetector | None = None,
+    ) -> None:
+        self._face_detector = face_detector or (
+            YuNetFaceDetector(model_path, score_threshold=score_threshold) if model_path is not None else None
+        )
+        self._face_margin_ratio = face_margin_ratio
+
+    def preload(self) -> None:
+        if self._face_detector is not None:
+            self._face_detector.preload()
+
     def redact_snapshot(
+        self,
         frame: np.ndarray,
         people: list[SnapshotPerson],
     ) -> PrivacyRedactionResult:
-        return redact_person_head_regions(frame, people)
+        if self._face_detector is None:
+            return redact_person_head_regions(frame, people)
+        detector_failed = False
+        try:
+            faces = self._face_detector.detect(frame)
+        except Exception as exc:
+            detector_failed = True
+            faces = []
+            logger.warning(
+                "YuNet face detection failed; using person-head fallback (%s).",
+                type(exc).__name__,
+            )
+        return redact_identity_regions(
+            frame,
+            people,
+            faces,
+            face_margin_ratio=self._face_margin_ratio,
+            face_detector_failed=detector_failed,
+        )
 
     @staticmethod
     def annotate_snapshot(
