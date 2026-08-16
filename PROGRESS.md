@@ -4,6 +4,11 @@
 - The machine control is now always enabled, including before a zone is created or selected. Its state is sent as a camera-wide WebSocket configuration value and immediately refreshes the active inference configuration.
 - Zone intrusion remains independent of machine state. The camera-wide state now controls only PPE evaluation, so a stopped machine suppresses PPE alerts consistently across all zones.
 
+## 2026-08-16: [Documentation] Separate task routing from developer onboarding
+- [x] Moved repository task-routing and documentation-index responsibility to root `context-map.md`.
+- [x] Rewrote root `README.md` for setup, environment variables, local sample requests, Docker smoke, and checks.
+- [x] Updated the mandatory workflow and current-structure documentation to reference the new context map.
+
 ## 2026-08-16: [Frontend] Align danger-zone UI copy and event metadata with the active rule
 - The monitor review pop-up, alert summary and confirmed-event history now say **Có người vào vùng cấm** for either machine state; the machine state remains visible only as operating context.
 - The legacy single-event fallback now writes the canonical `zone_intrusion` event type, matching the existing backend event contract. Focused popup tests cover a stopped-machine zone intrusion.

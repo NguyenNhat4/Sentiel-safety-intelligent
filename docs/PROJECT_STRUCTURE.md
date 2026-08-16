@@ -130,7 +130,7 @@ P-047/
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
 │   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
-├── docs/                # Problem statement, structure docs, technical guides and documentation index
+├── docs/                # Problem statement, structure docs and technical guides
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
@@ -174,6 +174,7 @@ P-047/
 │   ├── services/        # Legacy LLM factory
 │   └── ui/              # Legacy static UI
 ├── DECISIONS.md         # Single project-wide design decision log
+├── context-map.md       # Single repository context map and documentation index
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
 ├── tests/                # Cross-cutting and automation tests

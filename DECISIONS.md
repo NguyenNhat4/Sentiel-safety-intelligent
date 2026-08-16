@@ -200,10 +200,16 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Constraints:** The modular-monolith ownership and dependency direction in `docs/FUTURE_PROJECT_STRUCTURE.md` remain authoritative. Executable definitions remain runtime contract truth; architecture prose cannot silently change them.
 - **Safety consequences:** Vision emits observations, deterministic backend rules own severity/event lifecycle, LLM output is advisory, and unredacted evidence must never be persisted.
 
+## 2026-08-16: [Cross-cutting] Root context map is separate from setup README
+- **Reason:** Contributors need concise setup, environment-variable and sample-request guidance, while agents need a stable task-routing context map.
+- **Choice:** `context-map.md` is the sole repository documentation index and mandatory starting point. `README.md` is the operational onboarding guide and links back to the map. `AGENTS.md` and the current-structure document use the new location.
+- **Constraint:** Do not add another documentation catalog; update `context-map.md` when task-routing documentation changes.
+
 ## 2026-08-06: [Cross-cutting] Root README is the only documentation index
 - **Reason:** Layered catalogs and cross-document links create competing navigation paths and make documentation depend on file placement outside its own scope.
 - **Choice:** Only the root repository README indexes documentation. All other documents are standalone and do not link to one another; the agent workflow file is the sole exception because it must load mandatory context.
 - **Constraint:** Moving or adding documentation requires updating the root index. The approved read-only structure baseline is not rewritten solely to remove its existing historical links.
+- **Superseded by:** 2026-08-16 "Root context map is separate from setup README".
 
 ## 2026-08-06: [Cross-cutting] Persist PPE requirements as a rules-owned resource
 - **Reason:** Safety Officers configure required helmet, safety glasses, and gloves once for a camera–zone pair, and every browser/device must use the same saved rule.
