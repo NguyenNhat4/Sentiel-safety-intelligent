@@ -33,12 +33,12 @@ def request(*, with_zone: bool = True) -> FrameInferenceRequest:
 def test_default_inference_uses_only_the_safety_model(monkeypatch):
     monkeypatch.setattr(
         "backend.app.core.config.get_settings",
-        lambda: Settings(ppe_model_path="models/yolo11m_safety.onnx"),
+        lambda: Settings(ppe_model_path="models/yolo11m_safety.pt"),
     )
 
     service = FrameInferenceService()
 
-    assert service._model_path == "models/yolo11m_safety.onnx"
+    assert service._model_path == "models/yolo11m_safety.pt"
 
 
 def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():

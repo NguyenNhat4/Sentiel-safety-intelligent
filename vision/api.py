@@ -72,7 +72,6 @@ class PpeVisionFacade:
                 classes=[0, 3, 4],
                 conf=self._confidence_threshold,
                 verbose=False,
-                device="cpu",
             )[0]
             return self._safety_result(result, require_track_ids=False)
 
@@ -88,7 +87,6 @@ class PpeVisionFacade:
             classes=[0, 3, 4],
             conf=self._confidence_threshold,
             verbose=False,
-            device="cpu",
         )[0]
         return self._safety_result(result, require_track_ids=True)
 
@@ -193,7 +191,6 @@ class PpeVisionFacade:
             classes=[0, 3, 4],
             conf=self._confidence_threshold,
             verbose=False,
-            device="cpu",
         )[0]
         names = result.names
         selected_boxes: list[tuple[int, str, list[int], float]] = []
@@ -237,13 +234,9 @@ class PpeVisionFacade:
     def _create_model(self) -> Any:
         if self._model_factory is not None:
             return self._model_factory(self._model_path)
-        if Path(self._model_path).suffix.lower() != ".onnx":
-            raise RuntimeError(
-                "Safety inference requires an ONNX checkpoint; set PPE_MODEL_PATH to models/yolo11m_safety.onnx"
-            )
         from ultralytics import YOLO
 
-        return YOLO(str(Path(self._model_path)), task="detect")
+        return YOLO(str(Path(self._model_path)))
 
     def _expire_sessions(self, now: float) -> None:
         expired = [
@@ -274,7 +267,9 @@ class PpeVisionFacade:
             index: str(name) for index, name in dict(enumerate(names) if isinstance(names, list) else names).items()
         }
         if normalized != cls.SOURCE_CLASS_NAMES:
-            raise RuntimeError(f"Safety ONNX class mapping must be {cls.SOURCE_CLASS_NAMES}, received {normalized}")
+            raise RuntimeError(
+                f"yolo11m_safety.pt class mapping must be {cls.SOURCE_CLASS_NAMES}, received {normalized}"
+            )
 
     @staticmethod
     def _canonical_people(

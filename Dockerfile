@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         torch==2.9.1+cpu torchvision==0.24.1+cpu && \
     /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
         -r requirements.docker.txt && \
-    /opt/venv/bin/python -c "import onnxruntime; import torch, torchvision; from ultralytics import YOLO; print(onnxruntime.__version__, torch.__version__, torchvision.__version__, YOLO.__name__)"
+    /opt/venv/bin/python -c "import torch, torchvision; from ultralytics import YOLO; print(torch.__version__, torchvision.__version__, YOLO.__name__)"
 
 # ---- Stage 3: Production ----
 FROM python:3.11-slim
@@ -43,7 +43,7 @@ COPY backend ./backend
 COPY vision ./vision
 COPY scripts ./scripts
 COPY alembic.ini ./
-COPY models/yolo11m_safety.onnx ./models/
+COPY models/yolo11m_safety.pt ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with correct ownership

@@ -26,13 +26,8 @@
 - `docker-compose.yml` loads `.env.development` and starts a dedicated disposable PostgreSQL service; only `DATABASE_URL` is redirected away from the developer-configured database.
 - Once the database healthcheck succeeds, the container runs migrations, starts in development mode, and idempotently seeds demo users; remaining application variables still come from `.env.development`.
 
-## 2026-08-16: [Vision/Backend] Migrate Safety inference to ONNX Runtime
-- Production settings, environment templates, Docker and startup validation now use the pinned `models/yolo11m_safety.onnx`; the existing `.pt` is export-only and no runtime fallback is accepted.
-- Added the controlled exporter, LFS tracking, ONNX Runtime dependency, CPU provider smoke evidence and an onboarding guide explaining purpose, reproduction, limits and rollback.
-- Explicitly pass `device="cpu"` on the facade predict/track calls so CUDA-capable developer machines do not make Ultralytics request `onnxruntime-gpu`; focused vision regression passes.
-
 ## 2026-08-15: [Vision/Backend] Restore single YOLO11m Safety deployment artifact
-- Historical: this deployment artifact was later superseded by the pinned ONNX runtime artifact above.
+- Production image, Compose and hosted environment examples now use only the pinned `models/yolo11m_safety.pt`; startup verifies its approved SHA-256 before serving traffic.
 - Removed stale `PERSON_MODEL_PATH`, YOLO11n and SH17 PPE artifact wiring from the active deployment path, preventing a wrongly named checkpoint from reaching inference.
 
 ## 2026-08-13: [Backend] Analysis PPE requirement loading uses the request database session
@@ -43,7 +38,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ## Current State
 - `/health` is ready only when runtime models are initialized, the selected database is live PostgreSQL (not SQLite fallback), and the configured S3 bucket answers `HeadBucket`; degraded responses identify the unavailable dependency without exposing provider details or credentials.
-- Runtime frame inference now uses only `models/yolo11m_safety.onnx`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest through ONNX Runtime; YOLO11n is no longer loaded or called.
+- Runtime frame inference now uses only `models/yolo11m_safety.pt`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest; YOLO11n is no longer loaded or called.
 - Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
 - New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
 - The current MVP and two-command developer workflow default to SQLite. PostgreSQL remains supported through an explicit `DATABASE_URL`; runtime fallback and `/health` backend reporting from `develop2` are preserved.

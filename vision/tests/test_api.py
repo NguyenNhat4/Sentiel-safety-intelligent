@@ -24,7 +24,7 @@ def test_ppe_facade_exposes_only_canonical_person_hat_and_vest():
         def __init__(self):
             self.calls = 0
 
-        def predict(self, frame, classes, conf, verbose, device):
+        def predict(self, frame, classes, conf, verbose):
             self.calls += 1
             assert classes == [0, 3, 4]
             result = type("Result", (), {})()
@@ -82,7 +82,7 @@ def test_stateless_safety_analysis_uses_model_person_as_canonical_in_one_call():
     assert result["canonical_people"] == [(10, 10, 30, 80, 0.92, 1)]
     assert result["people"][0]["vest"] == {"status": "present", "confidence": 0.84}
     assert [item["class_name"] for item in result["detections"]] == ["person", "vest"]
-    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.35, "verbose": False, "device": "cpu"}]
+    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.35, "verbose": False}]
 
 
 def test_ppe_facade_keeps_unassociated_hat_when_no_person_is_detected():
@@ -94,7 +94,7 @@ def test_ppe_facade_keeps_unassociated_hat_when_no_person_is_detected():
     class FakeModel:
         names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
 
-        def predict(self, frame, classes, conf, verbose, device):
+        def predict(self, frame, classes, conf, verbose):
             result = type("Result", (), {})()
             result.names = self.names
             result.boxes = [FakeBox()]
@@ -123,7 +123,7 @@ def test_ppe_model_person_supports_association_without_replacing_canonical_perso
     class FakeModel:
         names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
 
-        def predict(self, frame, classes, conf, verbose, device):
+        def predict(self, frame, classes, conf, verbose):
             result = type("Result", (), {})()
             result.names = self.names
             result.boxes = [
@@ -174,11 +174,4 @@ def test_ppe_facade_requires_exact_checkpoint_label_casing():
     facade._model = FakeModel()
 
     with np.testing.assert_raises_regex(RuntimeError, "class mapping"):
-        facade.preload()
-
-
-def test_runtime_facade_rejects_a_pytorch_checkpoint() -> None:
-    facade = PpeVisionFacade("models/yolo11m_safety.pt")
-
-    with np.testing.assert_raises_regex(RuntimeError, "ONNX checkpoint"):
         facade.preload()

@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # Video & Model paths
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
-    ppe_model_path: str = "models/yolo11m_safety.onnx"
+    ppe_model_path: str = "models/yolo11m_safety.pt"
     violation_frame: int = Field(default=5, ge=1, le=60)
     # Local commands load development defaults. Docker and managed platforms pass
     # production settings as process environment variables.
