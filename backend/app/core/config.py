@@ -72,7 +72,11 @@ class Settings(BaseSettings):
     ppe_alert_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
-    model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env.development", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     def validate_snapshot_storage(self) -> None:
         if self.snapshot_storage_backend != "s3":
