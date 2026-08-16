@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Nguyễn Minh Nhật", email = "123147485+NguyenNhat4@users.noreply.github.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "alembic>=1.14.0",
     "boto3>=1.43.70",

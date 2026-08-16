@@ -8,6 +8,11 @@ Tài liệu này chi tiết hóa cấu trúc thư mục hiện tại của dự 
 
 ```text
 P-047/
+├── .github/             # GitHub Actions CI, Railway deploy/rollback and dependency audit
+│   └── workflows/
+│       ├── ci.yml        # Required PR/main checks and Docker Hub :latest publication
+│       ├── deploy-railway.yml # CI-gated Railway image redeploy and health verification
+│       └── dependency-audit.yml # Non-blocking nightly dependency audit
 ├── alembic.ini          # Alembic entrypoint for backend migrations
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
@@ -138,6 +143,7 @@ P-047/
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
+│   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md

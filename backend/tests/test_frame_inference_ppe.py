@@ -94,19 +94,14 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     assert [item.class_name for item in result.detections] == ["person", "hat"]
 
 
-def test_preload_models_warms_person_ppe_and_tracking_models(monkeypatch):
-    service = FrameInferenceService(
-        person_model_path="unused.pt",
-        ppe_observer=lambda frame, people: {"people": [], "detections": []},
-    )
+def test_preload_models_warms_the_unified_safety_model(monkeypatch):
+    service = FrameInferenceService(model_path="unused.pt")
     loaded = []
-    monkeypatch.setattr(service, "_load_person_model", lambda: loaded.append("person"))
-    monkeypatch.setattr(service, "_ppe_preloader", lambda: loaded.append("ppe"))
-    monkeypatch.setattr(service._person_tracker, "preload", lambda: loaded.append("tracking"))
+    monkeypatch.setattr(service, "_model_preloader", lambda: loaded.append("unified"))
 
     service.preload_models()
 
-    assert loaded == ["person", "ppe", "tracking"]
+    assert loaded == ["unified"]
 
 
 def test_required_explicitly_missing_ppe_requests_review():

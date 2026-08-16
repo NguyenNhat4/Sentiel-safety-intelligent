@@ -54,6 +54,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Khi cần | Đọc tài liệu/nguồn |
 |---|---|
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
+| Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/CI_CD.md) |
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |
