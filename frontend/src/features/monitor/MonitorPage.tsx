@@ -124,8 +124,8 @@ export function MonitorPage() {
         detections={state.pendingViolation?.detections}
         timer={state.timer}
         reviewSaving={state.reviewSaving}
-        alertTitle={state.view.alertTitle}
-        alertSummary={state.view.alertSummary}
+        alertTitle={state.reviewAlertTitle}
+        alertSummary={state.reviewAlertSummary}
         onReview={status => void actions.review(status)}
       />
 

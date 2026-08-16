@@ -129,6 +129,9 @@ export function useMonitor() {
   const machineRunningRef = useRef(true);
   const [pendingViolation, setPendingViolation] = useState<InferenceResult | null>(null);
   const pendingViolationRef = useRef<InferenceResult | null>(null);
+  const activeReviewLogIdRef = useRef<string | null>(null);
+  const activeReviewIsPpeOnlyRef = useRef(false);
+  const [reviewLogCopy, setReviewLogCopy] = useState<{title: string; detail: string} | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -220,6 +223,9 @@ export function useMonitor() {
     const violation = result.result === "violate";
     const humanReview = buildHumanReviewState(result);
     const newLogs = buildHitlLogEntries(result);
+    const presentPersonLogIds = new Set(
+      result.people.map((person, index) => personLogId(result, person.track_id ?? index + 1)),
+    );
     const criticalCount = newLogs.filter(entry => entry.tone === "critical").length;
     const ppeCount = newLogs.filter(entry => entry.tone === "warning").length;
     const activeAlertTitle = criticalCount > 0
@@ -228,31 +234,24 @@ export function useMonitor() {
     const activeAlertSummary = criticalCount > 0
       ? "Có người trong vùng cấm khi máy đang chạy. Streaming vẫn tiếp tục; chọn log để xem đúng khung hình."
       : "Thiếu mũ hoặc áo đã được xác nhận qua nhiều khung hình. Chọn log để xem đúng người và khung hình.";
-    setHitlLogs(current => {
-      const incomingById = new Map(newLogs.map(log => [log.id, log]));
-      const updated = current.map(existing => {
-        const incoming = incomingById.get(existing.id);
-        if (!incoming) return existing;
-        incomingById.delete(existing.id);
-        const violationKeys = [...new Set([...(existing.violationKeys ?? []), ...(incoming.violationKeys ?? [])])];
-        const tone: HitlLogEntry["tone"] = violationKeys.some(
-          key => key.startsWith("zone_intrusion") || key === "restricted_area_person"
-        ) ? "critical" : "warning";
-        return {
-          ...existing,
-          tone,
-          title: buildViolationTitle(violationKeys),
-          detail: incoming.detail,
-          violationKeys,
-          hasNewOccurrence: incoming.hasNewOccurrence,
-          reviewStatus: incoming.hasNewOccurrence ? "pending" : existing.reviewStatus,
-          reviewResult: incoming.hasNewOccurrence && incoming.reviewResult?.snapshot_data
-            ? incoming.reviewResult
-            : existing.reviewResult,
-        };
-      });
-      return [...incomingById.values(), ...updated];
-    });
+    const activeReviewLogId = activeReviewLogIdRef.current;
+    const activeIncomingLog = newLogs.find(log => log.id === activeReviewLogId);
+    const activeReviewChanged = Boolean(
+      activeReviewLogId
+      && activeReviewIsPpeOnlyRef.current
+      && presentPersonLogIds.has(activeReviewLogId)
+      && (!activeIncomingLog || activeIncomingLog.title !== reviewLogCopy?.title),
+    );
+    setHitlLogs(current => reconcileHitlLogs(current, newLogs, presentPersonLogIds));
+    if (activeReviewChanged) {
+      activeReviewLogIdRef.current = null;
+      activeReviewIsPpeOnlyRef.current = false;
+      pendingViolationRef.current = null;
+      setPendingViolation(null);
+      setIsReviewModalOpen(false);
+      setReviewStartedAt(null);
+      setReviewLogCopy(null);
+    }
     setView(current => ({
       ...current,
       violation,
@@ -539,7 +538,20 @@ export function useMonitor() {
       setPendingViolation(selectedLog.reviewResult);
       setReviewStartedAt(Date.now());
     }
+    activeReviewLogIdRef.current = logId;
+    activeReviewIsPpeOnlyRef.current = Boolean(
+      selectedLog?.violationKeys?.length
+      && selectedLog.violationKeys.every(key => key.startsWith("missing_ppe:")),
+    );
+    setReviewLogCopy(selectedLog ? {title: selectedLog.title, detail: selectedLog.detail} : null);
     setIsReviewModalOpen(true);
+  }
+
+  function closeReviewModal(): void {
+    activeReviewLogIdRef.current = null;
+    activeReviewIsPpeOnlyRef.current = false;
+    setReviewLogCopy(null);
+    setIsReviewModalOpen(false);
   }
 
   function stopPreviewPlayback(): void {
@@ -725,6 +737,9 @@ export function useMonitor() {
         ? {...log, reviewStatus: "reviewed", hasNewOccurrence: false}
         : log));
       pendingViolationRef.current = null;
+      activeReviewLogIdRef.current = null;
+      activeReviewIsPpeOnlyRef.current = false;
+      setReviewLogCopy(null);
       setPendingViolation(null);
       setIsReviewModalOpen(false);
       setReviewStartedAt(null);
@@ -742,13 +757,15 @@ export function useMonitor() {
   const selectedZone = zones.find(zone => zone.zone_id === selectedZoneId);
   const selectedPointPosition = selectedPoint === null ? undefined : selectedZone?.points[selectedPoint];
   const timer = useReviewTimer(reviewStartedAt);
+  const reviewAlertTitle = reviewLogCopy?.title ?? view.alertTitle;
+  const reviewAlertSummary = reviewLogCopy?.detail ?? view.alertSummary;
 
   return {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
       zones, zoneRevision, zoneHydrated, selectedZoneId, selectedZone, drawingZoneId, newDraftZoneId, zoneSaving,
       machineRunning: selectedZone ? selectedZone.machine_state === "running" : machineRunning,
-      pendingViolation, isReviewModalOpen, reviewSaving, view,
+      pendingViolation, isReviewModalOpen, reviewSaving, view, reviewAlertTitle, reviewAlertSummary,
       pendingReviewCounts: {critical: pendingCriticalLogs, other: pendingPpeLogs},
       hitlLogs,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
@@ -768,7 +785,7 @@ export function useMonitor() {
       handlePointerDown, handlePointerMove,
       handlePointerUp, deleteSelectedPoint, review,
       openReviewLog,
-      closeReviewModal: () => setIsReviewModalOpen(false),
+      closeReviewModal,
     }
   };
 }
@@ -844,7 +861,7 @@ export function buildHitlLogEntries(result: InferenceResult): HitlLogEntry[] {
     const missingLabel = missingPpe.map(item => ppeLabel[item]).join(" và ");
     const violationKeys = [...new Set(violations.map(entry => entry.rule_key))];
     entries.push({
-      id: `${result.monitoring_session_id ?? "session"}:person:${person.track_id ?? index + 1}`,
+      id: personLogId(result, person.track_id ?? index + 1),
       tone: hasZoneIntrusion || hasRestrictedAreaAlert ? "critical" : "warning",
       title: hasRestrictedAreaAlert
         ? `Phát hiện người trong phạm vi camera${missingLabel ? ` · thiếu ${missingLabel}` : ""}`
@@ -865,6 +882,102 @@ export function buildHitlLogEntries(result: InferenceResult): HitlLogEntry[] {
     });
   });
   return entries;
+}
+
+function personLogId(result: InferenceResult, trackId: number): string {
+  return `${result.monitoring_session_id ?? "session"}:person:${trackId}`;
+}
+
+function isPpeViolation(ruleKey: string): boolean {
+  return ruleKey.startsWith("missing_ppe:");
+}
+
+export function reconcileHitlLogs(
+  current: HitlLogEntry[],
+  incomingLogs: HitlLogEntry[],
+  presentPersonLogIds: Set<string>,
+): HitlLogEntry[] {
+  const incomingById = new Map(incomingLogs.map(log => [log.id, log]));
+  const updated = current.flatMap(existing => {
+    const incoming = incomingById.get(existing.id);
+    if (!incoming) {
+      if (existing.reviewStatus !== "pending" || !presentPersonLogIds.has(existing.id)) return [existing];
+      const violationKeys = (existing.violationKeys ?? []).filter(key => !isPpeViolation(key));
+      if (violationKeys.length === 0) return [];
+      if (violationKeys.length === (existing.violationKeys ?? []).length) return [existing];
+      return [{
+        ...existing,
+        title: buildViolationTitle(violationKeys),
+        violationKeys,
+        reviewResult: filterReviewResult(existing.reviewResult, violationKeys),
+      }];
+    }
+    incomingById.delete(existing.id);
+    const violationKeys = existing.reviewStatus === "pending"
+      ? [...new Set([
+          ...(existing.violationKeys ?? []).filter(key => !isPpeViolation(key)),
+          ...(incoming.violationKeys ?? []),
+        ])]
+      : [...new Set([...(existing.violationKeys ?? []), ...(incoming.violationKeys ?? [])])];
+    const reviewResult = existing.reviewStatus === "pending"
+      ? refreshPendingReviewResult(existing.reviewResult, incoming.reviewResult, violationKeys)
+      : incoming.hasNewOccurrence && incoming.reviewResult?.snapshot_data
+      ? incoming.reviewResult
+      : existing.reviewResult;
+    const tone: HitlLogEntry["tone"] = violationKeys.some(
+      key => key.startsWith("zone_intrusion") || key === "restricted_area_person"
+    ) ? "critical" : "warning";
+    return [{
+      ...existing,
+      tone,
+      title: buildViolationTitle(violationKeys),
+      detail: incoming.detail,
+      violationKeys,
+      hasNewOccurrence: incoming.hasNewOccurrence,
+      reviewStatus: incoming.hasNewOccurrence ? "pending" : existing.reviewStatus,
+      reviewResult,
+    }];
+  });
+  return [...incomingById.values(), ...updated];
+}
+
+function refreshPendingReviewResult(
+  existing: InferenceResult | undefined,
+  incoming: InferenceResult | undefined,
+  violationKeys: string[],
+): InferenceResult | undefined {
+  if (!incoming) return existing;
+  const retainedRules = new Set(violationKeys);
+  const existingNonPpeViolations = existing?.people[0]?.active_violations?.filter(
+    violation => !isPpeViolation(violation.rule_key) && retainedRules.has(violation.rule_key),
+  ) ?? [];
+  return {
+    ...incoming,
+    snapshot_data: existing?.snapshot_data ?? incoming.snapshot_data,
+    people: incoming.people.map(person => ({
+      ...person,
+      active_violations: [...new Map(
+        [...existingNonPpeViolations, ...(person.active_violations ?? [])]
+          .filter(violation => retainedRules.has(violation.rule_key))
+          .map(violation => [violation.rule_key, {...violation, is_new: true}]),
+      ).values()],
+    })),
+  };
+}
+
+function filterReviewResult(
+  result: InferenceResult | undefined,
+  violationKeys: string[],
+): InferenceResult | undefined {
+  if (!result) return result;
+  const retainedRules = new Set(violationKeys);
+  return {
+    ...result,
+    people: result.people.map(person => ({
+      ...person,
+      active_violations: person.active_violations?.filter(violation => retainedRules.has(violation.rule_key)),
+    })),
+  };
 }
 
 function buildViolationTitle(violationKeys: string[]): string {

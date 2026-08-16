@@ -135,7 +135,7 @@ def test_track_handoff_after_lost_grace_opens_a_new_occurrence():
 
 
 def test_tracks_and_rules_have_independent_occurrences():
-    service = ViolationTrackingService(ppe_confirmation_seconds=0)
+    service = ViolationTrackingService(ppe_confirmation_frames=1)
     result = service.evaluate(
         "session-a",
         {4: {"zone_intrusion", "missing_ppe:hat"}, 9: {"zone_intrusion"}},
@@ -146,16 +146,111 @@ def test_tracks_and_rules_have_independent_occurrences():
     assert len({item.occurrence_id for items in result.values() for item in items}) == 3
 
 
-def test_ppe_candidate_requires_continuous_absence_before_opening_occurrence():
-    service = ViolationTrackingService(ppe_confirmation_seconds=2.0)
+def test_ppe_candidate_requires_six_consecutive_missing_frames_before_opening_occurrence():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
 
-    assert service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=0.0)[4] == []
-    assert service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=1.9)[4] == []
-    opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=2.0)[4]
+    for frame in range(5):
+        assert service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=float(frame))[4] == []
+    opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=5.0)[4]
 
     assert len(opened) == 1
     assert opened[0].rule_key == "missing_ppe:hat"
     assert opened[0].is_new is True
+
+
+def test_unreviewed_ppe_log_requires_two_continuous_present_seconds_to_retract():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+
+    for frame in range(5):
+        service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=float(frame))
+    opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=5.0)[4][0]
+    for now in (6.0, 6.4, 6.8, 7.2, 7.99):
+        still_active = service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=now)[4]
+        assert still_active[0].occurrence_id == opened.occurrence_id
+    retracted = service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=8.0)[4]
+
+    assert opened.is_new is True
+    assert retracted == []
+
+
+def test_missing_ppe_stays_active_without_an_explicit_present_observation():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+
+    for frame in range(5):
+        service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=float(frame))
+    opened = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=5.0)[4][0]
+    later_result = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=6.0)[4][0]
+
+    assert later_result.occurrence_id == opened.occurrence_id
+    assert later_result.is_new is False
+
+
+def test_each_present_ppe_item_retracts_only_its_own_warning_after_two_seconds():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+    both_missing = {4: {"missing_ppe:hat", "missing_ppe:vest"}}
+
+    for frame in range(5):
+        service.evaluate("session-a", both_missing, {4}, now=float(frame))
+    opened = service.evaluate("session-a", both_missing, {4}, now=5.0)[4]
+    for now in (6.0, 6.5, 7.0, 7.99):
+        pending = service.evaluate(
+            "session-a",
+            {4: {"missing_ppe:vest"}},
+            {4},
+            ppe_present_items={4: {"hat"}},
+            now=now,
+        )[4]
+        assert {item.rule_key for item in pending} == {"missing_ppe:hat", "missing_ppe:vest"}
+    updated = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, ppe_present_items={4: {"hat"}}, now=8.0)[4]
+
+    assert {item.rule_key for item in opened} == {"missing_ppe:hat", "missing_ppe:vest"}
+    assert [item.rule_key for item in updated] == ["missing_ppe:vest"]
+
+
+def test_unknown_ppe_does_not_retract_an_active_warning():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+
+    for frame in range(5):
+        service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=float(frame))
+    opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=5.0)[4][0]
+    unknown_result = service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: set()}, now=5.1)[4][0]
+
+    assert unknown_result.occurrence_id == opened.occurrence_id
+
+
+def test_unknown_or_missing_resets_the_two_second_present_retraction_window():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+
+    for frame in range(6):
+        opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=float(frame))[4]
+    occurrence_id = opened[0].occurrence_id
+    service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=6.0)
+    service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=7.99)
+    service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: set()}, now=8.0)
+    for now in (8.1, 9.0, 10.09):
+        still_active = service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=now)[4]
+        assert still_active[0].occurrence_id == occurrence_id
+    assert service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=10.1)[4] == []
+
+
+def test_two_second_ppe_retraction_is_isolated_by_track_id():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
+    missing = {4: {"missing_ppe:hat"}, 9: {"missing_ppe:hat"}}
+
+    for frame in range(5):
+        service.evaluate("session-a", missing, {4, 9}, now=float(frame))
+    opened = service.evaluate("session-a", missing, {4, 9}, now=5.0)
+    for now in (6.0, 7.0, 8.0):
+        updated = service.evaluate(
+            "session-a",
+            {4: set(), 9: {"missing_ppe:hat"}},
+            {4, 9},
+            ppe_present_items={4: {"hat"}},
+            now=now,
+        )
+
+    assert updated[4] == []
+    assert updated[9][0].occurrence_id == opened[9][0].occurrence_id
 
 
 def test_zone_debounce_does_not_delay_a_restricted_area_alert():
@@ -169,13 +264,17 @@ def test_zone_debounce_does_not_delay_a_restricted_area_alert():
     assert {item.rule_key for item in opened} == {"zone_intrusion", "restricted_area_person"}
 
 
-def test_ppe_candidate_is_cancelled_when_later_frame_confirms_item_present():
-    service = ViolationTrackingService(ppe_confirmation_seconds=2.0)
+def test_ppe_candidate_restarts_after_the_missing_sequence_is_interrupted():
+    service = ViolationTrackingService(ppe_confirmation_frames=6)
 
-    service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=0.0)
-    # No observed missing rule means the later frame established present/unknown.
-    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
-    assert service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=2.1)[4] == []
-    opened = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=4.2)[4]
+    for frame in range(5):
+        service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=float(frame))
+    service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"vest"}}, now=5.0)
+    assert service._confirmed_ppe_items[("session-a", 4)] == {"vest"}
+    for frame in range(6, 11):
+        assert service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=float(frame))[4] == []
+    assert service._confirmed_ppe_items[("session-a", 4)] == {"vest"}
+    opened = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=11.0)[4]
 
     assert opened[0].is_new is True
+    assert service._confirmed_ppe_items[("session-a", 4)] == set()

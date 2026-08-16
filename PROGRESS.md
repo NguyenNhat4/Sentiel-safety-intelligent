@@ -15,9 +15,16 @@
 - [x] Added `docs/architecture_diagram.md` with Mermaid component and runtime data-flow diagrams; the root architecture document remains the canonical boundary and invariant reference.
 - [x] Replaced the nested sequence diagram with a render-compatible flowchart covering WebSocket backpressure, four-frame debounce, redaction-first snapshot handling and fail-closed persistence.
 
+## 2026-08-16: [Cross-cutting] Human-authoritative PPE log reconciliation
+- A missing-PPE log is reviewable after six consecutive missing frames and opens its modal only when the Safety Officer clicks it.
+- The review modal now displays the selected log's saved title/detail instead of the latest live-frame status.
+- AI updates remain isolated per monitoring-session TrackID and per PPE item. Before a log exists, one explicit present observation resets its pending missing sequence. After a log exists, explicit presence must continue for two seconds before retracting only that item's warning; `missing` or `unknown` resets the revoke timer. Six new consecutive missing frames are required to create another warning. Submitted `acknowledged`/`false_alarm` outcomes remain authoritative.
+- Merged the latest `origin/develop2` while preserving its CI/Railway and YuNet privacy changes; reapplied only the branch-owned tracking, HITL, migration compatibility, and PostgreSQL environment behavior removed by the upstream revert.
+- Full equivalent checks pass after merge resolution and the two-second PPE revocation update: 20 root tests, 159 backend/vision tests, 53 frontend tests, lint, type-check, formatting, and production build.
+
 ## 2026-08-16: [Cross-cutting] Zone-intrusion debounce restored
 - A person must remain inside the same active danger zone for four consecutive sampled frames before the backend opens a `zone_intrusion` occurrence.
-- Whole-camera restricted-area alerts remain immediate; missing PPE still requires continuous two-second confirmation.
+- Whole-camera restricted-area alerts remain immediate; missing PPE requires six consecutive sampled frames.
 
 ## 2026-08-15: [Cross-cutting] One accumulated event per tracked person
 - Human-in-the-Loop review now isolates the selected tracked person and saves one `person_safety_violation` event containing every observed hat, vest, restricted-area, and zone rule.
@@ -216,13 +223,14 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Added required monitoring-area assignment for new/updated `area_manager` accounts, Telegram username/chat-ID administration, reversible user-schema migration, and non-blocking area-scoped Telegram delivery for newly opened alerts. Delivery remains disabled until `TELEGRAM_BOT_TOKEN` and recipient chat IDs are configured.
 - [x] [Frontend] Changed HITL counting to pending-review logs rather than current-frame violations. Hat, vest and zone occurrences are consolidated into one log per session track/person; reviewed logs remain visible but leave the pending count, and the eight-log display cap was removed.
 - [x] [Frontend] Aligned HITL logs with review context: person cards now use backend `track_id`, each log retains its own inference snapshot/result and opens that exact frame, while the rule-result title is derived from current active zone/PPE occurrences instead of a hard-coded zone-intrusion message.
-- [x] [Cross-cutting] Reduced transient PPE alerts: backend now confirms missing hat/vest for 2.0 continuous seconds per session track before opening a HITL occurrence; a present/unknown frame cancels the candidate, while forbidden-zone intrusion remains immediate. Frontend logs only confirmed occurrences.
+- [x] [Cross-cutting] Reduced transient PPE alerts: backend creates a clickable review log only after six consecutive missing frames and retracts each matching unreviewed item only after two continuous seconds of explicit presence for the same session TrackID. Human review remains authoritative after submission.
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
 - [ ] Establish final ground truth, qualified-absence evidence and benchmark targets for the hat/vest model before production alerting.
 - [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
 ## Known Issues
-- `ppe_alert_confirm_seconds=2.0` is an MVP starting value and must be calibrated using held-out, representative footage before production use.
+- `ppe_alert_confirm_frames=6` is an MVP starting value and must be calibrated using held-out, representative footage before production use.
+- `ppe_revoke_confirm_seconds=2.0` is also an MVP starting value and requires calibration against intermittent PPE detections.
 - Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - YOLO11m Safety detects presence; backend derives `missing` from qualified absence. Final US-13 ground truth, false-negative/false-alarm evaluation and target-device latency remain release blockers for real alerts.
 - Person-head redaction is a prototype safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.

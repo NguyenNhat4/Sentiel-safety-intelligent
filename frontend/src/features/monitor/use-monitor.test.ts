@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from "vitest";
 import type {InferenceResult} from "../../types";
-import {buildEventBatchPayload, buildEventPayload, buildHitlLogEntries, buildHumanReviewState, buildPpeRule, captureVideoSnapshot} from "./use-monitor";
+import {buildEventBatchPayload, buildEventPayload, buildHitlLogEntries, buildHumanReviewState, buildPpeRule, captureVideoSnapshot, reconcileHitlLogs} from "./use-monitor";
 
 describe("review event payload", () => {
   const pending: InferenceResult = {
@@ -115,6 +115,27 @@ describe("Human-in-the-Loop alert states", () => {
 });
 
 describe("Human-in-the-Loop warning logs", () => {
+  it("retracts only an unreviewed PPE log for the same TrackID", () => {
+    const sessionId = "3cddfe85-9428-44d7-afbf-0cd9e5fc0640";
+    const result: InferenceResult = {
+      type: "inference_result", frame_id: 1, video_time: 2, result: "violate", review_required: true,
+      monitoring_session_id: sessionId, snapshot_data: "data:image/jpeg;base64,AA==",
+      people: [{bbox: [0, 0, 10, 20], confidence: 0.9, inside_zone: false, track_id: 9,
+        ppe: {hat: {status: "missing", confidence: null}, vest: {status: "present", confidence: 0.9}},
+        missing_required_ppe: ["hat"],
+        active_violations: [
+          {occurrence_id: "7aedf540-36da-4cf8-bb9b-8cd7aeab460d", rule_key: "missing_ppe:hat", is_new: true},
+        ]}],
+      rule: {person_inside_zone: false, machine_state: "running", ppe_profile: "hat_vest_v1", camera_id: "uploaded_video", zone_id: "zone_01",
+        ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: true}, ppe_alert: true},
+    };
+    const logs = buildHitlLogEntries(result);
+    const presentIds = new Set([`${sessionId}:person:9`]);
+
+    expect(reconcileHitlLogs(logs, [], presentIds)).toEqual([]);
+    expect(reconcileHitlLogs([{...logs[0], reviewStatus: "reviewed"}], [], presentIds)).toHaveLength(1);
+  });
+
   it("creates one combined warning per person for all missing PPE items", () => {
     const result: InferenceResult = {
       type: "inference_result", frame_id: 1, video_time: 0, result: "violate", review_required: true,
@@ -132,6 +153,26 @@ describe("Human-in-the-Loop warning logs", () => {
     expect(logs.map(entry => entry.title)).toEqual(["Thiếu mũ bảo hộ và áo phản quang"]);
     expect(logs).toHaveLength(1);
     expect(logs[0].reviewResult?.people).toEqual([result.people[0]]);
+
+    const vestOnly: InferenceResult = {
+      ...result,
+      frame_id: 2,
+      review_required: false,
+      snapshot_data: undefined,
+      people: [{
+        ...result.people[0],
+        ppe: {...result.people[0].ppe, hat: {status: "present", confidence: 0.9}},
+        missing_required_ppe: ["vest"],
+        active_violations: [
+          {occurrence_id: "90494038-ea97-405b-830d-75d0b2613826", rule_key: "missing_ppe:vest", is_new: false},
+        ],
+      }],
+    };
+    const reconciled = reconcileHitlLogs(logs, buildHitlLogEntries(vestOnly), new Set(["session:person:9"]));
+
+    expect(reconciled[0].violationKeys).toEqual(["missing_ppe:vest"]);
+    expect(reconciled[0].reviewResult?.snapshot_data).toBe(result.snapshot_data);
+    expect(reconciled[0].reviewResult?.people[0].active_violations?.[0].is_new).toBe(true);
   });
 
   it("keeps hat, vest and zone intrusion in one person event", () => {
@@ -157,6 +198,29 @@ describe("Human-in-the-Loop warning logs", () => {
     expect(payload.details.violations).toEqual([
       "missing_ppe:hat", "missing_ppe:vest", "zone_intrusion:zone_01",
     ]);
+
+    const logs = buildHitlLogEntries(result);
+    const zoneOnly: InferenceResult = {
+      ...result,
+      frame_id: 3,
+      people: [{
+        ...result.people[0],
+        ppe: {hat: {status: "present", confidence: 0.9}, vest: {status: "present", confidence: 0.9}},
+        missing_required_ppe: [],
+        active_violations: [
+          {occurrence_id: "4f6d4ee1-28fd-43a8-b754-736b80fcf742", rule_key: "zone_intrusion:zone_01", zone_id: "zone_01", is_new: false},
+        ],
+      }],
+    };
+    const reconciled = reconcileHitlLogs(
+      logs,
+      buildHitlLogEntries(zoneOnly),
+      new Set([`${result.monitoring_session_id}:person:9`]),
+    );
+
+    expect(reconciled[0].violationKeys).toEqual(["zone_intrusion:zone_01"]);
+    expect(reconciled[0].reviewResult?.people[0].active_violations?.map(item => item.rule_key))
+      .toEqual(["zone_intrusion:zone_01"]);
   });
 });
 

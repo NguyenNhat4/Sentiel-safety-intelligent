@@ -62,7 +62,9 @@ class FrameInferenceService:
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
         self._violation_tracker = ViolationTrackingService(
-            ppe_confirmation_seconds=settings.ppe_alert_confirm_seconds,
+            activation_frames=settings.violation_frame,
+            ppe_confirmation_frames=settings.ppe_alert_confirm_frames,
+            ppe_revoke_confirmation_seconds=settings.ppe_revoke_confirm_seconds,
             zone_activation_frames=settings.zone_alert_confirm_frames,
         )
 
@@ -185,6 +187,18 @@ class FrameInferenceService:
             observed_rules[person.track_id] = rules
 
         if request.monitoring_session_id is not None:
+            required_ppe_items = [
+                item
+                for item, required in (
+                    ("hat", requirements.hat_required),
+                    ("vest", requirements.vest_required),
+                )
+                if required
+            ]
+            ppe_present_items = {
+                person.track_id: {item for item in required_ppe_items if getattr(person.ppe, item).status == "present"}
+                for person in people
+            }
             active = self._violation_tracker.evaluate(
                 str(request.monitoring_session_id),
                 observed_rules,
@@ -192,6 +206,7 @@ class FrameInferenceService:
                 track_positions={
                     person.track_id: (person.foot_point[0] / width, person.foot_point[1] / height) for person in people
                 },
+                ppe_present_items=ppe_present_items,
                 now=now,
             )
             for person in people:
