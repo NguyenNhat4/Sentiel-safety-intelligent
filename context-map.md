@@ -47,7 +47,7 @@ Vision pipeline (YOLO + tracking + zone + privacy)
 PostgreSQL / blurred object storage
 ```
 
-Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md) và [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md).
+Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md). Sơ đồ components và data flow runtime: [System diagrams](docs/architecture_diagram.md).
 
 ## Đọc theo task
 
@@ -61,7 +61,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Đọc frame alert rule và luồng inference | [Alert Rule Contract](docs/alert-rule-contract.md) |
 | Xem tiến độ hoặc quyết định đã chốt | [PROGRESS.md](PROGRESS.md), [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow AI/contributor | [AGENTS.md](AGENTS.md) |
-| Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md), [System diagrams](docs/architecture_diagram.md) |
 | Xem filesystem hiện có | [Current Project Structure](docs/PROJECT_STRUCTURE.md) |
 | Sửa production code | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md), rồi README của owner |
 | Sửa REST/WebSocket payload | FastAPI routes/Pydantic schemas, frontend wire types và test liên quan; [backend README](backend/README.md) cho protocol inference |

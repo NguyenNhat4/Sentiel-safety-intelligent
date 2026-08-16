@@ -134,6 +134,7 @@ P-047/
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
+│   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract

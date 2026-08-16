@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-16: [Documentation] Add component and runtime data-flow diagrams
+- [x] Added `docs/architecture_diagram.md` with Mermaid component and runtime data-flow diagrams; the root architecture document remains the canonical boundary and invariant reference.
+- [x] Replaced the nested sequence diagram with a render-compatible flowchart covering WebSocket backpressure, four-frame debounce, redaction-first snapshot handling and fail-closed persistence.
+
 ## 2026-08-16: [Cross-cutting] Decouple the camera-wide machine switch from danger zones
 - The machine control is now always enabled, including before a zone is created or selected. Its state is sent as a camera-wide WebSocket configuration value and immediately refreshes the active inference configuration.
 - Zone intrusion remains independent of machine state. The camera-wide state now controls only PPE evaluation, so a stopped machine suppresses PPE alerts consistently across all zones.

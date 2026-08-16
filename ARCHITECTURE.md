@@ -9,32 +9,14 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 - Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập vùng enabled luôn là critical, không phụ thuộc trạng thái máy mô phỏng. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
 - Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
 - Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
-- Hai vai trò được backend phân quyền: `safety_officer` và `zone_manager`.
+- Ba vai trò được backend phân quyền: `system_admin`, `safety_officer` và `area_manager`.
 - MVP là một stream mô phỏng; camera thật, PLC, tự dừng máy và multi-stream nằm ngoài phạm vi.
 
 ## Kiến trúc đích
 
-```mermaid
-flowchart LR
-    UI["React SPA\nmonitor · review · dashboard"]
-    API["FastAPI transport\nREST · WebSocket · auth"]
-    DOMAIN["Backend service layer\nmonitoring · rules · events · auth\nanalytics · escalation · reporting"]
-    VISION["Vision facade\nperson/PPE · tracking · zone · redaction"]
-    DB[("PostgreSQL\nevent · audit · config")]
-    STORE[("Encrypted object storage\nredacted snapshots/reports")]
-    OUT["Notification provider"]
-
-    UI -->|typed REST / binary-JPEG WS| API
-    API --> DOMAIN
-    DOMAIN -->|observation request| VISION
-    VISION -->|observation + redacted image| DOMAIN
-    DOMAIN --> DB
-    DOMAIN --> STORE
-    DOMAIN -->|critical, idempotent| OUT
-```
-
 Giữ **modular monolith** để giao nhanh và triển khai đơn giản. `frontend/`, `backend/` và
 `vision/` là ba owner production; chỉ tách service khi có nhu cầu scale hoặc vận hành đã đo được.
+Sơ đồ component và data flow runtime nằm trong `docs/architecture_diagram.md`.
 
 ## Boundary và dependency
 
@@ -57,29 +39,6 @@ frontend feature → frontend api → backend api → backend service
 Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
 tests) là nguồn sự thật. Thay đổi breaking phải được phê duyệt và có migration hoặc
 compatibility test.
-
-## Luồng quyết định an toàn
-
-```mermaid
-sequenceDiagram
-    participant UI as Browser
-    participant API as FastAPI
-    participant CV as Vision
-    participant R as Rules / Events
-    participant P as Persistence
-    UI->>API: zone collection config + frame JPEG / image
-    API->>CV: analyze frame once
-    CV-->>API: observations, track, confidence, redacted image
-    API->>R: observations + zones/machines/rule/session context
-    R->>R: point-in-polygons + triage + zone-scoped dedup + severity
-    alt normal hoặc dưới ngưỡng
-        R-->>UI: result, không tạo event
-    else mơ hồ hoặc vi phạm
-        R-->>UI: pending HITL alert
-        UI->>API: confirm / false_alarm / acknowledge
-        API->>P: atomic event + audit + redacted snapshot
-    end
-```
 
 Các bất biến an toàn:
 
