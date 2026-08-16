@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import type {ChangeEvent, PointerEvent as ReactPointerEvent, RefObject} from "react";
 import {InferenceClient} from "../../api/inference-client";
-import {saveReviewedEvent, saveReviewedEventBatch} from "../../api/events";
+import {saveReviewedEvent} from "../../api/events";
 import {loadMonitoringZones, saveMonitoringZones} from "../../api/monitoring-zones";
 import type {
   EventBatchPayload,
@@ -24,9 +24,27 @@ const DEFAULT_PPE_REQUIREMENTS: PpeRequirementUpdate = {
   profile: "hat_vest_v1",
   hat_required: false,
   vest_required: false,
+  restricted_area_detection_enabled: false,
 };
 
 interface RuleView {yes: boolean | null; text: string; badge: string}
+export type HumanReviewTone = "normal" | "critical" | "warning" | "unknown";
+
+export interface HumanReviewState {
+  tone: HumanReviewTone;
+  message: string;
+}
+
+export interface HitlLogEntry {
+  id: string;
+  tone: "critical" | "warning";
+  title: string;
+  detail: string;
+  reviewStatus: "pending" | "reviewed";
+  hasNewOccurrence: boolean;
+  violationKeys?: string[];
+  reviewResult?: InferenceResult;
+}
 
 export interface MonitorView {
   violation: boolean;
@@ -37,12 +55,13 @@ export interface MonitorView {
   eventStatus: string;
   confidenceLabel: string;
   confidenceWidth: string;
+  humanReviewTone?: HumanReviewTone;
   zoneRule: RuleView;
   machineRule: RuleView;
   ppeRule: RuleView;
 }
 
-const initialView = (machineIsRunning = true): MonitorView => ({
+const initialView = (machineRunning = true): MonitorView => ({
   violation: false,
   alertTitle: "Chưa có vi phạm",
   severity: "NORMAL",
@@ -51,11 +70,12 @@ const initialView = (machineIsRunning = true): MonitorView => ({
   eventStatus: "CHƯA CÓ SỰ KIỆN ĐƯỢC LƯU",
   confidenceLabel: "READY",
   confidenceWidth: "12%",
+  humanReviewTone: "normal",
   zoneRule: {yes: null, text: "Chưa phát hiện", badge: "—"},
   machineRule: {
-    yes: machineIsRunning,
-    text: machineIsRunning ? "Máy đang chạy" : "Máy đã dừng",
-    badge: machineIsRunning ? "ON" : "OFF"
+    yes: machineRunning,
+    text: machineRunning ? "Machine A đang chạy" : "Machine A đã dừng",
+    badge: machineRunning ? "ON" : "OFF"
   },
   ppeRule: {yes: null, text: "Chưa phát hiện", badge: "—"}
 });
@@ -92,6 +112,7 @@ export function useMonitor() {
   const [zoneRevision, setZoneRevision] = useState(0);
   const zoneRevisionRef = useRef(0);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const selectedZoneIdRef = useRef<string | null>(null);
   const [drawingZoneId, setDrawingZoneId] = useState<string | null>(null);
   const [newDraftZoneId, setNewDraftZoneId] = useState<string | null>(null);
   const [zoneSaving, setZoneSaving] = useState(false);
@@ -111,6 +132,7 @@ export function useMonitor() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [hitlLogs, setHitlLogs] = useState<HitlLogEntry[]>([]);
   const [view, setView] = useState<MonitorView>(() => initialView());
   const [fileLabel, setFileLabel] = useState("Chưa chọn video");
   const [videoMeta, setVideoMeta] = useState("CHỌN VIDEO ĐỂ BẮT ĐẦU");
@@ -121,7 +143,7 @@ export function useMonitor() {
   const [zoneDisabled, setZoneDisabled] = useState(true);
   const [flowStatus, setFlowStatus] = useState("Sẵn sàng");
   const [toast, setToast] = useState<string>();
-  const videoUrl = useRef<string | undefined>(undefined);
+  const videosByZone = useRef(new Map<string, {name: string; url: string}>());
   const session = useRef<SessionState>({
     running: false,
     frameSequence: 0,
@@ -139,10 +161,10 @@ export function useMonitor() {
   if (!clientRef.current) {
     clientRef.current = new InferenceClient({
       getConfiguration: () => ({
-        zones: appliedZonesRef.current,
-        zone_revision: zoneRevisionRef.current,
+        zone_points: selectedZoneForInference(appliedZonesRef.current, selectedZoneIdRef.current),
+        machine_state: selectedMachineState(appliedZonesRef.current, selectedZoneIdRef.current),
         camera_id: "uploaded_video",
-        machine_state: machineRunningRef.current ? "running" : "stopped",
+        zone_id: selectedZoneIdRef.current ?? "zone_01",
         monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
@@ -150,6 +172,10 @@ export function useMonitor() {
     });
   }
   const client = clientRef.current;
+
+  useEffect(() => {
+    selectedZoneIdRef.current = selectedZoneId;
+  }, [selectedZoneId]);
 
   const updateZones = useCallback((nextZones: MonitoringZone[]) => {
     zonesRef.current = nextZones;
@@ -192,42 +218,85 @@ export function useMonitor() {
     setActivePpeRequirements(result.rule.ppe_requirements);
     const inside = result.people.some(person => person.inside_zone);
     const violation = result.result === "violate";
+    const humanReview = buildHumanReviewState(result);
+    const newLogs = buildHitlLogEntries(result);
+    const criticalCount = newLogs.filter(entry => entry.tone === "critical").length;
+    const ppeCount = newLogs.filter(entry => entry.tone === "warning").length;
+    const activeAlertTitle = criticalCount > 0
+      ? `Đang có ${criticalCount} vi phạm vùng cấm${ppeCount > 0 ? ` và ${ppeCount} vi phạm PPE` : ""}`
+      : `Đang có ${ppeCount} vi phạm PPE cần xác minh`;
+    const activeAlertSummary = criticalCount > 0
+      ? "Có người trong vùng cấm khi máy đang chạy. Streaming vẫn tiếp tục; chọn log để xem đúng khung hình."
+      : "Thiếu mũ hoặc áo đã được xác nhận qua nhiều khung hình. Chọn log để xem đúng người và khung hình.";
+    setHitlLogs(current => {
+      const incomingById = new Map(newLogs.map(log => [log.id, log]));
+      const updated = current.map(existing => {
+        const incoming = incomingById.get(existing.id);
+        if (!incoming) return existing;
+        incomingById.delete(existing.id);
+        const violationKeys = [...new Set([...(existing.violationKeys ?? []), ...(incoming.violationKeys ?? [])])];
+        const tone: HitlLogEntry["tone"] = violationKeys.some(
+          key => key.startsWith("zone_intrusion") || key === "restricted_area_person"
+        ) ? "critical" : "warning";
+        return {
+          ...existing,
+          tone,
+          title: buildViolationTitle(violationKeys),
+          detail: incoming.detail,
+          violationKeys,
+          hasNewOccurrence: incoming.hasNewOccurrence,
+          reviewStatus: incoming.hasNewOccurrence ? "pending" : existing.reviewStatus,
+          reviewResult: incoming.hasNewOccurrence && incoming.reviewResult?.snapshot_data
+            ? incoming.reviewResult
+            : existing.reviewResult,
+        };
+      });
+      return [...incomingById.values(), ...updated];
+    });
     setView(current => ({
       ...current,
       violation,
-      alertTitle: violation ? current.alertTitle : "Trạng thái bình thường",
+      alertTitle: violation ? activeAlertTitle : "Trạng thái bình thường",
       severity: violation ? "VIOLATE" : "NORMAL",
-      alertSummary: violation ? current.alertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
+      alertSummary: violation ? activeAlertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
       zoneRule: {yes: inside, text: inside ? "Trong vùng nguy hiểm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
       ppeRule: buildPpeRule(result),
+      humanReviewTone: criticalCount > 0 ? "critical" : humanReview.tone,
+      reviewMessage: humanReview.message,
     }));
     if (!result.review_required) session.current.violationLatched = false;
     if (!result.review_required || session.current.violationLatched) return;
     session.current.violationLatched = true;
-    session.current.running = false;
-    const video = videoRef.current;
-    video?.pause();
-    client.close();
-    const reviewCopy = buildReviewCopy(result);
-    setPlaybackLabel("▶ Tiếp tục");
-    setPlaybackDisabled(true);
-    setFlowStatus("Chờ xác minh");
+    setFlowStatus("Có cảnh báo cần xác minh");
     setView(current => ({
       ...current,
       violation: true,
-      alertTitle: reviewCopy.title,
       severity: "VIOLATE",
-      alertSummary: reviewCopy.summary,
-      reviewMessage: reviewCopy.reviewMessage,
+      reviewMessage: "Có log mới đang chờ cán bộ an toàn xác minh",
       eventStatus: "Đang chờ xác minh · chưa lưu",
       confidenceLabel: "VIOLATE",
-      confidenceWidth: "100%"
+      confidenceWidth: "100%",
     }));
-    freezeAtViolationFrame(result);
+    queueViolationReview(result);
   }
 
   resultHandler.current = handleInferenceResult;
   failureHandler.current = handleInferenceFailure;
+
+  const pendingCriticalLogs = hitlLogs.filter(log => log.reviewStatus === "pending" && log.tone === "critical").length;
+  const pendingPpeLogs = hitlLogs.filter(log => log.reviewStatus === "pending" && log.tone === "warning").length;
+  const pendingReviewLogCount = pendingCriticalLogs + pendingPpeLogs;
+
+  useEffect(() => {
+    if (pendingReviewLogCount === 0) return;
+    setView(current => ({
+      ...current,
+      violation: true,
+      severity: "VIOLATE",
+      alertTitle: `Có ${pendingReviewLogCount} log cần review`,
+      alertSummary: `${pendingCriticalLogs} log nghiêm trọng · ${pendingPpeLogs} log PPE cần xác minh.`,
+    }));
+  }, [pendingCriticalLogs, pendingPpeLogs, pendingReviewLogCount]);
 
   useEffect(() => {
     const canvas = overlayRef.current;
@@ -271,18 +340,21 @@ export function useMonitor() {
 
   useEffect(() => () => {
     client.close();
-    if (videoUrl.current) URL.revokeObjectURL(videoUrl.current);
+    videosByZone.current.forEach(video => URL.revokeObjectURL(video.url));
   }, [client]);
 
   function handleVideoSelection(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     const video = videoRef.current;
-    if (!file || !video) return;
+    const zoneId = selectedZoneId;
+    if (!file || !video || !zoneId) return;
     client.close();
     video.pause();
-    if (videoUrl.current) URL.revokeObjectURL(videoUrl.current);
-    videoUrl.current = URL.createObjectURL(file);
-    video.src = videoUrl.current;
+    const previous = videosByZone.current.get(zoneId);
+    if (previous) URL.revokeObjectURL(previous.url);
+    const zoneVideo = {name: file.name, url: URL.createObjectURL(file)};
+    videosByZone.current.set(zoneId, zoneVideo);
+    video.src = zoneVideo.url;
     video.load();
     Object.assign(session.current, {
       running: false, lastHandledFrame: -1, lastSampleTime: -1,
@@ -291,6 +363,7 @@ export function useMonitor() {
     });
     setLatestPeople([]);
     setLatestDetections([]);
+    setHitlLogs([]);
     setSelectedPoint(null);
     pendingViolationRef.current = null;
     setPendingViolation(null);
@@ -302,9 +375,39 @@ export function useMonitor() {
     setPlaybackDisabled(true);
     setZoneDisabled(true);
     setPlaybackLabel("▶ Phát video");
-    setFlowStatus(zonesRef.current.length ? "Đã khôi phục cấu hình vùng" : "Chờ tạo vùng");
+    setFlowStatus(`${zonesRef.current.find(zone => zone.zone_id === zoneId)?.display_name ?? "Vùng"} · đang tải video`);
     setView(initialView(machineRunningRef.current));
-    showToast("Video đã sẵn sàng. Bấm Tạo vùng nếu cần thêm khu vực nguy hiểm.");
+    showToast("Video đã được gắn với vùng đang chọn.");
+  }
+
+  function switchSelectedZone(zoneId: string): void {
+    if (zoneId === selectedZoneId) return;
+    if (session.current.running) stopRealtimeInference();
+    else client.close();
+    setSelectedZoneId(zoneId);
+    setSelectedPoint(null);
+    setLatestPeople([]);
+    setLatestDetections([]);
+    setPreviewSrc(undefined);
+    setStageReady(false);
+    setPlaybackDisabled(true);
+    setZoneDisabled(true);
+    const video = videoRef.current;
+    const zoneVideo = videosByZone.current.get(zoneId);
+    const zone = zonesRef.current.find(item => item.zone_id === zoneId);
+    setView(initialView(zone?.machine_state === "running"));
+    if (!video || !zoneVideo) {
+      video?.removeAttribute("src");
+      setFileLabel(`${zone?.display_name ?? "Vùng"} chưa có video`);
+      setVideoMeta("CHỌN VIDEO ĐỂ BẮT ĐẦU");
+      setFlowStatus(`${zone?.display_name ?? "Vùng"} chưa có video`);
+      return;
+    }
+    video.src = zoneVideo.url;
+    video.load();
+    setFileLabel(zoneVideo.name);
+    setVideoMeta("ĐANG TẢI VIDEO");
+    setFlowStatus(`${zone?.display_name ?? "Vùng"} · đang tải video`);
   }
 
   function handleLoadedMetadata(): void {
@@ -368,7 +471,7 @@ export function useMonitor() {
 
   async function handlePlayback(): Promise<void> {
     const video = videoRef.current;
-    if (!video?.src || pendingViolationRef.current) return;
+    if (!video?.src) return;
     if (!video.paused) {
       stopPreviewPlayback();
       return;
@@ -423,39 +526,20 @@ export function useMonitor() {
     if (session.current.running) requestAnimationFrame(sampleFrameLoop);
   }
 
-  function freezeAtViolationFrame(result: InferenceResult): void {
-    const video = videoRef.current;
-    const capture = captureRef.current;
-    if (!video || !capture || !video.videoWidth) {
-      openViolationReview(result, result.snapshot_data);
-      return;
-    }
-
-    let completed = false;
-    const finish = () => {
-      if (completed) return;
-      completed = true;
-      window.clearTimeout(fallbackTimer);
-      video.removeEventListener("seeked", renderStoppedFrame);
-      openViolationReview(result, captureVideoSnapshot(video, capture) ?? result.snapshot_data);
-    };
-    const renderStoppedFrame = () => {
-      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => finish());
-      else window.requestAnimationFrame(finish);
-    };
-
-    video.addEventListener("seeked", renderStoppedFrame, {once: true});
-    const fallbackTimer = window.setTimeout(finish, 800);
-    if (Math.abs(video.currentTime - result.video_time) < 0.01) renderStoppedFrame();
-    else video.currentTime = result.video_time;
+  function queueViolationReview(result: InferenceResult): void {
+    pendingViolationRef.current = result;
+    setPendingViolation(result);
+    setReviewStartedAt(Date.now());
   }
 
-  function openViolationReview(result: InferenceResult, snapshotData?: string): void {
-    const reviewedFrame = snapshotData ? {...result, snapshot_data: snapshotData} : result;
-    pendingViolationRef.current = reviewedFrame;
-    setPendingViolation(reviewedFrame);
+  function openReviewLog(logId: string): void {
+    const selectedLog = hitlLogs.find(log => log.id === logId);
+    if (selectedLog?.reviewResult) {
+      pendingViolationRef.current = selectedLog.reviewResult;
+      setPendingViolation(selectedLog.reviewResult);
+      setReviewStartedAt(Date.now());
+    }
     setIsReviewModalOpen(true);
-    setReviewStartedAt(Date.now());
   }
 
   function stopPreviewPlayback(): void {
@@ -467,23 +551,22 @@ export function useMonitor() {
   function handleEnded(): void {
     session.current.running = false;
     client.close();
-    capturePausedFrame();
     const video = videoRef.current;
     if (video) video.currentTime = 0;
     setPlaybackLabel("↻ Phát lại");
-    setPlaybackDisabled(false);
-    setFlowStatus("Video đã kết thúc · bấm Phát lại để chạy lại cùng video");
+    capturePausedFrame();
   }
 
   function toggleMachine(): void {
-    const running = !machineRunningRef.current;
+    const selected = zonesRef.current.find(zone => zone.zone_id === selectedZoneId);
+    const running = selected ? selected.machine_state !== "running" : !machineRunningRef.current;
     machineRunningRef.current = running;
     setMachineRunning(running);
+    if (selected) updateZone(selected.zone_id, zone => ({...zone, machine_state: running ? "running" : "stopped"}));
     setView(current => ({
       ...current,
       machineRule: {yes: running, text: running ? "Máy đang chạy" : "Máy đã dừng", badge: running ? "ON" : "OFF"}
     }));
-    client.updateConfiguration();
   }
 
   function resetZone(): void {
@@ -636,9 +719,11 @@ export function useMonitor() {
     if (!pending) return;
     setReviewSaving(true);
     try {
-      const batch = buildEventBatchPayload(status, pending, appliedZonesRef.current);
-      if (batch) await saveReviewedEventBatch(batch);
-      else await saveReviewedEvent(buildEventPayload(status, pending, [], machineRunningRef.current));
+      await saveReviewedEvent(buildEventPayload(status, pending, [], machineRunningRef.current));
+      const reviewedLogIds = new Set(buildHitlLogEntries(pending).map(log => log.id));
+      setHitlLogs(current => current.map(log => reviewedLogIds.has(log.id)
+        ? {...log, reviewStatus: "reviewed", hasNewOccurrence: false}
+        : log));
       pendingViolationRef.current = null;
       setPendingViolation(null);
       setIsReviewModalOpen(false);
@@ -662,8 +747,10 @@ export function useMonitor() {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
       zones, zoneRevision, zoneHydrated, selectedZoneId, selectedZone, drawingZoneId, newDraftZoneId, zoneSaving,
-      machineRunning,
+      machineRunning: selectedZone ? selectedZone.machine_state === "running" : machineRunning,
       pendingViolation, isReviewModalOpen, reviewSaving, view,
+      pendingReviewCounts: {critical: pendingCriticalLogs, other: pendingPpeLogs},
+      hitlLogs,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
       zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
       latestPeople, latestDetections, peopleCount: latestPeople.length,
@@ -673,14 +760,14 @@ export function useMonitor() {
       openFilePicker: () => fileInputRef.current?.click(), handleVideoSelection,
       handleLoadedMetadata, handleSeeked, handlePlayback, handleEnded, toggleMachine,
       resetZone, createZone, cancelZoneCreation, deleteSelectedZone, saveZones,
-      selectZone: (zoneId: string) => { setSelectedZoneId(zoneId); setSelectedPoint(null); },
+      selectZone: switchSelectedZone,
       updateSelectedZoneName: (displayName: string) => selectedZoneId
         && updateZone(selectedZoneId, zone => ({...zone, display_name: displayName})),
       toggleSelectedZoneEnabled: () => selectedZoneId
         && updateZone(selectedZoneId, zone => ({...zone, enabled: !zone.enabled})),
       handlePointerDown, handlePointerMove,
       handlePointerUp, deleteSelectedPoint, review,
-      openReviewModal: () => setIsReviewModalOpen(true),
+      openReviewLog,
       closeReviewModal: () => setIsReviewModalOpen(false),
     }
   };
@@ -696,7 +783,12 @@ export function buildPpeRule(result: InferenceResult): RuleView {
 
   const missing = [...new Set(result.people.flatMap(person => person.missing_required_ppe))];
   const ppeLabel: Record<string, string> = {hat: "mũ bảo hộ", vest: "áo phản quang"};
-  if (missing.length) return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
+  if (missing.length) {
+    if (result.rule.ppe_alert) {
+      return {yes: false, text: `Thiếu: ${missing.map(item => ppeLabel[item]).join(", ")}`, badge: "MISS"};
+    }
+    return {yes: null, text: "Đang xác nhận PPE qua nhiều khung hình", badge: "CHECK"};
+  }
 
   const hasUnknown = result.people.some(person =>
     requiredLabels.some(label => {
@@ -708,78 +800,116 @@ export function buildPpeRule(result: InferenceResult): RuleView {
   return {yes: true, text: `Đủ PPE: ${requiredLabels.join(", ")}`, badge: "OK"};
 }
 
-export function buildReviewCopy(result: InferenceResult): {
-  title: string;
-  summary: string;
-  reviewMessage: string;
-} {
-  const ppeLabels: Record<"hat" | "vest", string> = {
-    hat: "mũ bảo hộ",
-    vest: "áo phản quang",
-  };
-  const ppeReasons = result.people.flatMap((person, index) => {
-    if (!person.missing_required_ppe.length) return [];
-    return `Người #${index + 1} thiếu ${person.missing_required_ppe.map(item => ppeLabels[item]).join(", ")}`;
-  });
-  const activeZones = result.rule.zone_results?.filter(zone => zone.violation) ?? [];
-  const zoneReasons = activeZones.length
-    ? activeZones.map(zone => `Vùng cấm "${zone.zone_id}" có người xâm nhập`)
-    : result.rule.person_inside_zone
-      ? ["Có người trong vùng cấm"]
-      : [];
-  const reasons = [...ppeReasons, ...zoneReasons];
-
-  if (!reasons.length) {
-    return {
-      title: "Cần xác minh vi phạm an toàn",
-      summary: "Rule an toàn đã kích hoạt nhưng chưa có lý do chi tiết từ frame. Hãy xác minh thủ công.",
-      reviewMessage: "Khung hình đang chờ cán bộ an toàn xác minh",
-    };
+export function buildHumanReviewState(result: InferenceResult): HumanReviewState {
+  if (result.rule.restricted_area_alert) {
+    return {tone: "critical", message: "Phát hiện người trong phạm vi camera · cần xử lý ngay"};
   }
-  const hasPpeViolation = ppeReasons.length > 0;
-  const hasZoneViolation = zoneReasons.length > 0;
-  const title = hasPpeViolation && hasZoneViolation
-    ? "Thiếu PPE và có người vào vùng cấm"
-    : hasPpeViolation
-      ? "Thiếu PPE bắt buộc"
-      : "Có người vào vùng cấm";
+  if (result.people.some(person => person.inside_zone)) {
+    return {tone: "critical", message: "Người đã đi vào vùng cấm · cần xử lý ngay"};
+  }
 
-  return {
-    title,
-    summary: `${reasons.join(". ")}. Video đã dừng để xác minh vi phạm thực tế hoặc báo sai.`,
-    reviewMessage: `${reasons.length} lỗi cần xác minh: ${reasons.join("; ")}`,
-  };
+  if (result.rule.ppe_alert) {
+    return {tone: "warning", message: "Phát hiện người thiếu mũ hoặc áo theo quy định"};
+  }
+
+  if (result.people.some(person => person.missing_required_ppe.length > 0)) {
+    return {tone: "unknown", message: "Đang xác nhận PPE qua nhiều khung hình"};
+  }
+
+  const required = result.rule.ppe_requirements;
+  const hasUnknownPpe = result.people.some(person =>
+    (required.hat_required && person.ppe.hat.status === "unknown")
+    || (required.vest_required && person.ppe.vest.status === "unknown"),
+  );
+  if (hasUnknownPpe) {
+    return {tone: "unknown", message: "Không xác định được PPE · cần người review"};
+  }
+
+  return {tone: "normal", message: "Không có cảnh báo · người đã đủ mũ và áo theo quy định"};
+}
+
+export function buildHitlLogEntries(result: InferenceResult): HitlLogEntry[] {
+  const ppeLabel = {hat: "mũ bảo hộ", vest: "áo phản quang"} as const;
+  const entries: HitlLogEntry[] = [];
+  result.people.forEach((person, index) => {
+    const personLabel = `Người #${person.track_id ?? index + 1}`;
+    const violations = person.active_violations ?? [];
+    const hasZoneIntrusion = violations.some(entry => entry.rule_key.startsWith("zone_intrusion"));
+    const hasRestrictedAreaAlert = violations.some(entry => entry.rule_key === "restricted_area_person");
+    const missingPpe = [...new Set(violations
+      .filter(entry => entry.rule_key.startsWith("missing_ppe:"))
+      .map(entry => entry.rule_key.split(":", 2)[1] as keyof typeof ppeLabel)
+      .filter(item => item in ppeLabel))];
+    if (!hasZoneIntrusion && !hasRestrictedAreaAlert && missingPpe.length === 0) return;
+    const missingLabel = missingPpe.map(item => ppeLabel[item]).join(" và ");
+    const violationKeys = [...new Set(violations.map(entry => entry.rule_key))];
+    entries.push({
+      id: `${result.monitoring_session_id ?? "session"}:person:${person.track_id ?? index + 1}`,
+      tone: hasZoneIntrusion || hasRestrictedAreaAlert ? "critical" : "warning",
+      title: hasRestrictedAreaAlert
+        ? `Phát hiện người trong phạm vi camera${missingLabel ? ` · thiếu ${missingLabel}` : ""}`
+        : hasZoneIntrusion
+        ? `Đi vào vùng cấm${missingLabel ? ` · thiếu ${missingLabel}` : ""}`
+        : `Thiếu ${missingLabel}`,
+      detail: `${personLabel} · cần xác minh`,
+      reviewStatus: "pending",
+      hasNewOccurrence: violations.some(entry => entry.is_new),
+      violationKeys,
+      reviewResult: {
+        ...result,
+        people: [person],
+        detections: (result.detections ?? [])
+          .filter(detection => detection.person_index === index)
+          .map(detection => ({...detection, person_index: 0})),
+      },
+    });
+  });
+  return entries;
+}
+
+function buildViolationTitle(violationKeys: string[]): string {
+  const labels: string[] = [];
+  if (violationKeys.some(key => key === "restricted_area_person")) labels.push("trong phạm vi camera");
+  else if (violationKeys.some(key => key.startsWith("zone_intrusion"))) labels.push("vào vùng cấm");
+  if (violationKeys.includes("missing_ppe:hat")) labels.push("thiếu mũ bảo hộ");
+  if (violationKeys.includes("missing_ppe:vest")) labels.push("thiếu áo phản quang");
+  return labels.join(" · ") || "Vi phạm an toàn";
 }
 
 export function buildEventPayload(
   status: ReviewStatus,
   pending: InferenceResult,
   zonePoints: ZonePoint[],
-  machineIsRunning: boolean
+  machineRunning: boolean
 ): EventPayload {
+  const person = pending.people[0];
+  const violations = person?.active_violations ?? [];
   const occurrenceIds = [...new Set(
-    pending.people.flatMap(person =>
-      person.active_violations?.filter(item => item.is_new).map(item => item.occurrence_id) ?? []
-    ),
+    violations.filter(item => item.is_new).map(item => item.occurrence_id),
   )];
+  const violationKeys = [...new Set(violations.map(item => item.rule_key))];
+  const zoneId = violations.find(item => item.zone_id)?.zone_id ?? pending.rule.zone_id;
+  const critical = violationKeys.some(key => key.startsWith("zone_intrusion") || key === "restricted_area_person");
   return {
-    zone_id: "zone_01",
+    zone_id: zoneId,
     camera_id: "uploaded_video",
-    event_type: "zone_intrusion",
-    severity: "high",
+    event_type: "person_safety_violation",
+    severity: critical ? "critical" : "high",
     status,
     acknowledged_by: "Safety Officer",
     snapshot_data: pending.snapshot_data,
     snapshot_people: pending.people,
     snapshot_detections: pending.detections ?? [],
     monitoring_session_id: pending.monitoring_session_id,
+    track_id: person?.track_id,
     occurrence_ids: occurrenceIds,
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
-      machine_state: machineIsRunning ? "running" : "stopped",
+      machine_state: machineRunning ? "running" : "stopped",
       video_timestamp_seconds: pending.video_time,
-      people: pending.people,
+      people: person ? [person] : [],
+      violations: violationKeys,
       zone_points: zonePoints
     }
   };
@@ -844,6 +974,15 @@ function useReviewTimer(startedAt: number | null): string {
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+}
+
+function selectedZoneForInference(zones: MonitoringZone[], selectedZoneId: string | null): ZonePoint[] {
+  const zone = zones.find(item => item.zone_id === selectedZoneId);
+  return zone?.enabled && zone.points.length === 4 ? zone.points : [];
+}
+
+function selectedMachineState(zones: MonitoringZone[], selectedZoneId: string | null): "running" | "stopped" {
+  return zones.find(item => item.zone_id === selectedZoneId)?.machine_state ?? "stopped";
 }
 
 export type MonitorRefs = {

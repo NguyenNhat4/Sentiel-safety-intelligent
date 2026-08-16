@@ -5,6 +5,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.api.v1.auth import require_admin
 from backend.app.core.database import Base
+from backend.app.models.monitoring_zone import MonitoringZoneCollection, MonitoringZoneRecord
 from backend.app.models.user import User, UserRole
 from backend.app.services.auth_service import (
     AuthService,
@@ -91,18 +92,37 @@ def test_system_admin_can_create_assign_reset_and_delete_user():
     service = AuthService(session)
     service.seed_demo_users()
     _, admin, _ = service.login("admin@sentinel.local", "Sentinel123!")
+    session.add(MonitoringZoneCollection(camera_id="uploaded_video", revision=1))
+    session.add(
+        MonitoringZoneRecord(
+            camera_id="uploaded_video",
+            zone_id="zone_1",
+            normalized_zone_id="zone_1",
+            display_name="Khu vực 1",
+            points=[],
+            machine_state="stopped",
+            enabled=True,
+            order=0,
+        )
+    )
+    session.commit()
 
     created = service.create_user(
         full_name="Test User",
         email="test.user@sentinel.local",
         password="Initial123!",
         role=UserRole.AREA_MANAGER,
+        managed_area_id="zone_1",
+        telegram_username="@test_manager",
+        telegram_chat_id="123456789",
     )
     token, _, _ = service.login(created.email, "Initial123!")
     updated = service.update_role(actor=admin, target_user_id=created.id, role=UserRole.SAFETY_MANAGER)
     service.change_password(actor=admin, target_user_id=created.id, new_password="Changed123!", current_password=None)
 
     assert updated.role == UserRole.SAFETY_MANAGER.value
+    assert updated.managed_area_id is None
+    assert created.telegram_username == "@test_manager"
     assert [user.email for user in service.list_users(query="test.user", role=UserRole.SAFETY_MANAGER)] == [
         created.email
     ]

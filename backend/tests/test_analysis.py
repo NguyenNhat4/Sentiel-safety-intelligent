@@ -242,9 +242,9 @@ def test_zone_entry_requests_review_when_machine_is_stopped(monkeypatch):
 
     assert result.people[0].foot_point == [60, 100]
     assert result.people[0].inside_zone is True
-    assert result.review_required is True
-    assert result.result == "violate"
-    assert result.snapshot_data.startswith("data:image/jpeg;base64,")
+    assert result.review_required is False
+    assert result.result == "normal"
+    assert result.snapshot_data is None
 
 
 def test_inference_websocket_returns_empty_people(client, monkeypatch):

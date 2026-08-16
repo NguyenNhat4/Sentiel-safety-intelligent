@@ -15,48 +15,36 @@
 - [x] Added `docs/architecture_diagram.md` with Mermaid component and runtime data-flow diagrams; the root architecture document remains the canonical boundary and invariant reference.
 - [x] Replaced the nested sequence diagram with a render-compatible flowchart covering WebSocket backpressure, four-frame debounce, redaction-first snapshot handling and fail-closed persistence.
 
-## 2026-08-16: [Cross-cutting] Decouple the camera-wide machine switch from danger zones
-- The machine control is now always enabled, including before a zone is created or selected. Its state is sent as a camera-wide WebSocket configuration value and immediately refreshes the active inference configuration.
-- Zone intrusion remains independent of machine state. The camera-wide state now controls only PPE evaluation, so a stopped machine suppresses PPE alerts consistently across all zones.
+## 2026-08-15: [Cross-cutting] One accumulated event per tracked person
+- Human-in-the-Loop review now isolates the selected tracked person and saves one `person_safety_violation` event containing every observed hat, vest, restricted-area, and zone rule.
+- Later violations for the same `(monitoring_session_id, track_id)` merge into the existing event. Added a portable Alembic uniqueness constraint and focused backend/frontend coverage.
 
-## 2026-08-16: [Documentation] Separate task routing from developer onboarding
-- [x] Moved repository task-routing and documentation-index responsibility to root `context-map.md`.
-- [x] Rewrote root `README.md` for setup, environment variables, local sample requests, Docker smoke, and checks.
-- [x] Updated the mandatory workflow and current-structure documentation to reference the new context map.
+## 2026-08-15: [Cross-cutting] Area log details and resolution workflow
+- Area managers now see individual logs only for their assigned area, can open a log to inspect its snapshot/context, and can mark it **Đã giải quyết** or **Không phải vi phạm**.
+- Backend authorization rejects updates to another area's event. Focused event tests, frontend lint, type-check, and production build pass.
 
-## 2026-08-16: [Frontend] Align danger-zone UI copy and event metadata with the active rule
-- The monitor review pop-up, alert summary and confirmed-event history now say **Có người vào vùng cấm** for either machine state; the machine state remains visible only as operating context.
-- The legacy single-event fallback now writes the canonical `zone_intrusion` event type, matching the existing backend event contract. Focused popup tests cover a stopped-machine zone intrusion.
+## 2026-08-15: [Cross-cutting] Confirmed violations now reach the correct area manager
+- AI detections no longer notify area managers before Human-in-the-Loop review. A confirmed `acknowledged` event now routes to the manager assigned to its `zone_id`.
+- Area-manager event history and summary statistics are server-filtered to the assigned area; focused backend routing tests and frontend checks pass.
 
-## 2026-08-16: [Backend] Alert enabled danger-zone intrusion for either machine state
-- Updated deterministic and multi-zone inference rules so a detected foot point inside any enabled zone makes the frame violate whether its machine is `running` or `stopped`; machine state remains audit/UI context.
-- Required PPE is now evaluated only while the relevant machine state is `running`; stopped machines keep PPE observations visible but suppress PPE alerts. Kept the existing frame-level review popup, per-track/per-zone occurrence deduplication, and per-zone event persistence.
+## 2026-08-14: [Frontend] Human-in-the-Loop review no longer pauses live streaming
+- The monitor keeps streaming after a violation, surfaces compact critical/PPE counts above the video, and records the candidate in the Human-in-the-Loop log.
+- Safety officers open the snapshot and review/escalation choices only by selecting a log entry.
 
-## 2026-08-15: [Frontend] Replay the uploaded video without selecting it again
-- When the uploaded video ends, the monitor preserves its existing browser object URL, captures the final preview frame, rewinds to `0`, and enables the **Phát lại** control.
-- A UI regression test verifies that ending an uploaded video leaves the replay control enabled and reuses the same video rather than requiring a second file selection.
+## 2026-08-14: [Frontend] PPE configuration follows the selected area
+- The PPE requirement controls now load and save against the selected `zone_id`, matching the inference request for that area instead of always editing `zone_01`.
 
-## 2026-08-15: [Frontend] Explain concrete reasons in the HITL review pop-up
-- The review title, summary and pending-review message now derive from the inference result: each affected person’s missing required hat/vest and each active danger-zone entry are named explicitly. A combined PPE and zone violation displays both reasons rather than a generic zone-only message.
+## 2026-08-14: [Frontend] Human-in-the-Loop records individual PPE warnings
+- Missing required hats and vests now create separate deduplicated Human-in-the-Loop warning entries per detected person and PPE item; zone intrusion entries remain critical.
+- The monitor's rule summary is compact so the right panel has room for the recent warning log.
 
-## 2026-08-15: [Backend] Lock hat/vest and danger-zone rule truth table
-- Added deterministic regression coverage for required hat/vest, zero or multiple detected people, and danger-zone entry. A violation is raised when any detected person lacks a required PPE item or enters an enabled danger zone regardless of simulated machine state.
-- Restored the additive legacy GET aliases on `PpeRequirementResponse`: callers of the canonical `hat_vest_v1` response no longer need to supply legacy fields, while `helmet_required` continues to mirror `hat_required`.
+## 2026-08-13: [Frontend] Human-in-the-Loop alert tones clarify safety response
+- The Human-in-the-Loop panel now prioritizes red for a person in a forbidden zone, orange for missing configured PPE, yellow for required PPE that cannot be determined, and green/no-alert messaging when detected people have all required PPE.
+- Added focused UI-state coverage for the alert priority; frontend type-check, lint, tests, and production build pass.
 
-## 2026-08-15: [Backend] Smooth violation alerts with four consecutive frames
-- Added `VIOLATION_FRAME=4` to development and production environment templates. The session-local tracker now opens a review only after four consecutive observations of the same track/rule; any non-violating frame resets the pending sequence.
-
-## 2026-08-15: [Backend] Bridge stale PPE browser payloads to the hat/vest contract
-- `PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}` now accepts the complete former helmet/glasses/gloves boolean payload as a temporary compatibility path, mapping helmet to hat and requiring vest.
-- Canonical `hat_vest_v1` persistence and inference remain unchanged; GET includes read-only aliases so an old browser can load and save without 422. Focused contract tests cover legacy mapping and reject mixed payloads.
-
-## 2026-08-15: [Cross-cutting] Isolate Docker Compose test database
-- `docker-compose.yml` loads `.env.development` and starts a dedicated disposable PostgreSQL service; only `DATABASE_URL` is redirected away from the developer-configured database.
-- Once the database healthcheck succeeds, the container runs migrations, starts in development mode, and idempotently seeds demo users; remaining application variables still come from `.env.development`.
-
-## 2026-08-15: [Vision/Backend] Restore single YOLO11m Safety deployment artifact
-- Production image, Compose and hosted environment examples now use only the pinned `models/yolo11m_safety.pt`; startup verifies its approved SHA-256 before serving traffic.
-- Removed stale `PERSON_MODEL_PATH`, YOLO11n and SH17 PPE artifact wiring from the active deployment path, preventing a wrongly named checkpoint from reaching inference.
+## 2026-08-13: [Frontend] Video upload is scoped to the selected monitoring area
+- Browser-local video uploads are now retained by selected `zone_id`; selecting another area shows only that area's video or an empty state.
+- Live inference uses the selected area's polygon and machine state through the compatible single-zone WebSocket configuration, rather than evaluating the selected video's frames against every saved area.
 
 ## 2026-08-13: [Backend] Analysis PPE requirement loading uses the request database session
 - Frame inference REST and WebSocket paths now load the active PPE profile through their injected SQLAlchemy session, so test database overrides and runtime database selection are respected.
@@ -64,8 +52,12 @@
 
 This is the single progress tracker for the repository. Completed work is grouped by area; current state, known issues, and next steps are project-wide.
 
+## 2026-08-15: [Cross-cutting] Per-zone restricted-area detection
+- Added the **Vùng cấm** switch beside the selected zone's mũ/áo configuration; its value persists per `camera_id` + `zone_id` and defaults OFF.
+- When enabled, any detected person anywhere in the camera frame creates an immediate critical, red Human-in-the-Loop log, independent of polygon and machine state. Existing hat/vest and polygon intrusion behavior remains unchanged.
+- Added Alembic revision `20260815_02_add_restricted_area_detection.py`; focused backend and frontend tests pass.
+
 ## Current State
-- `/health` is ready only when runtime models are initialized, the selected database is live PostgreSQL (not SQLite fallback), and the configured S3 bucket answers `HeadBucket`; degraded responses identify the unavailable dependency without exposing provider details or credentials.
 - Runtime frame inference now uses only `models/yolo11m_safety.pt`: one `[0,3,4]` predict/track call supplies canonical people, ByteTrack IDs, hat and vest; YOLO11n is no longer loaded or called.
 - Area managers now land on a dedicated compliance/event workspace; system administrators retain the complete safety-officer monitor/log experience and receive the additional account-management navigation.
 - New and administrator-reset accounts must replace their temporary password after login; normal self-service password changes are disabled and forgotten-password recovery returns to System Admin.
@@ -148,7 +140,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added role-aware login/logout entry points backed by persisted server sessions.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
-- [x] Pause playback when a returned frame has a newly opened zone/PPE occurrence; enabled-zone intrusion is a violation regardless of simulated machine state.
+- [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
 - [x] Added actual-violation and false-alarm review actions with REST event persistence.
 - [x] After acknowledged save, close the review state and keep the monitor visible; load confirmed snapshots when the operator opens “Nhật ký vi phạm”.
 - [x] Added development localhost CORS support for frontend/backend ports.
@@ -217,11 +209,16 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Closed US-27 documentation by moving the multi-zone implementation specification to `specs/done/` and removing the redundant `specs/backlog/US-27.md` story file; the root context map and current structure now point to the completed spec.
 
 ## In Progress
+- [x] [Cross-cutting] Added required monitoring-area assignment for new/updated `area_manager` accounts, Telegram username/chat-ID administration, reversible user-schema migration, and non-blocking area-scoped Telegram delivery for newly opened alerts. Delivery remains disabled until `TELEGRAM_BOT_TOKEN` and recipient chat IDs are configured.
+- [x] [Frontend] Changed HITL counting to pending-review logs rather than current-frame violations. Hat, vest and zone occurrences are consolidated into one log per session track/person; reviewed logs remain visible but leave the pending count, and the eight-log display cap was removed.
+- [x] [Frontend] Aligned HITL logs with review context: person cards now use backend `track_id`, each log retains its own inference snapshot/result and opens that exact frame, while the rule-result title is derived from current active zone/PPE occurrences instead of a hard-coded zone-intrusion message.
+- [x] [Cross-cutting] Reduced transient PPE alerts: backend now confirms missing hat/vest for 2.0 continuous seconds per session track before opening a HITL occurrence; a present/unknown frame cancels the candidate, while forbidden-zone intrusion remains immediate. Frontend logs only confirmed occurrences.
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
 - [ ] Establish final ground truth, qualified-absence evidence and benchmark targets for the hat/vest model before production alerting.
 - [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
 ## Known Issues
+- `ppe_alert_confirm_seconds=2.0` is an MVP starting value and must be calibrated using held-out, representative footage before production use.
 - Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - YOLO11m Safety detects presence; backend derives `missing` from qualified absence. Final US-13 ground truth, false-negative/false-alarm evaluation and target-device latency remain release blockers for real alerts.
 - Person-head redaction is a prototype safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.

@@ -36,7 +36,8 @@ P-047/
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
-│   │   │   └── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
+│   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
+│   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
@@ -52,6 +53,7 @@ P-047/
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
+│   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
 │   │   │   ├── auth_service.py
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
@@ -73,10 +75,14 @@ P-047/
 │   │       ├── 20260811_01_add_authentication_schema.py
 │   │       ├── 20260811_02_add_forced_password_change.py
 │   │       ├── 20260811_03_add_monitoring_zones.py
-│   │       └── 20260813_01_migrate_ppe_profile_hat_vest.py
+│   │       ├── 20260813_01_migrate_ppe_profile_hat_vest.py
+│   │       ├── 20260814_01_add_user_area_telegram.py
+│   │       ├── 20260815_02_add_restricted_area_detection.py # Per-zone whole-camera person-alert switch
+│   │       └── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
+│       ├── test_alert_notifications.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_frame_inference_ppe.py

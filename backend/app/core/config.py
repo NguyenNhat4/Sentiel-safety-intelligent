@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # App
     app_name: str = "PPE & Danger Zone Safety Monitoring System API"
-    app_env: Literal["development", "production", "test"] = "production"
+    app_env: Literal["development", "production", "test"] = "development"
     app_port: int = Field(default=8000, ge=1, le=65535, validation_alias=AliasChoices("APP_PORT", "PORT"))
     app_host: str = "0.0.0.0"
     app_debug: bool = True
@@ -48,9 +48,13 @@ class Settings(BaseSettings):
     model_name: str = "gpt-4o-mini"
     llm_temperature: float = Field(default=0.7, ge=0.0, le=2.0)
 
+    # Telegram alert delivery
+    telegram_bot_token: str = ""
+    telegram_request_timeout_seconds: float = Field(default=5.0, ge=1.0, le=30.0)
+
     # Database Settings
     database_url: str = "sqlite:///./data/safety_events.db"
-    database_fallback_enabled: bool = False
+    database_fallback_enabled: bool = True
     run_db_migrations_on_start: bool = True
     database_fallback_url: str = "sqlite:///./data/safety_events.db"
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
@@ -69,10 +73,10 @@ class Settings(BaseSettings):
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     violation_frame: int = Field(default=5, ge=1, le=60)
+    ppe_alert_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
     # Local commands load development defaults. Docker and managed platforms pass
     # production settings as process environment variables.
     model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
-    # Violate frame least confidence threshold for PPE & Danger Zone detection
 
     def validate_snapshot_storage(self) -> None:
         if self.snapshot_storage_backend != "s3":

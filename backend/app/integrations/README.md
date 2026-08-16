@@ -6,4 +6,4 @@ Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành 
 
 `privacy_vision.py` là boundary độc lập cho redaction fail-closed và annotation snapshot. Adapter cache YuNet theo cấu hình; detected face được blur trước và person không có face dùng fallback 40%. Event service luôn gọi theo thứ tự `redact → annotate → persist`; privacy không tải hoặc phụ thuộc checkpoint PPE.
 
-Snapshot storage exposes a non-mutating connectivity check. `/health` uses it to verify the configured S3 bucket with `HeadBucket`; it never uploads, reads, or deletes a snapshot during a health probe.
+`telegram_notifications.py` chỉ chuyển nội dung cảnh báo đã được backend quyết định sang Telegram Bot API. Routing theo khu vực và người nhận vẫn thuộc backend service; lỗi nhà cung cấp không được làm gián đoạn inference.

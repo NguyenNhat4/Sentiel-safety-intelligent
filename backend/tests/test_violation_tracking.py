@@ -135,7 +135,7 @@ def test_track_handoff_after_lost_grace_opens_a_new_occurrence():
 
 
 def test_tracks_and_rules_have_independent_occurrences():
-    service = ViolationTrackingService()
+    service = ViolationTrackingService(ppe_confirmation_seconds=0)
     result = service.evaluate(
         "session-a",
         {4: {"zone_intrusion", "missing_ppe:hat"}, 9: {"zone_intrusion"}},
@@ -144,3 +144,27 @@ def test_tracks_and_rules_have_independent_occurrences():
     )
 
     assert len({item.occurrence_id for items in result.values() for item in items}) == 3
+
+
+def test_ppe_candidate_requires_continuous_absence_before_opening_occurrence():
+    service = ViolationTrackingService(ppe_confirmation_seconds=2.0)
+
+    assert service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=0.0)[4] == []
+    assert service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=1.9)[4] == []
+    opened = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=2.0)[4]
+
+    assert len(opened) == 1
+    assert opened[0].rule_key == "missing_ppe:hat"
+    assert opened[0].is_new is True
+
+
+def test_ppe_candidate_is_cancelled_when_later_frame_confirms_item_present():
+    service = ViolationTrackingService(ppe_confirmation_seconds=2.0)
+
+    service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=0.0)
+    # No observed missing rule means the later frame established present/unknown.
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    assert service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=2.1)[4] == []
+    opened = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=4.2)[4]
+
+    assert opened[0].is_new is True

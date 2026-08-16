@@ -61,7 +61,9 @@ class FrameInferenceService:
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
-        self._violation_tracker = ViolationTrackingService(activation_frames=settings.violation_frame)
+        self._violation_tracker = ViolationTrackingService(
+            ppe_confirmation_seconds=settings.ppe_alert_confirm_seconds,
+        )
 
     def preload_models(self) -> None:
         self._model_preloader()
@@ -164,7 +166,7 @@ class FrameInferenceService:
         decision = self._rule_engine.evaluate(
             people=rule_people,
             requirements=requirements,
-            machine_state=request.machine_state,
+            machine_state="stopped",
             zone_active=False,
         )
         for person, missing in zip(people, decision.missing_required_ppe, strict=True):
@@ -173,9 +175,11 @@ class FrameInferenceService:
         observed_rules: dict[int, set[str]] = {}
         for person in people:
             rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
+            if requirements.restricted_area_detection_enabled:
+                rules.add("restricted_area_person")
             membership_by_id = {item.zone_id: item.inside for item in person.zone_memberships}
             for zone in active_zones:
-                if membership_by_id.get(zone.zone_id):
+                if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
                     rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             observed_rules[person.track_id] = rules
 
@@ -223,7 +227,8 @@ class FrameInferenceService:
                     for person in people
                     for membership in person.zone_memberships
                 ),
-                "violation": any(
+                "violation": zone.machine_state == "running"
+                and any(
                     membership.zone_id == zone.zone_id and membership.inside
                     for person in people
                     for membership in person.zone_memberships
@@ -231,14 +236,13 @@ class FrameInferenceService:
             }
             for zone in active_zones
         ]
-        zone_violation = any(item["violation"] for item in zone_results)
         person_inside_zone = any(item["person_inside_zone"] for item in zone_results)
         primary_zone = self._primary_zone(active_zones, people)
-        primary_machine_state = request.machine_state
+        primary_machine_state = primary_zone.machine_state if primary_zone else request.machine_state
         primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
 
         return FrameInferenceResponse(
-            result="violate" if decision.ppe_alert or zone_violation else "normal",
+            result="violate" if has_active_violation else "normal",
             review_required=review_required,
             has_active_violation=has_active_violation,
             people=people,
@@ -256,8 +260,18 @@ class FrameInferenceService:
                     "profile": requirements.profile,
                     "hat_required": requirements.hat_required,
                     "vest_required": requirements.vest_required,
+                    "restricted_area_detection_enabled": requirements.restricted_area_detection_enabled,
                 },
-                "ppe_alert": decision.ppe_alert,
+                "restricted_area_alert": any(
+                    violation.rule_key == "restricted_area_person"
+                    for person in people
+                    for violation in person.active_violations
+                ),
+                "ppe_alert": any(
+                    violation.rule_key.startswith("missing_ppe:")
+                    for person in people
+                    for violation in person.active_violations
+                ),
             },
         )
 
@@ -284,6 +298,8 @@ class FrameInferenceService:
             return legacy_zone_id
         if rule_key.startswith("zone_intrusion:"):
             return rule_key.split(":", 1)[1]
+        if rule_key == "restricted_area_person":
+            return legacy_zone_id
         return None
 
     @staticmethod

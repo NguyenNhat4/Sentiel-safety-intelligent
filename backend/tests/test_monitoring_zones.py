@@ -170,8 +170,7 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
         {"zone_id": "left", "inside": True},
         {"zone_id": "right", "inside": False},
     ]
-    assert result.people[0].active_violations[0].rule_key == "zone_intrusion:left"
-    assert result.people[0].active_violations[0].zone_id == "left"
+    assert result.people[0].active_violations == []
     assert result.people[1].active_violations[0].rule_key == "zone_intrusion:right"
     assert result.people[1].active_violations[0].zone_id == "right"
     assert result.rule["zone_results"] == [
@@ -179,7 +178,7 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
             "zone_id": "left",
             "machine_state": "stopped",
             "person_inside_zone": True,
-            "violation": True,
+            "violation": False,
         },
         {
             "zone_id": "right",

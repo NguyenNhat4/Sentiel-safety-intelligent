@@ -38,6 +38,9 @@ def as_auth_user(user) -> AuthUser:
             role=role,
             role_label=ROLE_LABELS[role],
             must_change_password=user.must_change_password,
+            managed_area_id=user.managed_area_id,
+            telegram_username=user.telegram_username,
+            telegram_chat_id=user.telegram_chat_id,
         )
     except (KeyError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=500, detail="Account has an unsupported role") from exc
@@ -130,10 +133,15 @@ def create_user(payload: UserCreate, _: User = Depends(require_admin), db: Sessi
             email=payload.email,
             password=payload.password,
             role=payload.role,
+            managed_area_id=payload.managed_area_id,
+            telegram_username=payload.telegram_username,
+            telegram_chat_id=payload.telegram_chat_id,
         )
         return as_managed_user(user)
     except DuplicateEmailError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except UserManagementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except AuthenticationUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -146,7 +154,17 @@ def update_user_role(
     db: Session = Depends(get_db),
 ):
     try:
-        return as_managed_user(AuthService(db).update_role(actor=actor, target_user_id=user_id, role=payload.role))
+        return as_managed_user(
+            AuthService(db).update_role(
+                actor=actor,
+                target_user_id=user_id,
+                role=payload.role,
+                managed_area_id=payload.managed_area_id,
+                telegram_username=payload.telegram_username,
+                telegram_chat_id=payload.telegram_chat_id,
+                update_telegram=bool({"telegram_username", "telegram_chat_id"} & payload.model_fields_set),
+            )
+        )
     except UserManagementError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except AuthenticationUnavailableError as exc:

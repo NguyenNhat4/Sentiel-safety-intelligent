@@ -34,14 +34,10 @@ class SafetyRuleEngine:
         machine_state: Literal["running", "stopped"],
         zone_active: bool,
     ) -> RuleEvaluationResult:
-        missing = (
-            [self._missing_for_person(person, requirements) for person in people]
-            if machine_state == "running"
-            else [[] for _ in people]
-        )
+        missing = [self._missing_for_person(person, requirements) for person in people]
         ppe_alert = any(missing)
         person_inside_zone = zone_active and any(person.inside_zone for person in people)
-        violation = ppe_alert or person_inside_zone
+        violation = ppe_alert or (person_inside_zone and machine_state == "running")
         return RuleEvaluationResult(
             outcome="violate" if violation else "normal",
             review_required=violation,

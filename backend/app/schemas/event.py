@@ -14,6 +14,7 @@ class EventBase(BaseModel):
     severity: str = "high"
     details: dict[str, Any] | None = None
     monitoring_session_id: UUID | None = None
+    track_id: int | None = Field(default=None, ge=0)
 
 
 class EventCreate(EventBase):
@@ -38,7 +39,9 @@ class EventCreate(EventBase):
 
 
 class EventUpdate(BaseModel):
-    status: str | None = Field(None, description="unacknowledged, acknowledged, false_alarm")
+    status: Literal["unacknowledged", "acknowledged", "false_alarm", "resolved"] | None = Field(
+        None, description="unacknowledged, acknowledged, false_alarm, resolved"
+    )
     acknowledged_by: str | None = None
 
 

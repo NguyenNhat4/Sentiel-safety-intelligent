@@ -1,15 +1,16 @@
 export type MachineState = "running" | "stopped";
 export type ReviewStatus = "acknowledged" | "false_alarm";
+export type EventStatus = ReviewStatus | "unacknowledged" | "resolved";
 export type UserRole = "system_admin" | "safety_manager" | "area_manager";
 export type AssignableUserRole = UserRole;
 
-export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; }
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
 export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
-export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; }
+export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export interface PasswordChangeRequest { new_password: string; current_password?: string; }
-export interface UserRoleUpdate { role: AssignableUserRole; }
+export interface UserRoleUpdate { role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 
 export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
 export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
@@ -90,6 +91,7 @@ export interface InferenceRule {
   zone_id: string;
   ppe_requirements: PpeRequirementUpdate;
   ppe_alert: boolean;
+  restricted_area_alert?: boolean;
   zone_revision?: number | null;
   zone_results?: ZoneResult[];
 }
@@ -115,7 +117,7 @@ export interface SafetyEvent {
   camera_id: string;
   event_type: string;
   severity: string;
-  status: ReviewStatus;
+  status: EventStatus;
   acknowledged_by?: string | null;
   snapshot_path?: string | null;
   details?: {
@@ -124,6 +126,7 @@ export interface SafetyEvent {
     review_result?: string;
   };
   monitoring_session_id?: string | null;
+  track_id?: number | null;
   occurrence_ids?: string[];
   batch_id?: string | null;
 }
@@ -165,6 +168,7 @@ export interface EventPayload {
   snapshot_detections?: ModelDetection[];
   details: Record<string, unknown>;
   monitoring_session_id?: string;
+  track_id?: number;
   occurrence_ids: string[];
 }
 
@@ -172,6 +176,7 @@ export interface PpeRequirementUpdate {
   profile: "hat_vest_v1";
   hat_required: boolean;
   vest_required: boolean;
+  restricted_area_detection_enabled?: boolean;
 }
 
 export interface PpeRequirement extends PpeRequirementUpdate {
