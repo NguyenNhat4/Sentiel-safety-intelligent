@@ -1,24 +1,41 @@
 # Project Design Decisions
 
-## 2026-08-15: [Cross-cutting] One violation log per tracked person and video session
-- **Choice:** Confirmed warnings use `(monitoring_session_id, track_id)` as the per-video person-log key. Missing hat, missing vest, restricted-camera presence, and zone intrusion occurrences are accumulated into that one event while the same track remains in the session.
-- **Boundary:** `track_id` remains a temporary ByteTrack association, not a person's identity and not a cross-video or cross-camera identifier. A new video session may create a new log for the same physical person.
-
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
-## 2026-08-15: [Cross-cutting] Area managers close only their own routed logs
-- **Choice:** The area workspace presents its scoped events as selectable logs with snapshot and event context. An area manager may set only an event in their assigned area to `resolved` or `false_alarm`.
-- **Reason:** This supports local follow-up without allowing a manager to see or alter another area's incidents, or to change the safety officer's original confirmation flow.
+## 2026-08-16: [Cross-cutting] Make machine state camera-wide, not zone-owned
+- **Reason:** The UI disabled machine control until a zone was selected, while zone intrusion no longer depends on machine state. This made the control unavailable and tied PPE behavior to unrelated zone configuration.
+- **Choice:** Multi-zone WebSocket configuration carries its own `machine_state`, defaulting to `running` for compatibility. The frontend switch is always available and pushes an updated configuration immediately. Zone geometry and persisted zone rows remain unchanged; the camera-wide state gates PPE evaluation only.
+- **Compatibility:** The change is additive for multi-zone WebSocket clients. Existing clients that omit `machine_state` retain the `running` default; legacy one-zone messages continue unchanged.
 
-## 2026-08-15: [Cross-cutting] Confirmed violations route by assigned area
-- **Choice:** A notification to an area manager is queued only after a safety manager confirms an event as `acknowledged`. The event's `zone_id` is matched to the manager's `managed_area_id`; the area workspace and statistics API enforce the same scope server-side.
-- **Reason:** An AI candidate is not an official violation. This prevents unverified alerts and information from another area appearing in the manager's workspace.
-- **Reliability:** Idempotent event/batch retries do not queue a second notification.
+## 2026-08-16: [Frontend] Render danger-zone intrusion independently from machine state
+- **Reason:** The deterministic backend rule already alerts whenever a person enters an enabled danger zone, but the review UI and legacy event fallback still described an obsolete running-machine gate.
+- **Choice:** Use **Có người vào vùng cấm** in alert/review/history copy for any zone intrusion. Keep `machine_state` as visible operating context and audit metadata, not a qualifier of the intrusion. The legacy single-event fallback emits canonical `zone_intrusion`.
+- **Compatibility:** REST/WebSocket schemas, multi-zone grouping, occurrence keys and persisted event payload fields are unchanged.
 
-## 2026-08-13: [Frontend] Upload video per selected monitoring area
-- **Choice:** A browser-local uploaded video belongs only to the selected danger area (`zone_id`). Switching areas swaps to that area's own video or an empty video state, and inference uses the existing legacy single-zone WebSocket configuration for that selected area only.
-- **Reason:** The operator requires each displayed Vùng/Khu vực to have an independent video workflow rather than evaluating one uploaded video against every configured area.
-- **Compatibility:** Stored zone collections and the multi-zone WebSocket contract remain supported for existing clients. Uploaded browser videos remain transient and are not persisted or shared between areas.
+## 2026-08-16: [Cross-cutting] Alert enabled danger-zone intrusion regardless of machine state
+- **Supersedes:** The running-machine gate for zone alerts recorded in the US-27-era architecture and runtime behavior; its historical specification remains unchanged.
+- **Choice:** A frame violates when any detected person is inside an enabled danger zone, whether its simulated machine state is `running` or `stopped`. Required hat/vest evaluation applies only while the machine is `running`; no-person frames remain normal.
+- **Compatibility:** `machine_state`, per-track/per-zone occurrence keys, grouped HITL review, and per-zone event persistence remain unchanged. The response continues to aggregate one review candidate per frame through the existing fields; no REST/WebSocket, ORM, or migration change is introduced.
+
+## 2026-08-15: [Backend] Debounce safety alerts across consecutive frames
+- **Choice:** `VIOLATION_FRAME` defaults to `4`; a track/rule occurrence opens only after that many consecutive observed frames. A missing observed frame resets a pending occurrence, while existing exit, lost-track grace and cooldown semantics continue after an alert has opened.
+- **Reason:** One-frame detector flicker must not pause the operator video or create an alert candidate.
+- **Constraint:** The debounce is session-local and applies only when `monitoring_session_id` is present. Stateless REST inference has no safe cross-request identity and therefore cannot establish consecutive frames.
+
+## 2026-08-15: [Backend] Temporary PPE request compatibility bridge for stale browser bundles
+- **Supersedes:** The `PUT`-validation portion of the 2026-08-13 PPE cutover decision that rejected every legacy payload.
+- **Choice:** Keep `hat_vest_v1` canonical for persisted configuration and inference, while accepting only the complete former three-boolean request shape. Map `helmet_required` to `hat_required`, require `vest_required=true`, and return read-only legacy aliases so an already-loaded old browser can finish its load/save cycle.
+- **Constraint:** Mixed, partial, unknown-profile and extra payloads still return `422`; glasses and gloves do not become model observations, requirements or alerts. Remove the bridge only after the deployed frontend bundle is confirmed current.
+
+## 2026-08-15: [Cross-cutting] Docker Compose isolates only its test database
+- **Choice:** Compose loads `.env.development`, then overrides only the database runtime to its disposable PostgreSQL service and starts it with migrations enabled after database health succeeds.
+- **Reason:** Local container validation must not contact the developer-configured database, while CORS, S3 and other non-database configuration remain aligned with development.
+- **Constraint:** The container entrypoint accepts development mode for this isolated Compose stack so FastAPI seeds demo users; production mode remains strict. Existing `.env.development` files must set `PPE_MODEL_PATH=models/yolo11m_safety.pt`; do not place production storage credentials in that file.
+
+## 2026-08-15: [Backend] Health readiness requires live PostgreSQL and S3
+- **Reason:** A loaded process and model warm-up alone do not prove that production can persist safety events or retrieve redacted evidence.
+- **Choice:** Keep the existing `/health` endpoint and `ready` field, but make `ready=true` require initialized runtime files/models, a live `SELECT 1` through the selected PostgreSQL engine without SQLite fallback, and S3 `HeadBucket`. Add typed per-dependency readiness fields with only stable reason codes.
+- **Constraint:** The response must not expose database URLs, S3 endpoints, provider exception text, or credentials.
 
 ## 2026-08-11: [Backend] Keep SQLite as the current MVP default
 - **Choice:** The two-command local workflow and default settings use `sqlite:///./data/safety_events.db`. PostgreSQL support from `develop2` remains available through an explicit `DATABASE_URL` override and is still the deployment direction after environment validation.
@@ -183,10 +200,16 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Constraints:** The modular-monolith ownership and dependency direction in `docs/FUTURE_PROJECT_STRUCTURE.md` remain authoritative. Executable definitions remain runtime contract truth; architecture prose cannot silently change them.
 - **Safety consequences:** Vision emits observations, deterministic backend rules own severity/event lifecycle, LLM output is advisory, and unredacted evidence must never be persisted.
 
+## 2026-08-16: [Cross-cutting] Root context map is separate from setup README
+- **Reason:** Contributors need concise setup, environment-variable and sample-request guidance, while agents need a stable task-routing context map.
+- **Choice:** `context-map.md` is the sole repository documentation index and mandatory starting point. `README.md` is the operational onboarding guide and links back to the map. `AGENTS.md` and the current-structure document use the new location.
+- **Constraint:** Do not add another documentation catalog; update `context-map.md` when task-routing documentation changes.
+
 ## 2026-08-06: [Cross-cutting] Root README is the only documentation index
 - **Reason:** Layered catalogs and cross-document links create competing navigation paths and make documentation depend on file placement outside its own scope.
 - **Choice:** Only the root repository README indexes documentation. All other documents are standalone and do not link to one another; the agent workflow file is the sole exception because it must load mandatory context.
 - **Constraint:** Moving or adding documentation requires updating the root index. The approved read-only structure baseline is not rewritten solely to remove its existing historical links.
+- **Superseded by:** 2026-08-16 "Root context map is separate from setup README".
 
 ## 2026-08-06: [Cross-cutting] Persist PPE requirements as a rules-owned resource
 - **Reason:** Safety Officers configure required helmet, safety glasses, and gloves once for a camera–zone pair, and every browser/device must use the same saved rule.
@@ -285,19 +308,7 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Runtime:** Remove `person_model_path` and do not preload or call `models/yolo11n.pt`. Per-session model instances may exist to isolate ByteTrack state, but every instance uses the same pinned YOLO11m Safety artifact and each frame has one model call.
 - **Constraint:** This cutover does not claim improved accuracy. Person/hat/vest precision, recall, association, tracking stability and target-device latency must be re-evaluated through US-13 before pilot/production use.
 
-## 2026-08-14: [Cross-cutting] Confirm missing PPE over time before creating a HITL occurrence
-- **Reason:** A single frame can miss a hat or vest because of blur, occlusion, pose, or weak confidence. Creating a candidate for every such frame overwhelms the operator with false/duplicate HITL logs.
-- **Choice:** Keep zone intrusion immediate. For `missing_ppe:hat` and `missing_ppe:vest`, the backend waits for continuous absence for `ppe_alert_confirm_seconds` (default `2.0`) on the same session track before opening an occurrence. A later present or unknown observation cancels an unconfirmed candidate. Candidate state follows a nearby track handoff, expires with the monitoring session, and never crosses sessions.
-- **Compatibility:** No REST/WebSocket field changes. Responses remain `normal` and have no active PPE violation until confirmation; the frontend logs only backend-confirmed active occurrences.
-- **Calibration:** The default is a conservative MVP starting point, not a production accuracy claim. Tune it against the held-out US-13 footage, balancing false alarms against detection delay.
-
-## 2026-08-15: [Cross-cutting] Area-scoped manager accounts and Telegram alert delivery
-- **Reason:** An `area_manager` account must identify the monitoring area it owns, and newly confirmed safety occurrences must reach the responsible manager outside the browser.
-- **Account contract:** Add nullable `managed_area_id`, `telegram_username` and `telegram_chat_id` fields for backward-compatible historical accounts. New assignments to `area_manager` require an existing saved monitoring area. Telegram username is display identity only; private delivery uses the numeric chat ID.
-- **Delivery:** On a newly opened occurrence, backend routing selects active area managers assigned to that area and queues one consolidated Telegram message per recipient/frame. The provider adapter uses Bot API `sendMessage`; an absent token, unlinked recipient or provider failure never interrupts WebSocket inference or removes the in-app alert.
-- **Operational constraint:** Configure `TELEGRAM_BOT_TOKEN` outside source control. A private recipient must start the bot first and have the resulting chat ID stored on the account.
-
-## 2026-08-15: [Cross-cutting] Per-zone whole-camera restricted-area alert
-- **Reason:** Safety Officers need a simple mode that treats any detected person in a selected camera-zone configuration as an immediate danger alert, without relying on polygon placement or simulated machine state.
-- **Choice:** Add the persisted `restricted_area_detection_enabled` switch to the existing camera-zone safety requirement resource, default OFF. When ON, each detected canonical person opens a deduplicated `restricted_area_person` critical occurrence immediately; the frontend presents it as a red Human-in-the-Loop log.
-- **Compatibility:** The REST/WebSocket additions are additive. Existing configuration writes may omit the new field and save it as OFF. PPE hat/vest rules and polygon intrusion behavior are unchanged.
+## 2026-08-15: [Backend] Aggregate rule follows per-person hat/vest and active-zone truth table
+- **Reason:** The operator rule matrix must give the same result for one or more detected people, while preserving independent hat/vest requirements and the machine-state safety gate.
+- **Choice:** Report `violate` when any detected person is missing a PPE item currently required for that camera-zone, or when any detected person enters an active danger zone while its machine is `running`. No detected person is `normal`; a zone entry while `stopped` is `normal` unless an independent PPE rule is violated.
+- **Compatibility:** The REST/WebSocket result fields are unchanged. `PpeRequirementResponse` continues to emit legacy GET aliases; when a canonical caller omits them, `helmet_required` is derived from `hat_required` and the retired glasses/gloves aliases remain `false`.

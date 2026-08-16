@@ -1,7 +1,7 @@
 import datetime
 import enum
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from backend.app.core.database import Base
@@ -26,7 +26,6 @@ def utc_now():
 
 class SafetyEvent(Base):
     __tablename__ = "safety_events"
-    __table_args__ = (UniqueConstraint("monitoring_session_id", "track_id", name="uq_safety_events_session_track"),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     zone_id = Column(String(50), nullable=False, index=True)
@@ -41,7 +40,6 @@ class SafetyEvent(Base):
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     details = Column(JSON, nullable=True)  # JSON for detected items, track_id, bounding boxes
     monitoring_session_id = Column(String(36), nullable=True, index=True)
-    track_id = Column(Integer, nullable=True, index=True)
     occurrences = relationship(
         "EventOccurrence",
         back_populates="event",

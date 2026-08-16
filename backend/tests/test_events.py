@@ -5,10 +5,9 @@ from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy.exc import OperationalError
 
 from backend.app.models.event import EventOccurrence, SafetyEvent
-from backend.app.models.user import User, UserRole
-from backend.app.services.auth_service import AuthService, hash_password
 from backend.app.services.event_service import EventService
 from backend.app.services.frame_inference_service import frame_inference_service
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def test_create_and_get_event(client):
@@ -109,49 +108,8 @@ def test_occurrence_cannot_be_reused_for_a_conflicting_event(client):
     assert conflict.status_code == 409
 
 
-def test_same_track_in_one_session_merges_all_violations_into_one_event(client):
-    session_id = str(uuid4())
-    first_occurrence = str(uuid4())
-    second_occurrence = str(uuid4())
-    common = {
-        "zone_id": "zone_01",
-        "camera_id": "uploaded_video",
-        "event_type": "person_safety_violation",
-        "status": "acknowledged",
-        "monitoring_session_id": session_id,
-        "track_id": 7,
-    }
-
-    first = client.post(
-        "/api/v1/events",
-        json={
-            **common,
-            "occurrence_ids": [first_occurrence],
-            "details": {"violations": ["missing_ppe:hat"]},
-        },
-    )
-    second = client.post(
-        "/api/v1/events",
-        json={
-            **common,
-            "occurrence_ids": [second_occurrence],
-            "details": {"violations": ["missing_ppe:vest", "zone_intrusion:zone_01"]},
-        },
-    )
-
-    assert first.status_code == 201
-    assert second.status_code == 201
-    assert second.json()["id"] == first.json()["id"]
-    assert second.json()["track_id"] == 7
-    assert set(second.json()["occurrence_ids"]) == {first_occurrence, second_occurrence}
-    assert second.json()["details"]["violations"] == [
-        "missing_ppe:hat",
-        "missing_ppe:vest",
-        "zone_intrusion:zone_01",
-    ]
-
-
-def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client):
+def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     session_id = str(uuid4())
     active = frame_inference_service._violation_tracker.evaluate(
         session_id,
@@ -198,7 +156,8 @@ def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(cli
     assert len({event["batch_id"] for event in first.json()["events"]}) == 1
 
 
-def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client):
+def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     session_id = str(uuid4())
     active = frame_inference_service._violation_tracker.evaluate(
         session_id,
@@ -235,14 +194,7 @@ def test_event_batch_returns_503_when_occurrence_lookup_loses_database_connectio
     db_session,
     monkeypatch,
 ):
-    original_query = db_session.query
-    query_calls = 0
-
-    def disconnected_query(*args, **kwargs):
-        nonlocal query_calls
-        query_calls += 1
-        if query_calls == 1:
-            return original_query(*args, **kwargs)
+    def disconnected_query(*_args, **_kwargs):
         raise OperationalError("SELECT safety_events", {}, ConnectionError("connection closed"))
 
     monkeypatch.setattr(db_session, "query", disconnected_query)
@@ -292,45 +244,3 @@ def test_occurrence_lookup_avoids_distinct_over_postgresql_json_columns(db_sessi
         sqlalchemy_event.remove(engine, "before_cursor_execute", capture_statement)
 
     assert not any(statement.lstrip().upper().startswith("SELECT DISTINCT") for statement in statements)
-
-
-def test_area_manager_only_sees_confirmed_events_for_their_assigned_area(client, db_session):
-    db_session.add(
-        User(
-            email="area.zone2@sentinel.local",
-            full_name="Area Zone 2",
-            role=UserRole.AREA_MANAGER.value,
-            password_hash=hash_password("Sentinel123!"),
-            managed_area_id="zone_2",
-        )
-    )
-    db_session.commit()
-    token, _, _ = AuthService(db_session).login("area.zone2@sentinel.local", "Sentinel123!")
-
-    for zone_id in ("zone_2", "zone_3"):
-        response = client.post(
-            "/api/v1/events",
-            json={
-                "zone_id": zone_id,
-                "event_type": "zone_intrusion",
-                "status": "acknowledged",
-            },
-        )
-        assert response.status_code == 201
-
-    client.headers.update({"Authorization": f"Bearer {token}"})
-    events = client.get("/api/v1/events?status=acknowledged")
-    summary = client.get("/api/v1/statistics/summary")
-
-    assert [event["zone_id"] for event in events.json()] == ["zone_2"]
-    assert summary.json()["total_events"] == 1
-    assert [zone["zone_id"] for zone in summary.json()["zone_stats"]] == ["zone_2"]
-
-    event_id = events.json()[0]["id"]
-    resolved = client.patch(f"/api/v1/events/{event_id}", json={"status": "resolved"})
-    assert resolved.status_code == 200
-    assert resolved.json()["status"] == "resolved"
-
-    other_event = db_session.query(SafetyEvent).filter(SafetyEvent.zone_id == "zone_3").first()
-    denied = client.patch(f"/api/v1/events/{other_event.id}", json={"status": "resolved"})
-    assert denied.status_code == 404

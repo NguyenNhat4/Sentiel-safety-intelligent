@@ -28,9 +28,6 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     must_change_password = Column(Boolean, nullable=False, default=False)
-    managed_area_id = Column(String(50), nullable=True, index=True)
-    telegram_username = Column(String(64), nullable=True)
-    telegram_chat_id = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 

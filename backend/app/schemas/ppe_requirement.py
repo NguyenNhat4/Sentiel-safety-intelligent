@@ -12,7 +12,6 @@ class PpeRequirementUpdate(BaseModel):
     profile: Literal["hat_vest_v1"]
     hat_required: StrictBool
     vest_required: StrictBool
-    restricted_area_detection_enabled: StrictBool = False
 
     model_config = ConfigDict(extra="forbid")
 

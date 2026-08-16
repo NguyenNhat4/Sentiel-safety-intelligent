@@ -8,11 +8,3 @@
 .zone-row, .area-event { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem 0; border-top: 1px solid #edf1f0; }
 .zone-row div, .area-event div { display: grid; gap: .25rem; }.zone-row small, .area-event small { color: #64748b; }.zone-row > span { color: #08785b; font-weight: 800; }.area-event > span { border-radius: 1rem; background: #eef5f2; padding: .3rem .65rem; color: #35695b; font-size: .78rem; font-weight: 700; }
 @media (max-width: 900px) { .area-kpis, .area-grid { grid-template-columns: 1fr; } }
-.area-event { width: 100%; border-left: 0; border-right: 0; background: transparent; text-align: left; cursor: pointer; }
-.area-event.selected { background: #f0faf6; padding-left: .75rem; padding-right: .75rem; }
-.area-log-card { max-height: 30rem; overflow: auto; }
-.area-event-detail { margin-top: 1rem; }
-.area-detail-grid { display: grid; grid-template-columns: minmax(14rem, .9fr) 1.1fr; gap: 1.25rem; align-items: start; }
-.area-detail-grid img, .area-snapshot-empty { width: 100%; min-height: 12rem; object-fit: cover; border-radius: .7rem; background: #edf1f0; }
-.area-snapshot-empty { display: grid; place-items: center; color: #64748b; }
-.area-event-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }

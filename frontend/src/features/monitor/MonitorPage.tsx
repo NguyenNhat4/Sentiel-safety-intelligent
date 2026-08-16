@@ -25,12 +25,12 @@ export function MonitorPage() {
           <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy" onClick={actions.toggleMachine}><span /></button>
         </div>
         <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
-        <button className="secondary-btn" disabled={!state.selectedZone} onClick={actions.openFilePicker}>＋ Tải video</button>
+        <button className="secondary-btn" onClick={actions.openFilePicker}>＋ Tải video</button>
         <button className="secondary-btn" disabled={state.playbackDisabled} onClick={() => void actions.handlePlayback()}>{state.playbackLabel}</button>
-        <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
+        <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || state.zoneDisabled || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
       </div>
 
-      <PpeRequirementsPanel cameraId="uploaded_video" zoneId={state.selectedZoneId ?? "zone_01"} />
+      <PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />
 
       <section className="zone-manager" aria-label="Cấu hình vùng nguy hiểm">
         <div className="zone-manager-head">
@@ -77,10 +77,6 @@ export function MonitorPage() {
             <p>{state.videoMeta}</p>
             <button onClick={actions.resetZone} disabled={!state.selectedZone} title="Vẽ lại vùng đang chọn">↺</button>
           </div>
-          {(state.pendingReviewCounts.critical > 0 || state.pendingReviewCounts.other > 0) && <div className="video-alert-summary" role="status">
-            <strong>{state.pendingReviewCounts.critical} log nghiêm trọng cần review</strong>
-            <span>· {state.pendingReviewCounts.other} log PPE cần review</span>
-          </div>}
           <div className={`camera-scene ${state.stageReady ? "ready" : ""}`}>
             <video ref={refs.videoRef} className="uploaded-media active" preload="auto" playsInline muted
               onLoadedMetadata={actions.handleLoadedMetadata} onSeeked={actions.handleSeeked} onEnded={actions.handleEnded} />
@@ -109,10 +105,14 @@ export function MonitorPage() {
 
         <AlertPanel
           view={state.view}
-          hitlLogs={state.hitlLogs}
+          reviewPending={Boolean(state.pendingViolation)}
+          reviewSaving={state.reviewSaving}
           people={state.latestPeople}
           detections={state.latestDetections}
-          onOpenModal={actions.openReviewLog}
+          snapshot={state.pendingViolation?.snapshot_data}
+          timer={state.timer}
+          onReview={status => void actions.review(status)}
+          onOpenModal={actions.openReviewModal}
         />
       </div>
 
