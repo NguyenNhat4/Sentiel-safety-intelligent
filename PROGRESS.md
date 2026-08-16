@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-16: [Cross-cutting] Zone-intrusion debounce restored
+- A person must remain inside the same active danger zone for four consecutive sampled frames before the backend opens a `zone_intrusion` occurrence.
+- Whole-camera restricted-area alerts remain immediate; missing PPE still requires continuous two-second confirmation.
+
 ## 2026-08-15: [Cross-cutting] One accumulated event per tracked person
 - Human-in-the-Loop review now isolates the selected tracked person and saves one `person_safety_violation` event containing every observed hat, vest, restricted-area, and zone rule.
 - Later violations for the same `(monitoring_session_id, track_id)` merge into the existing event. Added a portable Alembic uniqueness constraint and focused backend/frontend coverage.

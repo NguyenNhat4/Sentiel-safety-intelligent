@@ -63,6 +63,7 @@ class FrameInferenceService:
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
         self._violation_tracker = ViolationTrackingService(
             ppe_confirmation_seconds=settings.ppe_alert_confirm_seconds,
+            zone_activation_frames=settings.zone_alert_confirm_frames,
         )
 
     def preload_models(self) -> None:

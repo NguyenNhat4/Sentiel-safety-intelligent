@@ -158,6 +158,17 @@ def test_ppe_candidate_requires_continuous_absence_before_opening_occurrence():
     assert opened[0].is_new is True
 
 
+def test_zone_debounce_does_not_delay_a_restricted_area_alert():
+    service = ViolationTrackingService(zone_activation_frames=4)
+
+    for frame in range(1, 4):
+        result = service.evaluate("session-a", {4: {"zone_intrusion", "restricted_area_person"}}, {4}, now=float(frame))
+        assert [item.rule_key for item in result[4]] == ["restricted_area_person"]
+
+    opened = service.evaluate("session-a", {4: {"zone_intrusion", "restricted_area_person"}}, {4}, now=4.0)[4]
+    assert {item.rule_key for item in opened} == {"zone_intrusion", "restricted_area_person"}
+
+
 def test_ppe_candidate_is_cancelled_when_later_frame_confirms_item_present():
     service = ViolationTrackingService(ppe_confirmation_seconds=2.0)
 

@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
     ppe_alert_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
+    zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
     model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
 

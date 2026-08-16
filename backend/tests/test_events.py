@@ -153,12 +153,13 @@ def test_same_track_in_one_session_merges_all_violations_into_one_event(client):
 
 def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client):
     session_id = str(uuid4())
-    active = frame_inference_service._violation_tracker.evaluate(
-        session_id,
-        {1: {"zone_intrusion:left"}, 2: {"zone_intrusion:right"}},
-        {1, 2},
-        now=time.monotonic(),
-    )
+    for frame in range(4):
+        active = frame_inference_service._violation_tracker.evaluate(
+            session_id,
+            {1: {"zone_intrusion:left"}, 2: {"zone_intrusion:right"}},
+            {1, 2},
+            now=time.monotonic() + frame,
+        )
     left_id = active[1][0].occurrence_id
     right_id = active[2][0].occurrence_id
     payload = {
@@ -200,12 +201,13 @@ def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(cli
 
 def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client):
     session_id = str(uuid4())
-    active = frame_inference_service._violation_tracker.evaluate(
-        session_id,
-        {1: {"zone_intrusion:left"}},
-        {1},
-        now=time.monotonic(),
-    )
+    for frame in range(4):
+        active = frame_inference_service._violation_tracker.evaluate(
+            session_id,
+            {1: {"zone_intrusion:left"}},
+            {1},
+            now=time.monotonic() + frame,
+        )
     occurrence_id = active[1][0].occurrence_id
     try:
         response = client.post(

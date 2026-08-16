@@ -27,6 +27,7 @@ class ViolationTrackingService:
         self,
         *,
         activation_frames: int | None = None,
+        zone_activation_frames: int = 1,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
@@ -36,7 +37,10 @@ class ViolationTrackingService:
     ) -> None:
         if activation_frames is not None and activation_frames < 1:
             raise ValueError("activation_frames must be at least 1")
+        if zone_activation_frames < 1:
+            raise ValueError("zone_activation_frames must be at least 1")
         self._activation_frames = activation_frames
+        self._zone_activation_frames = zone_activation_frames
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
@@ -79,7 +83,10 @@ class ViolationTrackingService:
         for key in observed_keys:
             _, track_id, rule_key = key
             occurrence = self._occurrences.get(key)
-            if self._activation_frames is not None:
+            activation_frames = self._activation_frames
+            if activation_frames is None and rule_key.startswith("zone_intrusion"):
+                activation_frames = self._zone_activation_frames
+            if activation_frames is not None:
                 if occurrence is None:
                     occurrence = _Occurrence(occurrence_id=str(uuid4()), active=False)
                     self._occurrences[key] = occurrence
@@ -90,8 +97,11 @@ class ViolationTrackingService:
                     is_new = False
                 else:
                     occurrence.consecutive_frames += 1
-                    if occurrence.consecutive_frames < self._activation_frames:
+                    if occurrence.consecutive_frames < activation_frames:
                         continue
+                    if occurrence.cooldown_until > 0:
+                        occurrence = _Occurrence(occurrence_id=str(uuid4()), active=True)
+                        self._occurrences[key] = occurrence
                     occurrence.active = True
                     is_new = True
                 occurrence.absent_frames = 0
