@@ -7,6 +7,7 @@ import numpy as np
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.frame_inference_service import FrameInferenceService
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def _zone(zone_id: str, points: list[tuple[float, float]], *, state: str = "stopped", order: int = 0):
@@ -117,6 +118,17 @@ def test_zone_collection_rejects_overlap_touch_and_containment_atomically(client
     assert loaded["zones"] == original
 
 
+def test_multi_zone_request_accepts_camera_wide_machine_state():
+    request = FrameInferenceRequest(
+        image_data=_jpeg_data_url(),
+        zones=[_rect("press_01", 0.1, 0.1, 0.3, 0.4)],
+        zone_revision=1,
+        machine_state="stopped",
+    )
+
+    assert request.machine_state == "stopped"
+
+
 def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch):
     observer_calls = 0
 
@@ -130,6 +142,7 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
         return [present for _ in people]
 
     service = FrameInferenceService(ppe_observer=observe, requirement_loader=_no_ppe_requirements)
+    service._violation_tracker = ViolationTrackingService(activation_frames=1)
     monkeypatch.setattr(
         service,
         "_track_people",

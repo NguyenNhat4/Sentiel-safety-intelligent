@@ -6,35 +6,17 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 ## Mục tiêu và ràng buộc
 
 - Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ bảo hộ/áo phản quang và xâm nhập vùng nguy hiểm.
-- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập chỉ là critical khi chính máy của vùng đó đang chạy. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
+- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập vùng enabled luôn là critical, không phụ thuộc trạng thái máy mô phỏng. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
 - Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
 - Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
-- Hai vai trò được backend phân quyền: `safety_officer` và `zone_manager`.
+- Ba vai trò được backend phân quyền: `system_admin`, `safety_officer` và `area_manager`.
 - MVP là một stream mô phỏng; camera thật, PLC, tự dừng máy và multi-stream nằm ngoài phạm vi.
 
 ## Kiến trúc đích
 
-```mermaid
-flowchart LR
-    UI["React SPA\nmonitor · review · dashboard"]
-    API["FastAPI transport\nREST · WebSocket · auth"]
-    DOMAIN["Backend service layer\nmonitoring · rules · events · auth\nanalytics · escalation · reporting"]
-    VISION["Vision facade\nperson/PPE · tracking · zone · redaction"]
-    DB[("PostgreSQL\nevent · audit · config")]
-    STORE[("Encrypted object storage\nredacted snapshots/reports")]
-    OUT["Notification provider"]
-
-    UI -->|typed REST / binary-JPEG WS| API
-    API --> DOMAIN
-    DOMAIN -->|observation request| VISION
-    VISION -->|observation + redacted image| DOMAIN
-    DOMAIN --> DB
-    DOMAIN --> STORE
-    DOMAIN -->|critical, idempotent| OUT
-```
-
 Giữ **modular monolith** để giao nhanh và triển khai đơn giản. `frontend/`, `backend/` và
 `vision/` là ba owner production; chỉ tách service khi có nhu cầu scale hoặc vận hành đã đo được.
+Sơ đồ component và data flow runtime nằm trong `docs/architecture_diagram.md`.
 
 ## Boundary và dependency
 
@@ -58,36 +40,14 @@ Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlc
 tests) là nguồn sự thật. Thay đổi breaking phải được phê duyệt và có migration hoặc
 compatibility test.
 
-## Luồng quyết định an toàn
-
-```mermaid
-sequenceDiagram
-    participant UI as Browser
-    participant API as FastAPI
-    participant CV as Vision
-    participant R as Rules / Events
-    participant P as Persistence
-    UI->>API: zone collection config + frame JPEG / image
-    API->>CV: analyze frame once
-    CV-->>API: observations, track, confidence, redacted image
-    API->>R: observations + zones/machines/rule/session context
-    R->>R: point-in-polygons + triage + zone-scoped dedup + severity
-    alt normal hoặc dưới ngưỡng
-        R-->>UI: result, không tạo event
-    else mơ hồ hoặc vi phạm
-        R-->>UI: pending HITL alert
-        UI->>API: confirm / false_alarm / acknowledge
-        API->>P: atomic event + audit + redacted snapshot
-    end
-```
-
 Các bất biến an toàn:
 
 1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
-2. Zone entry khi máy của chính vùng đó chạy luôn critical; vùng stopped không được làm phát sinh zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
-3. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
-4. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
-5. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.
+2. Zone entry của một vùng enabled luôn critical, dù machine state là `running` hay `stopped`. Machine state vẫn là audit/operational context, không phải điều kiện chặn zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
+3. PPE chỉ được đánh giá khi máy đang `running`; khi máy `stopped`, các switch requirement và observation PPE không được tạo PPE alert.
+4. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
+5. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
+6. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.
 
 ## Trạng thái triển khai
 

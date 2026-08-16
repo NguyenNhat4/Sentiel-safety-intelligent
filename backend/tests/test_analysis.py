@@ -9,6 +9,7 @@ import pytest
 from backend.app.api.v1.analysis import frame_inference_service
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def jpeg_bytes(width=160, height=120):
@@ -21,6 +22,7 @@ def jpeg_bytes(width=160, height=120):
 @pytest.fixture(autouse=True)
 def use_stubbed_vision_observations(monkeypatch):
     """Keep analysis rule tests independent from the installed vision model."""
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
     monkeypatch.setattr(
         frame_inference_service,
@@ -71,7 +73,10 @@ def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    data = response.json()
+    assert data["status"] in {"ok", "degraded"}
+    assert isinstance(data["ready"], bool)
+    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage"}
 
 
 def test_frontend_is_served(client):
@@ -203,7 +208,7 @@ def test_frame_inference_rejects_invalid_image(client):
     assert response.status_code == 400
 
 
-def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch):
+def test_zone_entry_requests_review_when_machine_is_stopped(monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",

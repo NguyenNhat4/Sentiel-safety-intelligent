@@ -15,7 +15,7 @@ def jpeg_data_url() -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(buffer.tobytes()).decode()}"
 
 
-def request() -> FrameInferenceRequest:
+def request(*, with_zone: bool = True, machine_state: str = "running") -> FrameInferenceRequest:
     return FrameInferenceRequest(
         image_data=jpeg_data_url(),
         zone_points=[
@@ -23,8 +23,10 @@ def request() -> FrameInferenceRequest:
             {"x": 0.9, "y": 0.1},
             {"x": 0.9, "y": 0.9},
             {"x": 0.1, "y": 0.9},
-        ],
-        machine_state="stopped",
+        ]
+        if with_zone
+        else [],
+        machine_state=machine_state,
     )
 
 
@@ -92,6 +94,16 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     assert [item.class_name for item in result.detections] == ["person", "hat"]
 
 
+def test_preload_models_warms_the_unified_safety_model(monkeypatch):
+    service = FrameInferenceService(ppe_observer=lambda frame, people: {"people": [], "detections": []})
+    loaded = []
+    monkeypatch.setattr(service, "_model_preloader", lambda: loaded.append("safety"))
+
+    service.preload_models()
+
+    assert loaded == ["safety"]
+
+
 def test_required_explicitly_missing_ppe_requests_review():
     service = FrameInferenceService(
         model_path="unused.pt",
@@ -141,7 +153,7 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
     )
     service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
 
-    result = service.infer(request())
+    result = service.infer(request(with_zone=False, machine_state="stopped"))
 
     assert result.people[0].ppe.hat.status == "missing"
     assert result.people[0].missing_required_ppe == []
@@ -238,7 +250,7 @@ def test_low_confidence_person_without_hat_remains_unknown():
     )
     service._detect_people = lambda frame: [(40, 10, 40, 80, 0.2)]
 
-    result = service.infer(request())
+    result = service.infer(request(with_zone=False, machine_state="stopped"))
 
     assert result.people[0].ppe.hat.status == "unknown"
     assert result.people[0].missing_required_ppe == []

@@ -50,6 +50,9 @@ class PpeRequirementService:
                 restricted_area_detection_enabled=False,
                 is_configured=False,
                 updated_at=None,
+                helmet_required=False,
+                safety_glasses_required=False,
+                gloves_required=False,
             )
         return self._response(requirement)
 
@@ -95,4 +98,7 @@ class PpeRequirementService:
             restricted_area_detection_enabled=requirement.restricted_area_detection_enabled,
             is_configured=True,
             updated_at=requirement.updated_at,
+            helmet_required=requirement.hat_required,
+            safety_glasses_required=False,
+            gloves_required=False,
         )

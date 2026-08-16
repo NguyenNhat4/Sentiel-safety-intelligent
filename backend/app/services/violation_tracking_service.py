@@ -17,6 +17,7 @@ class _Occurrence:
     absent_frames: int = 0
     lost_frames: int = 0
     cooldown_until: float = 0.0
+    consecutive_frames: int = 0
 
 
 class ViolationTrackingService:
@@ -25,6 +26,7 @@ class ViolationTrackingService:
     def __init__(
         self,
         *,
+        activation_frames: int | None = None,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
@@ -32,6 +34,9 @@ class ViolationTrackingService:
         session_ttl_seconds: float = 300.0,
         track_handoff_max_distance: float = 0.12,
     ) -> None:
+        if activation_frames is not None and activation_frames < 1:
+            raise ValueError("activation_frames must be at least 1")
+        self._activation_frames = activation_frames
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
@@ -74,6 +79,25 @@ class ViolationTrackingService:
         for key in observed_keys:
             _, track_id, rule_key = key
             occurrence = self._occurrences.get(key)
+            if self._activation_frames is not None:
+                if occurrence is None:
+                    occurrence = _Occurrence(occurrence_id=str(uuid4()), active=False)
+                    self._occurrences[key] = occurrence
+                if occurrence.active:
+                    is_new = False
+                elif now < occurrence.cooldown_until:
+                    occurrence.active = True
+                    is_new = False
+                else:
+                    occurrence.consecutive_frames += 1
+                    if occurrence.consecutive_frames < self._activation_frames:
+                        continue
+                    occurrence.active = True
+                    is_new = True
+                occurrence.absent_frames = 0
+                occurrence.lost_frames = 0
+                output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
+                continue
             if occurrence is None and self._requires_ppe_confirmation(rule_key):
                 started_at = self._pending_ppe_since.setdefault(key, now)
                 if now - started_at < self._ppe_confirmation_seconds:
@@ -100,6 +124,8 @@ class ViolationTrackingService:
         for key, occurrence in list(self._occurrences.items()):
             existing_session, track_id, _ = key
             if existing_session != session_id or key in observed_keys or not occurrence.active:
+                if existing_session == session_id and key not in observed_keys and not occurrence.active:
+                    occurrence.consecutive_frames = 0
                 continue
             if track_id not in present_tracks:
                 occurrence.lost_frames += 1

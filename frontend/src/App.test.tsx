@@ -147,12 +147,40 @@ describe("Sentinel React application", () => {
     expect(screen.getByText("Tải video demo")).toBeInTheDocument();
   });
 
-  it("does not expose a camera-wide machine switch without a selected zone", async () => {
+  it("keeps the camera-wide machine switch available without a selected zone", async () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
-    expect(screen.getByRole("button", {name: "Chuyển trạng thái máy của vùng đang chọn"})).toBeDisabled();
-    expect(screen.getByText("Chưa chọn vùng")).toBeInTheDocument();
+    const machineToggle = screen.getByRole("button", {name: "Chuyển trạng thái máy"});
+    expect(machineToggle).toBeEnabled();
+    fireEvent.click(machineToggle);
+    expect(screen.getAllByText("Máy đã dừng")).toHaveLength(2);
+  });
+
+  it("rewinds an uploaded video so the same file can be replayed after it ends", async () => {
+    mockAuthenticatedSession();
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:uploaded-video"),
+      revokeObjectURL: vi.fn(),
+    });
+    const {container} = render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const video = container.querySelector("video") as HTMLVideoElement;
+    Object.defineProperties(video, {
+      videoWidth: {value: 1280},
+      videoHeight: {value: 720},
+      duration: {value: 20},
+      currentTime: {value: 20, writable: true},
+    });
+    vi.spyOn(video, "load").mockImplementation(() => undefined);
+    fireEvent.change(input, {target: {files: [new File(["video"], "shift.mp4", {type: "video/mp4"})]}});
+    fireEvent.loadedMetadata(video);
+    fireEvent.ended(video);
+
+    expect(video.currentTime).toBe(0);
+    expect(screen.getByRole("button", {name: "↻ Phát lại"})).toBeEnabled();
   });
 
   it("creates points only after the explicit Tạo vùng action", async () => {
@@ -189,7 +217,7 @@ describe("Sentinel React application", () => {
       fireEvent.pointerUp(canvas, {pointerId: 1});
     });
     await waitFor(() => expect(screen.getByText("Vùng 1 · 4/4 · kéo điểm để chỉnh")).toBeInTheDocument());
-    expect(screen.getByText((_, node) => node?.textContent === "4/4 · BẬT · STOP")).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node?.textContent === "4/4 · BẬT")).toBeInTheDocument();
   });
 
   it("removes a confirmed zone from the UI and persists only when configuration is saved", async () => {
@@ -238,7 +266,7 @@ describe("Sentinel React application", () => {
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
     await screen.findByText("2 vùng đã cấu hình");
-    expect(canvasLabels).toContain("Vùng 2 · STOP");
+    expect(canvasLabels).toContain("Vùng 2");
     fireEvent.click(screen.getByRole("button", {name: /Vùng 2/}));
 
     fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
@@ -248,7 +276,7 @@ describe("Sentinel React application", () => {
     fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
     expect(screen.getByText("1 vùng đã cấu hình")).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Vùng 2/})).not.toBeInTheDocument();
-    expect(canvasLabels).not.toContain("Vùng 2 · STOP");
+    expect(canvasLabels).not.toContain("Vùng 2");
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình vùng"}));

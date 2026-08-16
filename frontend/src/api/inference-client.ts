@@ -13,6 +13,7 @@ interface MultiZoneConfiguration {
   zones: MonitoringZone[];
   zone_revision: number;
   camera_id: string;
+  machine_state: MachineState;
   monitoring_session_id: string;
 }
 

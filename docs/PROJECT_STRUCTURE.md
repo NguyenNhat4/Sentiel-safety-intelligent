@@ -26,7 +26,8 @@ P-047/
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
 │   │   │   ├── config.py
 │   │   │   ├── database.py
-│   │   │   └── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   ├── operational_metrics.py # Rotated privacy-safe JSONL writer
+│   │   │   └── startup_validation.py # Production model and writable-volume validation
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
@@ -41,6 +42,7 @@ P-047/
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
 │   │   │   ├── event.py
+│   │   │   ├── health.py # Typed public /health dependency-readiness response
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
@@ -134,12 +136,14 @@ P-047/
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
 │   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
-├── docs/                # Problem statement, structure docs, technical guides and documentation index
+├── docs/                # Problem statement, structure docs and technical guides
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
+│   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
+│   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
@@ -160,6 +164,11 @@ P-047/
 │   ├── README.md
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── production_start.py # Docker preflight, migration and one-worker startup
+│   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
+│   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check
+│   ├── backup_data.py # Timestamped archive of persistent Docker data
+│   ├── restore_data.py # Safe restore into empty persistent Docker data
 │   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums
 ├── eval/                # Evaluation reports and benchmark results
 │   └── results/
@@ -172,12 +181,17 @@ P-047/
 │   ├── services/        # Legacy LLM factory
 │   └── ui/              # Legacy static UI
 ├── DECISIONS.md         # Single project-wide design decision log
+├── context-map.md       # Single repository context map and documentation index
 ├── PROGRESS.md          # Single project-wide progress tracker
 ├── ARCHITECTURE.md      # Canonical system architecture and diagrams
 ├── tests/                # Cross-cutting and automation tests
 │   ├── test_bootstrap_legacy_sqlite.py
+│   ├── test_startup_validation.py
 │   └── test_validate_us13_dataset.py
 ├── docker-compose.yml
+├── .env.development.example # Development environment template for `make setup`
+├── .env.production.example  # Production Docker Compose environment template
+├── requirements.docker.txt # Production-only, CPU/headless Python dependency set
 └── README.md
 ```
 

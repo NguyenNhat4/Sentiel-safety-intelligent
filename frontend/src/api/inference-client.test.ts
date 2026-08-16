@@ -95,6 +95,7 @@ describe("InferenceClient", () => {
         }],
         zone_revision: 7,
         camera_id: "uploaded_video",
+        machine_state: "stopped",
         monitoring_session_id: "46a62d3a-4fb4-4a54-87bc-58e075722e2c",
       }),
       onResult: vi.fn(), onFailure: vi.fn(),
@@ -106,7 +107,7 @@ describe("InferenceClient", () => {
     const connection = client.connect();
     sockets[0].open();
     expect(JSON.parse(sockets[0].sent[0] as string)).toMatchObject({
-      type: "configure", zone_revision: 7, camera_id: "uploaded_video",
+      type: "configure", zone_revision: 7, camera_id: "uploaded_video", machine_state: "stopped",
       zones: [{zone_id: "press_01", machine_state: "running"}],
     });
     sockets[0].message({type: "configured", zone_revision: 7});

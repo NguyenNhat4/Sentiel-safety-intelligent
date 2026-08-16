@@ -64,7 +64,7 @@ function EventCard({event}: {event: SafetyEvent}) {
 }
 
 function eventTypeLabel(type: string): string {
-  return type === "missing_ppe_and_intrusion" ? "Thiếu PPE trong vùng cấm" : "Người đi vào vùng cấm khi máy đang chạy";
+  return type === "missing_ppe_and_intrusion" ? "Thiếu PPE trong vùng cấm" : "Có người vào vùng cấm";
 }
 
 function formatTimestamp(timestamp: string): string {

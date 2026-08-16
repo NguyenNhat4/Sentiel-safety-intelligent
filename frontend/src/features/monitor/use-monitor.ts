@@ -551,6 +551,8 @@ export function useMonitor() {
   function handleEnded(): void {
     session.current.running = false;
     client.close();
+    const video = videoRef.current;
+    if (video) video.currentTime = 0;
     setPlaybackLabel("↻ Phát lại");
     capturePausedFrame();
   }
@@ -563,7 +565,7 @@ export function useMonitor() {
     if (selected) updateZone(selected.zone_id, zone => ({...zone, machine_state: running ? "running" : "stopped"}));
     setView(current => ({
       ...current,
-      machineRule: {yes: running, text: running ? "Vùng đang chạy" : "Vùng đã dừng", badge: running ? "ON" : "OFF"}
+      machineRule: {yes: running, text: running ? "Máy đang chạy" : "Máy đã dừng", badge: running ? "ON" : "OFF"}
     }));
   }
 
