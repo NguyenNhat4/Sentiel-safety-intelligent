@@ -74,9 +74,13 @@ class Settings(BaseSettings):
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     violation_frame: int = Field(default=5, ge=1, le=60)
     ppe_alert_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
-    # Local commands load development defaults. Docker and managed platforms pass
-    # production settings as process environment variables.
-    model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
+    zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
+
+    model_config = SettingsConfigDict(
+        env_file=(".env.development", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     def validate_snapshot_storage(self) -> None:
         if self.snapshot_storage_backend != "s3":

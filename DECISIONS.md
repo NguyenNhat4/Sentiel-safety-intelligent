@@ -307,6 +307,11 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Compatibility:** No REST/WebSocket field changes. Responses remain `normal` and have no active PPE violation until confirmation; the frontend logs only backend-confirmed active occurrences.
 - **Calibration:** The default is a conservative MVP starting point, not a production accuracy claim. Tune it against the held-out US-13 footage, balancing false alarms against detection delay.
 
+## 2026-08-16: [Cross-cutting] Debounce zone intrusion over four consecutive frames
+- **Supersedes:** The “keep zone intrusion immediate” portion of the 2026-08-14 decision; its PPE confirmation policy remains unchanged.
+- **Choice:** Open a `zone_intrusion` occurrence only after the same tracked person is inside the same active zone in four consecutive sampled frames. `restricted_area_person` remains immediate and missing hat/vest remains governed by the independent two-second confirmation rule.
+- **Reason:** A short-lived false person detection must not produce a critical zone alert, while whole-camera restricted-area mode remains an explicit immediate-safety control.
+
 ## 2026-08-15: [Cross-cutting] Area-scoped manager accounts and Telegram alert delivery
 - **Reason:** An `area_manager` account must identify the monitoring area it owns, and newly confirmed safety occurrences must reach the responsible manager outside the browser.
 - **Account contract:** Add nullable `managed_area_id`, `telegram_username` and `telegram_chat_id` fields for backward-compatible historical accounts. New assignments to `area_manager` require an existing saved monitoring area. Telegram username is display identity only; private delivery uses the numeric chat ID.
