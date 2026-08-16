@@ -40,7 +40,7 @@ class FrameInferenceRequest(BaseModel):
     def validate_session_frame_pair(self):
         if (self.monitoring_session_id is None) != (self.frame_id is None):
             raise ValueError("monitoring_session_id and frame_id must be provided together")
-        if self.zones is not None and {"zone_points", "machine_state", "zone_id"} & self.model_fields_set:
+        if self.zones is not None and {"zone_points", "zone_id"} & self.model_fields_set:
             raise ValueError("Use either legacy zone fields or zones, not both")
         if self.zones is None and "zone_revision" in self.model_fields_set:
             raise ValueError("zone_revision is only valid with zones")
@@ -111,7 +111,7 @@ class InferenceWebSocketConfigure(BaseModel):
 
     @model_validator(mode="after")
     def validate_configuration_mode(self):
-        if self.zones is not None and {"zone_points", "machine_state", "zone_id"} & self.model_fields_set:
+        if self.zones is not None and {"zone_points", "zone_id"} & self.model_fields_set:
             raise ValueError("Use either legacy zone fields or zones, not both")
         if self.zones is None and "zone_revision" in self.model_fields_set:
             raise ValueError("zone_revision is only valid with zones")

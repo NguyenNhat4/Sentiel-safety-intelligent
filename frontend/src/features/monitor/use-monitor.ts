@@ -42,7 +42,7 @@ export interface MonitorView {
   ppeRule: RuleView;
 }
 
-const initialView = (machineRunning = true): MonitorView => ({
+const initialView = (machineIsRunning = true): MonitorView => ({
   violation: false,
   alertTitle: "Chưa có vi phạm",
   severity: "NORMAL",
@@ -53,9 +53,9 @@ const initialView = (machineRunning = true): MonitorView => ({
   confidenceWidth: "12%",
   zoneRule: {yes: null, text: "Chưa phát hiện", badge: "—"},
   machineRule: {
-    yes: machineRunning,
-    text: machineRunning ? "Machine A đang chạy" : "Machine A đã dừng",
-    badge: machineRunning ? "ON" : "OFF"
+    yes: machineIsRunning,
+    text: machineIsRunning ? "Máy đang chạy" : "Máy đã dừng",
+    badge: machineIsRunning ? "ON" : "OFF"
   },
   ppeRule: {yes: null, text: "Chưa phát hiện", badge: "—"}
 });
@@ -142,6 +142,7 @@ export function useMonitor() {
         zones: appliedZonesRef.current,
         zone_revision: zoneRevisionRef.current,
         camera_id: "uploaded_video",
+        machine_state: machineRunningRef.current ? "running" : "stopped",
         monitoring_session_id: session.current.monitoringSessionId
       }),
       onResult: result => resultHandler.current(result),
@@ -475,15 +476,14 @@ export function useMonitor() {
   }
 
   function toggleMachine(): void {
-    const selected = zonesRef.current.find(zone => zone.zone_id === selectedZoneId);
-    const running = selected ? selected.machine_state !== "running" : !machineRunningRef.current;
+    const running = !machineRunningRef.current;
     machineRunningRef.current = running;
     setMachineRunning(running);
-    if (selected) updateZone(selected.zone_id, zone => ({...zone, machine_state: running ? "running" : "stopped"}));
     setView(current => ({
       ...current,
-      machineRule: {yes: running, text: running ? "Vùng đang chạy" : "Vùng đã dừng", badge: running ? "ON" : "OFF"}
+      machineRule: {yes: running, text: running ? "Máy đang chạy" : "Máy đã dừng", badge: running ? "ON" : "OFF"}
     }));
+    client.updateConfiguration();
   }
 
   function resetZone(): void {
@@ -662,7 +662,7 @@ export function useMonitor() {
     refs: {videoRef, overlayRef, captureRef, fileInputRef},
     state: {
       zones, zoneRevision, zoneHydrated, selectedZoneId, selectedZone, drawingZoneId, newDraftZoneId, zoneSaving,
-      machineRunning: selectedZone ? selectedZone.machine_state === "running" : machineRunning,
+      machineRunning,
       pendingViolation, isReviewModalOpen, reviewSaving, view,
       fileLabel, videoMeta, previewSrc, stageReady, playbackDisabled, playbackLabel,
       zoneDisabled, flowStatus, toast, selectedPointPosition, timer,
@@ -723,9 +723,9 @@ export function buildReviewCopy(result: InferenceResult): {
   });
   const activeZones = result.rule.zone_results?.filter(zone => zone.violation) ?? [];
   const zoneReasons = activeZones.length
-    ? activeZones.map(zone => `Vùng cấm "${zone.zone_id}" có người khi máy đang chạy`)
-    : result.rule.person_inside_zone && result.rule.machine_state === "running"
-      ? ["Có người trong vùng cấm khi máy đang chạy"]
+    ? activeZones.map(zone => `Vùng cấm "${zone.zone_id}" có người xâm nhập`)
+    : result.rule.person_inside_zone
+      ? ["Có người trong vùng cấm"]
       : [];
   const reasons = [...ppeReasons, ...zoneReasons];
 
@@ -739,10 +739,10 @@ export function buildReviewCopy(result: InferenceResult): {
   const hasPpeViolation = ppeReasons.length > 0;
   const hasZoneViolation = zoneReasons.length > 0;
   const title = hasPpeViolation && hasZoneViolation
-    ? "Thiếu PPE và vào vùng cấm khi máy đang chạy"
+    ? "Thiếu PPE và có người vào vùng cấm"
     : hasPpeViolation
       ? "Thiếu PPE bắt buộc"
-      : "Người vào vùng cấm khi máy đang chạy";
+      : "Có người vào vùng cấm";
 
   return {
     title,
@@ -755,7 +755,7 @@ export function buildEventPayload(
   status: ReviewStatus,
   pending: InferenceResult,
   zonePoints: ZonePoint[],
-  machineRunning: boolean
+  machineIsRunning: boolean
 ): EventPayload {
   const occurrenceIds = [...new Set(
     pending.people.flatMap(person =>
@@ -765,7 +765,7 @@ export function buildEventPayload(
   return {
     zone_id: "zone_01",
     camera_id: "uploaded_video",
-    event_type: "zone_intrusion_while_machine_running",
+    event_type: "zone_intrusion",
     severity: "high",
     status,
     acknowledged_by: "Safety Officer",
@@ -777,7 +777,7 @@ export function buildEventPayload(
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
-      machine_state: machineRunning ? "running" : "stopped",
+      machine_state: machineIsRunning ? "running" : "stopped",
       video_timestamp_seconds: pending.video_time,
       people: pending.people,
       zone_points: zonePoints

@@ -12,7 +12,7 @@ Hệ thống hướng tới:
 
 - Phát hiện người và PPE bắt buộc theo profile `hat_vest_v1`: mũ bảo hộ và áo phản quang.
 - Xác định người đi vào polygon vùng nguy hiểm.
-- Chỉ đánh giá xâm nhập là critical khi máy đang chạy.
+- Báo vi phạm khi người đi vào vùng cấm đang bật, bất kể trạng thái máy; trạng thái máy vẫn là ngữ cảnh vận hành và chỉ gate cảnh báo PPE.
 - Hiển thị cảnh báo gần realtime và chuyển trường hợp mơ hồ cho con người.
 - Chống tạo nhiều event cho cùng một vi phạm liên tục.
 - Lưu quyết định review, audit context và snapshot đã làm mờ danh tính.
@@ -180,9 +180,9 @@ npm --prefix frontend run build
 
 1. Mở <http://localhost:8000/> và upload video mô phỏng.
 2. Vẽ đúng bốn điểm của vùng nguy hiểm.
-3. Chuyển máy sang trạng thái chạy và phát video.
+3. Chọn trạng thái máy phù hợp và phát video.
 4. Xác nhận bounding box người và foot point được hiển thị.
-5. Xác nhận video chỉ dừng để review khi foot point vào vùng trong lúc máy chạy.
+5. Xác nhận video dừng để review khi foot point vào vùng cấm đang bật, kể cả khi máy đã dừng.
 6. Chọn **Vi phạm thực tế**, mở **Nhật ký vi phạm** và kiểm tra event đã lưu.
 
 ## Quy tắc đóng góp quan trọng

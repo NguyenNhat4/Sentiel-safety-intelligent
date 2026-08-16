@@ -118,6 +118,17 @@ def test_zone_collection_rejects_overlap_touch_and_containment_atomically(client
     assert loaded["zones"] == original
 
 
+def test_multi_zone_request_accepts_camera_wide_machine_state():
+    request = FrameInferenceRequest(
+        image_data=_jpeg_data_url(),
+        zones=[_rect("press_01", 0.1, 0.1, 0.3, 0.4)],
+        zone_revision=1,
+        machine_state="stopped",
+    )
+
+    assert request.machine_state == "stopped"
+
+
 def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch):
     observer_calls = 0
 

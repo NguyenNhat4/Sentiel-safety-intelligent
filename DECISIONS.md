@@ -2,6 +2,16 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-16: [Cross-cutting] Make machine state camera-wide, not zone-owned
+- **Reason:** The UI disabled machine control until a zone was selected, while zone intrusion no longer depends on machine state. This made the control unavailable and tied PPE behavior to unrelated zone configuration.
+- **Choice:** Multi-zone WebSocket configuration carries its own `machine_state`, defaulting to `running` for compatibility. The frontend switch is always available and pushes an updated configuration immediately. Zone geometry and persisted zone rows remain unchanged; the camera-wide state gates PPE evaluation only.
+- **Compatibility:** The change is additive for multi-zone WebSocket clients. Existing clients that omit `machine_state` retain the `running` default; legacy one-zone messages continue unchanged.
+
+## 2026-08-16: [Frontend] Render danger-zone intrusion independently from machine state
+- **Reason:** The deterministic backend rule already alerts whenever a person enters an enabled danger zone, but the review UI and legacy event fallback still described an obsolete running-machine gate.
+- **Choice:** Use **Có người vào vùng cấm** in alert/review/history copy for any zone intrusion. Keep `machine_state` as visible operating context and audit metadata, not a qualifier of the intrusion. The legacy single-event fallback emits canonical `zone_intrusion`.
+- **Compatibility:** REST/WebSocket schemas, multi-zone grouping, occurrence keys and persisted event payload fields are unchanged.
+
 ## 2026-08-16: [Cross-cutting] Alert enabled danger-zone intrusion regardless of machine state
 - **Supersedes:** The running-machine gate for zone alerts recorded in the US-27-era architecture and runtime behavior; its historical specification remains unchanged.
 - **Choice:** A frame violates when any detected person is inside an enabled danger zone, whether its simulated machine state is `running` or `stopped`. Required hat/vest evaluation applies only while the machine is `running`; no-person frames remain normal.

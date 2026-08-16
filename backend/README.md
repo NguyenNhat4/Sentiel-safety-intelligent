@@ -30,7 +30,7 @@ The baseline uses two transports with separate responsibilities:
 - WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
 - REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
 
-US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
+US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision and carries the camera-wide `machine_state` separately; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
 
 The versioned `hat_vest_v1` profile uses a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
 

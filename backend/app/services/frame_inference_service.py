@@ -161,19 +161,10 @@ class FrameInferenceService:
                 )
             )
 
-        ppe_machine_state = (
-            "running"
-            if (
-                any(zone.machine_state == "running" for zone in active_zones)
-                if multi_zone_mode
-                else request.machine_state == "running"
-            )
-            else "stopped"
-        )
         decision = self._rule_engine.evaluate(
             people=rule_people,
             requirements=requirements,
-            machine_state=ppe_machine_state,
+            machine_state=request.machine_state,
             zone_active=False,
         )
         for person, missing in zip(people, decision.missing_required_ppe, strict=True):
@@ -243,7 +234,7 @@ class FrameInferenceService:
         zone_violation = any(item["violation"] for item in zone_results)
         person_inside_zone = any(item["person_inside_zone"] for item in zone_results)
         primary_zone = self._primary_zone(active_zones, people)
-        primary_machine_state = primary_zone.machine_state if primary_zone else request.machine_state
+        primary_machine_state = request.machine_state
         primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
 
         return FrameInferenceResponse(

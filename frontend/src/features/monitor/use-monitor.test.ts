@@ -37,6 +37,7 @@ describe("review event payload", () => {
   it("maps acknowledged review without changing the backend contract", () => {
     const payload = buildEventPayload("acknowledged", pending, [{x: 0.1, y: 0.2}], true);
     expect(payload.status).toBe("acknowledged");
+    expect(payload.event_type).toBe("zone_intrusion");
     expect(payload.details).toMatchObject({
       review_result: "actual_violation",
       machine_state: "running",
@@ -77,7 +78,7 @@ describe("review event payload", () => {
     expect(buildPpeRule(hatRequired)).toEqual({yes: null, text: "Đang kiểm tra mũ bảo hộ", badge: "CHECK"});
   });
 
-  it("states the concrete PPE and danger-zone reasons in the review popup", () => {
+  it("states danger-zone intrusion without making it conditional on the machine state", () => {
     const copy = buildReviewCopy({
       ...pending,
       people: [{
@@ -91,13 +92,13 @@ describe("review event payload", () => {
       rule: {
         ...pending.rule,
         ppe_alert: true,
-        zone_results: [{zone_id: "zone_01", machine_state: "running", person_inside_zone: true, violation: true}],
+        zone_results: [{zone_id: "zone_01", machine_state: "stopped", person_inside_zone: true, violation: true}],
       },
     });
 
-    expect(copy.title).toBe("Thiếu PPE và vào vùng cấm khi máy đang chạy");
+    expect(copy.title).toBe("Thiếu PPE và có người vào vùng cấm");
     expect(copy.summary).toContain("Người #1 thiếu mũ bảo hộ, áo phản quang");
-    expect(copy.summary).toContain('Vùng cấm "zone_01" có người khi máy đang chạy');
+    expect(copy.summary).toContain('Vùng cấm "zone_01" có người xâm nhập');
     expect(copy.reviewMessage).toContain("2 lỗi cần xác minh");
   });
 

@@ -204,6 +204,7 @@ async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depen
                     "zones": configuration.zones,
                     "zone_revision": configuration.zone_revision,
                     "camera_id": configuration.camera_id,
+                    "machine_state": configuration.machine_state,
                 }
                 if configuration.zones is not None
                 else {

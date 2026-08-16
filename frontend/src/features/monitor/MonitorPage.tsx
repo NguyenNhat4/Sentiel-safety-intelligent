@@ -21,8 +21,8 @@ export function MonitorPage() {
           <span>⌄</span>
         </div>
         <div className="machine-control">
-          <div><small> TRẠNG THÁI MÁY</small><strong>{state.selectedZone ? (state.machineRunning ? "Đang hoạt động" : "Đã dừng") : "Chưa chọn vùng"}</strong></div>
-          <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy của vùng đang chọn" disabled={!state.selectedZone} onClick={actions.toggleMachine}><span /></button>
+          <div><small> TRẠNG THÁI MÁY</small><strong>{state.machineRunning ? "Máy đang chạy" : "Máy đã dừng"}</strong></div>
+          <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy" onClick={actions.toggleMachine}><span /></button>
         </div>
         <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
         <button className="secondary-btn" onClick={actions.openFilePicker}>＋ Tải video</button>
@@ -45,7 +45,7 @@ export function MonitorPage() {
         <div className="zone-list">
           {state.zones.map(zone => (
             <button key={zone.zone_id} className={`zone-list-item ${state.selectedZoneId === zone.zone_id ? "selected" : ""}`} onClick={() => actions.selectZone(zone.zone_id)}>
-              <span>{zone.order + 1}</span><strong>{zone.display_name}</strong><small>{zone.points.length}/4 · {zone.enabled ? "BẬT" : "TẮT"} · {zone.machine_state === "running" ? "RUN" : "STOP"}</small>
+              <span>{zone.order + 1}</span><strong>{zone.display_name}</strong><small>{zone.points.length}/4 · {zone.enabled ? "BẬT" : "TẮT"}</small>
             </button>
           ))}
           {!state.zones.length && <p className="zone-empty">Canvas không tự tạo vùng. Hãy bấm <strong>Tạo vùng</strong>.</p>}

@@ -123,7 +123,7 @@ function drawZone(
   const anchor = points[0];
   context.fillStyle = color;
   context.font = "bold 13px Manrope";
-  context.fillText(`${zone.display_name} · ${zone.machine_state === "running" ? "RUN" : "STOP"}`, anchor.x * canvas.width, Math.max(15, anchor.y * canvas.height - 10));
+  context.fillText(zone.display_name, anchor.x * canvas.width, Math.max(15, anchor.y * canvas.height - 10));
   context.setLineDash([]);
   context.globalAlpha = 1;
 }

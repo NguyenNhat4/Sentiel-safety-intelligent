@@ -1,5 +1,13 @@
 # Project Progress
 
+## 2026-08-16: [Cross-cutting] Decouple the camera-wide machine switch from danger zones
+- The machine control is now always enabled, including before a zone is created or selected. Its state is sent as a camera-wide WebSocket configuration value and immediately refreshes the active inference configuration.
+- Zone intrusion remains independent of machine state. The camera-wide state now controls only PPE evaluation, so a stopped machine suppresses PPE alerts consistently across all zones.
+
+## 2026-08-16: [Frontend] Align danger-zone UI copy and event metadata with the active rule
+- The monitor review pop-up, alert summary and confirmed-event history now say **Có người vào vùng cấm** for either machine state; the machine state remains visible only as operating context.
+- The legacy single-event fallback now writes the canonical `zone_intrusion` event type, matching the existing backend event contract. Focused popup tests cover a stopped-machine zone intrusion.
+
 ## 2026-08-16: [Backend] Alert enabled danger-zone intrusion for either machine state
 - Updated deterministic and multi-zone inference rules so a detected foot point inside any enabled zone makes the frame violate whether its machine is `running` or `stopped`; machine state remains audit/UI context.
 - Required PPE is now evaluated only while the relevant machine state is `running`; stopped machines keep PPE observations visible but suppress PPE alerts. Kept the existing frame-level review popup, per-track/per-zone occurrence deduplication, and per-zone event persistence.
