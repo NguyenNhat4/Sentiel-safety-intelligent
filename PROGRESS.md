@@ -2,7 +2,7 @@
 
 ## 2026-08-16: [Backend] Alert enabled danger-zone intrusion for either machine state
 - Updated deterministic and multi-zone inference rules so a detected foot point inside any enabled zone makes the frame violate whether its machine is `running` or `stopped`; machine state remains audit/UI context.
-- Kept the existing frame-level review popup, per-track/per-zone occurrence deduplication, and per-zone event persistence. Focused regression tests cover the confirmed PPE, no-person, multi-person, and both machine-state cases; runtime startup was verified against the configured PostgreSQL URL while API fixtures remained isolated in SQLite memory.
+- Required PPE is now evaluated only while the relevant machine state is `running`; stopped machines keep PPE observations visible but suppress PPE alerts. Kept the existing frame-level review popup, per-track/per-zone occurrence deduplication, and per-zone event persistence.
 
 ## 2026-08-15: [Frontend] Replay the uploaded video without selecting it again
 - When the uploaded video ends, the monitor preserves its existing browser object URL, captures the final preview frame, rewinds to `0`, and enables the **Phát lại** control.

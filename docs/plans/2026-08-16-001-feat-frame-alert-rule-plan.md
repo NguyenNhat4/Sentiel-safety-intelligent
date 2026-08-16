@@ -21,7 +21,7 @@ execution: code
 
 1. The decision shown to the operator is frame-level: one frame is `violate` if **any** detected person violates any enabled rule; the UI opens at most one review popup for that frame.
 2. An enabled zone is violated when any person's foot point is on or inside it, regardless of `machine_state` (`running` or `stopped`).
-3. PPE remains per person and per enabled requirement. Missing hat alerts only when `hat_required=true`; missing vest alerts only when `vest_required=true`.
+3. PPE remains per person and per enabled requirement, but only while the machine is `running`. Missing hat alerts only when `hat_required=true`; missing vest alerts only when `vest_required=true`; stopped machines suppress PPE alerts.
 4. No detected people always yields `normal`; absent PPE fields without a person do not create an alert.
 5. Multiple people do not create multiple popups. Existing track/zone occurrences remain internal evidence and deduplication state, while the response aggregates them through its existing `result`, `review_required`, and `has_active_violation` fields.
 

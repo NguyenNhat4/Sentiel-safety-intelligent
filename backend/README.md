@@ -39,7 +39,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns canonical `profile`, `hat_required` and `vest_required`; a missing record materializes as two OFF values with `is_configured=false`. It also includes read-only `helmet_required`, `safety_glasses_required=false` and `gloves_required=false` aliases during the temporary legacy-browser bridge. PUT accepts either the exact canonical profile plus both strict booleans, or exactly the former three-field payload (`helmet_required`, `safety_glasses_required`, `gloves_required`); the latter maps helmet to hat and requires vest. Mixed, partial, unknown-profile and extra payloads still return `422`. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public inference detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
+GET returns canonical `profile`, `hat_required` and `vest_required`; a missing record materializes as two OFF values with `is_configured=false`. It also includes read-only `helmet_required`, `safety_glasses_required=false` and `gloves_required=false` aliases during the temporary legacy-browser bridge. PUT accepts either the exact canonical profile plus both strict booleans, or exactly the former three-field payload (`helmet_required`, `safety_glasses_required`, `gloves_required`); the latter maps helmet to hat and requires vest. Mixed, partial, unknown-profile and extra payloads still return `422`. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public inference detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard, has no associated required PPE detection, and the relevant machine state is `running`.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. `VIOLATION_FRAME` controls how many consecutive observed frames are required before that occurrence opens; it defaults to `4` and a missing observed frame resets the pending count. This debounce requires a monitoring session; stateless REST inference has no cross-request frame history. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
@@ -188,8 +188,8 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
 | `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
 | `ppe`, `missing_required_ppe` | Per-person `hat`/`vest` observations and only the currently required items that passed qualified-absence guards. |
-| `review_required` | `true` when a zone or required-PPE occurrence is newly active. An enabled-zone foot point is sufficient regardless of machine state; the frontend pauses only for this value. |
-| `result` | `violate` when any detected person is inside an enabled zone or lacks a required PPE item; a continuing debounced occurrence can remain `violate` after `review_required` becomes `false`. |
+| `review_required` | `true` when a zone or required-PPE occurrence is newly active. An enabled-zone foot point is sufficient regardless of machine state; PPE can produce an occurrence only while the machine is running. The frontend pauses only for this value. |
+| `result` | `violate` when any detected person is inside an enabled zone or, while the machine is running, lacks a required PPE item; a continuing debounced occurrence can remain `violate` after `review_required` becomes `false`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
 | `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
 
@@ -197,7 +197,7 @@ The current decision is:
 
 ```text
 person_inside_zone = any(person.inside_zone for person in people)
-ppe_alert = any(person.missing_required_ppe for person in people)
+ppe_alert = machine_state == "running" AND any(person.missing_required_ppe for person in people)
 frame_violation = person_inside_zone OR ppe_alert
 review_required = any(new_occurrence_for_frame_violation)
 result = "violate" if frame_violation else "normal"
@@ -213,6 +213,8 @@ Common outcomes:
 | Person inside zone | Running | `true` | `violate` | `true` | Yes |
 
 Bounding boxes, `inside_zone`, and zone alerts remain active when the machine is stopped; `machine_state` remains response/audit context. A qualified required-PPE absence also requests review.
+
+When the machine is stopped, PPE observations remain visible but configured PPE requirements are not evaluated and cannot create a PPE alert.
 
 ### Protocol errors
 

@@ -40,7 +40,7 @@ def test_returns_violate_and_review_for_required_missing_ppe():
     result = SafetyRuleEngine().evaluate(
         people=[person(hat="missing")],
         requirements=requirements(hat_required=True),
-        machine_state="stopped",
+        machine_state="running",
         zone_active=False,
     )
 
@@ -49,11 +49,25 @@ def test_returns_violate_and_review_for_required_missing_ppe():
     assert result.missing_required_ppe == [["hat"]]
 
 
+def test_skips_required_ppe_alerts_when_machine_is_stopped():
+    result = SafetyRuleEngine().evaluate(
+        people=[person(hat="missing")],
+        requirements=requirements(hat_required=True),
+        machine_state="stopped",
+        zone_active=False,
+    )
+
+    assert result.outcome == "normal"
+    assert result.review_required is False
+    assert result.ppe_alert is False
+    assert result.missing_required_ppe == [[]]
+
+
 def test_evaluates_hat_and_vest_independently_for_multiple_people():
     result = SafetyRuleEngine().evaluate(
         people=[person(hat="missing"), person(vest="missing")],
         requirements=requirements(hat_required=True, vest_required=True),
-        machine_state="stopped",
+        machine_state="running",
         zone_active=False,
     )
 
