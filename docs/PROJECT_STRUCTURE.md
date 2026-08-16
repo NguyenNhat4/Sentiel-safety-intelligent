@@ -136,6 +136,7 @@ P-047/
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
+│   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   └── plans/                       # Implementation-ready plans and their reading guide
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md

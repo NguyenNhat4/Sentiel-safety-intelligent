@@ -87,6 +87,7 @@ Chi tiết boundary, data flow và dependency direction: [ARCHITECTURE.md](ARCHI
 | Dùng template và kiểm tra manifest US-13 | [US-13 evaluation workspace](data/evaluation/README.md) |
 | Hiểu JSONL metrics, API và UI quan sát hệ thống | [Operational Metrics](docs/operational-metrics.md) |
 | Xem implementation plan đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
+| Đọc contract rule alert và sơ đồ luồng frame | [Frame Alert Rule Contract](docs/alert-rule-contract.md) |
 | Đặc tả triển khai US-07 PPE | [US-07 PPE Specification](specs/done/US-07-SPEC.md) |
 | Đặc tả US-08 tracking và chống event trùng | [US-08 Tracking/Dedup Specification](specs/done/US-08-SPEC.md) |
 | Đặc tả US-27 đa vùng trên một video | [US-27 Multi-zone Specification](specs/done/US-27-MULTI-ZONE-SPEC.md) |
