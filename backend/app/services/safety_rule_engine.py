@@ -37,7 +37,7 @@ class SafetyRuleEngine:
         missing = [self._missing_for_person(person, requirements) for person in people]
         ppe_alert = any(missing)
         person_inside_zone = zone_active and any(person.inside_zone for person in people)
-        violation = ppe_alert or (person_inside_zone and machine_state == "running")
+        violation = ppe_alert or person_inside_zone
         return RuleEvaluationResult(
             outcome="violate" if violation else "normal",
             review_required=violation,

@@ -7,6 +7,7 @@ import numpy as np
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.frame_inference_service import FrameInferenceService
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def _zone(zone_id: str, points: list[tuple[float, float]], *, state: str = "stopped", order: int = 0):
@@ -130,6 +131,7 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
         return [present for _ in people]
 
     service = FrameInferenceService(ppe_observer=observe, requirement_loader=_no_ppe_requirements)
+    service._violation_tracker = ViolationTrackingService(activation_frames=1)
     monkeypatch.setattr(
         service,
         "_track_people",
@@ -157,7 +159,8 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
         {"zone_id": "left", "inside": True},
         {"zone_id": "right", "inside": False},
     ]
-    assert result.people[0].active_violations == []
+    assert result.people[0].active_violations[0].rule_key == "zone_intrusion:left"
+    assert result.people[0].active_violations[0].zone_id == "left"
     assert result.people[1].active_violations[0].rule_key == "zone_intrusion:right"
     assert result.people[1].active_violations[0].zone_id == "right"
     assert result.rule["zone_results"] == [
@@ -165,7 +168,7 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
             "zone_id": "left",
             "machine_state": "stopped",
             "person_inside_zone": True,
-            "violation": False,
+            "violation": True,
         },
         {
             "zone_id": "right",

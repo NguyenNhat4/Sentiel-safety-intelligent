@@ -83,7 +83,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside an enabled configured danger zone?** Zone alerts do not depend on the simulated machine state. One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
@@ -188,8 +188,8 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
 | `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
 | `ppe`, `missing_required_ppe` | Per-person `hat`/`vest` observations and only the currently required items that passed qualified-absence guards. |
-| `review_required` | `true` when the machine is running and at least one foot point is inside, or when a required PPE is `missing` for a qualified person. The frontend pauses only for this value. |
-| `result` | `violate` when `review_required=true`; otherwise `normal`. |
+| `review_required` | `true` when a zone or required-PPE occurrence is newly active. An enabled-zone foot point is sufficient regardless of machine state; the frontend pauses only for this value. |
+| `result` | `violate` when any detected person is inside an enabled zone or lacks a required PPE item; a continuing debounced occurrence can remain `violate` after `review_required` becomes `false`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
 | `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
 
@@ -198,8 +198,9 @@ The current decision is:
 ```text
 person_inside_zone = any(person.inside_zone for person in people)
 ppe_alert = any(person.missing_required_ppe for person in people)
-review_required = (person_inside_zone AND machine_state == "running") OR ppe_alert
-result = "violate" if review_required else "normal"
+frame_violation = person_inside_zone OR ppe_alert
+review_required = any(new_occurrence_for_frame_violation)
+result = "violate" if frame_violation else "normal"
 ```
 
 Common outcomes:
@@ -208,10 +209,10 @@ Common outcomes:
 |---|---|---:|---|---:|---:|
 | No person | Running or stopped | — | `normal` | `false` | No |
 | Person outside zone | Running or stopped | `false` | `normal` | `false` | No |
-| Person inside zone | Stopped | `true` | `normal` | `false` | No |
+| Person inside zone | Stopped | `true` | `violate` | `true` when its occurrence first opens | Yes when review is required |
 | Person inside zone | Running | `true` | `violate` | `true` | Yes |
 
-Bounding boxes and `inside_zone` remain available when the machine is stopped; zone-driven review, video pause, and snapshot generation are suppressed. A qualified required-PPE absence still requests review.
+Bounding boxes, `inside_zone`, and zone alerts remain active when the machine is stopped; `machine_state` remains response/audit context. A qualified required-PPE absence also requests review.
 
 ### Protocol errors
 
@@ -236,7 +237,7 @@ foot_x = (x1 + x2) / 2
 foot_y = y2
 ```
 
-The four normalized zone points are converted to frame pixels. OpenCV `pointPolygonTest` sets `inside_zone=true` when the foot point is on or inside the polygon. Zone review is based on this foot point, not bounding-box overlap. A review, snapshot, and violation are produced only when the foot point is inside while `machine_state` is `running`; bounding boxes remain available while the machine is stopped.
+The four normalized zone points are converted to frame pixels. OpenCV `pointPolygonTest` sets `inside_zone=true` when the foot point is on or inside the polygon. Zone review is based on this foot point, not bounding-box overlap. A foot point inside an enabled zone produces a violation regardless of `machine_state`; the first debounced occurrence produces the review and snapshot.
 
 The REST fallback `POST /api/v1/analysis/frame` remains available and returns the same core `FrameInferenceResponse` without WebSocket correlation fields.
 

@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-16: [Cross-cutting] Alert enabled danger-zone intrusion regardless of machine state
+- **Supersedes:** The running-machine gate for zone alerts recorded in the US-27-era architecture and runtime behavior; its historical specification remains unchanged.
+- **Choice:** A frame violates when any detected person is inside an enabled danger zone, whether its simulated machine state is `running` or `stopped`. Required hat/vest evaluation remains independent and no-person frames remain normal.
+- **Compatibility:** `machine_state`, per-track/per-zone occurrence keys, grouped HITL review, and per-zone event persistence remain unchanged. The response continues to aggregate one review candidate per frame through the existing fields; no REST/WebSocket, ORM, or migration change is introduced.
+
 ## 2026-08-15: [Backend] Debounce safety alerts across consecutive frames
 - **Choice:** `VIOLATION_FRAME` defaults to `4`; a track/rule occurrence opens only after that many consecutive observed frames. A missing observed frame resets a pending occurrence, while existing exit, lost-track grace and cooldown semantics continue after an alert has opened.
 - **Reason:** One-frame detector flicker must not pause the operator video or create an alert candidate.

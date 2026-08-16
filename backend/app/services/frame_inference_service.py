@@ -175,7 +175,7 @@ class FrameInferenceService:
             rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
             membership_by_id = {item.zone_id: item.inside for item in person.zone_memberships}
             for zone in active_zones:
-                if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
+                if membership_by_id.get(zone.zone_id):
                     rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             observed_rules[person.track_id] = rules
 
@@ -223,8 +223,7 @@ class FrameInferenceService:
                     for person in people
                     for membership in person.zone_memberships
                 ),
-                "violation": zone.machine_state == "running"
-                and any(
+                "violation": any(
                     membership.zone_id == zone.zone_id and membership.inside
                     for person in people
                     for membership in person.zone_memberships

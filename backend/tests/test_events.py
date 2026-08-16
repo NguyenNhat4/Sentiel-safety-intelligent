@@ -7,6 +7,7 @@ from sqlalchemy.exc import OperationalError
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.services.event_service import EventService
 from backend.app.services.frame_inference_service import frame_inference_service
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def test_create_and_get_event(client):
@@ -107,7 +108,8 @@ def test_occurrence_cannot_be_reused_for_a_conflicting_event(client):
     assert conflict.status_code == 409
 
 
-def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client):
+def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     session_id = str(uuid4())
     active = frame_inference_service._violation_tracker.evaluate(
         session_id,
@@ -154,7 +156,8 @@ def test_event_batch_creates_one_event_per_zone_atomically_and_is_idempotent(cli
     assert len({event["batch_id"] for event in first.json()["events"]}) == 1
 
 
-def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client):
+def test_event_batch_rejects_occurrence_assigned_to_the_wrong_zone(client, monkeypatch):
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     session_id = str(uuid4())
     active = frame_inference_service._violation_tracker.evaluate(
         session_id,

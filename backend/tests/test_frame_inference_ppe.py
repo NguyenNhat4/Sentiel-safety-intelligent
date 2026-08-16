@@ -15,7 +15,7 @@ def jpeg_data_url() -> str:
     return f"data:image/jpeg;base64,{base64.b64encode(buffer.tobytes()).decode()}"
 
 
-def request() -> FrameInferenceRequest:
+def request(*, with_zone: bool = True) -> FrameInferenceRequest:
     return FrameInferenceRequest(
         image_data=jpeg_data_url(),
         zone_points=[
@@ -23,7 +23,9 @@ def request() -> FrameInferenceRequest:
             {"x": 0.9, "y": 0.1},
             {"x": 0.9, "y": 0.9},
             {"x": 0.1, "y": 0.9},
-        ],
+        ]
+        if with_zone
+        else [],
         machine_state="stopped",
     )
 
@@ -156,7 +158,7 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
     )
     service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
 
-    result = service.infer(request())
+    result = service.infer(request(with_zone=False))
 
     assert result.people[0].ppe.hat.status == "missing"
     assert result.people[0].missing_required_ppe == []
@@ -229,7 +231,7 @@ def test_low_confidence_person_without_hat_remains_unknown():
     )
     service._detect_people = lambda frame: [(40, 10, 40, 80, 0.2)]
 
-    result = service.infer(request())
+    result = service.infer(request(with_zone=False))
 
     assert result.people[0].ppe.hat.status == "unknown"
     assert result.people[0].missing_required_ppe == []

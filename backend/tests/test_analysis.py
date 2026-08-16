@@ -9,6 +9,7 @@ import pytest
 from backend.app.api.v1.analysis import frame_inference_service
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
 def jpeg_bytes(width=160, height=120):
@@ -21,6 +22,7 @@ def jpeg_bytes(width=160, height=120):
 @pytest.fixture(autouse=True)
 def use_stubbed_vision_observations(monkeypatch):
     """Keep analysis rule tests independent from the installed vision model."""
+    monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
     monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
     monkeypatch.setattr(
         frame_inference_service,
@@ -206,7 +208,7 @@ def test_frame_inference_rejects_invalid_image(client):
     assert response.status_code == 400
 
 
-def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch):
+def test_zone_entry_requests_review_when_machine_is_stopped(monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
         "_detect_people",
@@ -240,9 +242,9 @@ def test_zone_entry_does_not_request_review_when_machine_is_stopped(monkeypatch)
 
     assert result.people[0].foot_point == [60, 100]
     assert result.people[0].inside_zone is True
-    assert result.review_required is False
-    assert result.result == "normal"
-    assert result.snapshot_data is None
+    assert result.review_required is True
+    assert result.result == "violate"
+    assert result.snapshot_data.startswith("data:image/jpeg;base64,")
 
 
 def test_inference_websocket_returns_empty_people(client, monkeypatch):

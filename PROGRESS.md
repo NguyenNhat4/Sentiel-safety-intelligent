@@ -1,5 +1,9 @@
 # Project Progress
 
+## 2026-08-16: [Backend] Alert enabled danger-zone intrusion for either machine state
+- Updated deterministic and multi-zone inference rules so a detected foot point inside any enabled zone makes the frame violate whether its machine is `running` or `stopped`; machine state remains audit/UI context.
+- Kept the existing frame-level review popup, per-track/per-zone occurrence deduplication, and per-zone event persistence. Focused regression tests cover the confirmed PPE, no-person, multi-person, and both machine-state cases; runtime startup was verified against the configured PostgreSQL URL while API fixtures remained isolated in SQLite memory.
+
 ## 2026-08-15: [Frontend] Replay the uploaded video without selecting it again
 - When the uploaded video ends, the monitor preserves its existing browser object URL, captures the final preview frame, rewinds to `0`, and enables the **Phát lại** control.
 - A UI regression test verifies that ending an uploaded video leaves the replay control enabled and reuses the same video rather than requiring a second file selection.
@@ -8,7 +12,7 @@
 - The review title, summary and pending-review message now derive from the inference result: each affected person’s missing required hat/vest and each active danger-zone entry are named explicitly. A combined PPE and zone violation displays both reasons rather than a generic zone-only message.
 
 ## 2026-08-15: [Backend] Lock hat/vest and danger-zone rule truth table
-- Added deterministic regression coverage for required hat/vest, zero or multiple detected people, and danger-zone entry while the machine is running. A violation is raised when any detected person lacks a required PPE item or enters an active danger zone while the machine is running.
+- Added deterministic regression coverage for required hat/vest, zero or multiple detected people, and danger-zone entry. A violation is raised when any detected person lacks a required PPE item or enters an enabled danger zone regardless of simulated machine state.
 - Restored the additive legacy GET aliases on `PpeRequirementResponse`: callers of the canonical `hat_vest_v1` response no longer need to supply legacy fields, while `helmet_required` continues to mirror `hat_required`.
 
 ## 2026-08-15: [Backend] Smooth violation alerts with four consecutive frames
@@ -116,7 +120,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] Added role-aware login/logout entry points backed by persisted server sessions.
 - [x] Added local video playback, normalized four-point zone editing, Canvas overlays, and foot-point visualization.
 - [x] Added 2 FPS WebSocket inference with one frame in flight and same-origin/port-8000 fallback.
-- [x] Pause playback only when a returned person foot point is inside the configured polygon while the machine is running.
+- [x] Pause playback when a returned frame has a newly opened zone/PPE occurrence; enabled-zone intrusion is a violation regardless of simulated machine state.
 - [x] Added actual-violation and false-alarm review actions with REST event persistence.
 - [x] After acknowledged save, close the review state and keep the monitor visible; load confirmed snapshots when the operator opens “Nhật ký vi phạm”.
 - [x] Added development localhost CORS support for frontend/backend ports.

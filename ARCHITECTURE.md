@@ -6,7 +6,7 @@ Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô t�
 ## Mục tiêu và ràng buộc
 
 - Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ bảo hộ/áo phản quang và xâm nhập vùng nguy hiểm.
-- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập chỉ là critical khi chính máy của vùng đó đang chạy. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
+- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập vùng enabled luôn là critical, không phụ thuộc trạng thái máy mô phỏng. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
 - Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
 - Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
 - Hai vai trò được backend phân quyền: `safety_officer` và `zone_manager`.
@@ -84,7 +84,7 @@ sequenceDiagram
 Các bất biến an toàn:
 
 1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
-2. Zone entry khi máy của chính vùng đó chạy luôn critical; vùng stopped không được làm phát sinh zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
+2. Zone entry của một vùng enabled luôn critical, dù machine state là `running` hay `stopped`. Machine state vẫn là audit/operational context, không phải điều kiện chặn zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
 3. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
 4. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
 5. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.

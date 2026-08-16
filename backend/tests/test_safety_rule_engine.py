@@ -61,9 +61,10 @@ def test_evaluates_hat_and_vest_independently_for_multiple_people():
     assert result.ppe_alert is True
 
 
-def test_returns_violate_for_person_in_active_zone_while_machine_runs():
+@pytest.mark.parametrize("machine_state", ["running", "stopped"])
+def test_returns_violate_for_person_in_active_zone_regardless_of_machine_state(machine_state):
     result = SafetyRuleEngine().evaluate(
-        people=[person(inside_zone=True)], requirements=requirements(), machine_state="running", zone_active=True
+        people=[person(inside_zone=True)], requirements=requirements(), machine_state=machine_state, zone_active=True
     )
 
     assert result.outcome == "violate"
@@ -84,9 +85,9 @@ def test_returns_violate_for_person_in_active_zone_while_machine_runs():
         (True, True, [], "running", False, "normal"),
         # Any person can trigger the aggregate result.
         (True, True, [person(), person(hat="missing")], "running", False, "violate"),
-        # Zone entry is a violation only while the machine is running.
+        # Zone entry is a violation regardless of machine state.
         (False, False, [person(inside_zone=True)], "running", True, "violate"),
-        (False, False, [person(inside_zone=True)], "stopped", True, "normal"),
+        (False, False, [person(inside_zone=True)], "stopped", True, "violate"),
     ],
 )
 def test_evaluates_hat_vest_zone_and_person_count_truth_table(
