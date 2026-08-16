@@ -44,6 +44,7 @@ COPY vision ./vision
 COPY scripts ./scripts
 COPY alembic.ini ./
 COPY models/yolo11m_safety.pt ./models/
+COPY models/face_detection_yunet_2023mar.onnx ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with correct ownership

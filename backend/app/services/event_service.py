@@ -10,7 +10,8 @@ import numpy as np
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.integrations.privacy_vision import get_privacy_vision_adapter
+from backend.app.core.operational_metrics import record_operational_event
+from backend.app.integrations.privacy_vision import get_configured_privacy_vision_adapter
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
 from backend.app.schemas.analysis import PersonDetection as SnapshotPersonDetection
@@ -24,6 +25,14 @@ class EventPersistenceError(RuntimeError):
 
 class EventPrivacyError(RuntimeError):
     pass
+
+
+def _privacy_redaction_outcome(redaction: PrivacyRedactionResult) -> str:
+    if redaction["detected_face_count"] and redaction["fallback_person_count"]:
+        return "face_and_person_fallback"
+    if redaction["detected_face_count"]:
+        return "face"
+    return "person_fallback"
 
 
 SnapshotRedactor = Callable[[np.ndarray, list[SnapshotPerson]], PrivacyRedactionResult]
@@ -241,6 +250,11 @@ class EventService:
                 for person in snapshot_people
             ]
             redaction = self._snapshot_redactor(frame, people)
+            record_operational_event(
+                "privacy_redaction_completed",
+                outcome=_privacy_redaction_outcome(redaction),
+                error_kind="yunet_inference_failed" if redaction["face_detector_failed"] else None,
+            )
             annotated = self._snapshot_annotator(
                 redaction["image"],
                 people,
@@ -267,7 +281,7 @@ class EventService:
         frame: np.ndarray,
         people: list[SnapshotPerson],
     ) -> PrivacyRedactionResult:
-        return get_privacy_vision_adapter().redact_snapshot(frame, people)
+        return get_configured_privacy_vision_adapter().redact_snapshot(frame, people)
 
     @staticmethod
     def _default_snapshot_annotator(
@@ -275,7 +289,7 @@ class EventService:
         people: list[SnapshotPerson],
         detections: list[ModelDetection],
     ) -> np.ndarray:
-        return get_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
+        return get_configured_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
 
     def _snapshot_file(self, snapshot_path: str) -> Path:
         return self._snapshot_dir / Path(snapshot_path).name

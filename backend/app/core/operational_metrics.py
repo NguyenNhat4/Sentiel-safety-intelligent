@@ -16,6 +16,7 @@ _EVENT_TYPES = {
     "websocket_connection_closed",
     "inference_completed",
     "inference_failed",
+    "privacy_redaction_completed",
 }
 
 

@@ -2,6 +2,12 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-16: [Vision/Backend] Use YuNet-first snapshot redaction with a per-person fallback
+- **Choice:** Run pinned OpenCV YuNet once when a reviewed snapshot is persisted, blur every expanded face region, and apply the existing upper-40% blur only to canonical people without an associated face. Unassociated YuNet faces are still blurred.
+- **Boundary:** YOLO11m Safety remains the sole source of canonical person/hat/vest observations and does not perform face detection. YuNet is reachable only through the privacy facade/adapter and cannot affect safety decisions.
+- **Failure semantics:** A valid no-face result or per-frame YuNet error degrades to the existing person-head fallback; the latter emits only a stable privacy-safe operational error kind. A missing/corrupt YuNet artifact fails startup, and a snapshot without any valid canonical person remains fail-closed.
+- **Artifact:** Pin OpenCV Zoo revision `41c69c8506f4ddb038aad0f5da660cbc2a83f58e`; the ONNX artifact is 232,589 bytes with SHA-256 `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4` and is managed through Git LFS.
+
 ## 2026-08-16: [Cross-cutting] Gate Railway production image deploys on GitHub CI
 - **Choice:** `main` accepts protected pull requests only. GitHub Actions runs Python 3.11 locked dependency checks, isolated frontend/backend/vision suites, and a Docker build. Successful `main` CI pushes `DOCKERHUB_IMAGE:latest`; a `workflow_run` then calls Railway CLI `redeploy` and requires `/health` to return `ready: true`.
 - **Secrets and rollback:** Repository Actions secrets own Docker Hub credentials, Railway token/service/environment and public base URL; Railway Variables retain database, S3, model and optional provider configuration. Because only the moving `:latest` tag is published, rollback uses Railway Deployment History rather than a misleading SHA workflow.

@@ -36,7 +36,7 @@ P-047/
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
-│   │   │   └── privacy_vision.py # Model-independent fail-closed snapshot privacy adapter
+│   │   │   └── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
@@ -89,10 +89,12 @@ P-047/
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
-│   ├── pipeline.py      # Pure person-head redaction and post-redaction annotation
+│   ├── face_detection.py # Thread-safe OpenCV YuNet provider
+│   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       ├── test_api.py
+│       ├── test_face_detection.py
 │       ├── test_privacy_pipeline.py
 │       └── test_tracking.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
@@ -132,6 +134,7 @@ P-047/
 │   └── snapshots/
 ├── models/              # Git LFS-managed baseline and PPE model checkpoints
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
+│   ├── face_detection_yunet_2023mar.onnx # Pinned OpenCV YuNet face detector
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
 │   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
@@ -162,6 +165,7 @@ P-047/
 │       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
+│   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── production_start.py # Docker preflight, migration and one-worker startup

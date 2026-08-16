@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
+    face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
+    face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     violation_frame: int = Field(default=5, ge=1, le=60)
     # Local commands load development defaults. Docker and managed platforms pass
     # production settings as process environment variables.

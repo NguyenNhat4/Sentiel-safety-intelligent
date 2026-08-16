@@ -1,5 +1,10 @@
 # Project Progress
 
+## 2026-08-16: [Vision/Backend] Add YuNet-first identity redaction
+- Added the pinned OpenCV YuNet detector, startup artifact/capability validation, cached thread-safe inference, expanded face blur, and the existing upper-person fallback for each person without an associated face.
+- Snapshot persistence remains fail-closed: all detected faces are redacted, detector errors fall back for every person with a stable operational warning, no-person frames fail, and database failures still remove the already-redacted file.
+- Added focused Vision/backend/startup coverage and a reusable privacy latency benchmark. On the official 512×512 OpenCV sample, 20 CPU iterations detected one face with no fallback at 14.583 ms mean and 19.479 ms p95.
+
 ## 2026-08-16: [Cross-cutting] Add CI-gated Railway release workflow
 - [x] Standardized the Python project lock and local interpreter pin on Python 3.11, matching Docker and the supported test runtime.
 - [x] Replaced the legacy requirements-based CI with parallel locked uv, frontend and scoped Docker checks for PRs and pushes on `main`; added a non-blocking nightly dependency audit.
