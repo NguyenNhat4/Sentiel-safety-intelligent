@@ -1,12 +1,13 @@
 {
-  "version": "1.0",
+  "description": "Log Codex prompts and completed turns to .ai-log/session.jsonl.",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
-            "name": "log-prompt",
-            "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel)\"; bash \"$REPO_ROOT/scripts/_pyrun.sh\" \"$REPO_ROOT/scripts/log_hook.py\" --tool=codex",
+            "commandWindows": "wsl.exe -d Ubuntu --cd /mnt/d/AI-Vin/AI_Builder/P-047 -- bash -c \"python3 scripts/log_hook.py --tool=codex\" 2>> .ai-log\\wsl-hook-error.log",
             "timeout": 10
           }
         ]
@@ -16,8 +17,9 @@
       {
         "hooks": [
           {
-            "name": "log-stop",
-            "command": "bash scripts/_pyrun.sh scripts/log_hook.py --tool=codex",
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel)\"; bash \"$REPO_ROOT/scripts/_pyrun.sh\" \"$REPO_ROOT/scripts/log_hook.py\" --tool=codex",
+            "commandWindows": "wsl.exe -d Ubuntu --cd /mnt/d/AI-Vin/AI_Builder/P-047 -- bash -c \"python3 scripts/log_hook.py --tool=codex\" 2>> .ai-log\\wsl-hook-error.log",
             "timeout": 10
           }
         ]

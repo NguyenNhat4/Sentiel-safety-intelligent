@@ -4,15 +4,29 @@
 set -e
 
 HOOK_FILE=".git/hooks/pre-push"
+BACKUP_HOOK=".git/hooks/pre-push.before-ai-log"
+
+# Preserve an existing hook (for example Git LFS). The generated dispatcher
+# runs it first, so its exit status continues to protect the push.
+if [ -f "$HOOK_FILE" ] && ! grep -q 'AI log pre-push dispatcher' "$HOOK_FILE"; then
+  cp "$HOOK_FILE" "$BACKUP_HOOK"
+  chmod +x "$BACKUP_HOOK"
+fi
 
 cat > "$HOOK_FILE" <<'EOF'
 #!/usr/bin/env bash
-# Pre-push: sweep recent Antigravity / Gemini prompts, then submit AI logs.
+# AI log pre-push dispatcher. It preserves the pre-existing hook, then sweeps
+# recent Antigravity / Gemini prompts and submits all pending AI logs.
 # Uses the cross-platform Python launcher so it works whether the user
 # has python3, python, or only the `py` launcher (Windows).
+set -e
+
+if [ -x .git/hooks/pre-push.before-ai-log ]; then
+  .git/hooks/pre-push.before-ai-log "$@"
+fi
+
 bash scripts/_pyrun.sh scripts/log_antigravity.py --auto || true
 bash scripts/_pyrun.sh scripts/submit_log.py || true
-exit 0  # Never block push, even if either step fails
 EOF
 
 chmod +x "$HOOK_FILE"

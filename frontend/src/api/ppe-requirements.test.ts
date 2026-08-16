@@ -1,0 +1,61 @@
+import {afterEach, describe, expect, it, vi} from "vitest";
+import {loadPpeRequirements, savePpeRequirements} from "./ppe-requirements";
+
+describe("PPE requirements API", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("loads the fixed camera-zone requirement resource", async () => {
+    const payload = {
+      camera_id: "uploaded_video", zone_id: "zone_01",
+      profile: "hat_vest_v1", hat_required: false, vest_required: false,
+      is_configured: false, updated_at: null
+    };
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(payload), {status: 200, headers: {"Content-Type": "application/json"}})
+    );
+
+    await expect(loadPpeRequirements("uploaded_video", "zone_01")).resolves.toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/ppe-requirements/uploaded_video/zone_01");
+  });
+
+  it("saves the versioned hat-and-vest profile with PUT", async () => {
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        camera_id: "uploaded_video", zone_id: "zone_01",
+        profile: "hat_vest_v1", hat_required: true, vest_required: true,
+        is_configured: true, updated_at: "2026-08-06T10:00:00Z"
+      }), {status: 200, headers: {"Content-Type": "application/json"}})
+    );
+
+    await savePpeRequirements("uploaded_video", "zone_01", {
+      profile: "hat_vest_v1",
+      hat_required: true,
+      vest_required: true
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/ppe-requirements/uploaded_video/zone_01",
+      {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          profile: "hat_vest_v1",
+          hat_required: true,
+          vest_required: true
+        })
+      }
+    );
+  });
+
+  it("returns a safe error for non-success responses", async () => {
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({detail: "Database unavailable"}), {
+        status: 503,
+        headers: {"Content-Type": "application/json"}
+      })
+    );
+
+    await expect(loadPpeRequirements("uploaded_video", "zone_01"))
+      .rejects.toThrow("Database unavailable");
+  });
+});

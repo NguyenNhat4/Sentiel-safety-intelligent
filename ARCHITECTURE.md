@@ -1,110 +1,64 @@
-# Architecture Document
+# Kiến trúc hệ thống P-047
 
-## System Overview
+Tài liệu này là nguồn kiến trúc duy nhất của dự án. Nó mô tả hướng đích; runtime hiện tại
+được ghi rõ để không nhầm phần đã chạy với phần còn phải triển khai.
 
-[Tóm tắt 2-3 câu về kiến trúc hệ thống]
+## Mục tiêu và ràng buộc
 
-## Architecture Diagram
+- Phân tích video/ảnh mô phỏng để phát hiện người, thiếu mũ bảo hộ/áo phản quang và xâm nhập vùng nguy hiểm.
+- Một stream có thể chứa nhiều vùng bốn điểm; xâm nhập vùng enabled luôn là critical, không phụ thuộc trạng thái máy mô phỏng. Kết quả mơ hồ phải chuyển Human-in-the-Loop (HITL).
+- Cảnh báo gần realtime, không tạo event lặp cho một vi phạm liên tục.
+- Không lưu video thô; chỉ lưu snapshot sự kiện sau khi che danh tính thành công.
+- Ba vai trò được backend phân quyền: `system_admin`, `safety_officer` và `area_manager`.
+- MVP là một stream mô phỏng; camera thật, PLC, tự dừng máy và multi-stream nằm ngoài phạm vi.
 
-```mermaid
-graph TB
-    subgraph Frontend
-        UI[React/Next.js UI]
-    end
+## Kiến trúc đích
 
-    subgraph Backend[FastAPI Backend]
-        API[API Routes]
-        Agent[LangGraph Agent]
-        LLM[LLM Service]
-        Tools[Agent Tools]
-    end
+Giữ **modular monolith** để giao nhanh và triển khai đơn giản. `frontend/`, `backend/` và
+`vision/` là ba owner production; chỉ tách service khi có nhu cầu scale hoặc vận hành đã đo được.
+Sơ đồ component và data flow runtime nằm trong `docs/architecture_diagram.md`.
 
-    subgraph Data[Data Layer]
-        DB[(Database)]
-        Vector[Vector Store]
-    end
+## Boundary và dependency
 
-    UI -->|HTTP/REST| API
-    API --> Agent
-    Agent --> LLM
-    Agent --> Tools
-    Agent --> Vector
-    Tools --> DB
-    API --> DB
+| Owner | Trách nhiệm | Không được làm |
+|---|---|---|
+| Frontend | Capture frame, UI state, overlay, review và dashboard | Tự quyết severity hoặc authorization |
+| Backend API | Parse/authenticate/map REST và WebSocket | Chứa SQL, CV hoặc rule nghiệp vụ |
+| Backend services | Use case, rule, transaction, dedup, RBAC, analytics và reporting | HTTP rendering hoặc provider SDK details |
+| Integrations | Adapter vision, storage, LLM và notification | Quyết định event state hoặc permission |
+| Vision | Detection, association, tracking, geometry, confidence, redaction | Biết HTTP, database, user hoặc event lifecycle |
+
+Luồng phụ thuộc bắt buộc:
+
+```text
+frontend feature → frontend api → backend api → backend service
+                                             → model/schema/core
+                                             → integration → vision facade/provider
 ```
 
-## Components
+Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
+tests) là nguồn sự thật. Thay đổi breaking phải được phê duyệt và có migration hoặc
+compatibility test.
 
-### 1. Frontend (React/Next.js)
-- **Purpose:** [mô tả]
-- **Key Features:** [danh sách]
-- **State Management:** [approach]
+Các bất biến an toàn:
 
-### 2. Backend (FastAPI)
-- **Purpose:** [mô tả]
-- **API Design:** RESTful
-- **Authentication:** [JWT/None]
+1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
+2. Zone entry của một vùng enabled luôn critical, dù machine state là `running` hay `stopped`. Machine state vẫn là audit/operational context, không phải điều kiện chặn zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
+3. PPE chỉ được đánh giá khi máy đang `running`; khi máy `stopped`, các switch requirement và observation PPE không được tạo PPE alert.
+4. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
+5. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
+6. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.
 
-### 3. AI Agent (LangGraph)
-- **Agent Type:** [ReAct / Plan-and-Execute / Custom]
-- **State:** [mô tả state schema]
-- **Nodes:** [danh sách nodes]
-- **Tools:** [danh sách tools]
-- **Flow:**
+## Trạng thái triển khai
 
-```mermaid
-graph LR
-    START --> A[Node A]
-    A --> B{Decision}
-    B -->|Yes| C[Node C]
-    B -->|No| D[Node D]
-    C --> E[END]
-    D --> E
-```
+Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
+machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
+event history. PostgreSQL, PPE/face detector production model, RBAC và các
+capability nâng cao vẫn là đích cần triển khai.
 
-### 4. Database
-- **Type:** [PostgreSQL / SQLite]
-- **Tables:** [danh sách]
-- **Migrations:** Alembic
+Thứ tự tiến hóa theo backlog:
 
-### 5. Vector Store
-- **Type:** [ChromaDB / FAISS / Pinecone]
-- **Embeddings:** [model]
-- **Purpose:** [RAG / similarity search]
-
-## Data Flow
-
-1. User gửi request từ Frontend
-2. API route nhận và validate input
-3. Agent xử lý qua LangGraph pipeline
-4. LLM generate response
-5. Tools thực thi actions (nếu cần)
-6. Response trả về Frontend
-
-## Deployment Architecture
-
-```mermaid
-graph LR
-    subgraph Docker
-        FE[Frontend Container]
-        BE[Backend Container]
-        DB_C[Database Container]
-    end
-    FE --> BE --> DB_C
-```
-
-## Security
-
-- API keys stored in `.env` (never commit)
-- Input validation via Pydantic
-- Rate limiting on API endpoints
-- CORS configured for frontend domain
-
-## Design Decisions
-
-| Decision | Choice | Reason |
-|----------|--------|--------|
-| Framework | FastAPI | Async, auto-docs, type-safe |
-| Agent | LangGraph | Flexible state management |
-| Database | [choice] | [reason] |
-| Frontend | Next.js | [reason] |
+1. **Đóng MVP:** PPE + tracking/dedup + multi-zone một stream + event state + auth/RBAC + image parity + metrics.
+2. **Bổ sung context:** zone/shift và confidence-based HITL.
+3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
+4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.

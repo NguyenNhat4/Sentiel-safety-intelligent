@@ -1,7 +1,10 @@
 .git
 .gitignore
 .env
+.env.production
 .venv
+frontend/node_modules
+frontend/dist
 __pycache__
 *.pyc
 .pytest_cache
@@ -11,6 +14,9 @@ presentation/
 eval/
 *.md
 !requirements.txt
+data/
+models/*
+!models/yolo11m_safety.pt
 .dockerignore
 Dockerfile
 docker-compose.yml

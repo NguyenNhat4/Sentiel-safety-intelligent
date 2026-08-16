@@ -16,10 +16,10 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Create .env if not exists
-if [ ! -f .env ]; then
-    cp .env.example .env
-    echo "Created .env — please edit with your API keys"
+# Create development environment config if not exists
+if [ ! -f .env.development ]; then
+    cp .env.development.example .env.development
+    echo "Created .env.development — please edit local development values if needed"
 fi
 
 # Create data directories

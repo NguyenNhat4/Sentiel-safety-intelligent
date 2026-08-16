@@ -1,0 +1,9 @@
+*
+!.gitignore
+!snapshots/
+!snapshots/README.md
+!evaluation/
+!evaluation/README.md
+!evaluation/shooting-sheet-template.csv
+!evaluation/ground-truth-template.json
+!evaluation/manifest-template.json

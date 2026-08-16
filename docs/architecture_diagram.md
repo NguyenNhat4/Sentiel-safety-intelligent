@@ -1,38 +1,56 @@
-# Architecture Diagram
+# Sơ đồ hệ thống P-047
 
-## System Overview
+Các sơ đồ này mô tả runtime hiện hành và boundary đã chốt. Contract thực thi vẫn nằm ở FastAPI,
+Pydantic, frontend wire types, SQLAlchemy/Alembic và tests.
 
-```mermaid
-graph TB
-    User([User]) --> UI[Frontend<br/>React/Next.js]
-    UI -->|REST API| API[FastAPI Backend]
-    API --> Agent[LangGraph Agent]
-    Agent --> LLM[LLM Service<br/>GPT-4o / Gemini]
-    Agent --> Tools[Agent Tools]
-    Tools --> DB[(Database)]
-    Agent --> VS[Vector Store<br/>ChromaDB]
-```
-
-## Agent Flow
+## Sơ đồ components
 
 ```mermaid
-graph LR
-    START((Start)) --> Input[Parse Input]
-    Input --> Analyze[Analyze Query]
-    Analyze --> Decide{Need Tool?}
-    Decide -->|Yes| CallTool[Call Tool]
-    CallTool --> Analyze
-    Decide -->|No| Generate[Generate Response]
-    Generate --> END((End))
+flowchart LR
+    Browser[React browser]
+    Client[REST and WebSocket client]
+    API[FastAPI API transport]
+    Service[Backend services]
+    Integration[Integration adapters]
+    Models[Models schemas and core]
+    Vision[Vision facade]
+    Database[(PostgreSQL)]
+    Storage[(Protected snapshot storage)]
+    Notify[Notification provider]
+
+    Browser --> Client
+    Client -->|REST or binary JPEG WebSocket| API
+    API --> Service
+    Service --> Integration
+    Service --> Models
+    Integration --> Vision
+    Models --> Database
+    Integration --> Storage
+    Integration --> Notify
 ```
 
-## Component Details
+## Sơ đồ data flow runtime
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Frontend | React/Next.js | User interface |
-| Backend | FastAPI | API server |
-| Agent | LangGraph | AI agent orchestration |
-| LLM | OpenAI/Gemini | Language model |
-| Database | PostgreSQL/SQLite | Data persistence |
-| Vector Store | ChromaDB | RAG / embeddings |
+```mermaid
+flowchart TD
+    A[Browser video and saved zone configuration] --> B[WebSocket inference endpoint]
+    B --> C[Frame inference service]
+    C --> D[Vision facade: one YOLO11m Safety track call]
+    D --> E[Observations: person, hat, vest, track ID, foot point]
+    E --> F[Safety rule and four-frame occurrence debounce]
+    F -->|Normal or continuing occurrence| G[Correlated result and browser overlays]
+    F -->|New violation occurrence| H[Pause video and open grouped HITL review]
+    H -->|False alarm| I[Persist feedback audit only]
+    H -->|Acknowledged| J[Redact snapshot before annotation]
+    J -->|Redaction failure| K[Return error and keep review pending]
+    J --> L[Write redacted snapshot]
+    L -->|Storage failure| K
+    L --> M[Persist event, audit, and object metadata]
+    M -->|Database failure| K
+    M --> N[Return acknowledged event IDs]
+```
+
+Runtime realtime dùng `/api/v1/ws/inference`: browser chỉ gửi tối đa hai frame mẫu mỗi giây và
+chỉ có một frame đang chờ. `POST /api/v1/analysis/frame` là REST fallback, không có state debounce
+giữa các request. Snapshot chỉ được ghi sau acknowledgment; nếu redaction, storage hoặc database
+thất bại thì backend không tạo event và UI giữ review để operator thử lại.
