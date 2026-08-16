@@ -2,6 +2,11 @@
 
 This is the single decision log for the repository. Prefix each entry with its owning area, such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`.
 
+## 2026-08-16: [Cross-cutting] Gate Railway production image deploys on GitHub CI
+- **Choice:** `main` accepts protected pull requests only. GitHub Actions runs Python 3.11 locked dependency checks, isolated frontend/backend/vision suites, and a Docker build. Successful `main` CI pushes `DOCKERHUB_IMAGE:latest`; a `workflow_run` then calls Railway CLI `redeploy` and requires `/health` to return `ready: true`.
+- **Secrets and rollback:** Repository Actions secrets own Docker Hub credentials, Railway token/service/environment and public base URL; Railway Variables retain database, S3, model and optional provider configuration. Because only the moving `:latest` tag is published, rollback uses Railway Deployment History rather than a misleading SHA workflow.
+- **Initial release constraint:** The optional repository variable `INITIAL_RELEASE_SOURCE_BRANCH=develop2` makes the required `Release source` check reject all other source branches. Remove the variable after the first release.
+
 ## 2026-08-16: [Cross-cutting] Make machine state camera-wide, not zone-owned
 - **Reason:** The UI disabled machine control until a zone was selected, while zone intrusion no longer depends on machine state. This made the control unavailable and tied PPE behavior to unrelated zone configuration.
 - **Choice:** Multi-zone WebSocket configuration carries its own `machine_state`, defaulting to `running` for compatibility. The frontend switch is always available and pushes an updated configuration immediately. Zone geometry and persisted zone rows remain unchanged; the camera-wide state gates PPE evaluation only.

@@ -1,5 +1,11 @@
 # Project Progress
 
+## 2026-08-16: [Cross-cutting] Add CI-gated Railway release workflow
+- [x] Standardized the Python project lock and local interpreter pin on Python 3.11, matching Docker and the supported test runtime.
+- [x] Replaced the legacy requirements-based CI with parallel locked uv, frontend and scoped Docker checks for PRs and pushes on `main`; added a non-blocking nightly dependency audit.
+- [x] Added a Docker Hub `:latest` publication after successful `main` CI, followed by Railway CLI redeploy and `/health` readiness polling.
+- [x] Added `docs/CI_CD.md` so a new contributor can configure repository secrets, Railway Docker-image deployment, production variables and migrations, branch protection, release, rollback and incident triage.
+
 ## 2026-08-16: [Documentation] Add component and runtime data-flow diagrams
 - [x] Added `docs/architecture_diagram.md` with Mermaid component and runtime data-flow diagrams; the root architecture document remains the canonical boundary and invariant reference.
 - [x] Replaced the nested sequence diagram with a render-compatible flowchart covering WebSocket backpressure, four-frame debounce, redaction-first snapshot handling and fail-closed persistence.
@@ -66,7 +72,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - The baseline upload → four-point zone → binary WebSocket inference → foot-point zone review → event save flow is implemented.
 - FastAPI serves the React production build at `/` and provides REST plus WebSocket APIs.
 - Frontend uses React 19, TypeScript, Vite, typed feature boundaries, and a tested transport layer.
-- Python static checks, focused single-model backend/vision tests, frontend lint/type-check/unit/component tests, and production build pass; full `make check` remains blocked by the documented Python 3.14 test hang.
+- Python static checks, full root/backend/vision tests, frontend lint/type-check/unit/component tests, and production build pass through `make check` on Python 3.11.
 - US-28 is implemented with pinned `yolo11m_safety.pt`, exact source-mapping validation, one-call-per-frame class filter `[0,3,4]`, and public `hat_vest_v1` observations for the fixed `uploaded_video` / `zone_01` pair.
 - Backend US-07 follows the approved flat layered layout (`api`, `models`, `schemas`, `services`, `integrations`); the temporary `backend/app/modules` tree has been removed.
 - Inference `rule` now echoes `ppe_profile=hat_vest_v1` plus persisted `hat_required`/`vest_required` values in REST and WebSocket responses.
@@ -214,17 +220,18 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - YOLO11m Safety detects presence; backend derives `missing` from qualified absence. Final US-13 ground truth, false-negative/false-alarm evaluation and target-device latency remain release blockers for real alerts.
 - Person-head redaction is a prototype safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.
-- Python 3.14 in the current environment deadlocks AnyIO's blocking portal, so FastAPI/Starlette `TestClient` and full `make check` cannot complete here. Focused non-portal backend tests pass; full API/WebSocket regression must be rerun on the supported CI Python/runtime.
 - Chrome DevTools MCP is not configured, so US-27 browser visual/runtime verification remains pending despite passing component tests and production build.
 - US-08 browser QA passes with local synthetic media through two reviewed occurrences in one monitoring session; the test media is intentionally not distributed in the repository.
 - Legacy unversioned SQLite databases still require a safe Alembic upgrade path; browser QA passes against a newly created schema, while the original pre-US-08 database remains preserved as a backup.
 
 ## Next Steps
-1. Run US-27 browser UAT with two disjoint zones, mixed machine states, reload restoration and grouped review/event verification.
-2. Chốt US-13 metric protocol, annotation guide, scenario matrix, sample size and acceptance thresholds with the Product Owner.
-3. Record and annotate the custom US-13 calibration/final evaluation dataset with manifest and checksums.
-4. Run the complete API/WebSocket suite on the supported CI Python/runtime and perform `make setup` + `make run` release smoke testing.
-5. Preserve the passing US-08 browser sequence as an automated repository E2E test.
-6. Validate or replace the person-head MVP redactor with a dedicated face detector before pilot/production use.
-7. Validate authentication and the complete migration chain against PostgreSQL.
-8. Replace the JSONL writer with a centralized sink before any multi-worker deployment.
+1. Configure the documented GitHub `production` Environment, Railway variables/pre-deploy command, branch protection and `INITIAL_RELEASE_SOURCE_BRANCH=develop2` before opening the first release PR.
+2. Run the first `develop2` to `main` PR through CI, deploy, record its SHA and verify `/health` returns `ready: true`.
+3. Exercise the manual Railway rollback workflow once with a known-good immutable SHA/tag.
+4. Run US-27 browser UAT with two disjoint zones, mixed machine states, reload restoration and grouped review/event verification.
+5. Chốt US-13 metric protocol, annotation guide, scenario matrix, sample size and acceptance thresholds with the Product Owner.
+6. Record and annotate the custom US-13 calibration/final evaluation dataset with manifest and checksums.
+7. Preserve the passing US-08 browser sequence as an automated repository E2E test.
+8. Validate or replace the person-head MVP redactor with a dedicated face detector before pilot/production use.
+9. Validate authentication and the complete migration chain against PostgreSQL.
+10. Replace the JSONL writer with a centralized sink before any multi-worker deployment.

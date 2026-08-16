@@ -4,11 +4,11 @@ P-047 là ứng dụng giám sát an toàn PPE và vùng nguy hiểm bằng Comp
 
 ## Yêu cầu
 
-- Python 3.11–3.13 và [uv](https://docs.astral.sh/uv/)
+- Python 3.11 và [uv](https://docs.astral.sh/uv/)
 - Node.js/npm tương thích với `frontend/package-lock.json`
 - Git LFS nếu clone model checkpoint lần đầu
 
-Python 3.14 hiện có thể làm bộ test FastAPI `TestClient` bị treo; hãy dùng phiên bản được hỗ trợ để chạy toàn bộ kiểm tra.
+Python 3.11 là runtime duy nhất được lock, Docker và CI hỗ trợ; `make setup` dùng `.python-version` để chọn đúng runtime.
 
 ## Cài đặt và chạy local
 
@@ -89,6 +89,10 @@ make docker-smoke
 ```
 
 Compose nạp `.env.development` nhưng dùng PostgreSQL `db` nội bộ disposable, tách biệt với `DATABASE_URL` của developer. Dùng credential development/staging cho smoke test, không dùng credential production.
+
+## CI/CD và release
+
+Pipeline GitHub Actions kiểm tra PR vào `main`, deploy Railway chỉ sau CI xanh và hỗ trợ rollback theo SHA/tag. Thành viên mới cấu hình Environment, Railway Variables, branch protection và vận hành release theo [CI/CD và Railway release](docs/CI_CD.md).
 
 ## Kiểm tra
 

@@ -32,8 +32,8 @@ Lệnh này sẽ tự động:
 Nếu không dùng `make setup`, bạn có thể thực hiện từng bước với `uv`:
 
 ```bash
-# Tạo virtual environment (khuyên dùng Python 3.12 hoặc 3.13)
-uv venv .venv --python 3.12
+# Tạo virtual environment (runtime được hỗ trợ duy nhất là Python 3.11)
+uv venv .venv --python 3.11
 
 # Đồng bộ dependencies từ pyproject.toml / uv.lock
 uv sync
@@ -113,7 +113,7 @@ Tất cả các lệnh Make trong dự án đều được tích hợp sẵn v�
 
 ## 💡 Troubleshooting & Best Practices
 
-1. **Khuyên dùng Python 3.11 - 3.13**: Hiện tại Python 3.14 có thể gây đơ bộ test HTTP `TestClient` của FastAPI trong môi trường test chung.
+1. **Dùng Python 3.11**: Đây là runtime duy nhất được pin trong `.python-version`, lockfile, Docker và CI.
 2. **Không sửa trực tiếp `requirements.txt`**: Dự án quản lý dependencies chính qua `pyproject.toml` và `uv.lock`. Nếu cần cập nhật `requirements.txt` cho môi trường deploy cũ, chạy:
    ```bash
    uv export --format requirements-txt -o requirements.txt
