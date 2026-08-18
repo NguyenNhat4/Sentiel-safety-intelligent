@@ -103,6 +103,12 @@ P-047/
 │       ├── test_face_detection.py
 │       ├── test_privacy_pipeline.py
 │       └── test_tracking.py
+├── streamer/            # Standalone mock camera video streamer (port 8001)
+│   ├── README.md
+│   ├── app.py           # Upload API, camera stream manager and test UI
+│   ├── Dockerfile       # FFmpeg + minimal Python runtime
+│   └── tests/
+│       └── test_app.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference

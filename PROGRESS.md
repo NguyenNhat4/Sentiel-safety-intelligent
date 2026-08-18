@@ -1,5 +1,13 @@
 # Project Progress
 
+## 2026-08-18: [Cross-cutting] Add standalone mock camera streamer
+- Added the independent `streamer` service on port 8001 with per-camera video upload, persistent local media, looped FFmpeg MJPEG output, camera listing, health endpoint, and a browser upload/test page.
+- Added a Docker image that includes FFmpeg, Compose wiring, and the standard `make run` workflow now starts both the streamer and backend. Backend inference integration, RTSP, and HLS remain intentionally deferred until manual MJPEG validation.
+- Focused streamer tests and the full `make check` pass. The current development host does not have the `ffmpeg` binary installed, so local playback requires installing FFmpeg or using the Docker service.
+- Added real-time FFmpeg input pacing and low-buffer output flags after initial manual testing exposed browser backlog/latency.
+- Added camera tabs to the standalone streamer UI so one selected camera is displayed at a time instead of rendering every stream simultaneously.
+- Fixed MJPEG startup on the current FFmpeg image by removing the incompatible `low_delay` encoder flag; force-recreated Compose and verified `/stream/cam_1` emits frames.
+
 ## 2026-08-16: [Vision/Backend] Add YuNet-first identity redaction
 - Added the pinned OpenCV YuNet detector, startup artifact/capability validation, cached thread-safe inference, expanded face blur, and the existing upper-person fallback for each person without an associated face.
 - Snapshot persistence remains fail-closed: all detected faces are redacted, detector errors fall back for every person with a stable operational warning, no-person frames fail, and database failures still remove the already-redacted file.

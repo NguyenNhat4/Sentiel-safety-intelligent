@@ -1,5 +1,10 @@
 # Project Design Decisions
 
+## 2026-08-18: [Cross-cutting] Build the camera streamer before backend integration
+- **Choice:** Add an isolated `streamer/` service on port 8001 for per-camera video upload and looped FFmpeg MJPEG playback. Backend connection, RTSP/HLS, and multi-camera inference integration are deferred until the standalone stream is manually validated.
+- **Reason:** The Product Owner wants to test the mock camera stream independently before changing the existing FastAPI/WebSocket inference flow.
+- **Boundary:** The streamer owns video files, FFmpeg processes, and stream transport only. It does not know safety rules, users, zones, YOLO, events, or the backend database.
+
 ## 2026-08-15: [Cross-cutting] One violation log per tracked person and video session
 - **Choice:** Confirmed warnings use `(monitoring_session_id, track_id)` as the per-video person-log key. Missing hat, missing vest, restricted-camera presence, and zone intrusion occurrences are accumulated into that one event while the same track remains in the session.
 - **Boundary:** `track_id` remains a temporary ByteTrack association, not a person's identity and not a cross-video or cross-camera identifier. A new video session may create a new log for the same physical person.

@@ -1,6 +1,21 @@
 # Local container run uses the developer environment, with an isolated
 # PostgreSQL URL so application checks never target a developer's configured DB.
 services:
+  streamer:
+    build:
+      context: .
+      dockerfile: streamer/Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data/streamer:/app/data/streamer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   db:
     image: postgres:17-alpine
     environment:
