@@ -135,13 +135,34 @@ function selectCamera(camera){
 async function refresh(preferredCamera=null){
     const cameras = await fetch('/api/cameras').then(r=>r.json());
     tabs.innerHTML = cameras.map(c => `
-      <button type="button" role="tab" data-camera-tab="${c}" aria-selected="false"
-        style="border:0; padding:9px 14px; border-radius:6px; cursor:pointer;">${c}</button>`).join('');
+      <span style="display:inline-flex; gap:3px; align-items:center;">
+        <button type="button" role="tab" data-camera-tab="${c}" aria-selected="false"
+          style="border:0; padding:9px 14px; border-radius:6px; cursor:pointer;">${c}</button>
+        <button type="button" data-delete-camera="${c}" title="Xóa ${c}"
+          style="border:0; padding:9px 10px; border-radius:6px; cursor:pointer; background:#fee2e2; color:#991b1b;">Xóa</button>
+      </span>`).join('');
     tabs.querySelectorAll('[data-camera-tab]').forEach(tab=>{
         tab.onclick=()=>selectCamera(tab.dataset.cameraTab);
     });
+    tabs.querySelectorAll('[data-delete-camera]').forEach(button=>{
+        button.onclick=async()=>{
+            const camera=button.dataset.deleteCamera;
+            if(!confirm('Xóa camera '+camera+'?')) return;
+            const response=await fetch('/api/cameras/'+encodeURIComponent(camera), {method:'DELETE'});
+            if(!response.ok){ status.textContent='❌ Xóa camera thất bại'; return; }
+            status.textContent='✅ Đã xóa '+camera;
+            refresh(activeCamera===camera ? null : activeCamera);
+        };
+    });
     const camera=preferredCamera && cameras.includes(preferredCamera) ? preferredCamera : (activeCamera && cameras.includes(activeCamera) ? activeCamera : cameras[0]);
     if(camera) selectCamera(camera);
+    else {
+        activeCamera=null;
+        title.textContent='Chưa có camera';
+        empty.style.display='block';
+        image.style.display='none';
+        image.removeAttribute('src');
+    }
 }
 form.onsubmit = async e => {
     e.preventDefault();
@@ -173,6 +194,15 @@ refresh();
         await video.close()
         temporary.replace(target)
         return {"camera_id": camera_id, "stream_url": f"/stream/{camera_id}"}
+
+    @app.delete("/api/cameras/{camera_id}")
+    async def delete_camera(camera_id: str) -> dict[str, str]:
+        camera_id = valid_camera_id(camera_id)
+        video_path = manager.upload_path(camera_id)
+        if not video_path.is_file():
+            raise HTTPException(status_code=404, detail="Camera video not found")
+        video_path.unlink()
+        return {"camera_id": camera_id, "status": "deleted"}
 
     @app.get("/stream/{camera_id}")
     async def stream(camera_id: str) -> StreamingResponse:

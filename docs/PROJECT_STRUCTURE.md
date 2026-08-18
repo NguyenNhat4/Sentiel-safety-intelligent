@@ -180,6 +180,7 @@ P-047/
 │   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
+│   ├── build_streamer.sh # Build the standalone streamer image
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
 │   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check

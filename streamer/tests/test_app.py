@@ -43,3 +43,18 @@ def test_rejects_invalid_camera_and_extension(tmp_path: Path) -> None:
         ).status_code
         == 415
     )
+
+
+def test_deletes_camera_video(tmp_path: Path) -> None:
+    client = TestClient(create_app(tmp_path))
+    client.post(
+        "/api/cameras/cam_1",
+        files={"video": ("sample.mp4", b"video", "video/mp4")},
+    )
+
+    response = client.delete("/api/cameras/cam_1")
+
+    assert response.status_code == 200
+    assert response.json() == {"camera_id": "cam_1", "status": "deleted"}
+    assert client.get("/api/cameras").json() == []
+    assert client.delete("/api/cameras/cam_1").status_code == 404

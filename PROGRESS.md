@@ -7,6 +7,7 @@
 - Added real-time FFmpeg input pacing and low-buffer output flags after initial manual testing exposed browser backlog/latency.
 - Added camera tabs to the standalone streamer UI so one selected camera is displayed at a time instead of rendering every stream simultaneously.
 - Fixed MJPEG startup on the current FFmpeg image by removing the incompatible `low_delay` encoder flag; force-recreated Compose and verified `/stream/cam_1` emits frames.
+- Added `DELETE /api/cameras/{camera_id}` and a per-tab **Xóa** action that removes the uploaded video and resets the viewer when no cameras remain.
 
 ## 2026-08-16: [Vision/Backend] Add YuNet-first identity redaction
 - Added the pinned OpenCV YuNet detector, startup artifact/capability validation, cached thread-safe inference, expanded face blur, and the existing upper-person fallback for each person without an associated face.

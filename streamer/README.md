@@ -18,6 +18,9 @@ camera's live stream. The direct stream URL is
 `http://localhost:8001/stream/cam_1` and the current camera list is available at
 `http://localhost:8001/api/cameras`.
 
+Use the **Xóa** button beside a camera tab to delete that camera's uploaded video,
+or call `DELETE /api/cameras/{camera_id}` directly.
+
 ## Run with Docker
 
 ```bash
@@ -35,6 +38,18 @@ context and is required because the Dockerfile copies the `streamer/` directory.
 ```bash
 docker build -f streamer/Dockerfile -t p047-streamer:dev .
 docker images p047-streamer
+```
+
+Hoặc dùng script trong folder `scripts/`:
+
+```bash
+./scripts/build_streamer.sh
+```
+
+Script mặc định build image `nguyennaht4/streamer:dev`. Có thể truyền tag khác:
+
+```bash
+./scripts/build_streamer.sh DOCKERHUB_USERNAME/streamer:dev
 ```
 
 Run the locally built image:
