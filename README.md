@@ -7,6 +7,7 @@ P-047 là ứng dụng giám sát an toàn PPE và vùng nguy hiểm bằng Comp
 - Python 3.11 và [uv](https://docs.astral.sh/uv/)
 - Node.js/npm tương thích với `frontend/package-lock.json`
 - Git LFS nếu clone model checkpoint lần đầu
+- FFmpeg (`ffmpeg` trong `PATH`) cho mock camera streamer local
 
 Python 3.11 là runtime duy nhất được lock, Docker và CI hỗ trợ; `make setup` dùng `.python-version` để chọn đúng runtime.
 
@@ -19,11 +20,12 @@ make setup
 make run
 ```
 
-`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend và khởi động FastAPI tại cổng 8000.
+`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000.
 
 Mở sau khi server sẵn sàng:
 
 - App: <http://localhost:8000/>
+- Mock streamer: <http://localhost:8001/>
 - Swagger: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
 - OpenAPI: <http://localhost:8000/openapi.json>
@@ -92,6 +94,21 @@ make docker-smoke
 ```
 
 Compose nạp `.env.development` nhưng dùng PostgreSQL `db` nội bộ disposable, tách biệt với `DATABASE_URL` của developer. Dùng credential development/staging cho smoke test, không dùng credential production.
+
+Để build và publish riêng mock streamer, xem `streamer/README.md`. Tóm tắt:
+
+```bash
+docker build -f streamer/Dockerfile -t p047-streamer:dev .
+docker run --rm --name p047-streamer -p 8001:8001 \
+  -v "$PWD/data/streamer:/app/data/streamer" p047-streamer:dev
+docker login
+docker tag p047-streamer:dev DOCKERHUB_USERNAME/p047-streamer:dev
+docker push DOCKERHUB_USERNAME/p047-streamer:dev
+```
+
+Nếu đã build image bằng username `nguyennaht4`, image cụ thể là
+`nguyennaht4/streamer:dev`; xem `streamer/README.md` để biết cách chạy và ý
+nghĩa từng tham số Docker.
 
 ## CI/CD và release
 

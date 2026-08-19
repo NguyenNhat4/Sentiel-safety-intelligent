@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+.PHONY: setup py-setup env-setup db-upgrade run streamer-run streamer-test test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -19,7 +19,13 @@ db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/alembic upgrade head
 
 run: db-upgrade frontend-build
-	$(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+	$(VENV_BIN)/uvicorn streamer.app:app --host 0.0.0.0 --port 8001 & STREAMER_PID=$$!; trap 'kill $$STREAMER_PID' EXIT INT TERM; $(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+
+streamer-run:
+	$(VENV_BIN)/uvicorn streamer.app:app --reload --host 0.0.0.0 --port 8001
+
+streamer-test:
+	PYTHONPATH=. $(VENV_BIN)/pytest streamer/tests/ -v
 
 frontend-install:
 	npm --prefix frontend ci
@@ -59,13 +65,13 @@ restore:
 	$(VENV_BIN)/python scripts/restore_data.py $(ARCHIVE)
 
 test:
-	PYTHONPATH=. $(VENV_BIN)/pytest tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ vision/tests/ -v
+	PYTHONPATH=. $(VENV_BIN)/pytest tests/ streamer/tests/ -v && PYTHONPATH=. $(VENV_BIN)/pytest backend/tests/ vision/tests/ -v
 
 lint:
-	$(VENV_BIN)/ruff check src/ backend/ vision/
+	$(VENV_BIN)/ruff check src/ backend/ streamer/ vision/
 
 format:
-	$(VENV_BIN)/ruff format --check src/ backend/ vision/
+	$(VENV_BIN)/ruff format --check src/ backend/ streamer/ vision/
 
 check: lint format frontend-lint frontend-type-check frontend-test frontend-build test
 

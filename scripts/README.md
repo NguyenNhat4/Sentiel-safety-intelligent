@@ -1,5 +1,14 @@
 # Benchmark scripts
 
+`build_streamer.sh` builds the standalone mock camera streamer image from the
+repository root. It defaults to `nguyennaht4/streamer:dev`; pass another image
+tag as the first argument when needed:
+
+```bash
+./scripts/build_streamer.sh
+./scripts/build_streamer.sh DOCKERHUB_USERNAME/streamer:dev
+```
+
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 
