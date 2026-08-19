@@ -1,0 +1,104 @@
+import {fireEvent, render, screen} from "@testing-library/react";
+import {beforeEach, describe, expect, it, vi} from "vitest";
+import {loadEventDetail} from "../../api/events";
+import type {EventDetail} from "../../types";
+import {EventDetailDialog} from "./EventDetailDialog";
+
+vi.mock("../../api/events", () => ({loadEventDetail: vi.fn()}));
+
+const detail: EventDetail = {
+  id: 42,
+  timestamp: "2026-08-15T03:05:32Z",
+  zone_id: "zone_01",
+  camera_id: "uploaded_video",
+  event_type: "missing_ppe_and_intrusion",
+  severity: "high",
+  status: "acknowledged",
+  acknowledged_by: "Nguyễn Anh Tuấn",
+  decision_context: {
+    schema_version: "decision_context_v1",
+    rule: {
+      rule_version: "safety_rule_v1",
+      violation_frame_count: 4,
+      triggered_rule_keys: ["zone_intrusion:zone_01", "missing_ppe:hat"],
+      ppe_profile: "hat_vest_v1",
+      ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: false},
+    },
+    scene: {
+      camera_id: "uploaded_video",
+      zone_id: "zone_01",
+      zone_name: "Máy dập A",
+      frame_id: 12,
+      video_timestamp_seconds: 6,
+      machine_state: "running",
+      zone_revision: 3,
+      zone_points: [],
+      people: [{
+        track_id: 7,
+        bbox: [40, 10, 80, 100],
+        confidence: 0.91,
+        inside_zone: true,
+        ppe: {
+          hat: {status: "missing", confidence: null},
+          vest: {status: "present", confidence: 0.88},
+        },
+        missing_required_ppe: ["hat"],
+      }],
+      detections: [],
+    },
+    system_decision: {
+      result: "violate",
+      reason_codes: ["zone_intrusion", "missing_required_ppe:hat"],
+      severity: "high",
+    },
+    human_review: {
+      outcome: "actual_violation",
+      actor_user_id: "user-1",
+      actor_name: "Nguyễn Anh Tuấn",
+      actor_role: "safety_manager",
+      reviewed_at: "2026-08-15T03:05:40Z",
+    },
+  },
+  summary: {
+    text: "Một người được phát hiện tại Máy dập A và được xác nhận là vi phạm thực tế.",
+    source: "deterministic",
+    context_schema_version: "decision_context_v1",
+  },
+};
+
+describe("EventDetailDialog", () => {
+  beforeEach(() => vi.mocked(loadEventDetail).mockResolvedValue(detail));
+
+  it("presents the persisted AI to rule to HITL audit chain", async () => {
+    render(<EventDetailDialog eventId={42} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Đang tải");
+    expect(await screen.findByRole("dialog", {name: "Chi tiết sự kiện #42"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "1. AI quan sát"})).toBeInTheDocument();
+    expect(screen.getByText(/91%/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "2. Rule quyết định"})).toBeInTheDocument();
+    expect(screen.getByText(/safety_rule_v1/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "3. Human review"})).toBeInTheDocument();
+    expect(screen.getByText(/Nguyễn Anh Tuấn/)).toBeInTheDocument();
+    expect(screen.getByText(/Nguồn: Mẫu xác định/)).toBeInTheDocument();
+  });
+
+  it("shows a limited-audit explanation for legacy events", async () => {
+    vi.mocked(loadEventDetail).mockResolvedValue({...detail, decision_context: null});
+
+    render(<EventDetailDialog eventId={42} onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/Audit hạn chế/)).toBeInTheDocument();
+    expect(screen.getByText(/phiên bản hệ thống cũ/)).toBeInTheDocument();
+  });
+
+  it("closes from the explicitly labelled button", async () => {
+    const onClose = vi.fn();
+    render(<EventDetailDialog eventId={42} onClose={onClose} />);
+    await screen.findByRole("dialog");
+
+    fireEvent.click(screen.getByRole("button", {name: "Đóng chi tiết sự kiện"}));
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
