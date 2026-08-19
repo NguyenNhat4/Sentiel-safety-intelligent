@@ -1,6 +1,8 @@
+import json
 from typing import Any
 
 from backend.app.core.config import get_settings
+from backend.app.schemas.event import EventIncidentSummary
 
 
 def get_llm():
@@ -53,3 +55,86 @@ class SafetyAgentService:
                 "Issue a warning to the personnel and provide required helmet/safety gear before resuming task."
             )
         return f"[{severity.upper()}] Safety event logged in {zone_id}. Perform routine safety inspection."
+
+    def generate_incident_summary(
+        self,
+        *,
+        decision_context: dict[str, Any] | None,
+        event_type: str,
+        zone_id: str,
+    ) -> EventIncidentSummary:
+        deterministic = self._deterministic_incident_summary(
+            decision_context=decision_context,
+            event_type=event_type,
+            zone_id=zone_id,
+        )
+        if not decision_context or not self.llm:
+            return EventIncidentSummary(
+                text=deterministic,
+                source="deterministic",
+                context_schema_version=(decision_context or {}).get("schema_version"),
+            )
+        try:
+            facts = self._incident_summary_facts(decision_context)
+            prompt = (
+                "Tóm tắt sự việc an toàn sau bằng tối đa hai câu tiếng Việt. "
+                "Chỉ dùng dữ kiện có trong JSON, không suy đoán, không thêm khuyến nghị. "
+                f"Incident facts: {json.dumps(facts, ensure_ascii=False)}"
+            )
+            response = self.llm.invoke(prompt)
+            text = str(response.content).strip()
+            if text:
+                return EventIncidentSummary(
+                    text=text[:1200],
+                    source="llm",
+                    context_schema_version=decision_context.get("schema_version"),
+                )
+        except Exception:
+            pass
+        return EventIncidentSummary(
+            text=deterministic,
+            source="deterministic",
+            context_schema_version=decision_context.get("schema_version"),
+        )
+
+    @staticmethod
+    def _incident_summary_facts(decision_context: dict[str, Any]) -> dict[str, Any]:
+        scene = decision_context["scene"]
+        decision = decision_context["system_decision"]
+        review = decision_context["human_review"]
+        return {
+            "schema_version": decision_context.get("schema_version"),
+            "zone_name": scene.get("zone_name"),
+            "machine_state": scene.get("machine_state"),
+            "people_count": len(scene.get("people") or []),
+            "result": decision.get("result"),
+            "reason_codes": decision.get("reason_codes") or [],
+            "severity": decision.get("severity"),
+            "review_outcome": review.get("outcome"),
+        }
+
+    @staticmethod
+    def _deterministic_incident_summary(
+        *,
+        decision_context: dict[str, Any] | None,
+        event_type: str,
+        zone_id: str,
+    ) -> str:
+        if not decision_context:
+            return (
+                f"Sự kiện {event_type} tại {zone_id} không có decision context đầy đủ "
+                "do được tạo bởi phiên bản hệ thống cũ."
+            )
+        scene = decision_context["scene"]
+        decision = decision_context["system_decision"]
+        review = decision_context["human_review"]
+        zone_name = scene.get("zone_name") or scene.get("zone_id") or zone_id
+        machine_state = "đang chạy" if scene.get("machine_state") == "running" else "đã dừng"
+        people_count = len(scene.get("people") or [])
+        outcome = "vi phạm thực tế" if review.get("outcome") == "actual_violation" else "báo sai"
+        reasons = ", ".join(decision.get("reason_codes") or [])
+        return (
+            f"Tại {zone_name}, hệ thống ghi nhận {people_count} người khi máy {machine_state} "
+            f"và đưa ra kết quả {decision.get('result', 'không xác định')} ({reasons}). "
+            f"{review.get('actor_name', 'Cán bộ an toàn')} xác nhận là {outcome}."
+        )

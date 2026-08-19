@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     snapshot_storage_region: str = "auto"
     snapshot_storage_access_key_id: str = ""
     snapshot_storage_secret_access_key: str = ""
+    audit_retention_days: int = Field(default=365, ge=1, le=3650)
+    snapshot_retention_days: int = Field(default=90, ge=1, le=3650)
     operational_metrics_log_max_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     operational_metrics_log_backup_count: int = Field(default=6, ge=1, le=30)
     operational_metrics_max_scan_bytes: int = Field(default=10 * 1024 * 1024, gt=0)

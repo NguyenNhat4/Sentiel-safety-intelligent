@@ -31,6 +31,7 @@ def configure_operational_metrics_logger(log_path: str | Path, *, max_bytes: int
     path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(logging.INFO)
+    logger.disabled = False
     logger.propagate = False
     for handler in logger.handlers:
         if getattr(handler, _HANDLER_MARKER, False) and Path(handler.baseFilename) == path.resolve():

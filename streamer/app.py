@@ -21,7 +21,9 @@ class CameraStreamManager:
         self.media_dir.mkdir(parents=True, exist_ok=True)
 
     def cameras(self) -> list[str]:
-        return sorted(path.stem for path in self.media_dir.iterdir() if path.is_file() and path.suffix in VIDEO_EXTENSIONS)
+        return sorted(
+            path.stem for path in self.media_dir.iterdir() if path.is_file() and path.suffix in VIDEO_EXTENSIONS
+        )
 
     def upload_path(self, camera_id: str) -> Path:
         return self.media_dir / f"{camera_id}.mp4"
@@ -32,15 +34,22 @@ class CameraStreamManager:
             [
                 "ffmpeg",
                 "-hide_banner",
-                "-loglevel", "error",
-                "-stream_loop", "-1",
+                "-loglevel",
+                "error",
+                "-stream_loop",
+                "-1",
                 "-re",
-                "-i", str(video_path),
+                "-i",
+                str(video_path),
                 "-an",
-                "-fflags", "nobuffer",
-                "-f", "mjpeg",
-                "-q:v", "5",
-                "-flush_packets", "1",
+                "-fflags",
+                "nobuffer",
+                "-f",
+                "mjpeg",
+                "-q:v",
+                "5",
+                "-flush_packets",
+                "1",
                 "pipe:1",
             ],
             stdout=subprocess.PIPE,
@@ -212,8 +221,7 @@ refresh();
             raise HTTPException(status_code=404, detail="Camera video not found")
 
         return StreamingResponse(
-            manager.frames_generator(video_path),
-            media_type="multipart/x-mixed-replace; boundary=frame"
+            manager.frames_generator(video_path), media_type="multipart/x-mixed-replace; boundary=frame"
         )
 
     @app.get("/health")

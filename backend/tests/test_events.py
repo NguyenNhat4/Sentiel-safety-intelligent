@@ -67,7 +67,7 @@ def test_create_event_with_completed_review(client):
     assert response.status_code == 201
     body = response.json()
     assert body["status"] == "false_alarm"
-    assert body["acknowledged_by"] == "Safety Officer"
+    assert body["acknowledged_by"] == "Safety Test"
     assert body["acknowledged_at"] is not None
 
 

@@ -5,6 +5,7 @@ import {saveReviewedEvent} from "../../api/events";
 import {loadMonitoringZones, saveMonitoringZones} from "../../api/monitoring-zones";
 import type {
   EventBatchPayload,
+  DecisionContextInput,
   EventPayload,
   InferenceResult,
   ModelDetection,
@@ -731,7 +732,14 @@ export function useMonitor() {
     if (!pending) return;
     setReviewSaving(true);
     try {
-      await saveReviewedEvent(buildEventPayload(status, pending, [], machineRunningRef.current));
+      const selectedZone = appliedZonesRef.current.find(zone => zone.zone_id === selectedZoneIdRef.current);
+      await saveReviewedEvent(buildEventPayload(
+        status,
+        pending,
+        selectedZone?.points ?? [],
+        machineRunningRef.current,
+        selectedZone?.display_name ?? pending.rule.zone_id,
+      ));
       const reviewedLogIds = new Set(buildHitlLogEntries(pending).map(log => log.id));
       setHitlLogs(current => current.map(log => reviewedLogIds.has(log.id)
         ? {...log, reviewStatus: "reviewed", hasNewOccurrence: false}
@@ -993,7 +1001,8 @@ export function buildEventPayload(
   status: ReviewStatus,
   pending: InferenceResult,
   zonePoints: ZonePoint[],
-  machineRunning: boolean
+  machineRunning: boolean,
+  zoneName = "Vùng 1",
 ): EventPayload {
   const person = pending.people[0];
   const violations = person?.active_violations ?? [];
@@ -1003,6 +1012,7 @@ export function buildEventPayload(
   const violationKeys = [...new Set(violations.map(item => item.rule_key))];
   const zoneId = violations.find(item => item.zone_id)?.zone_id ?? pending.rule.zone_id;
   const critical = violationKeys.some(key => key.startsWith("zone_intrusion") || key === "restricted_area_person");
+  const triggeredRuleKeys = violationKeys.length ? violationKeys : newRuleKeys(pending);
   return {
     zone_id: zoneId,
     camera_id: "uploaded_video",
@@ -1016,6 +1026,13 @@ export function buildEventPayload(
     monitoring_session_id: pending.monitoring_session_id,
     track_id: person?.track_id,
     occurrence_ids: occurrenceIds,
+    decision_context: buildDecisionContext(
+      pending,
+      zoneName,
+      zonePoints,
+      machineRunning ? "running" : "stopped",
+      triggeredRuleKeys,
+    ),
     details: {
       inference_result: pending.result,
       review_result: status === "acknowledged" ? "actual_violation" : "normal",
@@ -1060,6 +1077,15 @@ export function buildEventBatchPayload(
         event_type: "zone_intrusion" as const,
         severity: "critical",
         occurrence_ids: occurrenceIds,
+        decision_context: buildDecisionContext(
+          pending,
+          byId.get(zoneId)?.display_name ?? zoneId,
+          byId.get(zoneId)?.points ?? [],
+          byId.get(zoneId)?.machine_state ?? "running",
+          pending.people.flatMap(person => person.active_violations
+            ?.filter(violation => violation.is_new && violation.zone_id === zoneId)
+            .map(violation => violation.rule_key) ?? []),
+        ),
         details: {
           review_result: status === "acknowledged" ? "actual_violation" : "normal",
           machine_state: byId.get(zoneId)?.machine_state ?? "running",
@@ -1068,6 +1094,48 @@ export function buildEventBatchPayload(
           zone_points: byId.get(zoneId)?.points ?? [],
         },
       })),
+  };
+}
+
+function newRuleKeys(pending: InferenceResult): string[] {
+  const keys = [...new Set(pending.people.flatMap(person =>
+    person.active_violations?.filter(violation => violation.is_new).map(violation => violation.rule_key) ?? []
+  ))];
+  if (keys.length) return keys;
+  if (pending.rule.ppe_alert) return ["missing_required_ppe"];
+  if (pending.rule.person_inside_zone && pending.rule.machine_state === "running") return ["zone_intrusion"];
+  return ["review_required"];
+}
+
+function buildDecisionContext(
+  pending: InferenceResult,
+  zoneName: string,
+  zonePoints: ZonePoint[],
+  machineState: "running" | "stopped",
+  triggeredRuleKeys: string[],
+): DecisionContextInput {
+  if (pending.result !== "violate") throw new Error("Decision audit chỉ được tạo từ cảnh báo vi phạm");
+  const ruleKeys = [...new Set(triggeredRuleKeys)];
+  return {
+    rule: {
+      triggered_rule_keys: ruleKeys,
+      ppe_profile: pending.rule.ppe_profile,
+      ppe_requirements: pending.rule.ppe_requirements,
+    },
+    scene: {
+      frame_id: pending.frame_id,
+      video_timestamp_seconds: pending.video_time,
+      machine_state: machineState,
+      zone_name: zoneName,
+      zone_revision: pending.rule.zone_revision,
+      zone_points: zonePoints,
+      people: pending.people,
+      detections: pending.detections ?? [],
+    },
+    system_decision: {
+      result: pending.result,
+      reason_codes: ruleKeys,
+    },
   };
 }
 

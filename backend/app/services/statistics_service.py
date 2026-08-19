@@ -13,12 +13,13 @@ class StatisticsService:
         events = self.db.query(SafetyEvent)
         if zone_id:
             events = events.filter(SafetyEvent.zone_id == zone_id)
-        total_events = events.count()
+        official_violations = events.filter(SafetyEvent.status.in_(("acknowledged", "resolved")))
+        total_events = official_violations.count()
         unacknowledged = events.filter(SafetyEvent.status == "unacknowledged").count()
 
         # Count by event type
         type_counts = (
-            events.with_entities(SafetyEvent.event_type, func.count(SafetyEvent.id))
+            official_violations.with_entities(SafetyEvent.event_type, func.count(SafetyEvent.id))
             .group_by(SafetyEvent.event_type)
             .all()
         )
@@ -26,7 +27,9 @@ class StatisticsService:
 
         # Count by severity
         severity_counts = (
-            events.with_entities(SafetyEvent.severity, func.count(SafetyEvent.id)).group_by(SafetyEvent.severity).all()
+            official_violations.with_entities(SafetyEvent.severity, func.count(SafetyEvent.id))
+            .group_by(SafetyEvent.severity)
+            .all()
         )
         violations_by_severity = {severity: count for severity, count in severity_counts}
 
@@ -34,7 +37,7 @@ class StatisticsService:
         zones = [zone_id] if zone_id else ["zone_01", "zone_02", "zone_03"]
         zone_stats = []
         for z in zones:
-            v_count = self.db.query(SafetyEvent).filter(SafetyEvent.zone_id == z).count()
+            v_count = official_violations.filter(SafetyEvent.zone_id == z).count()
             # Simulated total detections for compliance calculation
             total_det = max(v_count + 50, 100)
             compliance = round(((total_det - v_count) / total_det) * 100, 2)
