@@ -40,6 +40,9 @@ class SafetyEvent(Base):
     acknowledged_by = Column(String(100), nullable=True)
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     details = Column(JSON, nullable=True)  # JSON for detected items, track_id, bounding boxes
+    decision_context = Column(JSON, nullable=True)
+    audit_retention_until = Column(DateTime(timezone=True), nullable=True)
+    snapshot_retention_until = Column(DateTime(timezone=True), nullable=True)
     monitoring_session_id = Column(String(36), nullable=True, index=True)
     track_id = Column(Integer, nullable=True, index=True)
     occurrences = relationship(
