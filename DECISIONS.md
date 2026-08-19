@@ -334,3 +334,16 @@ This is the single decision log for the repository. Prefix each entry with its o
 - **Reason:** Safety Officers need a simple mode that treats any detected person in a selected camera-zone configuration as an immediate danger alert, without relying on polygon placement or simulated machine state.
 - **Choice:** Add the persisted `restricted_area_detection_enabled` switch to the existing camera-zone safety requirement resource, default OFF. When ON, each detected canonical person opens a deduplicated `restricted_area_person` critical occurrence immediately; the frontend presents it as a red Human-in-the-Loop log.
 - **Compatibility:** The REST/WebSocket additions are additive. Existing configuration writes may omit the new field and save it as OFF. PPE hat/vest rules and polygon intrusion behavior are unchanged.
+
+## 2026-08-15: [Backend] Aggregate rule follows per-person hat/vest and active-zone truth table
+- **Reason:** The operator rule matrix must give the same result for one or more detected people, while preserving independent hat/vest requirements and the machine-state safety gate.
+- **Choice:** Report `violate` when any detected person is missing a PPE item currently required for that camera-zone, or when any detected person enters an active danger zone while its machine is `running`. No detected person is `normal`; a zone entry while `stopped` is `normal` unless an independent PPE rule is violated.
+- **Compatibility:** The REST/WebSocket result fields are unchanged. `PpeRequirementResponse` continues to emit legacy GET aliases; when a canonical caller omits them, `helmet_required` is derived from `hat_required` and the retired glasses/gloves aliases remain `false`.
+
+## 2026-08-15: [Cross-cutting] Persist a versioned immutable event decision audit
+- **Reason:** Area Managers must independently understand why a reviewed event exists without asking the Safety Officer or replaying raw video.
+- **Choice:** Store an additive `decision_context_v1` on every new reviewed event. It contains the observed frame/people/PPE/zone/machine state, triggered rule keys, `safety_rule_v1`, configured debounce, deterministic result/severity, and the server-stamped HITL actor/outcome/time. The structured context is immutable; later Area Manager lifecycle transitions do not rewrite the original HITL evidence.
+- **Presentation:** Event Detail may generate a short LLM summary only from stored context. Deterministic text is the required fallback and the structured JSON remains the sole source of truth.
+- **False alarms:** Retain and expose `false_alarm` events for audit/model evaluation, but exclude them from total, type, severity, zone and compliance violation statistics. Confirmed events remain official after an Area Manager marks them `resolved`.
+- **Retention/privacy:** Do not persist raw video or a replayable monitoring session. Store only reviewed metadata for 365 days and a blurred reviewed snapshot for 90 days by default, with separate configurable deadlines. This slice records deadlines; a cleanup scheduler is follow-up work.
+- **Compatibility/security:** Legacy events keep null context and display limited audit information. Reviewed-event endpoints retain the current role checks, and the backend stamps the authenticated actor instead of trusting the client-supplied display name.

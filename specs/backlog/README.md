@@ -10,5 +10,5 @@ Thư mục này chứa spec triển khai chi tiết cho các user story chưa ho
 
 ## Phân nhóm
 
-- Đóng MVP trong tuần hiện tại: `US-07` đến `US-13`, `US-16` đến `US-20` và `US-24`.
+- Đóng MVP trong tuần hiện tại: `US-07` đến `US-13`, `US-17` đến `US-20` và `US-24`.
 - Nâng cao trong 5 tuần sau MVP: `US-14`, `US-15`, `US-21` đến `US-23`, `US-25` và `US-26`.

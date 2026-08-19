@@ -179,19 +179,20 @@
 
 ### US-16 — Lưu memory và audit của phiên giám sát
 
-> Với vai trò cán bộ an toàn, tôi muốn hệ thống ghi nhớ rule, cảnh báo và quyết định review trong phiên, để truy vết vì sao một sự kiện được tạo.
+> Với vai trò quản lý khu vực, tôi muốn hệ thống ghi nhớ rule, cảnh báo và quyết định review trong phiên, để tự truy vết vì sao một sự kiện được tạo mà không cần hỏi lại cán bộ an toàn hoặc xem raw video.
 
-- Ưu tiên / trạng thái: **P0 / Hoàn thành một phần**
+- Ưu tiên / trạng thái: **P0 / Hoàn thành**
 - Phụ thuộc: US-06, US-09, US-11
 - Acceptance criteria:
-  - Mỗi event liên kết rule version, machine state, zone, confidence, severity và quyết định HITL tại thời điểm tạo.
-  - Reload trang vẫn truy xuất được audit data; không lưu raw video liên tục.
-  - Chỉ snapshot vi phạm/review được lưu; event detail giải thích được quyết định.
-  - Có thể sinh bản tóm tắt sự việc bằng ngôn ngữ tự nhiên từ decision context đã lưu; nội dung sinh phải bám dữ liệu nguồn, có fallback deterministic và không thay thế audit data có cấu trúc.
+  - [x] Mỗi event mới có audit context liên kết rule/schema version, machine state, zone, confidence, severity và quyết định HITL tại thời điểm tạo.
+  - [x] Reload trang vẫn truy xuất được audit data; hệ thống không lưu raw video hay session replay.
+  - [x] Chỉ snapshot đã làm mờ của event review được lưu; Event Detail giải thích chuỗi AI quan sát → rule quyết định → human review.
+  - [x] Bản tóm tắt ngôn ngữ tự nhiên chỉ sinh từ decision context đã lưu, có deterministic fallback và không thay thế audit data có cấu trúc.
+  - [x] False alarm vẫn truy xuất được trong audit nhưng bị loại khỏi thống kê vi phạm chính thức.
 - Task:
-  1. Chốt audit schema và retention mặc định.
-  2. Lưu immutable decision context cùng event.
-  3. Hoàn thiện event-detail API/UI, bản tóm tắt sự việc tùy chọn và test truy xuất/fallback.
+  1. [x] Chốt `decision_context_v1`, `safety_rule_v1`, metadata retention 365 ngày và snapshot retention 90 ngày mặc định.
+  2. [x] Lưu immutable decision context cùng event, để backend đóng dấu actor và các field canonical.
+  3. [x] Hoàn thiện event-detail API/UI, tách filter false alarm, summary tùy chọn và test truy xuất/fallback/migration.
 
 ### US-17 — Bảo mật dữ liệu MVP
 
