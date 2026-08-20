@@ -35,6 +35,7 @@ function mockAuthenticatedSession(): void {
       zones: [],
       updated_at: null
     });
+    if (url.includes("/stream-config")) return jsonResponse({active_camera_id: null, updated_at: null});
     return jsonResponse([]);
   }));
 }
@@ -49,6 +50,18 @@ describe("Sentinel authentication", () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<App />);
     await waitFor(() => expect(screen.getByRole("button", {name: /Đăng nhập/})).toBeInTheDocument());
+    expect(screen.getByText("Tài khoản dùng thử")).toBeInTheDocument();
+    expect(screen.getByText("admin@sentinel.local")).toBeInTheDocument();
+    expect(screen.getByText("Mật khẩu chung:")).toBeInTheDocument();
+  });
+
+  it("fills the login form from a demo account shortcut", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    render(<App />);
+    await screen.findByRole("button", {name: /Đăng nhập/});
+    fireEvent.click(screen.getByRole("button", {name: "Dùng tài khoản admin@sentinel.local"}));
+    expect(screen.getByLabelText("Email công việc")).toHaveValue("admin@sentinel.local");
+    expect(screen.getByLabelText("Mật khẩu")).toHaveValue("Sentinel123!");
   });
 
   it("opens the application after the API accepts credentials", async () => {
@@ -115,6 +128,9 @@ describe("Sentinel authentication", () => {
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Camera stream/})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Camera stream/}));
+    expect(await screen.findByRole("heading", {name: "Camera stream", level: 2})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
   });
 
@@ -144,7 +160,7 @@ describe("Sentinel React application", () => {
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
-    expect(screen.getByText("Tải video demo")).toBeInTheDocument();
+     expect(await screen.findByText("Chưa có stream được bật")).toBeInTheDocument();
   });
 
   it("keeps the camera-wide machine switch available without a selected zone", async () => {
@@ -157,43 +173,18 @@ describe("Sentinel React application", () => {
     expect(screen.getAllByText("Máy đã dừng")).toHaveLength(2);
   });
 
-  it("rewinds an uploaded video so the same file can be replayed after it ends", async () => {
+  it("does not render the removed local video upload controls", async () => {
     mockAuthenticatedSession();
-    vi.stubGlobal("URL", {
-      createObjectURL: vi.fn(() => "blob:uploaded-video"),
-      revokeObjectURL: vi.fn(),
-    });
     const {container} = render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
-
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const video = container.querySelector("video") as HTMLVideoElement;
-    Object.defineProperties(video, {
-      videoWidth: {value: 1280},
-      videoHeight: {value: 720},
-      duration: {value: 20},
-      currentTime: {value: 20, writable: true},
-    });
-    vi.spyOn(video, "load").mockImplementation(() => undefined);
-    fireEvent.change(input, {target: {files: [new File(["video"], "shift.mp4", {type: "video/mp4"})]}});
-    fireEvent.loadedMetadata(video);
-    fireEvent.ended(video);
-
-    expect(video.currentTime).toBe(0);
-    expect(screen.getByRole("button", {name: "↻ Phát lại"})).toBeEnabled();
+    expect(container.querySelector('input[type="file"]')).not.toBeInTheDocument();
+    expect(container.querySelector("video")).not.toBeInTheDocument();
   });
 
   it("creates points only after the explicit Tạo vùng action", async () => {
     mockAuthenticatedSession();
     const {container} = render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
-    const video = container.querySelector("video") as HTMLVideoElement;
-    Object.defineProperties(video, {
-      videoWidth: {value: 1280},
-      videoHeight: {value: 720},
-      duration: {value: 20}
-    });
-    fireEvent.loadedMetadata(video);
     const canvas = container.querySelector(".camera-scene canvas") as HTMLCanvasElement;
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
       left: 0,

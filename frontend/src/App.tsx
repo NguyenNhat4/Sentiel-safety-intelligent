@@ -2,7 +2,7 @@ import {useEffect, useState} from "react";
 import {AppShell} from "./components/AppShell";
 import type {Page} from "./components/AppShell";
 import {LoginPage} from "./features/auth/LoginPage";
-import {AdminUserPage} from "./features/auth/AdminUserPage";
+import {AdminUserPage, StreamAdminPage} from "./features/auth/AdminUserPage";
 import {ForcedPasswordChangePage} from "./features/auth/ForcedPasswordChangePage";
 import {AreaManagerPage} from "./features/area/AreaManagerPage";
 import {EventLogPage} from "./features/events/EventLogPage";
@@ -46,6 +46,7 @@ export default function App() {
       <OperationalMetricsPage active={page === "operations"} />
       {page === "area" && user.role !== "safety_manager" && <AreaManagerPage />}
       {page === "admin" && user.role === "system_admin" && <AdminUserPage currentUser={user} onLogout={() => void handleLogout()} />}
+      {page === "streams" && user.role === "system_admin" && <StreamAdminPage />}
     </AppShell>
   );
 }

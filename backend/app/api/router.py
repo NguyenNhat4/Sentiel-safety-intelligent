@@ -9,6 +9,7 @@ from backend.app.api.v1 import (
     operational_metrics,
     ppe_requirements,
     statistics,
+    stream_configuration,
     websocket,
 )
 
@@ -24,3 +25,4 @@ api_router.include_router(operational_metrics.router)
 api_router.include_router(websocket.router)
 api_router.include_router(agent.router)
 api_router.include_router(ppe_requirements.router)
+api_router.include_router(stream_configuration.router)

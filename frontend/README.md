@@ -1,6 +1,6 @@
 # Sentinel React Frontend
 
-React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns local video playback, normalized four-point zone editing, sampled binary WebSocket inference, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Detection and polygon evaluation remain backend responsibilities.
+React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns the admin-selected MJPEG camera viewer, normalized four-point zone editing, sampled binary WebSocket inference compatibility, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Local video upload is removed; the current streamer phase displays MJPEG only and does not yet feed AI inference.
 
 Project-wide decisions and progress are maintained centrally at repository root.
 
@@ -76,4 +76,4 @@ Transport code does not render UI. Canvas utilities do not call the network. Fea
 
 ## Authentication
 
-The login screen calls `POST /api/v1/auth/login`, stores the returned bearer token only in browser `sessionStorage`, restores a tab session through `GET /api/v1/auth/me`, and revokes it through `POST /api/v1/auth/logout`. A `system_admin` retains the safety monitor/event workspace and sees an additional account-management entry whose tabs call RBAC-protected backend endpoints. An `area_manager` lands on the dedicated area dashboard. New and administrator-reset accounts must replace their temporary password before entering a role workspace.
+The login screen calls `POST /api/v1/auth/login`, stores the returned bearer token only in browser `sessionStorage`, restores a tab session through `GET /api/v1/auth/me`, and revokes it through `POST /api/v1/auth/logout`. Local/demo builds show the three seeded demo accounts with copy and one-click fill shortcuts; these credentials must not be used outside local/demo environments. A `system_admin` retains the safety monitor/event workspace, sees account-management navigation, and has a separate **Camera stream** sidebar entry directly below **Quản trị hệ thống**. An `area_manager` lands on the dedicated area dashboard. New and administrator-reset accounts must replace their temporary password before entering a role workspace.

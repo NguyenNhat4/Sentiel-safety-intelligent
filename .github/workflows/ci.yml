@@ -36,7 +36,7 @@ jobs:
               - 'frontend/**'
               - 'vision/**'
               - 'models/**'
-              - 'scripts/**'
+             - 'scripts/**'
 
   release-source:
     name: Release source
@@ -154,3 +154,5 @@ jobs:
           tags: ${{ github.event_name == 'push' && format('{0}:latest', secrets.DOCKERHUB_IMAGE) || 'p047-ci:latest' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VITE_STREAMER_URL=${{ vars.STREAMER_PUBLIC_URL }}

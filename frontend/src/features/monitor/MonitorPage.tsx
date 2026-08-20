@@ -2,6 +2,7 @@ import {AlertPanel} from "../alerts/AlertPanel";
 import {ReviewModal} from "../alerts/ReviewModal";
 import {PpeRequirementsPanel} from "../rules/PpeRequirementsPanel";
 import {useMonitor} from "./use-monitor";
+import {StreamViewer} from "./StreamViewer";
 
 export function MonitorPage() {
   const {refs, state, actions} = useMonitor();
@@ -17,16 +18,13 @@ export function MonitorPage() {
       <div className="toolbar">
         <div className="camera-select">
           <span className="camera-icon">●</span>
-          <div><small>VIDEO ĐANG XEM</small><strong>{state.fileLabel}</strong></div>
+          <div><small>STREAM ĐANG XEM</small><strong>Camera từ streamer container</strong></div>
           <span>⌄</span>
         </div>
         <div className="machine-control">
           <div><small> TRẠNG THÁI MÁY</small><strong>{state.machineRunning ? "Máy đang chạy" : "Máy đã dừng"}</strong></div>
           <button className={`switch ${state.machineRunning ? "on" : ""}`} aria-label="Chuyển trạng thái máy" onClick={actions.toggleMachine}><span /></button>
         </div>
-        <input ref={refs.fileInputRef} type="file" accept="video/*" hidden onChange={actions.handleVideoSelection} />
-        <button className="secondary-btn" disabled={!state.selectedZone} onClick={actions.openFilePicker}>＋ Tải video</button>
-        <button className="secondary-btn" disabled={state.playbackDisabled} onClick={() => void actions.handlePlayback()}>{state.playbackLabel}</button>
         <button className="secondary-btn zone-create-btn" disabled={!state.zoneHydrated || Boolean(state.drawingZoneId)} onClick={actions.createZone}>＋ Tạo vùng</button>
       </div>
 
@@ -73,18 +71,16 @@ export function MonitorPage() {
       <div className="monitor-grid">
         <article className="video-card">
           <div className="video-head">
-            <span><i className="live-dot" /> VIDEO</span>
-            <p>{state.videoMeta}</p>
+              <span><i className="live-dot" /> STREAM</span>
+              <p>MJPEG từ camera active</p>
             <button onClick={actions.resetZone} disabled={!state.selectedZone} title="Vẽ lại vùng đang chọn">↺</button>
           </div>
           {(state.pendingReviewCounts.critical > 0 || state.pendingReviewCounts.other > 0) && <div className="video-alert-summary" role="status">
             <strong>{state.pendingReviewCounts.critical} log nghiêm trọng cần review</strong>
             <span>· {state.pendingReviewCounts.other} log PPE cần review</span>
           </div>}
-          <div className={`camera-scene ${state.stageReady ? "ready" : ""}`}>
-            <video ref={refs.videoRef} className="uploaded-media active" preload="auto" playsInline muted
-              onLoadedMetadata={actions.handleLoadedMetadata} onSeeked={actions.handleSeeked} onEnded={actions.handleEnded} />
-            {state.previewSrc && <img className="video-preview" src={state.previewSrc} alt="Khung hình đầu tiên của video" />}
+          <div className="camera-scene ready">
+            <StreamViewer />
             <canvas ref={refs.overlayRef} onPointerDown={actions.handlePointerDown} onPointerMove={actions.handlePointerMove} onPointerUp={actions.handlePointerUp} />
             {state.selectedPointPosition && <button className="point-delete" style={deleteStyle} title="Xóa điểm đã chọn" onClick={actions.deleteSelectedPoint}>×</button>}
             <div className="scene-glow" />
@@ -96,14 +92,13 @@ export function MonitorPage() {
               <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
               <label>PERSON · 96%</label><em>PPE CHECK</em>
             </div>
-            {!state.stageReady && <div className="empty-state"><strong>Tải video demo</strong><span>Phát video để xem detection; zone 4 điểm là tùy chọn.</span></div>}
-            <div className="zone-hint">{state.stageReady ? zoneHint : "Chưa tải video"}</div>
+            <div className="zone-hint">{zoneHint}</div>
           </div>
           <footer>
             <span><i /> AI Detection</span>
             <span>{state.peopleCount} người</span>
             <span>{state.ppeRequirementCount} PPE bắt buộc</span>
-            <strong className={state.view.violation ? "result-violate" : "result-normal"}>{state.view.violation ? "● VIOLATE" : state.stageReady ? "● NORMAL" : "● Chờ video"}</strong>
+            <strong className="result-normal">● Chờ AI inference</strong>
           </footer>
         </article>
 
@@ -130,10 +125,10 @@ export function MonitorPage() {
       />
 
       <div className="activity-strip">
-        <div><span className="activity-icon">⚠</span><p><small>LUỒNG BASELINE</small><strong>Upload video → Chọn vùng → Phát + inference realtime → Xác minh → Lưu</strong></p></div>
+            <div><span className="activity-icon">⚠</span><p><small>LUỒNG STREAM</small><strong>Admin bật camera → Hiển thị MJPEG stream → Sẵn sàng tích hợp inference</strong></p></div>
         <span>MULTI ZONE</span><span className="medium-pill">PPE · HAT / VEST</span>
         <span>{state.flowStatus}</span>
-        <button onClick={actions.openFilePicker}>Bắt đầu bằng video →</button>
+         <span>Camera được bật bởi System Admin</span>
       </div>
 
       <canvas ref={refs.captureRef} hidden />

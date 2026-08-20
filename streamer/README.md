@@ -111,6 +111,17 @@ docker tag p047-streamer:dev DOCKERHUB_USERNAME/p047-streamer:latest
 docker push DOCKERHUB_USERNAME/p047-streamer:latest
 ```
 
+The build and push steps can be combined with the repository script. Authenticate
+with Docker Hub first; the script never receives or stores a password/token:
+
+```bash
+docker login
+./scripts/push_streamer.sh DOCKERHUB_USERNAME/p047-streamer latest
+```
+
+The script accepts `[IMAGE_NAME] [TAG]` and defaults to
+`nguyennaht4/streamer:dev`.
+
 On another machine, pull and run the image with persistent uploaded videos:
 
 ```bash

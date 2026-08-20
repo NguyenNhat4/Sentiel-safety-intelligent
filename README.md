@@ -20,7 +20,7 @@ make setup
 make run
 ```
 
-`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000.
+`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000. Đây là workflow chỉ dành cho local; production triển khai streamer như một service riêng.
 
 Local development dùng SQLite và filesystem snapshots theo `.env.development.example`; Docker Compose đọc cùng file nhưng ghi đè `DATABASE_URL` bằng PostgreSQL disposable nội bộ. Với deployment, cấu hình giá trị thật từ `.env.production.example` trong secret/Variables của nền tảng.
 
@@ -52,6 +52,11 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 | `FACE_REDACTION_MARGIN_RATIO` | Biên mở rộng face trước blur | Mặc định `0.2` |
 | `VIOLATION_FRAME` | Số frame vi phạm liên tiếp trước khi cảnh báo | Mặc định `4`; một frame không vi phạm sẽ reset pending count |
 | `OPENAI_API_KEY` | Gợi ý AI tùy chọn | Để trống dùng offline safety recommendation |
+
+Frontend dùng `VITE_STREAMER_URL` để trỏ tới streamer. Local mặc định là
+`http://<frontend-host>:8001`; production bắt buộc đặt URL public của streamer
+service riêng. Ứng dụng dùng URL này để đọc `/api/cameras` và hiển thị
+`/stream/{camera_id}`.
 
 `/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. Vì vậy local SQLite hoặc storage chưa cấu hình có thể trả `degraded` dù server vẫn đang chạy để phát triển; xem các reason code an toàn trong response, không cần đưa URL/credential vào log hay ticket.
 

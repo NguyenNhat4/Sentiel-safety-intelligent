@@ -5,6 +5,24 @@
 - **Reason:** The Product Owner wants to test the mock camera stream independently before changing the existing FastAPI/WebSocket inference flow.
 - **Boundary:** The streamer owns video files, FFmpeg processes, and stream transport only. It does not know safety rules, users, zones, YOLO, events, or the backend database.
 
+## 2026-08-19: [Cross-cutting] Persist one admin-selected mock camera stream
+- **Choice:** Store one active `camera_id` in the backend `stream_configuration` singleton. `system_admin` may update or clear it; authenticated users may read it. The frontend reads camera discovery from streamer `GET /api/cameras` and renders `/stream/{camera_id}` as MJPEG.
+- **Reason:** The application needs a shared active-camera choice across reloads and user sessions without coupling streamer storage to authentication or safety rules.
+- **Boundary:** Streamer remains transport-only. This phase removes local upload UI and does not connect MJPEG frames to WebSocket inference.
+
+## 2026-08-19: [Frontend] Show local demo accounts on login
+- **Choice:** The login page shows the three seeded local accounts, shared demo password, copy-email actions, and one-click form filling.
+- **Boundary:** Demo credentials are for local/demo use only; the login API and production authorization remain unchanged.
+
+## 2026-08-19: [Frontend] Give camera stream its own admin navigation entry
+- **Choice:** Place **Camera stream** directly below **Quản trị hệ thống** in the System Admin sidebar instead of inside the account-management tabs.
+- **Reason:** Camera selection is an operational monitoring action and should be reachable without opening account administration.
+
+## 2026-08-20: [Cross-cutting] Deploy streamer as a separate service
+- **Choice:** Docker Compose remains the local all-in-one workflow. Production deploys the streamer image as a separate service and injects its public URL into the frontend build through `VITE_STREAMER_URL`.
+- **Reason:** Stream transport and media lifecycle must scale/deploy independently from the authenticated safety application.
+- **Constraint:** Production must not rely on `localhost:8001` or an application-service internal port; the streamer service must expose CORS-compatible `/api/cameras`, `/stream/{camera_id}`, and `/health`.
+
 ## 2026-08-15: [Cross-cutting] One violation log per tracked person and video session
 - **Choice:** Confirmed warnings use `(monitoring_session_id, track_id)` as the per-video person-log key. Missing hat, missing vest, restricted-camera presence, and zone intrusion occurrences are accumulated into that one event while the same track remains in the session.
 - **Boundary:** `track_id` remains a temporary ByteTrack association, not a person's identity and not a cross-video or cross-camera identifier. A new video session may create a new log for the same physical person.

@@ -5,6 +5,9 @@ FROM node:22-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
+ARG VITE_STREAMER_URL=
+ENV VITE_STREAMER_URL=${VITE_STREAMER_URL}
+
 COPY frontend/package*.json ./
 RUN npm ci
 
