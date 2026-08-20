@@ -26,6 +26,15 @@ change the default image name without passing an argument:
 DOCKERHUB_IMAGE=DOCKERHUB_USERNAME/p047-streamer ./scripts/push_streamer.sh
 ```
 
+`push_app.sh` builds and publishes the main P-047 app image from the root
+`Dockerfile`. Its default image is `nguyennaht4/p047:latest`:
+
+```bash
+docker login
+./scripts/push_app.sh
+./scripts/push_app.sh DOCKERHUB_USERNAME/p047 v1.0.0
+```
+
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 
