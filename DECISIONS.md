@@ -1,5 +1,9 @@
 # Project Design Decisions
 
+## 2026-08-20: [Backend] Use stream_camera_id and idempotent disconnect
+- **Choice:** A persisted camera mapping uses `camera_id` and `stream_camera_id`; it does not introduce a separate generic `stream_id`. Disconnecting an unknown or already disconnected camera returns `200 OK` and leaves the desired state disconnected.
+- **Reason:** This matches the simulator's camera-based stream contract and makes the Demo Day Disconnect action safe to retry.
+
 ## 2026-08-20: [Cross-cutting] Demo Day uses persisted unique stream-to-camera mappings
 - **Choice:** Sys Admin selects registered simulator streams from a dedicated configuration tab and maps each stream to one of four named cameras. A stream cannot be assigned to more than one camera. Mappings persist in the backend; disconnect removes the mapping and stops the stream session.
 - **Reason:** Technical judges need a real, inspectable stream-to-detection path while demo users need a fast, deterministic setup without entering URLs or uploading video.
