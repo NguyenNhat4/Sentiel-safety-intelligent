@@ -18,6 +18,11 @@
 - **Choice:** Place **Camera stream** directly below **Quản trị hệ thống** in the System Admin sidebar instead of inside the account-management tabs.
 - **Reason:** Camera selection is an operational monitoring action and should be reachable without opening account administration.
 
+## 2026-08-20: [Cross-cutting] Deploy streamer as a separate service
+- **Choice:** Docker Compose remains the local all-in-one workflow. Production deploys the streamer image as a separate service and injects its public URL into the frontend build through `VITE_STREAMER_URL`.
+- **Reason:** Stream transport and media lifecycle must scale/deploy independently from the authenticated safety application.
+- **Constraint:** Production must not rely on `localhost:8001` or an application-service internal port; the streamer service must expose CORS-compatible `/api/cameras`, `/stream/{camera_id}`, and `/health`.
+
 ## 2026-08-15: [Cross-cutting] One violation log per tracked person and video session
 - **Choice:** Confirmed warnings use `(monitoring_session_id, track_id)` as the per-video person-log key. Missing hat, missing vest, restricted-camera presence, and zone intrusion occurrences are accumulated into that one event while the same track remains in the session.
 - **Boundary:** `track_id` remains a temporary ByteTrack association, not a person's identity and not a cross-video or cross-camera identifier. A new video session may create a new log for the same physical person.

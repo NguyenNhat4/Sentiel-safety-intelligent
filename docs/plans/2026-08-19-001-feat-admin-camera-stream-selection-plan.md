@@ -1,57 +1,133 @@
-# Use Case: System Admin quản lý camera stream
+# Camera Stream Requirements and Handoff
 
-## Mục tiêu
+## 1. Mục tiêu
 
-Cho phép `system_admin` chọn duy nhất một camera đã tồn tại trong mock streamer
-container. Trạng thái camera active được lưu ở backend để mọi phiên đăng nhập
-nhìn thấy cùng một stream. Ứng dụng không còn upload video; phase này chỉ hiển
-thị MJPEG và chưa nối stream vào AI inference.
+Cho phép `system_admin` chọn một camera đã có trong streamer container và bật
+cho toàn hệ thống quan sát. Trạng thái active được lưu ở backend. Ứng dụng
+chính không upload video và phase này chỉ hiển thị MJPEG, chưa đưa frame vào AI
+inference.
 
-## Actors và quyền
+## 2. Trạng thái đã triển khai
+
+- Streamer container chạy cổng `8001`.
+- Backend chạy cổng `8000`.
+- Streamer cung cấp:
+  - `GET /api/cameras`
+  - `GET /stream/{camera_id}`
+  - `GET /health`
+- Backend cung cấp:
+  - `GET /api/v1/stream-config`: user đã đăng nhập được đọc.
+  - `PUT /api/v1/stream-config`: chỉ `system_admin` được cập nhật.
+- Database có singleton `stream_configuration`, chỉ lưu tối đa một
+  `active_camera_id`.
+- Sidebar có mục **Camera stream** riêng, nằm ngay dưới **Quản trị hệ thống**.
+- Camera active có nút **Tắt stream** trực tiếp trên card.
+- Login có tài khoản demo và nút điền nhanh/copy:
+  - `admin@sentinel.local`
+  - `antoan@sentinel.local`
+  - `khuvuc@sentinel.local`
+  - Mật khẩu: `Sentinel123!`
+
+## 3. Actors và quyền
 
 | Actor | Quyền |
 |---|---|
-| `system_admin` | Xem danh sách camera, bật một camera hoặc tắt stream |
-| `safety_manager` | Chỉ xem camera active |
-| `area_manager` | Chỉ xem camera active trong workspace được phép |
-| Streamer container | Cung cấp `GET /api/cameras` và `/stream/{camera_id}` |
+| `system_admin` | Xem camera, bật camera, tắt camera |
+| `safety_manager` | Xem Live Monitor và camera active, không được chọn |
+| `area_manager` | Xem workspace được cấp quyền, không được chọn |
+| Streamer | Lưu media và phát MJPEG; không biết user/RBAC/AI |
 
-## Use cases
+Frontend chỉ ẩn thao tác theo role để thuận tiện. Backend RBAC mới là lớp bảo vệ
+chính và phải giữ nguyên.
 
-### UC-01 — Admin xem danh sách camera
+## 4. Mô hình triển khai
 
-1. Admin mở **Quản trị hệ thống → Camera stream**.
-2. Frontend gọi `GET /api/cameras` tới streamer container.
-3. Danh sách camera được hiển thị cùng trạng thái active hiện tại.
+- **Local:** `docker compose` chạy backend, database và streamer cùng máy.
+- **Production:** application/backend service và streamer service được deploy
+  riêng. Frontend production phải được build với `VITE_STREAMER_URL` bằng public
+  URL của streamer service.
+- Không cấu hình production frontend trỏ vào `localhost:8001` hoặc port nội bộ
+  của backend.
 
-### UC-02 — Admin bật camera
+## 5. Luồng demo local chuẩn
 
-1. Admin chọn một camera.
-2. Frontend gọi `PUT /api/v1/stream-config` với `camera_id`.
-3. Backend kiểm tra session và role `system_admin`.
-4. Backend lưu camera active duy nhất.
-5. Live Monitor và các user khác hiển thị `/stream/{camera_id}`.
+### 4.1 Khởi động Docker
 
-### UC-03 — User xem camera active
+```bash
+docker compose down
+docker compose up -d --build
+```
 
-1. User mở Live Monitor.
-2. Frontend gọi `GET /api/v1/stream-config`.
-3. Nếu có camera active, frontend hiển thị MJPEG stream.
-4. User không thấy thao tác chọn/bật camera.
+Kiểm tra:
 
-### UC-04 — Tắt stream
+```bash
+docker compose ps
+curl http://localhost:8001/health
+curl http://localhost:8001/api/cameras
+```
 
-1. Admin chọn **Tắt stream**.
-2. Backend lưu `camera_id = null`.
-3. Live Monitor hiển thị empty state hướng dẫn phù hợp với role.
+Nếu `/api/cameras` trả `[]`, streamer chưa có camera. Camera có thể được nạp
+qua trang độc lập `http://localhost:8001/` hoặc được đặt sẵn trong volume
+`data/streamer/`. Việc này không phải upload trong app Sentinel.
 
-### UC-05 — Streamer lỗi hoặc không có camera
+### 4.2 Bật/tắt camera
 
-- Hiển thị trạng thái `Streamer offline` hoặc `Chưa có camera`.
-- Có nút **Thử lại**.
-- Không làm mất camera active đã lưu ở backend.
+1. Mở `http://localhost:8000`.
+2. Đăng nhập tài khoản `admin@sentinel.local`.
+3. Chọn **Camera stream** ở sidebar, ngay dưới **Quản trị hệ thống**.
+4. Bấm **Làm mới** để đọc camera từ streamer.
+5. Bấm **Bật stream** trên camera cần demo.
+6. Mở **Live monitor** để xem MJPEG.
+7. Muốn tắt, bấm **Tắt stream** ngay trên card camera active.
 
-## Use-case diagram
+Nếu vừa rebuild Docker, dùng `Ctrl + Shift + R` để loại cache frontend.
+
+## 6. API contract
+
+### Read active configuration
+
+```http
+GET /api/v1/stream-config
+Authorization: Bearer <token>
+```
+
+Response:
+
+```json
+{
+  "active_camera_id": "cam_1",
+  "updated_at": "2026-08-19T14:18:33.955873Z"
+}
+```
+
+Khi tắt stream, `active_camera_id` là `null`.
+
+### Set or clear active configuration
+
+```http
+PUT /api/v1/stream-config
+Authorization: Bearer <system-admin-token>
+Content-Type: application/json
+```
+
+Bật:
+
+```json
+{"camera_id": "cam_1"}
+```
+
+Tắt:
+
+```json
+{"camera_id": null}
+```
+
+Non-admin phải nhận `403`. Payload camera ID chỉ cho phép ký tự chữ, số, `_`
+và `-`.
+
+## 7. Diagrams
+
+### Use case
 
 ```mermaid
 flowchart LR
@@ -60,69 +136,83 @@ flowchart LR
     UI[React App]
     API[Backend Stream Config API]
     DB[(SQLite/PostgreSQL)]
-    Streamer[Streamer Container :8001]
+    S[Streamer :8001]
 
-    Admin -->|xem / bật / tắt| UI
-    Viewer -->|xem Live Monitor| UI
-    UI -->|GET/PUT active config| API
-    API -->|RBAC: system_admin cho PUT| API
+    Admin -->|bật / tắt| UI
+    Viewer -->|xem| UI
+    UI -->|GET /api/cameras| S
+    UI -->|GET/PUT stream-config| API
+    API -->|RBAC PUT| API
     API --> DB
-    UI -->|GET /api/cameras| Streamer
-    UI -->|GET /stream/{camera_id}| Streamer
+    UI -->|GET /stream/{camera_id}| S
 ```
 
-## Sequence diagram — bật và xem stream
+### Bật và xem
 
 ```mermaid
 sequenceDiagram
-    actor Admin as System Admin
-    actor User as Người xem
+    actor A as System Admin
     participant UI as React App
-    participant API as Backend API
+    participant S as Streamer
+    participant API as Backend
     participant DB as Database
-    participant S as Streamer :8001
 
-    Admin->>UI: Mở Quản trị hệ thống / Camera stream
+    A->>UI: Mở Camera stream
     UI->>S: GET /api/cameras
-    S-->>UI: camera_ids[]
+    S-->>UI: [cam_1]
     UI->>API: GET /api/v1/stream-config
-    API->>DB: đọc active camera
-    DB-->>API: active_camera_id
-    API-->>UI: active config
-    Admin->>UI: Chọn cam_1 và Bật stream
-    UI->>API: PUT /api/v1/stream-config {camera_id: cam_1}
-    API->>API: xác thực system_admin
-    API->>DB: lưu cam_1
-    DB-->>API: saved config
-    API-->>UI: 200 active cam_1
-    User->>UI: Mở Live Monitor
-    UI->>API: GET /api/v1/stream-config
-    API-->>UI: cam_1
+    API->>DB: Đọc active_camera_id
+    DB-->>API: null hoặc cam_1
+    API-->>UI: active configuration
+    A->>UI: Bật cam_1
+    UI->>API: PUT {camera_id: cam_1}
+    API->>DB: Lưu cam_1
+    API-->>UI: 200
     UI->>S: GET /stream/cam_1
     S-->>UI: MJPEG frames
 ```
 
-## State diagram
+### Tắt stream
 
 ```mermaid
 stateDiagram-v2
     [*] --> NoActiveStream
-    NoActiveStream --> Loading: tải cấu hình
-    Loading --> Active: có camera active
-    Loading --> NoActiveStream: active_camera_id = null
-    Loading --> Offline: API/streamer lỗi
-    Active --> Active: admin đổi camera
-    Active --> NoActiveStream: admin tắt stream
-    Active --> Offline: streamer mất kết nối
-    Offline --> Loading: Thử lại
+    NoActiveStream --> Active: PUT camera_id
+    Active --> Active: đổi camera
+    Active --> NoActiveStream: PUT camera_id = null
+    Active --> Offline: streamer lỗi
+    Offline --> Active: thử lại thành công
 ```
 
-## Acceptance criteria
+## 8. Acceptance criteria
 
-- Chỉ `system_admin` gọi thành công PUT/disable stream.
-- Một thời điểm chỉ có tối đa một camera active.
-- Reload trình duyệt hoặc user khác vẫn đọc được camera active đã lưu.
-- Không còn nút upload/file picker trong Live Monitor.
-- Không có camera active thì hiển thị empty state rõ ràng.
-- Streamer offline có thông báo lỗi và retry.
-- Phase này không gửi frame MJPEG vào WebSocket inference.
+- Sidebar chỉ hiển thị **Camera stream** cho `system_admin`.
+- Camera stream là mục riêng, không nằm trong tab tài khoản.
+- Một thời điểm chỉ có một camera active.
+- Admin bật được camera và user khác đọc được cùng trạng thái sau reload.
+- Admin tắt được camera bằng nút **Tắt stream** trên card active.
+- Live Monitor không còn file picker hoặc upload video.
+- Không có camera active thì hiển thị empty state.
+- Streamer lỗi có trạng thái lỗi và retry.
+- Non-admin không thể gọi PUT thành công dù tự gửi request.
+- MJPEG chưa được nối vào `/api/v1/ws/inference` trong phase này.
+
+## 9. Files chính
+
+- Frontend shell/navigation: `frontend/src/components/AppShell.tsx`
+- Frontend routing: `frontend/src/App.tsx`
+- Stream admin UI: `frontend/src/features/auth/AdminUserPage.tsx`
+- Stream transport: `frontend/src/api/stream-config.ts`
+- Live viewer: `frontend/src/features/monitor/StreamViewer.tsx`
+- Backend route: `backend/app/api/v1/stream_configuration.py`
+- Backend service: `backend/app/services/stream_configuration_service.py`
+- ORM: `backend/app/models/stream_configuration.py`
+- Migration: `backend/migrations/versions/20260819_01_add_stream_configuration.py`
+- Tests: `backend/tests/test_stream_configuration.py`, `frontend/src/App.test.tsx`
+
+## 10. Việc chưa làm
+
+- Kết nối MJPEG hoặc nguồn camera thật vào AI inference.
+- RTSP/HLS và multi-stream inference.
+- Metadata camera như tên hiển thị, vị trí, trạng thái online chính thức.
+- Persist lịch sử bật/tắt hoặc audit actor cho stream configuration.

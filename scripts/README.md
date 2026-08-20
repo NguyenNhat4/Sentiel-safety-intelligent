@@ -9,6 +9,23 @@ tag as the first argument when needed:
 ./scripts/build_streamer.sh DOCKERHUB_USERNAME/streamer:dev
 ```
 
+`push_streamer.sh` builds and publishes the streamer image to Docker Hub. Run
+`docker login` first, or use an existing Docker credential helper. It accepts
+the Docker Hub image name and tag separately:
+
+```bash
+docker login
+./scripts/push_streamer.sh
+./scripts/push_streamer.sh DOCKERHUB_USERNAME/p047-streamer v1.0.0
+```
+
+The default image is `nguyennaht4/streamer:dev`. Set `DOCKERHUB_IMAGE` to
+change the default image name without passing an argument:
+
+```bash
+DOCKERHUB_IMAGE=DOCKERHUB_USERNAME/p047-streamer ./scripts/push_streamer.sh
+```
+
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 

@@ -187,6 +187,7 @@ P-047/
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── build_streamer.sh # Build the standalone streamer image
+│   ├── push_streamer.sh # Build and publish the streamer image to Docker Hub
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
 │   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check

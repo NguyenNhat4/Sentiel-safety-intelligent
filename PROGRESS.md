@@ -11,7 +11,7 @@
 
 ## 2026-08-19: [Cross-cutting] Add admin-selected active camera stream
 - Added `stream_configuration` persistence, `GET/PUT /api/v1/stream-config`, and system-admin-only update authorization for one shared active camera.
-- Added the admin **Camera stream** tab, streamer-container camera discovery, enable/disable controls, and Live Monitor MJPEG empty/error/active states.
+- Added the admin **Camera stream** sidebar entry, streamer-container camera discovery, enable/disable controls, and Live Monitor MJPEG empty/error/active states.
 - Removed local video upload controls from the app. MJPEG-to-AI inference remains intentionally deferred.
 - Added the use-case plan with Mermaid use-case, sequence, and state diagrams at `docs/plans/2026-08-19-001-feat-admin-camera-stream-selection-plan.md`.
 - Focused backend tests and all frontend tests/lint/type-check/build pass; the full `make check` baseline is green.
@@ -23,6 +23,14 @@
 ## 2026-08-19: [Frontend] Move camera stream to sidebar navigation
 - Moved **Camera stream** out of the account tabs into a dedicated System Admin sidebar entry directly below **Quản trị hệ thống**.
 - Changed the active camera card action from disabled **Đang phát** to an explicit **Tắt stream** action; clearing active state is verified through the backend API.
+
+## 2026-08-20: [Cross-cutting] Add streamer Docker Hub publish script
+- Added `scripts/push_streamer.sh` to build and push the standalone streamer image with a configurable Docker Hub image name and tag.
+- The script defaults to `nguyennaht4/streamer:dev`, uses existing `docker login` credentials, and never handles credentials directly.
+
+## 2026-08-20: [Cross-cutting] Clarify separate streamer deployment
+- Documented Compose as local-only and production streamer as a separate service.
+- Added `VITE_STREAMER_URL` Docker build injection and CI variable `STREAMER_PUBLIC_URL` for the production frontend.
 
 ## 2026-08-16: [Vision/Backend] Add YuNet-first identity redaction
 - Added the pinned OpenCV YuNet detector, startup artifact/capability validation, cached thread-safe inference, expanded face blur, and the existing upper-person fallback for each person without an associated face.

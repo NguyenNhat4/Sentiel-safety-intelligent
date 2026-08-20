@@ -24,6 +24,7 @@ Thêm các repository Actions secrets sau. Không gửi giá trị secret qua ch
 | Repository secret | `RAILWAY_SERVICE` | Tên hoặc ID service ứng dụng, không phải PostgreSQL service |
 | Repository secret | `RAILWAY_ENVIRONMENT` | Railway environment name, thường là `production` |
 | Repository secret | `PROD_BASE_URL` | Public HTTPS base URL không có `/` cuối, ví dụ `https://p047-production.up.railway.app` |
+| Repository variable | `STREAMER_PUBLIC_URL` | Public HTTPS URL của streamer service riêng, ví dụ `https://p047-streamer.up.railway.app` |
 | Repository variable, tạm thời | `INITIAL_RELEASE_SOURCE_BRANCH` | Đặt `develop2` cho PR release đầu tiên; xóa hoặc để trống sau khi release xong |
 
 Trong GitHub branch protection/ruleset cho `main`, bật các điều kiện sau:
@@ -45,6 +46,8 @@ Trong GitHub branch protection/ruleset cho `main`, bật các điều kiện sau
 5. Đặt `RUN_DB_MIGRATIONS_ON_START=false`, để nhiều application instance không cùng chạy migration.
 6. Thêm các production Variables từ `.env.production.example`: PostgreSQL `DATABASE_URL`, S3-compatible `SNAPSHOT_STORAGE_*`, `PPE_MODEL_PATH=models/yolo11m_safety.pt`, `DATABASE_FALLBACK_ENABLED=false`, cùng `APP_ENV=production` và `CORS_ORIGINS` là public URL thật.
 7. Không đặt `DATABASE_URL`, S3 credential, model config hoặc OpenAI key trong GitHub Actions. Chúng chỉ ở Railway Variables.
+
+Streamer là service triển khai riêng, không chạy trong application service production. Build production injects `STREAMER_PUBLIC_URL` vào frontend dưới dạng `VITE_STREAMER_URL`; streamer service phải expose `GET /api/cameras`, `/stream/{camera_id}` và `/health`. Docker Compose chỉ dành cho local và chạy streamer ở `localhost:8001`.
 
 Trước release đầu, chạy một deploy thử và gọi `<PROD_BASE_URL>/health`. Chỉ tiếp tục khi HTTP thành công và JSON có `ready: true`.
 

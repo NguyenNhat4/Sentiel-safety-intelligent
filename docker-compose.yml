@@ -32,6 +32,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_STREAMER_URL: ${VITE_STREAMER_URL:-}
     env_file:
       - .env.development
     environment:
