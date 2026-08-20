@@ -194,6 +194,10 @@ P-047/
 │   │   ├── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
 │   │   └── US-28.md     # Completed YOLO11m Safety hat/vest cutover specification
 │   └── backlog/         # Remaining MVP and advanced user stories
+├── tasks/               # Scoped implementation plans and execution checklists
+│   ├── README.md
+│   ├── plan.md
+│   └── todo.md
 │       ├── README.md
 │       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks

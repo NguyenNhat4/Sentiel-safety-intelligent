@@ -1,8 +1,8 @@
 import {useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
 import {changePassword, createUser, deleteUser, listUsers, updateUserRole} from "../../api/auth";
 import {loadMonitoringZones} from "../../api/monitoring-zones";
-import {getStreamConfiguration, listStreamerCameras, updateStreamConfiguration} from "../../api/stream-config";
-import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, UserRole} from "../../types";
+import {disconnectStream, getStreamConfiguration, listStreamerCameras, updateStreamConfiguration} from "../../api/stream-config";
+import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, StreamMapping, UserRole} from "../../types";
 import "./admin-user.css";
 
 interface AdminUserPageProps { currentUser: AuthenticatedUser; onLogout: () => void; }
@@ -77,7 +77,7 @@ export function StreamAdminPage() {
 
 function StreamTab({onError, onMessage}: {onError: (message: string) => void; onMessage: (message: string) => void}) {
   const [cameras, setCameras] = useState<string[]>([]);
-  const [activeCamera, setActiveCamera] = useState<string | null>(null);
+  const [mappings, setMappings] = useState<StreamMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -86,28 +86,30 @@ function StreamTab({onError, onMessage}: {onError: (message: string) => void; on
     onError("");
     try {
       const [available, configuration] = await Promise.all([listStreamerCameras(), getStreamConfiguration()]);
-      setCameras(available); setActiveCamera(configuration.active_camera_id);
+      setCameras(available); setMappings(configuration.mappings);
     } catch (reason) { onError(errorMessage(reason)); }
     finally { setLoading(false); setRefreshing(false); }
   }, [onError]);
 
   useEffect(() => { void loadStreams(true); }, [loadStreams]);
 
-  async function selectCamera(cameraId: string | null) {
+  async function selectCamera(cameraId: string, streamCameraId: string) {
     setRefreshing(true); onError("");
     try {
-      const configuration = await updateStreamConfiguration(cameraId);
-      setActiveCamera(configuration.active_camera_id);
-      onMessage(cameraId ? `Đã bật stream ${cameraId}.` : "Đã tắt stream.");
+      if (mappings.some(mapping => mapping.stream_camera_id === streamCameraId && mapping.camera_id !== cameraId)) throw new Error("Stream này đã được gán cho camera khác.");
+      const next = [...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId}];
+      const configuration = await updateStreamConfiguration(next);
+      setMappings(configuration.mappings); onMessage(`Đã kết nối ${cameraId}.`);
     } catch (reason) { onError(errorMessage(reason)); }
     finally { setRefreshing(false); }
   }
 
   return <article className="admin-card stream-admin-card">
-    <div className="admin-card-title"><div><h3>Camera stream</h3><p>Chọn một camera đã được nạp trong streamer container. Không upload video tại đây.</p></div><button className="secondary-btn" disabled={loading || refreshing} onClick={() => void loadStreams()}>{refreshing ? "Đang tải…" : "Làm mới"}</button></div>
-     {loading ? <p className="stream-empty">Đang tải danh sách camera…</p> : cameras.length === 0 ? <p className="stream-empty">Chưa có camera trong streamer container.</p> : <div className="stream-camera-grid">{cameras.map(camera => { const isActive = activeCamera === camera; return <div className={`stream-camera-card ${isActive ? "active" : ""}`} key={camera}><div><strong>{camera}</strong><small>{isActive ? "ĐANG ACTIVE" : "Sẵn sàng"}</small></div><button className={isActive ? "stream-stop-button" : "admin-primary"} disabled={refreshing} onClick={() => void selectCamera(isActive ? null : camera)}>{isActive ? "Tắt stream" : "Bật stream"}</button></div>; })}</div>}
+    <div className="admin-card-title"><div><h3>Camera stream</h3><p>Gán stream đã đăng ký vào từng camera. Không upload video tại đây.</p></div><button className="secondary-btn" disabled={loading || refreshing} onClick={() => void loadStreams()}>{refreshing ? "Đang tải…" : "Làm mới"}</button></div>
+     {loading ? <p className="stream-empty">Đang tải danh sách camera…</p> : cameras.length === 0 ? <p className="stream-empty">Chưa có stream trong streamer container.</p> : <div className="stream-camera-grid">{["cam_1", "cam_2", "cam_3", "cam_4"].map(cameraId => { const mapping = mappings.find(item => item.camera_id === cameraId); return <div className={`stream-camera-card ${mapping ? "active" : ""}`} key={cameraId}><div><strong>{cameraId}</strong><small>{mapping ? `Stream: ${mapping.stream_camera_id}` : "Chưa kết nối"}</small></div><select aria-label={`Stream cho ${cameraId}`} value={mapping?.stream_camera_id ?? ""} disabled={refreshing} onChange={event => { if (event.target.value) void selectCamera(cameraId, event.target.value); }}><option value="">Chọn stream</option>{cameras.map(camera => <option key={camera} value={camera} disabled={mappings.some(item => item.stream_camera_id === camera && item.camera_id !== cameraId)}>{camera}</option>)}</select>{mapping && <button className="stream-stop-button" disabled={refreshing} onClick={() => void disconnectStream(cameraId).then(result => { setMappings(result.mappings); onMessage(`Đã ngắt ${cameraId}.`); }).catch(reason => onError(errorMessage(reason)))}>Disconnect</button>}</div>; })}</div>}
   </article>;
 }
+
 
 function AccountsTab({areas, users, loading, currentUserId, query, filterRole, onQuery, onFilterRole, onCreated, onDelete, onError}: {
   areas: MonitoringZone[];

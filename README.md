@@ -56,7 +56,10 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 Frontend dùng `VITE_STREAMER_URL` để trỏ tới streamer. Local mặc định là
 `http://<frontend-host>:8001`; production bắt buộc đặt URL public của streamer
 service riêng. Ứng dụng dùng URL này để đọc `/api/cameras` và hiển thị
-`/stream/{camera_id}`.
+`/stream/{camera_id}`. Backend `/api/v1/stream-config` persists up to four
+display-camera mappings; only `system_admin` may connect or disconnect them.
+Live Monitor renders the four mappings in a 2×2 grid and shows an empty state
+for an unmapped camera.
 
 `/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. Vì vậy local SQLite hoặc storage chưa cấu hình có thể trả `degraded` dù server vẫn đang chạy để phát triển; xem các reason code an toàn trong response, không cần đưa URL/credential vào log hay ticket.
 

@@ -6,11 +6,15 @@ export async function getStreamConfiguration(): Promise<StreamConfiguration> {
   return authenticatedRequest<StreamConfiguration>("/stream-config");
 }
 
-export async function updateStreamConfiguration(cameraId: string | null): Promise<StreamConfiguration> {
+export async function updateStreamConfiguration(mappings: StreamConfiguration["mappings"]): Promise<StreamConfiguration> {
   return authenticatedRequest<StreamConfiguration>("/stream-config", {
     method: "PUT",
-    body: JSON.stringify({camera_id: cameraId}),
+    body: JSON.stringify({mappings}),
   });
+}
+
+export async function disconnectStream(cameraId: string): Promise<StreamConfiguration> {
+  return authenticatedRequest<StreamConfiguration>(`/stream-config/${encodeURIComponent(cameraId)}`, {method: "DELETE"});
 }
 
 export async function listStreamerCameras(): Promise<string[]> {

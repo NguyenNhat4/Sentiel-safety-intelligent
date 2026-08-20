@@ -5,6 +5,8 @@ machine, runs on port `8001`, and stores one
 uploaded video per camera, and exposes a looped MJPEG stream. This service is
 deliberately independent from the safety backend; it does not run YOLO or save
 events.
+The application can select up to four of these registered camera streams; the
+same stream cannot be assigned to two display cameras.
 
 ## Run locally
 

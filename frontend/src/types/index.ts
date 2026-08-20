@@ -5,7 +5,8 @@ export type UserRole = "system_admin" | "safety_manager" | "area_manager";
 export type AssignableUserRole = UserRole;
 
 export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
-export interface StreamConfiguration { active_camera_id: string | null; updated_at: string | null; }
+export interface StreamMapping { camera_id: string; stream_camera_id: string; }
+export interface StreamConfiguration { mappings: StreamMapping[]; active_camera_id?: string | null; updated_at: string | null; }
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
 export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }

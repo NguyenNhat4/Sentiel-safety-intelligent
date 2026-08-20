@@ -26,7 +26,6 @@ export function AppShell({page, onNavigate, user, onLogout, children}: AppShellP
         {user.role !== "safety_manager" && <button className={`nav-item ${page === "area" ? "active" : ""}`} onClick={() => onNavigate("area")}><span>⌁</span> Dashboard</button>}
         <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
          {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
-         {user.role === "system_admin" && <button className={`nav-item ${page === "streams" ? "active" : ""}`} onClick={() => onNavigate("streams")}><span>◉</span> Camera stream</button>}
       </nav>
       <div className="system-card">
         <div><span className="pulse" /> Hệ thống hoạt động</div>

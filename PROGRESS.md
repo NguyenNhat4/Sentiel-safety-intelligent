@@ -1,9 +1,22 @@
 # Project Progress
 
+## 2026-08-20: [Frontend] Merge stream routing into Live Monitor
+- Removed the separate Camera stream navigation/page from the rendered app.
+- Moved the system-admin-only stream dropdown and disconnect controls into the Live Monitor above the four-camera 2×2 grid; non-admin roles remain view-only.
+- Frontend type-check and production build pass. Existing App.test.tsx still has five stale failures expecting the pre-multi-camera monitor controls and separate Camera stream page.
+
 ## 2026-08-20: [Cross-cutting] Demo Day multi-camera stream specification
 - Added `specs/US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md` for four-camera stream selection, unique mappings, disconnect semantics, real inference requirements and acceptance criteria.
 - Added a concise TDD test plan covering mapping, RBAC, streamer lifecycle, UI states and real-inference smoke verification.
 - Next step: reconcile the existing single-active-camera implementation/plan with US-29 before implementation.
+
+## 2026-08-20: [Cross-cutting] US-29 multi-camera implementation in progress
+- Implemented persisted up-to-four camera mappings, unique stream validation, per-camera disconnect, admin camera selection and Live Monitor 2×2 rendering.
+- Frontend type-check, 63 frontend tests, production build, Ruff app check and fresh SQLite Alembic upgrade pass.
+- Backend/streamer pytest startup remains unverified because the FastAPI lifespan hangs while preloading runtime models in this environment.
+- Live Monitor is now camera-only: it renders the four-camera 2×2 grid; zone/PPE/machine/inference controls are not rendered there.
+- Added `make e2e-demo`, a real-HTTP smoke test with no mocks. Live run reached the Docker streamer and backend, but stopped because only `cam_1`, `cam_2`, `cam_3` exist; one real fourth media asset is required. Backend `/health` is also `degraded` because development S3 is not configured.
+- Added `make e2e-streaming`, which reads real bytes from each MJPEG endpoint and validates multipart content plus complete JPEG markers. One-camera live run passed (`cam_1`, 63,978 bytes); the four-camera run correctly fails while the running streamer exposes only `cam_1`.
 
 ## 2026-08-19: [Cross-cutting] Restore US-16 audit onto current develop2
 - Restored the preserved US-16 work and synchronized the feature branch onto `origin/develop2` at `28daa62`, retaining current RBAC, area resolution, notification, per-track aggregation, camera-stream, and privacy behavior; the audit migration is linear revision `20260819_01` after `20260815_03`.
