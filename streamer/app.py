@@ -1,24 +1,111 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import subprocess
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 CAMERA_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"}
 FRAME_BOUNDARY = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+FRAME_SUFFIX = b"\r\n"
+DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024
+MAX_MJPEG_BUFFER_BYTES = 16 * 1024 * 1024
+LOGGER = logging.getLogger(__name__)
+
+
+class _SharedCameraStream:
+    def __init__(self, manager: CameraStreamManager, video_path: Path) -> None:
+        self.manager = manager
+        self.video_path = video_path
+        self.clients: set[asyncio.Queue[bytes | None]] = set()
+        self.process: subprocess.Popen[bytes] | None = None
+        self.task: asyncio.Task[None] | None = None
+
+    def subscribe(self) -> asyncio.Queue[bytes | None]:
+        queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1)
+        self.clients.add(queue)
+        if self.task is None or self.task.done():
+            self.task = asyncio.create_task(self._run())
+        return queue
+
+    def detach_worker(self) -> tuple[asyncio.Task[None] | None, subprocess.Popen[bytes] | None]:
+        task = self.task
+        process = self.process
+        self.task = None
+        self.process = None
+        return task, process
+
+    async def _run(self) -> None:
+        process: subprocess.Popen[bytes] | None = None
+        loop = asyncio.get_running_loop()
+        buffer = bytearray()
+
+        try:
+            process = self.manager.spawn_ffmpeg_reader(self.video_path)
+            self.process = process
+            assert process.stdout is not None
+            while True:
+                chunk = await loop.run_in_executor(None, process.stdout.read, 64 * 1024)
+                if not chunk:
+                    break
+                buffer.extend(chunk)
+
+                while True:
+                    start = buffer.find(b"\xff\xd8")
+                    if start < 0:
+                        if len(buffer) > MAX_MJPEG_BUFFER_BYTES:
+                            raise RuntimeError("FFmpeg MJPEG buffer exceeded limit")
+                        break
+                    end = buffer.find(b"\xff\xd9", start + 2)
+                    if end < 0:
+                        if start:
+                            del buffer[:start]
+                        if len(buffer) > MAX_MJPEG_BUFFER_BYTES:
+                            raise RuntimeError("FFmpeg MJPEG frame exceeded limit")
+                        break
+                    frame = bytes(buffer[start : end + 2])
+                    del buffer[: end + 2]
+                    self._publish(FRAME_BOUNDARY + frame + FRAME_SUFFIX)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOGGER.exception("Camera stream worker failed for %s", self.video_path.name)
+        finally:
+            if self.process is process:
+                self.process = None
+            self._publish(None)
+            if process is not None:
+                process.terminate()
+                try:
+                    await loop.run_in_executor(None, process.wait, 1)
+                except Exception:
+                    process.kill()
+                    await loop.run_in_executor(None, process.wait)
+
+    def _publish(self, frame: bytes | None) -> None:
+        for queue in tuple(self.clients):
+            if queue.full():
+                with suppress(asyncio.QueueEmpty):
+                    queue.get_nowait()
+            with suppress(asyncio.QueueFull):
+                queue.put_nowait(frame)
 
 
 class CameraStreamManager:
     def __init__(self, media_dir: Path) -> None:
         self.media_dir = media_dir
         self.media_dir.mkdir(parents=True, exist_ok=True)
+        self._streams: dict[Path, _SharedCameraStream] = {}
+        self._lock = asyncio.Lock()
 
     def cameras(self) -> list[str]:
         return sorted(
@@ -29,7 +116,7 @@ class CameraStreamManager:
         return self.media_dir / f"{camera_id}.mp4"
 
     def spawn_ffmpeg_reader(self, video_path: Path) -> subprocess.Popen[bytes]:
-        """Tạo một tiến trình ffmpeg riêng biệt cho từng client kết nối"""
+        """Create the one FFmpeg reader shared by this camera's clients."""
         return subprocess.Popen(
             [
                 "ffmpeg",
@@ -57,32 +144,91 @@ class CameraStreamManager:
         )
 
     async def frames_generator(self, video_path: Path) -> AsyncIterator[bytes]:
-        """Đọc và yield JPEG frame bất đồng bộ, tự dọn dẹp tiến trình khi ngắt kết nối"""
-        process = self.spawn_ffmpeg_reader(video_path)
-        assert process.stdout is not None
-        loop = asyncio.get_running_loop()
-        buffer = b""
+        """Yield one shared camera's JPEG frames to each connected client."""
+        async with self._lock:
+            stream = self._get_stream(video_path)
+            queue = stream.subscribe()
 
         try:
-            while True:
-                # Đọc không đồng bộ tránh block event loop
-                chunk = await loop.run_in_executor(None, process.stdout.read, 64 * 1024)
-                if not chunk:
-                    break
-                buffer += chunk
-
-                while b"\xff\xd8" in buffer and b"\xff\xd9" in buffer:
-                    start = buffer.index(b"\xff\xd8")
-                    end = buffer.index(b"\xff\xd9", start) + 2
-                    yield FRAME_BOUNDARY + buffer[start:end] + b"\r\n"
-                    buffer = buffer[end:]
+            while (payload := await queue.get()) is not None:
+                yield payload
         finally:
-            # Dọn dẹp tiến trình riêng này khi client disconnect
+            await self._unsubscribe(video_path, stream, queue)
+
+    def _get_stream(self, video_path: Path) -> _SharedCameraStream:
+        stream = self._streams.get(video_path)
+        if stream is None:
+            stream = _SharedCameraStream(self, video_path)
+            self._streams[video_path] = stream
+        return stream
+
+    def remove_stream(self, video_path: Path, stream: _SharedCameraStream) -> None:
+        if self._streams.get(video_path) is stream:
+            self._streams.pop(video_path, None)
+
+    async def _unsubscribe(
+        self,
+        video_path: Path,
+        stream: _SharedCameraStream,
+        queue: asyncio.Queue[bytes | None],
+    ) -> None:
+        task: asyncio.Task[None] | None = None
+        process: subprocess.Popen[bytes] | None = None
+        async with self._lock:
+            stream.clients.discard(queue)
+            if not stream.clients:
+                self.remove_stream(video_path, stream)
+                task, process = stream.detach_worker()
+        await self._stop_worker(task, process)
+
+    async def stop_stream(self, video_path: Path) -> None:
+        """Stop and unregister a camera worker, closing all connected clients."""
+        async with self._lock:
+            task, process = self._detach_stream(video_path)
+        await self._stop_worker(task, process)
+
+    async def replace_media(self, temporary: Path, video_path: Path) -> None:
+        """Atomically publish new media and detach any worker reading the old file."""
+        async with self._lock:
+            temporary.replace(video_path)
+            task, process = self._detach_stream(video_path)
+        await self._stop_worker(task, process)
+
+    async def delete_media(self, video_path: Path) -> bool:
+        """Atomically remove camera media and detach its active worker."""
+        async with self._lock:
+            if not video_path.is_file():
+                return False
+            video_path.unlink()
+            task, process = self._detach_stream(video_path)
+        await self._stop_worker(task, process)
+        return True
+
+    async def stop_all(self) -> None:
+        for video_path in tuple(self._streams):
+            await self.stop_stream(video_path)
+
+    def _detach_stream(
+        self,
+        video_path: Path,
+    ) -> tuple[asyncio.Task[None] | None, subprocess.Popen[bytes] | None]:
+        stream = self._streams.pop(video_path, None)
+        if stream is None:
+            return None, None
+        stream._publish(None)
+        return stream.detach_worker()
+
+    @staticmethod
+    async def _stop_worker(
+        task: asyncio.Task[None] | None,
+        process: subprocess.Popen[bytes] | None,
+    ) -> None:
+        if process is not None:
             process.terminate()
-            try:
-                await loop.run_in_executor(None, process.wait, 1)
-            except Exception:
-                process.kill()
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 def valid_camera_id(camera_id: str) -> str:
@@ -91,9 +237,20 @@ def valid_camera_id(camera_id: str) -> str:
     return camera_id
 
 
-def create_app(media_dir: Path | None = None) -> FastAPI:
+def create_app(
+    media_dir: Path | None = None,
+    *,
+    max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES,
+) -> FastAPI:
     manager = CameraStreamManager(media_dir or Path("data/streamer"))
-    app = FastAPI(title="P-047 Mock Camera Streamer", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        await manager.stop_all()
+
+    app = FastAPI(title="P-047 Mock Camera Streamer", version="0.1.0", lifespan=lifespan)
+    app.state.stream_manager = manager
 
     # 1. BẮT BUỘC: Thêm CORS để App chính / React gọi API lấy danh sách cam
     app.add_middleware(
@@ -197,20 +354,28 @@ refresh();
             raise HTTPException(status_code=415, detail="Unsupported video format")
         target = manager.upload_path(camera_id)
         temporary = target.with_suffix(".upload")
-        with temporary.open("wb") as output:
-            while chunk := await video.read(1024 * 1024):
-                output.write(chunk)
-        await video.close()
-        temporary.replace(target)
+        uploaded_bytes = 0
+        try:
+            with temporary.open("wb") as output:
+                while chunk := await video.read(1024 * 1024):
+                    uploaded_bytes += len(chunk)
+                    if uploaded_bytes > max_upload_bytes:
+                        raise HTTPException(status_code=413, detail="Video exceeds upload size limit")
+                    await run_in_threadpool(output.write, chunk)
+            await manager.replace_media(temporary, target)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+        finally:
+            await video.close()
         return {"camera_id": camera_id, "stream_url": f"/stream/{camera_id}"}
 
     @app.delete("/api/cameras/{camera_id}")
     async def delete_camera(camera_id: str) -> dict[str, str]:
         camera_id = valid_camera_id(camera_id)
         video_path = manager.upload_path(camera_id)
-        if not video_path.is_file():
+        if not await manager.delete_media(video_path):
             raise HTTPException(status_code=404, detail="Camera video not found")
-        video_path.unlink()
         return {"camera_id": camera_id, "status": "deleted"}
 
     @app.get("/stream/{camera_id}")

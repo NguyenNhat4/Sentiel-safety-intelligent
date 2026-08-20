@@ -1,5 +1,11 @@
 # Project Progress
 
+## 2026-08-20: [Cross-cutting] Share streamer FFmpeg workers per camera
+- Changed MJPEG streaming so one camera uses one FFmpeg reader shared across connected clients; each client receives the latest buffered JPEG frame and the worker stops when the last client disconnects.
+- Hardened worker lifecycle so FFmpeg exit/start failure closes clients, reconnect cannot create duplicate workers, camera replacement/deletion and application shutdown stop active processes, and malformed MJPEG output has a bounded buffer.
+- Bounded uploads at 512 MiB, moved file writes off the event loop, cleaned partial uploads, and reused one complete multipart payload across all clients.
+- Replaced the deadlocking Starlette `TestClient` path with async ASGI transport coverage. All 10 streamer tests, Ruff, Python compilation and `git diff --check` pass.
+
 ## 2026-08-20: [Frontend] Merge stream routing into Live Monitor
 - Removed the separate Camera stream navigation/page from the rendered app.
 - Moved the system-admin-only stream dropdown and disconnect controls into the Live Monitor above the four-camera 2×2 grid; non-admin roles remain view-only.

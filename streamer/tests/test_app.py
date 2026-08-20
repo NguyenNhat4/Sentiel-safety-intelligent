@@ -1,60 +1,200 @@
+import asyncio
+import io
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+import pytest
+from httpx import ASGITransport, AsyncClient
 
-from streamer.app import create_app
-
-
-def test_health_and_camera_list(tmp_path: Path) -> None:
-    client = TestClient(create_app(tmp_path))
-
-    assert client.get("/health").json() == {"status": "ok"}
-    assert client.get("/api/cameras").json() == []
+import streamer.app as streamer_app
+from streamer.app import CameraStreamManager, create_app
 
 
-def test_uploads_video_and_lists_camera(tmp_path: Path) -> None:
-    client = TestClient(create_app(tmp_path))
+class _CompletedProcess:
+    def __init__(self, output: bytes = b"") -> None:
+        self.stdout = io.BytesIO(output)
+        self.returncode: int | None = None
 
-    response = client.post(
-        "/api/cameras/cam_1",
-        files={"video": ("sample.mp4", b"not-a-real-video", "video/mp4")},
-    )
+    def terminate(self) -> None:
+        self.returncode = 0
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.returncode = 0
+        return 0
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+
+@pytest.fixture
+def immediate_threadpool(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def run_immediately(function: object, *args: object, **kwargs: object) -> object:
+        return function(*args, **kwargs)  # type: ignore[operator]
+
+    monkeypatch.setattr(streamer_app, "run_in_threadpool", run_immediately)
+
+
+def test_reuses_one_camera_worker_for_multiple_clients(tmp_path: Path) -> None:
+    app = create_app(tmp_path)
+    manager = app.state.stream_manager
+    video_path = tmp_path / "cam_1.mp4"
+    video_path.write_bytes(b"video")
+    first = manager._get_stream(video_path)
+    second = manager._get_stream(video_path)
+    first_client: asyncio.Queue[bytes] = asyncio.Queue(maxsize=1)
+    second_client: asyncio.Queue[bytes] = asyncio.Queue(maxsize=1)
+    first.clients.add(first_client)
+    second.clients.add(second_client)
+
+    assert first is second
+    first._publish(b"jpeg-frame")
+    first_frame = first_client.get_nowait()
+    second_frame = second_client.get_nowait()
+    assert first_frame == b"jpeg-frame"
+    assert second_frame is first_frame
+
+
+@pytest.mark.asyncio
+async def test_closes_client_stream_when_ffmpeg_exits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = CameraStreamManager(tmp_path)
+    video_path = tmp_path / "cam_1.mp4"
+    video_path.write_bytes(b"invalid-video")
+    manager.spawn_ffmpeg_reader = lambda _path: _CompletedProcess()  # type: ignore[method-assign]
+    loop = asyncio.get_running_loop()
+
+    async def run_immediately(_executor: object, function: object, *args: object) -> object:
+        return function(*args)  # type: ignore[operator]
+
+    monkeypatch.setattr(loop, "run_in_executor", run_immediately)
+
+    generator = manager.frames_generator(video_path)
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(anext(generator), timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_closes_client_stream_when_ffmpeg_cannot_start(tmp_path: Path) -> None:
+    manager = CameraStreamManager(tmp_path)
+    video_path = tmp_path / "cam_1.mp4"
+    video_path.write_bytes(b"invalid-video")
+
+    def fail_to_start(_path: Path) -> _CompletedProcess:
+        raise FileNotFoundError("ffmpeg")
+
+    manager.spawn_ffmpeg_reader = fail_to_start  # type: ignore[method-assign]
+    generator = manager.frames_generator(video_path)
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(anext(generator), timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_stopping_camera_closes_clients_and_removes_worker(tmp_path: Path) -> None:
+    manager = CameraStreamManager(tmp_path)
+    video_path = tmp_path / "cam_1.mp4"
+    stream = manager._get_stream(video_path)
+    client: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1)
+    stream.clients.add(client)  # type: ignore[arg-type]
+    stream.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+
+    await manager.stop_stream(video_path)
+
+    assert client.get_nowait() is None
+    assert stream.task is None
+    assert video_path not in manager._streams
+
+
+@pytest.mark.asyncio
+async def test_replacing_camera_atomically_stops_old_worker(tmp_path: Path) -> None:
+    manager = CameraStreamManager(tmp_path)
+    video_path = tmp_path / "cam_1.mp4"
+    temporary = tmp_path / "cam_1.upload"
+    video_path.write_bytes(b"old-video")
+    temporary.write_bytes(b"new-video")
+    stream = manager._get_stream(video_path)
+    client: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1)
+    stream.clients.add(client)  # type: ignore[arg-type]
+    stream.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+
+    await manager.replace_media(temporary, video_path)
+
+    assert video_path.read_bytes() == b"new-video"
+    assert client.get_nowait() is None
+    assert stream.task is None
+    assert video_path not in manager._streams
+
+
+@pytest.mark.asyncio
+async def test_rejects_upload_larger_than_configured_limit(tmp_path: Path) -> None:
+    app = create_app(tmp_path, max_upload_bytes=4)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/cameras/cam_1",
+            files={"video": ("sample.mp4", b"12345", "video/mp4")},
+        )
+
+    assert response.status_code == 413
+    assert not (tmp_path / "cam_1.mp4").exists()
+    assert not (tmp_path / "cam_1.upload").exists()
+
+
+@pytest.mark.asyncio
+async def test_health_and_camera_list(tmp_path: Path) -> None:
+    app = create_app(tmp_path)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        health_response = await client.get("/health")
+        cameras_response = await client.get("/api/cameras")
+
+    assert health_response.json() == {"status": "ok"}
+    assert cameras_response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_uploads_video_and_lists_camera(tmp_path: Path, immediate_threadpool: None) -> None:
+    app = create_app(tmp_path)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/cameras/cam_1",
+            files={"video": ("sample.mp4", b"not-a-real-video", "video/mp4")},
+        )
+        cameras_response = await client.get("/api/cameras")
 
     assert response.status_code == 200
     assert response.json() == {"camera_id": "cam_1", "stream_url": "/stream/cam_1"}
-    assert client.get("/api/cameras").json() == ["cam_1"]
+    assert cameras_response.json() == ["cam_1"]
     assert (tmp_path / "cam_1.mp4").read_bytes() == b"not-a-real-video"
 
 
-def test_rejects_invalid_camera_and_extension(tmp_path: Path) -> None:
-    client = TestClient(create_app(tmp_path))
-
-    assert (
-        client.post(
+@pytest.mark.asyncio
+async def test_rejects_invalid_camera_and_extension(tmp_path: Path) -> None:
+    app = create_app(tmp_path)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        invalid_camera_response = await client.post(
             "/api/cameras/cam.1",
             files={"video": ("sample.mp4", b"video", "video/mp4")},
-        ).status_code
-        == 400
-    )
-    assert (
-        client.post(
+        )
+        invalid_extension_response = await client.post(
             "/api/cameras/cam_1",
             files={"video": ("sample.txt", b"text", "text/plain")},
-        ).status_code
-        == 415
-    )
+        )
+
+    assert invalid_camera_response.status_code == 400
+    assert invalid_extension_response.status_code == 415
 
 
-def test_deletes_camera_video(tmp_path: Path) -> None:
-    client = TestClient(create_app(tmp_path))
-    client.post(
-        "/api/cameras/cam_1",
-        files={"video": ("sample.mp4", b"video", "video/mp4")},
-    )
-
-    response = client.delete("/api/cameras/cam_1")
+@pytest.mark.asyncio
+async def test_deletes_camera_video(tmp_path: Path, immediate_threadpool: None) -> None:
+    app = create_app(tmp_path)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await client.post(
+            "/api/cameras/cam_1",
+            files={"video": ("sample.mp4", b"video", "video/mp4")},
+        )
+        response = await client.delete("/api/cameras/cam_1")
+        cameras_response = await client.get("/api/cameras")
+        missing_response = await client.delete("/api/cameras/cam_1")
 
     assert response.status_code == 200
     assert response.json() == {"camera_id": "cam_1", "status": "deleted"}
-    assert client.get("/api/cameras").json() == []
-    assert client.delete("/api/cameras/cam_1").status_code == 404
+    assert cameras_response.json() == []
+    assert missing_response.status_code == 404
