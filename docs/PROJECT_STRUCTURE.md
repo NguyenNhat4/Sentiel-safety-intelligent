@@ -183,6 +183,7 @@ P-047/
 │   ├── README.md
 │   ├── PRD.md
 │   ├── USER_STORIES_LIST.md
+│   ├── US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md # Demo Day multi-camera stream configuration
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
 │   ├── done/            # Completed implementation specifications
 │   │   ├── README.md

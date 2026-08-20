@@ -1,5 +1,10 @@
 # Project Design Decisions
 
+## 2026-08-20: [Cross-cutting] Demo Day uses persisted unique stream-to-camera mappings
+- **Choice:** Sys Admin selects registered simulator streams from a dedicated configuration tab and maps each stream to one of four named cameras. A stream cannot be assigned to more than one camera. Mappings persist in the backend; disconnect removes the mapping and stops the stream session.
+- **Reason:** Technical judges need a real, inspectable stream-to-detection path while demo users need a fast, deterministic setup without entering URLs or uploading video.
+- **Boundary:** The streamer owns media transport only. Backend owns mapping, authorization and persistence. Live Monitor consumes the result; it does not invent fallback video or alerts.
+
 ## 2026-08-18: [Cross-cutting] Build the camera streamer before backend integration
 - **Choice:** Add an isolated `streamer/` service on port 8001 for per-camera video upload and looped FFmpeg MJPEG playback. Backend connection, RTSP/HLS, and multi-camera inference integration are deferred until the standalone stream is manually validated.
 - **Reason:** The Product Owner wants to test the mock camera stream independently before changing the existing FastAPI/WebSocket inference flow.

@@ -1,5 +1,10 @@
 # Project Progress
 
+## 2026-08-20: [Cross-cutting] Demo Day multi-camera stream specification
+- Added `specs/US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md` for four-camera stream selection, unique mappings, disconnect semantics, real inference requirements and acceptance criteria.
+- Added a concise TDD test plan covering mapping, RBAC, streamer lifecycle, UI states and real-inference smoke verification.
+- Next step: reconcile the existing single-active-camera implementation/plan with US-29 before implementation.
+
 ## 2026-08-19: [Cross-cutting] Restore US-16 audit onto current develop2
 - Restored the preserved US-16 work and synchronized the feature branch onto `origin/develop2` at `28daa62`, retaining current RBAC, area resolution, notification, per-track aggregation, camera-stream, and privacy behavior; the audit migration is linear revision `20260819_01` after `20260815_03`.
 - Added immutable `decision_context_v1`, Event Detail, false-alarm audit, server-owned review actor and retention deadlines; resolved events remain in official statistics while false alarms do not.
