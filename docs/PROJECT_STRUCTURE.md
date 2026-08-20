@@ -26,6 +26,7 @@ P-047/
 │   │   │   │   ├── operational_metrics.py # Read-only JSONL operational metrics aggregate
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
+│   │   │   │   ├── stream_configuration.py # Persisted active mock stream and RBAC
 │   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
 │   │   │   └── router.py
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
@@ -42,6 +43,7 @@ P-047/
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
+│   │   │   ├── stream_configuration.py
 │   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
@@ -61,6 +63,7 @@ P-047/
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
 │   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
+│   │   │   ├── stream_configuration_service.py # Active mock camera selection
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
@@ -78,7 +81,8 @@ P-047/
 │   │       ├── 20260813_01_migrate_ppe_profile_hat_vest.py
 │   │       ├── 20260814_01_add_user_area_telegram.py
 │   │       ├── 20260815_02_add_restricted_area_detection.py # Per-zone whole-camera person-alert switch
-│   │       └── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
+│   │       ├── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
+│   │       └── 20260819_01_add_stream_configuration.py # Persisted active mock stream
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -91,7 +95,8 @@ P-047/
 │       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
 │       ├── test_violation_tracking.py
-│       └── test_statistics.py
+│       ├── test_statistics.py
+│       └── test_stream_configuration.py
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
@@ -113,6 +118,7 @@ P-047/
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── auth.ts   # Authentication/account transport
+│   │   │   ├── stream-config.ts # Active stream and streamer-container transport
 │   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
 │   │   │   ├── statistics.ts # Area-dashboard statistics transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
@@ -120,7 +126,7 @@ P-047/
 │   │   ├── features/
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
-│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
+│   │   │   ├── monitor/ # Active MJPEG stream, multi-zone editor and future inference
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Acknowledged violation history
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page

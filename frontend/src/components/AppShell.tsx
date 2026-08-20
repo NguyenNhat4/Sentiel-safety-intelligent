@@ -1,7 +1,7 @@
 import {useEffect, useState, type ReactNode} from "react";
 import type {AuthenticatedUser} from "../types";
 
-export type Page = "monitor" | "events" | "operations" | "area" | "admin";
+export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "streams";
 
 interface AppShellProps {
   page: Page;
@@ -13,7 +13,7 @@ interface AppShellProps {
 
 export function AppShell({page, onNavigate, user, onLogout, children}: AppShellProps) {
   const clock = useClock();
-  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : "Quản trị hệ thống";
+  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "streams" ? "Camera stream" : "Quản trị hệ thống";
   const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map(part => part[0]).join("").toUpperCase();
 
   return <>
@@ -25,7 +25,8 @@ export function AppShell({page, onNavigate, user, onLogout, children}: AppShellP
         {user.role !== "area_manager" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
         {user.role !== "safety_manager" && <button className={`nav-item ${page === "area" ? "active" : ""}`} onClick={() => onNavigate("area")}><span>⌁</span> Dashboard</button>}
         <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
-        {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
+         {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
+         {user.role === "system_admin" && <button className={`nav-item ${page === "streams" ? "active" : ""}`} onClick={() => onNavigate("streams")}><span>◉</span> Camera stream</button>}
       </nav>
       <div className="system-card">
         <div><span className="pulse" /> Hệ thống hoạt động</div>

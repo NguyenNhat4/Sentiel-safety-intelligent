@@ -670,7 +670,7 @@ export function useMonitor() {
 
   function handlePointerDown(event: ReactPointerEvent<HTMLCanvasElement>): void {
     const video = videoRef.current;
-    if (!video?.videoWidth || !video.paused) return;
+    if (video && (!video.videoWidth || !video.paused)) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const position = normalizedPointerPosition(event.clientX, event.clientY, rect);
     const hit = findZonePointAt(zonesRef.current, position, rect);

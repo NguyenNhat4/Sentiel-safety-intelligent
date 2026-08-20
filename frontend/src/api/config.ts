@@ -1,9 +1,15 @@
 const configuredBackend = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
+const configuredStreamer = (import.meta.env.VITE_STREAMER_URL || "").replace(/\/$/, "");
 
 let activeBackendOrigin = configuredBackend;
 
 export function apiUrl(path: string): string {
   return `${activeBackendOrigin}/api/v1${path}`;
+}
+
+export function streamerUrl(path: string): string {
+  const origin = configuredStreamer || `${window.location.protocol}//${window.location.hostname}:8001`;
+  return `${origin}${path}`;
 }
 
 export function assetUrl(path?: string | null): string | null {

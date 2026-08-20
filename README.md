@@ -51,6 +51,10 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 | `VIOLATION_FRAME` | Số frame vi phạm liên tiếp trước khi cảnh báo | Mặc định `4`; một frame không vi phạm sẽ reset pending count |
 | `OPENAI_API_KEY` | Gợi ý AI tùy chọn | Để trống dùng offline safety recommendation |
 
+Frontend có thể đặt `VITE_STREAMER_URL` khi streamer container không chạy ở
+`http://<frontend-host>:8001`; ứng dụng dùng biến này để đọc `/api/cameras` và
+hiển thị `/stream/{camera_id}`.
+
 `/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. Vì vậy local SQLite hoặc storage chưa cấu hình có thể trả `degraded` dù server vẫn đang chạy để phát triển; xem các reason code an toàn trong response, không cần đưa URL/credential vào log hay ticket.
 
 ## Truy vấn mẫu
