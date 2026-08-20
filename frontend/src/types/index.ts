@@ -130,6 +130,61 @@ export interface SafetyEvent {
   track_id?: number | null;
   occurrence_ids?: string[];
   batch_id?: string | null;
+  decision_context?: StoredDecisionContext | null;
+  audit_retention_until?: string | null;
+  snapshot_retention_until?: string | null;
+}
+
+export interface EventRuleContextInput {
+  triggered_rule_keys: string[];
+  ppe_profile: "hat_vest_v1";
+  ppe_requirements: PpeRequirementUpdate;
+}
+
+export interface EventSceneContextInput {
+  frame_id: number;
+  video_timestamp_seconds: number;
+  machine_state: MachineState;
+  zone_name: string;
+  zone_revision?: number | null;
+  zone_points: ZonePoint[];
+  people: PersonDetection[];
+  detections: ModelDetection[];
+}
+
+export interface EventSystemDecisionInput {
+  result: "violate";
+  reason_codes: string[];
+}
+
+export interface DecisionContextInput {
+  rule: EventRuleContextInput;
+  scene: EventSceneContextInput;
+  system_decision: EventSystemDecisionInput;
+}
+
+export interface StoredDecisionContext extends DecisionContextInput {
+  schema_version: "decision_context_v1";
+  rule: EventRuleContextInput & {rule_version: "safety_rule_v1"; violation_frame_count: number};
+  scene: EventSceneContextInput & {camera_id: string; zone_id: string};
+  system_decision: EventSystemDecisionInput & {severity: "low" | "medium" | "high" | "critical"};
+  human_review: {
+    outcome: "actual_violation" | "false_alarm";
+    actor_user_id?: string | null;
+    actor_name: string;
+    actor_role?: string | null;
+    reviewed_at: string;
+  };
+}
+
+export interface EventIncidentSummary {
+  text: string;
+  source: "llm" | "deterministic";
+  context_schema_version: "decision_context_v1" | null;
+}
+
+export interface EventDetail extends SafetyEvent {
+  summary: EventIncidentSummary;
 }
 
 export interface EventBatchItem {
@@ -138,6 +193,7 @@ export interface EventBatchItem {
   severity: string;
   occurrence_ids: string[];
   details: Record<string, unknown>;
+  decision_context?: DecisionContextInput;
 }
 
 export interface EventBatchPayload {
@@ -171,6 +227,7 @@ export interface EventPayload {
   monitoring_session_id?: string;
   track_id?: number;
   occurrence_ids: string[];
+  decision_context?: DecisionContextInput;
 }
 
 export interface PpeRequirementUpdate {

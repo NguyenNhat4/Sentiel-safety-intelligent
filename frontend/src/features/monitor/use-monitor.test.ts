@@ -29,7 +29,11 @@ describe("review event payload", () => {
   };
 
   it("maps acknowledged review without changing the backend contract", () => {
-    const payload = buildEventPayload("acknowledged", pending, [{x: 0.1, y: 0.2}], true);
+    const zonePoints = [
+      {x: 0.1, y: 0.1}, {x: 0.9, y: 0.1},
+      {x: 0.9, y: 0.9}, {x: 0.1, y: 0.9},
+    ];
+    const payload = buildEventPayload("acknowledged", pending, zonePoints, true);
     expect(payload.status).toBe("acknowledged");
     expect(payload.details).toMatchObject({
       review_result: "actual_violation",
@@ -42,6 +46,26 @@ describe("review event payload", () => {
     expect(payload).not.toHaveProperty("privacy_blurred");
     expect(payload.monitoring_session_id).toBe(pending.monitoring_session_id);
     expect(payload.occurrence_ids).toEqual(["7aedf540-36da-4cf8-bb9b-8cd7aeab460d"]);
+    expect(payload.decision_context).toMatchObject({
+      rule: {
+        triggered_rule_keys: ["zone_intrusion"],
+        ppe_profile: "hat_vest_v1",
+        ppe_requirements: pending.rule.ppe_requirements,
+      },
+      scene: {
+        frame_id: 1,
+        video_timestamp_seconds: 4.25,
+        machine_state: "running",
+        zone_name: "Vùng 1",
+        zone_points: zonePoints,
+        people: pending.people,
+        detections: pending.detections,
+      },
+      system_decision: {
+        result: "violate",
+        reason_codes: ["zone_intrusion"],
+      },
+    });
   });
 
   it("does not attach an already reviewed active occurrence to a new grouped review", () => {
@@ -91,6 +115,11 @@ describe("review event payload", () => {
       {zone_id: "left", occurrence_ids: ["7aedf540-36da-4cf8-bb9b-8cd7aeab460d"]},
       {zone_id: "right", occurrence_ids: ["9a2c2d52-73ce-4a35-8a27-e5052925e17c"]},
     ]);
+    expect(payload?.events[0].decision_context).toMatchObject({
+      rule: {triggered_rule_keys: ["zone_intrusion:left"]},
+      scene: {zone_name: "left", machine_state: "running", zone_revision: undefined},
+      system_decision: {result: "violate", reason_codes: ["zone_intrusion:left"]},
+    });
   });
 });
 

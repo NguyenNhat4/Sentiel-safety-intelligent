@@ -1,8 +1,10 @@
 import json
+import logging
 from datetime import UTC, datetime
 
 from backend.app.core.config import Settings
 from backend.app.core.operational_metrics import (
+    LOGGER_NAME,
     configure_operational_metrics_logger,
     record_operational_event,
 )
@@ -11,6 +13,7 @@ from backend.app.services.operational_metrics_service import OperationalMetricsS
 
 def test_operational_metrics_writer_emits_allowlisted_jsonl(tmp_path):
     log_path = tmp_path / "operational-metrics.jsonl"
+    logging.getLogger(LOGGER_NAME).disabled = True
     configure_operational_metrics_logger(log_path, max_bytes=1024, backup_count=1)
 
     record_operational_event(

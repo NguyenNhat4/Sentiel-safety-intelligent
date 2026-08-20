@@ -73,8 +73,10 @@ The input is treated as one canonical person box so the report also identifies w
 
 `bootstrap_legacy_sqlite.py` is called by `make db-upgrade`. It recognizes the former local
 SQLite schema that predates Alembic, writes a timestamped `.bak` backup beside the database,
-adds the missing occurrence migration column, and stamps the known schema revision. New and
-already-versioned databases are unchanged; PostgreSQL is never bootstrapped by this script.
+adds only the missing occurrence migration column/index, and stamps the known schema revision.
+It never creates tables from current ORM metadata; later schema remains owned by ordered Alembic
+revisions. New and already-versioned databases are unchanged; PostgreSQL is never bootstrapped
+by this script.
 
 `production_start.py` is the Docker entrypoint. It validates the approved model artifacts and
 persistent data mount, safely adopts a recognized legacy SQLite database, upgrades Alembic to

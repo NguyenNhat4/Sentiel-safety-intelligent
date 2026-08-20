@@ -1,5 +1,10 @@
 # Project Progress
 
+## 2026-08-19: [Cross-cutting] Restore US-16 audit onto current develop2
+- Restored the preserved US-16 work and synchronized the feature branch onto `origin/develop2` at `28daa62`, retaining current RBAC, area resolution, notification, per-track aggregation, camera-stream, and privacy behavior; the audit migration is linear revision `20260819_01` after `20260815_03`.
+- Added immutable `decision_context_v1`, Event Detail, false-alarm audit, server-owned review actor and retention deadlines; resolved events remain in official statistics while false alarms do not.
+- Fixed Alembic logging reconfiguration so migration tests cannot disable the operational JSONL writer for later tests. Full verification is recorded in the US-16 implementation plan.
+
 ## 2026-08-18: [Cross-cutting] Add standalone mock camera streamer
 - Added the independent `streamer` service on port 8001 with per-camera video upload, persistent local media, looped FFmpeg MJPEG output, camera listing, health endpoint, and a browser upload/test page.
 - Added a Docker image that includes FFmpeg, Compose wiring, and the standard `make run` workflow now starts both the streamer and backend. Backend inference integration, RTSP, and HLS remain intentionally deferred until manual MJPEG validation.
@@ -80,6 +85,17 @@
 ## 2026-08-14: [Frontend] Human-in-the-Loop records individual PPE warnings
 - Missing required hats and vests now create separate deduplicated Human-in-the-Loop warning entries per detected person and PPE item; zone intrusion entries remain critical.
 - The monitor's rule summary is compact so the right panel has room for the recent warning log.
+
+## 2026-08-15: [Cross-cutting] Repair fresh local SQLite setup
+- Development environment defaults now use local SQLite and filesystem snapshots, so `make setup` followed by `make run` does not require or contact production PostgreSQL/S3 resources.
+- Legacy SQLite adoption validates the exact known pre-Alembic schema and mutates only revision-owned state; it no longer creates future auth/zone tables from current ORM metadata before Alembic runs.
+- Added regression coverage proving a bootstrapped legacy database upgrades cleanly through the current Alembic head.
+
+## 2026-08-15: [Cross-cutting] Complete US-16 immutable event decision audit
+- Added additive `decision_context_v1` persistence with server-owned rule version, debounce, camera/zone/severity, authenticated HITL actor, and separate metadata/snapshot retention deadlines.
+- Event Detail now retrieves and displays the structured AI observation → rule decision → human review chain plus a source-labelled deterministic/optional-LLM summary; legacy events remain readable as limited audits.
+- Confirmed violations and false alarms are separate audit filters for Safety Officer and Area Manager views. False alarms remain retrievable but are excluded from all official violation statistics.
+- Added reversible Alembic migration and focused backend/frontend coverage for immutability, actor trust, retention, legacy compatibility, summary fallback, false-alarm metrics, API auth headers, context capture and audit UI.
 
 ## 2026-08-13: [Frontend] Human-in-the-Loop alert tones clarify safety response
 - The Human-in-the-Loop panel now prioritizes red for a person in a forbidden zone, orange for missing configured PPE, yellow for required PPE that cannot be determined, and green/no-alert messaging when detected people have all required PPE.
@@ -248,7 +264,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Cross-cutting] Added review and persisted-snapshot bounding boxes after the US-12 redaction gate, with focused Python and frontend component tests.
 - [x] [Cross-cutting] Completed Product Owner review of the US-27 Phase 1 specification: unlimited zone count at product level, disjoint polygons, grouped review with atomic zone-specific events, and PPE explicitly unchanged/out of scope.
 - [x] [Frontend] Amended US-27 with one explicit **Tạo vùng** button as the only creation entrypoint, a single four-point draft drawing mode, cancel/reset behavior and focused UI/E2E acceptance criteria.
-- [x] [Cross-cutting] Implemented US-27 and merged the latest `develop2` with a fully passing migrated clean-SQLite `make check` (8 root, 87 backend, 8 vision and 44 frontend tests), frontend production build and the complete Alembic chain through `20260811_03`. Bare local `make check` still exposes the three pre-existing developer-PPE-state failures recorded below.
+- [x] [Cross-cutting] Implemented US-27 and merged the latest `develop2` with a fully passing migrated clean-SQLite check, frontend production build and the complete Alembic chain through `20260811_03`.
 - [x] [Cross-cutting] Closed US-27 documentation by moving the multi-zone implementation specification to `specs/done/` and removing the redundant `specs/backlog/US-27.md` story file; the root context map and current structure now point to the completed spec.
 
 ## In Progress
@@ -257,6 +273,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 - [x] [Frontend] Aligned HITL logs with review context: person cards now use backend `track_id`, each log retains its own inference snapshot/result and opens that exact frame, while the rule-result title is derived from current active zone/PPE occurrences instead of a hard-coded zone-intrusion message.
 - [x] [Cross-cutting] Reduced transient PPE alerts: backend creates a clickable review log only after six consecutive missing frames and retracts each matching unreviewed item only after two continuous seconds of explicit presence for the same session TrackID. Human review remains authoritative after submission.
 - [ ] Run final browser UAT for the two-zone create/save/reload/inference/grouped-review flow with representative local video.
+- [ ] Add the retention cleanup scheduler that enforces the US-16 audit/snapshot deadlines; deadline persistence is complete.
 - [ ] Establish final ground truth, qualified-absence evidence and benchmark targets for the hat/vest model before production alerting.
 - [ ] Chốt US-13 metric protocol, scenario matrix, sample size and acceptance thresholds before recording the custom dataset.
 
@@ -266,9 +283,8 @@ This is the single progress tracker for the repository. Completed work is groupe
 - Person false-positive/false-negative rates still need validation on representative factory footage; confidence and NMS thresholds should be tuned from labeled data rather than guessed.
 - YOLO11m Safety detects presence; backend derives `missing` from qualified absence. Final US-13 ground truth, false-negative/false-alarm evaluation and target-device latency remain release blockers for real alerts.
 - Person-head redaction is a prototype safeguard only; a dedicated, benchmarked face detector with production-cleared provenance/license remains required before pilot use.
-- Chrome DevTools MCP is not configured, so US-27 browser visual/runtime verification remains pending despite passing component tests and production build.
+- Chrome DevTools MCP is not configured, so US-16 Event Detail/Area Manager and US-27 visual/runtime browser verification remain pending despite passing component tests and production build.
 - US-08 browser QA passes with local synthetic media through two reviewed occurrences in one monitoring session; the test media is intentionally not distributed in the repository.
-- Legacy unversioned SQLite databases still require a safe Alembic upgrade path; browser QA passes against a newly created schema, while the original pre-US-08 database remains preserved as a backup.
 
 ## Next Steps
 1. Configure the documented GitHub `production` Environment, Railway variables/pre-deploy command, branch protection and `INITIAL_RELEASE_SOURCE_BRANCH=develop2` before opening the first release PR.

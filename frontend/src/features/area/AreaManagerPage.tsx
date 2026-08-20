@@ -3,6 +3,7 @@ import {loadAreaEvents, updateAreaEvent} from "../../api/events";
 import {assetUrl} from "../../api/config";
 import {loadStatisticsSummary} from "../../api/statistics";
 import type {SafetyEvent, StatisticsSummary} from "../../types";
+import {EventDetailDialog} from "../events/EventDetailDialog";
 import "./area-manager.css";
 
 export function AreaManagerPage() {
@@ -11,6 +12,7 @@ export function AreaManagerPage() {
   const [selectedEvent, setSelectedEvent] = useState<SafetyEvent>();
   const [updatingEventId, setUpdatingEventId] = useState<number>();
   const [status, setStatus] = useState("Đang tải dữ liệu khu vực...");
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setStatus("Đang tải dữ liệu khu vực...");
@@ -49,16 +51,17 @@ export function AreaManagerPage() {
     {status && <div className="log-status">{status}</div>}
     {summary && <>
       <div className="area-kpis">
-        <article><small>TỔNG SỰ KIỆN</small><strong>{summary.total_events}</strong></article>
+        <article><small>VI PHẠM CHÍNH THỨC</small><strong>{summary.total_events}</strong></article>
         <article><small>CHƯA XÁC NHẬN</small><strong>{summary.unacknowledged_events}</strong></article>
         <article><small>TUÂN THỦ CHUNG</small><strong>{summary.overall_compliance_rate}%</strong></article>
       </div>
       <div className="area-grid">
         <article className="area-card"><h3>Tuân thủ theo khu vực</h3>{summary.zone_stats.map(zone => <div className="zone-row" key={zone.zone_id}><div><strong>{zone.zone_name}</strong><small>{zone.total_violations} vi phạm / {zone.total_detections} lượt phát hiện</small></div><span>{zone.compliance_rate}%</span></div>)}</article>
-        <article className="area-card area-log-card"><h3>Log khu vực</h3>{events.length ? events.map(event => <button className={`area-event ${selectedEvent?.id === event.id ? "selected" : ""}`} key={event.id} onClick={() => setSelectedEvent(event)}><div><strong>#{event.id} · {event.zone_id}</strong><small>{new Date(event.timestamp).toLocaleString("vi-VN", {hour12: false})}</small></div><span>{statusLabel(event.status)}</span></button>) : <p>Chưa có log vi phạm.</p>}</article>
+        <article className="area-card area-log-card"><h3>Kết quả xác minh gần đây</h3>{events.length ? events.map(event => <button type="button" className={`area-event ${selectedEvent?.id === event.id ? "selected" : ""}`} aria-label={`Xem audit sự kiện #${event.id}`} key={event.id} onClick={() => { setSelectedEvent(event); setSelectedEventId(event.id); }}><div><strong>#{event.id} · {event.zone_id}</strong><small>{new Date(event.timestamp).toLocaleString("vi-VN", {hour12: false})}</small></div><span className={event.status === "false_alarm" ? "false-alarm" : ""}>{statusLabel(event.status)}</span></button>) : <p>Chưa có kết quả xác minh.</p>}</article>
       </div>
       {selectedEvent && <EventDetail event={selectedEvent} saving={updatingEventId === selectedEvent.id} onOutcome={setEventOutcome} />}
     </>}
+    <EventDetailDialog eventId={selectedEventId} onClose={() => setSelectedEventId(null)} />
   </section>;
 }
 

@@ -281,6 +281,12 @@ The baseline also persists `false_alarm` using the same endpoint so model qualit
 
 For current per-person reviews, `POST /api/v1/events` includes the session-local `track_id` and uses `(monitoring_session_id, track_id)` as the log identity. A person's missing-hat, missing-vest, restricted-area and zone-intrusion occurrences are accumulated into that single `person_safety_violation` event for the video session; this is tracking, not biometric identity.
 
+US-16 adds an optional, versioned `decision_context` to reviewed event creation. The browser supplies the observed frame, people/PPE detections, zone snapshot, active rule keys and system result; the backend stamps `decision_context_v1`, `safety_rule_v1`, the configured debounce, canonical camera/zone/severity, and the authenticated review actor. A completed context cannot be replaced through PATCH. Legacy requests without this additive field remain valid and return `decision_context=null`.
+
+`GET /api/v1/events/{event_id}` returns the structured context plus a short incident `summary`. The summary uses the optional LLM only as presentation; failures and unconfigured environments use a deterministic formatter, and neither path modifies the stored audit. `false_alarm` records remain queryable with `GET /api/v1/events?status=false_alarm` but are excluded from official statistics. No raw video or session replay is stored.
+
+Each new event records metadata retention through `AUDIT_RETENTION_DAYS` (default 365). A persisted blurred snapshot separately records `SNAPSHOT_RETENTION_DAYS` (default 90). These deadlines make retention explicit; automated deletion is not part of this delivery slice.
+
 ### Recommended production design
 
 Use a two-level record model:

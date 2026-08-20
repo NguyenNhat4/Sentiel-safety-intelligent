@@ -83,12 +83,15 @@ P-047/
 │   │       ├── 20260815_02_add_restricted_area_detection.py # Per-zone whole-camera person-alert switch
 │   │       ├── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
 │   │       └── 20260819_01_add_stream_configuration.py # Persisted active mock stream
+│   │       └── 20260819_01_add_event_decision_audit.py # Immutable reviewed-event context and retention deadlines
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_alert_notifications.py
 │       ├── test_analysis.py
 │       ├── test_events.py
+│       ├── test_event_audit.py
+│       ├── test_event_audit_migration.py
 │       ├── test_frame_inference_ppe.py
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
@@ -119,6 +122,8 @@ P-047/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── auth.ts   # Authentication/account transport
 │   │   │   ├── stream-config.ts # Active stream and streamer-container transport
+│   │   │   ├── events.ts  # Reviewed-event list, detail and persistence transport
+│   │   │   ├── events.test.ts
 │   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
 │   │   │   ├── statistics.ts # Area-dashboard statistics transport
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
@@ -127,8 +132,15 @@ P-047/
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
 │   │   │   ├── monitor/ # Active MJPEG stream, multi-zone editor and future inference
+│   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
+│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
-│   │   │   ├── events/  # Acknowledged violation history
+│   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
+│   │   │   │   ├── README.md
+│   │   │   │   ├── EventDetailDialog.tsx
+│   │   │   │   ├── EventDetailDialog.test.tsx
+│   │   │   │   ├── EventLogPage.tsx
+│   │   │   │   └── EventLogPage.test.tsx
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page
 │   │   │   ├── rules/   # PPE requirement switches and explicit-save state
 │   │   │   └── dashboard/ # Reserved dashboard boundary
@@ -166,6 +178,7 @@ P-047/
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   └── plans/                       # Implementation-ready plans and their reading guide
+│       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
 │   ├── PRD.md
@@ -176,6 +189,7 @@ P-047/
 │   │   ├── US-07-SPEC.md
 │   │   ├── US-08-SPEC.md
 │   │   ├── US-12.md
+│   │   ├── US-16.md     # Completed immutable event decision-audit specification
 │   │   ├── US-27-MULTI-ZONE-SPEC.md # Completed multi-zone implementation specification
 │   │   └── US-28.md     # Completed YOLO11m Safety hat/vest cutover specification
 │   └── backlog/         # Remaining MVP and advanced user stories

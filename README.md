@@ -22,6 +22,8 @@ make run
 
 `make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000. Đây là workflow chỉ dành cho local; production triển khai streamer như một service riêng.
 
+Local development dùng SQLite và filesystem snapshots theo `.env.development.example`; Docker Compose đọc cùng file nhưng ghi đè `DATABASE_URL` bằng PostgreSQL disposable nội bộ. Với deployment, cấu hình giá trị thật từ `.env.production.example` trong secret/Variables của nền tảng.
+
 Mở sau khi server sẵn sàng:
 
 - App: <http://localhost:8000/>
