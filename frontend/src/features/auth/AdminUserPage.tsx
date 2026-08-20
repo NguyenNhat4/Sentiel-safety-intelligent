@@ -105,8 +105,7 @@ function StreamTab({onError, onMessage}: {onError: (message: string) => void; on
 
   return <article className="admin-card stream-admin-card">
     <div className="admin-card-title"><div><h3>Camera stream</h3><p>Chọn một camera đã được nạp trong streamer container. Không upload video tại đây.</p></div><button className="secondary-btn" disabled={loading || refreshing} onClick={() => void loadStreams()}>{refreshing ? "Đang tải…" : "Làm mới"}</button></div>
-    {loading ? <p className="stream-empty">Đang tải danh sách camera…</p> : cameras.length === 0 ? <p className="stream-empty">Chưa có camera trong streamer container.</p> : <div className="stream-camera-grid">{cameras.map(camera => <div className={`stream-camera-card ${activeCamera === camera ? "active" : ""}`} key={camera}><div><strong>{camera}</strong><small>{activeCamera === camera ? "ĐANG ACTIVE" : "Sẵn sàng"}</small></div><button className="admin-primary" disabled={refreshing || activeCamera === camera} onClick={() => void selectCamera(camera)}>{activeCamera === camera ? "Đang phát" : "Bật stream"}</button></div>)}</div>}
-    {activeCamera && <button className="danger-link stream-disable" disabled={refreshing} onClick={() => void selectCamera(null)}>Tắt stream đang active ({activeCamera})</button>}
+     {loading ? <p className="stream-empty">Đang tải danh sách camera…</p> : cameras.length === 0 ? <p className="stream-empty">Chưa có camera trong streamer container.</p> : <div className="stream-camera-grid">{cameras.map(camera => { const isActive = activeCamera === camera; return <div className={`stream-camera-card ${isActive ? "active" : ""}`} key={camera}><div><strong>{camera}</strong><small>{isActive ? "ĐANG ACTIVE" : "Sẵn sàng"}</small></div><button className={isActive ? "stream-stop-button" : "admin-primary"} disabled={refreshing} onClick={() => void selectCamera(isActive ? null : camera)}>{isActive ? "Tắt stream" : "Bật stream"}</button></div>; })}</div>}
   </article>;
 }
 

@@ -22,6 +22,7 @@
 
 ## 2026-08-19: [Frontend] Move camera stream to sidebar navigation
 - Moved **Camera stream** out of the account tabs into a dedicated System Admin sidebar entry directly below **Quản trị hệ thống**.
+- Changed the active camera card action from disabled **Đang phát** to an explicit **Tắt stream** action; clearing active state is verified through the backend API.
 
 ## 2026-08-16: [Vision/Backend] Add YuNet-first identity redaction
 - Added the pinned OpenCV YuNet detector, startup artifact/capability validation, cached thread-safe inference, expanded face blur, and the existing upper-person fallback for each person without an associated face.
