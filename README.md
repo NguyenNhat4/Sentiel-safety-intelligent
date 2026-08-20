@@ -8,6 +8,7 @@ P-047 là ứng dụng giám sát an toàn PPE và vùng nguy hiểm bằng Comp
 - Node.js/npm tương thích với `frontend/package-lock.json`
 - Git LFS nếu clone model checkpoint lần đầu
 - FFmpeg (`ffmpeg` trong `PATH`) cho mock camera streamer local
+- PostgreSQL 16 đang chạy local, qua Docker Compose, hoặc qua TCP proxy có thể truy cập từ máy phát triển
 
 Python 3.11 là runtime duy nhất được lock, Docker và CI hỗ trợ; `make setup` dùng `.python-version` để chọn đúng runtime.
 
@@ -20,9 +21,11 @@ make setup
 make run
 ```
 
-`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000. Đây là workflow chỉ dành cho local; production triển khai streamer như một service riêng.
+`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi migrate PostgreSQL. `make run` migrate lại an toàn, build frontend, khởi động mock streamer tại cổng 8001 và FastAPI tại cổng 8000. Đây là workflow chỉ dành cho local; production triển khai streamer như một service riêng.
 
-Local development dùng SQLite và filesystem snapshots theo `.env.development.example`; Docker Compose đọc cùng file nhưng ghi đè `DATABASE_URL` bằng PostgreSQL disposable nội bộ. Với deployment, cấu hình giá trị thật từ `.env.production.example` trong secret/Variables của nền tảng.
+PostgreSQL là database duy nhất ở local, test và deployment. Trước khi chạy migration, `DATABASE_URL` phải là URL PostgreSQL có thể truy cập từ chính môi trường đang chạy lệnh. Host `*.railway.internal` chỉ dùng được giữa các service trong Railway; máy local phải dùng PostgreSQL local hoặc TCP Proxy URL của Railway. Không cấu hình SQLite và không bật database fallback. Docker Compose dùng PostgreSQL disposable nội bộ. Với deployment, cấu hình giá trị thật từ `.env.production.example` trong secret/Variables của nền tảng.
+
+> Trạng thái chuyển đổi: tài liệu đã chốt contract PostgreSQL-only, nhưng runtime hiện vẫn còn bootstrap/fallback SQLite tương thích cũ. Không xem chuyển đổi là hoàn tất cho đến khi Makefile, template môi trường, cấu hình backend và test đã loại bỏ đường chạy đó.
 
 Mở sau khi server sẵn sàng:
 
@@ -43,8 +46,8 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 |---|---|---|
 | `APP_ENV` | Chế độ runtime | `development` local; `production` khi deploy |
 | `CORS_ORIGINS` | Origin được phép gọi API | Mặc định `http://localhost:8000`; thêm `http://localhost:5173` khi dùng Vite riêng |
-| `DATABASE_URL` | PostgreSQL managed | Chỉ điền URL PostgreSQL thực khi dùng nó; Docker Compose tự ghi đè bằng DB disposable |
-| `DATABASE_FALLBACK_ENABLED` | Cho phép fallback database khi PostgreSQL không khả dụng | Giữ `false` cho deployment cần persistence chặt chẽ |
+| `DATABASE_URL` | PostgreSQL bắt buộc | Dùng URL truy cập được từ môi trường hiện tại; Docker Compose tự ghi đè bằng DB disposable |
+| `DATABASE_FALLBACK_ENABLED` | Cờ tương thích cũ đang chờ xóa | Luôn đặt `false`; PostgreSQL lỗi thì startup/migration phải fail |
 | `SNAPSHOT_STORAGE_*` | S3-compatible bucket cho snapshot đã redact | Điền bucket, endpoint và credential ở môi trường có S3; không đưa secrets vào tài liệu |
 | `PPE_MODEL_PATH` | Checkpoint an toàn | Phải trỏ đến `models/yolo11m_safety.pt` |
 | `FACE_DETECTOR_MODEL_PATH` | YuNet privacy detector | Phải trỏ đến `models/face_detection_yunet_2023mar.onnx` |
@@ -61,7 +64,7 @@ display-camera mappings; only `system_admin` may connect or disconnect them.
 Live Monitor renders the four mappings in a 2×2 grid and shows an empty state
 for an unmapped camera.
 
-`/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. Vì vậy local SQLite hoặc storage chưa cấu hình có thể trả `degraded` dù server vẫn đang chạy để phát triển; xem các reason code an toàn trong response, không cần đưa URL/credential vào log hay ticket.
+`/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. PostgreSQL hoặc storage chưa sẵn sàng sẽ trả `degraded`; xem các reason code an toàn trong response, không đưa URL/credential vào log hay ticket.
 
 ## Truy vấn mẫu
 
@@ -80,7 +83,7 @@ curl -X PUT http://localhost:8000/api/v1/ppe-requirements/uploaded_video/zone_01
   -d '{"profile":"hat_vest_v1","hat_required":true,"vest_required":true}'
 ```
 
-Local database rỗng được seed demo accounts. Ví dụ đăng nhập `system_admin` và gọi endpoint cần bearer token:
+PostgreSQL development rỗng được seed demo accounts. Ví dụ đăng nhập `system_admin` và gọi endpoint cần bearer token:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \

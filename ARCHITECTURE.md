@@ -52,9 +52,10 @@ Các bất biến an toàn:
 ## Trạng thái triển khai
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
-machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
-event history. PostgreSQL, PPE production model, RBAC và các
-capability nâng cao vẫn là đích cần triển khai.
+machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
+event history, PPE production model và RBAC. PostgreSQL là database duy nhất cho mọi môi trường;
+SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất
+chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 

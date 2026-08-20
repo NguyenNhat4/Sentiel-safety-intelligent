@@ -1,5 +1,12 @@
 # Project Design Decisions
 
+## 2026-08-20: [Backend] Standardize all environments on PostgreSQL
+- **Supersedes:** “Keep SQLite as the current MVP default” and “PostgreSQL-first runtime with SQLite startup fallback”.
+- **Choice:** PostgreSQL is the only supported relational database for local development, automated tests and deployment. SQLite and automatic database fallback are deprecated and must be removed from runtime configuration, setup scripts and active test requirements.
+- **Reason:** One database engine prevents local/test behavior from masking PostgreSQL-specific failures and avoids writing data into an unsynchronized fallback after a primary connection failure.
+- **Constraint:** `DATABASE_URL` must be reachable from the process environment. Railway private DNS is used only inside the same Railway project/environment; local developers use local PostgreSQL or Railway TCP Proxy details. Migration/startup fails clearly when PostgreSQL is unavailable.
+- **Transition:** Documentation records the approved target first. Runtime code, environment templates and tests remain incomplete until a separate implementation change removes the legacy SQLite path and proves `make setup` plus `make run` against PostgreSQL.
+
 ## 2026-08-20: [Backend] Use stream_camera_id and idempotent disconnect
 - **Choice:** A persisted camera mapping uses `camera_id` and `stream_camera_id`; it does not introduce a separate generic `stream_id`. Disconnecting an unknown or already disconnected camera returns `200 OK` and leaves the desired state disconnected.
 - **Reason:** This matches the simulator's camera-based stream contract and makes the Demo Day Disconnect action safe to retry.

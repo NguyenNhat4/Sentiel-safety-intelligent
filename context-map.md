@@ -33,7 +33,7 @@ Baseline hiện có:
 - Upload video local; tạo, lưu nhiều vùng bốn điểm không chồng nhau; zone intrusion đang bật luôn cảnh báo, còn machine state chỉ gate PPE.
 - YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; `person` là nguồn canonical cho tracking/zone, PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
-- SQLite cho MVP/local/test, PostgreSQL qua `DATABASE_URL` cho môi trường triển khai đã xác thực, và session authentication cho ba role.
+- PostgreSQL là database duy nhất cho local, test và deployment; không dùng SQLite hoặc database fallback. Session authentication hỗ trợ ba role.
 
 Các khoảng trống lớn là benchmark/calibration trên dữ liệu nhà máy, authorization nghiệp vụ đầy đủ, zone/shift CRUD, escalation và reporting. YuNet production face redaction đã có person fallback fail-closed; trạng thái mới nhất nằm trong [PROGRESS.md](PROGRESS.md).
 

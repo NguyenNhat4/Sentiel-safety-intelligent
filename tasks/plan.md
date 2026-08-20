@@ -43,7 +43,7 @@ migration/model → schemas/service/API → frontend API/types → admin + monit
 ### Checkpoint 1
 
 - [ ] Focused backend stream tests pass.
-- [ ] Alembic upgrade/downgrade and SQLite test metadata remain valid.
+- [ ] Alembic upgrade/downgrade and PostgreSQL test metadata remain valid.
 
 ### Phase 2: Demo UI
 

@@ -1,5 +1,10 @@
 # Project Progress
 
+## 2026-08-20: [Documentation] Adopt PostgreSQL-only database contract
+- Updated current onboarding, architecture, backend and migration documentation to make PostgreSQL the only supported database for local, test and deployment environments.
+- Superseded the SQLite-default and SQLite-fallback decisions; documented that Railway private DNS cannot be used from a local process.
+- Runtime removal is still pending: Makefile bootstrap, environment defaults, backend fallback code and SQLite-specific tests must be changed and verified before the migration is complete.
+
 ## 2026-08-20: [Cross-cutting] Share streamer FFmpeg workers per camera
 - Changed MJPEG streaming so one camera uses one FFmpeg reader shared across connected clients; each client receives the latest buffered JPEG frame and the worker stops when the last client disconnects.
 - Hardened worker lifecycle so FFmpeg exit/start failure closes clients, reconnect cannot create duplicate workers, camera replacement/deletion and application shutdown stop active processes, and malformed MJPEG output has a bounded buffer.
