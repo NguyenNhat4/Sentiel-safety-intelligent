@@ -5,11 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   printf 'Usage: %s [IMAGE_TAG]\n' "$0"
-  printf 'Default image tag: nguyennaht4/streamer:dev\n'
+  printf 'Default image tag: nguyennhat4/streamer:dev\n'
   exit 0
 fi
 
-IMAGE_TAG="${1:-nguyennaht4/streamer:dev}"
+IMAGE_TAG="${1:-nguyennhat4/streamer:dev}"
 
 if ! command -v docker >/dev/null 2>&1; then
   printf 'Error: docker is not installed or not available in PATH.\n' >&2
