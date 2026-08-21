@@ -215,6 +215,8 @@ P-047/
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
 │   ├── configure_railway_hls.sh # Safely sync shared HLS variables to Railway services
+│   ├── deploy_all_production.sh # Build, publish, redeploy, wait and health-check app plus streamer
+│   ├── test_deploy_all_production.sh # No-network regression for the combined production release
 │   ├── test_railway_hls_scripts.sh # No-network regression for HLS build/deploy wiring
 │   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py

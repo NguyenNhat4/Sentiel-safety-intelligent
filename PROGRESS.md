@@ -1,5 +1,10 @@
 # Project Progress
 
+## 2026-08-21: [Cross-cutting] Add one-command production app and streamer release
+
+- Added `scripts/deploy_all_production.sh` to run focused release gates, build/push both Docker images, redeploy `p047-app` and `streamer`, wait for new Railway deployments to reach `SUCCESS`, and verify both health endpoints are reachable.
+- Added a no-network regression harness and documented the command and environment-variable overrides.
+
 ## 2026-08-21: [Backend/Streamer/Frontend] Authorize all valid HLS camera IDs
 
 - HLS tokens for `system_admin` and `safety_manager` now carry `cameras: ["*"]` instead of a snapshot of stream mappings; streamer accepts the wildcard while retaining signature, expiry, role, camera-ID validation and authentication checks.

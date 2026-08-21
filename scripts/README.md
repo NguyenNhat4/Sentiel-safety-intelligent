@@ -1,5 +1,18 @@
 # Benchmark scripts
 
+`deploy_all_production.sh` runs the focused release gates, rebuilds and pushes
+both production images, redeploys `p047-app` and `streamer`, waits for new
+Railway deployments to reach `SUCCESS`, and checks both health endpoints:
+
+```bash
+./scripts/deploy_all_production.sh
+```
+
+The defaults target this project's production services and images. Override
+`RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT`, service names, image names/tags,
+health URLs, or `DEPLOY_TIMEOUT_SECONDS` through environment variables when
+needed. The script never prints or passes application secrets as build args.
+
 `configure_railway_hls.sh` synchronizes the shared HLS signing secret and
 Railway service-reference variables to `p047-app` and `streamer`. For a complete
 image-based release, `--publish-app` also builds the frontend with concrete
