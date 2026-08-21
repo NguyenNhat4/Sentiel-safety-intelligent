@@ -1,6 +1,18 @@
 # Local container run uses the developer environment, with an isolated
 # PostgreSQL URL so application checks never target a developer's configured DB.
 services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.20.1
+    volumes:
+      - ./streamer/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8888:8888"
+    expose:
+      - "8554"
+      - "9997"
+      - "9998"
+    restart: unless-stopped
+
   streamer:
     build:
       context: .
@@ -9,6 +21,12 @@ services:
       - "8001:8001"
     volumes:
       - ./data/streamer:/app/data/streamer
+    environment:
+      MEDIA_RTSP_ENABLED: "true"
+      MEDIA_RTSP_ORIGIN: rtsp://p047_local_publisher:p047_local_only_change_me@mediamtx:8554
+      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8888}
+    depends_on:
+      - mediamtx
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
@@ -34,6 +52,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_STREAMER_URL: ${VITE_STREAMER_URL:-}
+        VITE_MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8888}
+        VITE_STREAM_TRANSPORT: ${VITE_STREAM_TRANSPORT:-hls}
     env_file:
       - .env.development
     environment:

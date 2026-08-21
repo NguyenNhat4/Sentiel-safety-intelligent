@@ -1,5 +1,20 @@
 # Project Design Decisions
 
+## 2026-08-21: [Cross-cutting] Keep Railway MediaMTX private and deploy it separately
+- **Choice:** Deploy `streamer` and exact-version MediaMTX as separate Railway services. Streamer remains public for control/MJPEG compatibility; MediaMTX accepts authenticated RTSP publishers only on the Railway private network and has no public domain in the first rollout.
+- **Reason:** Separating publisher control from protocol fan-out allows independent lifecycle and scaling while avoiding direct public exposure of RTSP/HLS ports or credentials.
+- **Current consequence:** Four authenticated H.264 paths are online, but the private HLS origin is not browser-reachable. Production browser playback remains on MJPEG until an HTTPS playback ingress with viewer authorization and CORS allowlisting is approved and canaried.
+- **Verification boundary:** Streamer health and inventory are necessary but insufficient; deployment requires terminal `SUCCESS` plus MediaMTX evidence that each required path is online. This rollout does not prove RTSP inference or 200 × 4 capacity.
+- **Rollback:** Change browser transport back to MJPEG without deleting uploaded media, persisted mappings or redeploying the backend.
+
+## 2026-08-21: [Cross-cutting] Adopt RTSP-first CCTV simulation with MediaMTX
+- **Choice:** FFmpeg publishes one H.264 RTSP path per simulated camera to exact-version-pinned MediaMTX. Backend/vision reads RTSP; browsers use HLS for high-viewer playback. WebRTC/WHEP is a separate low-latency slice.
+- **Reason:** RTSP models the future CCTV boundary while HLS removes FastAPI from the 200-user × four-camera media delivery path.
+- **Compatibility:** Preserve camera IDs, persisted mapping/RBAC and MJPEG fallback through additive migration. MJPEG removal requires a later decision after browser, inference and capacity gates.
+- **Boundary:** MediaMTX owns protocol gateway/fan-out only. FastAPI remains control plane and never proxies HLS segments or RTSP bytes.
+- **Gate:** No production capacity claim without a real 200 × 4 load/soak report containing CPU, RSS, egress, errors and first-frame latency.
+- **Security:** RTSP/publisher endpoints remain private; public playback uses TLS and an explicit viewer-authorization policy. Credentials never enter frontend configuration or logs.
+
 ## 2026-08-20: [Backend] Standardize all environments on PostgreSQL
 - **Supersedes:** “Keep SQLite as the current MVP default” and “PostgreSQL-first runtime with SQLite startup fallback”.
 - **Choice:** PostgreSQL is the only supported relational database for local development, automated tests and deployment. SQLite and automatic database fallback are deprecated and must be removed from runtime configuration, setup scripts and active test requirements.

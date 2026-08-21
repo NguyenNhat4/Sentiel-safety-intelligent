@@ -19,7 +19,7 @@ db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/alembic upgrade head
 
 run: db-upgrade frontend-build
-	$(VENV_BIN)/uvicorn streamer.app:app --host 0.0.0.0 --port 8001 & STREAMER_PID=$$!; trap 'kill $$STREAMER_PID' EXIT INT TERM; $(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+	docker compose up -d mediamtx; MEDIA_RTSP_ENABLED=true MEDIA_RTSP_ORIGIN=rtsp://p047_local_publisher:p047_local_only_change_me@localhost:8554 MEDIA_PUBLIC_ORIGIN=http://localhost:8888 $(VENV_BIN)/uvicorn streamer.app:app --host 0.0.0.0 --port 8001 & STREAMER_PID=$$!; trap 'kill $$STREAMER_PID; docker compose stop mediamtx' EXIT INT TERM; $(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 
 streamer-run:
 	$(VENV_BIN)/uvicorn streamer.app:app --reload --host 0.0.0.0 --port 8001

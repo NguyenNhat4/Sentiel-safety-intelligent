@@ -33,24 +33,49 @@ def immediate_threadpool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(streamer_app, "run_in_threadpool", run_immediately)
 
 
-def test_reuses_one_camera_worker_for_multiple_clients(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_reuses_one_camera_worker_for_multiple_clients(tmp_path: Path) -> None:
     app = create_app(tmp_path)
     manager = app.state.stream_manager
     video_path = tmp_path / "cam_1.mp4"
     video_path.write_bytes(b"video")
     first = manager._get_stream(video_path)
     second = manager._get_stream(video_path)
-    first_client: asyncio.Queue[bytes] = asyncio.Queue(maxsize=1)
-    second_client: asyncio.Queue[bytes] = asyncio.Queue(maxsize=1)
-    first.clients.add(first_client)
-    second.clients.add(second_client)
+    first.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+    first_client = first.subscribe()
+    second_client = second.subscribe()
 
     assert first is second
     first._publish(b"jpeg-frame")
-    first_frame = first_client.get_nowait()
-    second_frame = second_client.get_nowait()
+    first_frame = await first_client.receive()
+    second_frame = await second_client.receive()
     assert first_frame == b"jpeg-frame"
     assert second_frame is first_frame
+
+    first.task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first.task
+
+
+@pytest.mark.asyncio
+async def test_buffers_one_latest_frame_for_one_hundred_clients(tmp_path: Path) -> None:
+    manager = CameraStreamManager(tmp_path)
+    stream = manager._get_stream(tmp_path / "cam_1.mp4")
+    stream.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+
+    subscriptions = [stream.subscribe() for _ in range(100)]
+    first_frame = b"first-frame"
+    latest_frame = b"latest-frame"
+
+    stream._publish(first_frame)
+    stream._publish(latest_frame)
+
+    assert stream.buffered_frame_count == 1
+    assert all(subscription.latest_payload is latest_frame for subscription in subscriptions)
+
+    stream.task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stream.task
 
 
 @pytest.mark.asyncio
@@ -93,13 +118,12 @@ async def test_stopping_camera_closes_clients_and_removes_worker(tmp_path: Path)
     manager = CameraStreamManager(tmp_path)
     video_path = tmp_path / "cam_1.mp4"
     stream = manager._get_stream(video_path)
-    client: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1)
-    stream.clients.add(client)  # type: ignore[arg-type]
     stream.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+    client = stream.subscribe()
 
     await manager.stop_stream(video_path)
 
-    assert client.get_nowait() is None
+    assert await client.receive() is None
     assert stream.task is None
     assert video_path not in manager._streams
 
@@ -112,14 +136,13 @@ async def test_replacing_camera_atomically_stops_old_worker(tmp_path: Path) -> N
     video_path.write_bytes(b"old-video")
     temporary.write_bytes(b"new-video")
     stream = manager._get_stream(video_path)
-    client: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1)
-    stream.clients.add(client)  # type: ignore[arg-type]
     stream.task = asyncio.create_task(asyncio.sleep(10))  # type: ignore[assignment]
+    client = stream.subscribe()
 
     await manager.replace_media(temporary, video_path)
 
     assert video_path.read_bytes() == b"new-video"
-    assert client.get_nowait() is None
+    assert await client.receive() is None
     assert stream.task is None
     assert video_path not in manager._streams
 
@@ -144,9 +167,23 @@ async def test_health_and_camera_list(tmp_path: Path) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         health_response = await client.get("/health")
         cameras_response = await client.get("/api/cameras")
+        inventory_response = await client.get("/api/media/inventory")
 
     assert health_response.json() == {"status": "ok"}
     assert cameras_response.json() == []
+    assert inventory_response.json() == {"version": "camera_inventory_v1", "cameras": []}
+
+
+@pytest.mark.asyncio
+async def test_stream_response_disables_proxy_buffering_and_caching(tmp_path: Path) -> None:
+    app = create_app(tmp_path)
+    (tmp_path / "cam_1.mp4").write_bytes(b"video")
+    stream_route = next(route for route in app.routes if getattr(route, "path", None) == "/stream/{camera_id}")
+
+    response = await stream_route.endpoint("cam_1")
+
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-accel-buffering"] == "no"
 
 
 @pytest.mark.asyncio

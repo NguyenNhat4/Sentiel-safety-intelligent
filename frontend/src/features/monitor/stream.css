@@ -3,3 +3,4 @@
 .monitor-stream-shell{display:grid;gap:16px}.stream-config-panel{display:grid;gap:14px;padding:18px 20px;background:#f7faf8;border:1px solid #d8e5de;border-radius:10px}.stream-config-panel h2{margin:3px 0 4px}.stream-config-panel p{margin:0;color:var(--muted);font-size:11px}.stream-config-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.stream-config-item{display:grid;gap:6px;color:#24352d;font-size:11px;font-weight:700}.stream-config-item select{min-width:0}.stream-config-item button{border:0;background:transparent;color:#a83a32;text-align:left;padding:0;font-size:10px;cursor:pointer}.stream-config-error{color:#a83a32!important}
 @media (max-width: 900px){.stream-config-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width: 520px){.stream-config-grid{grid-template-columns:1fr}.stream-config-panel{padding:16px}}
+.active-stream-view video{display:block;width:100%;height:100%;object-fit:cover}

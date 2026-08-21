@@ -1,6 +1,6 @@
 # Sentinel React Frontend
 
-React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns the admin-selected MJPEG camera viewer, normalized four-point zone editing, sampled binary WebSocket inference compatibility, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Local video upload is removed; the current streamer phase displays MJPEG only and does not yet feed AI inference.
+React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns the admin-selected HLS camera viewer with MJPEG rollback, normalized four-point zone editing, sampled binary WebSocket inference compatibility, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Local video upload is removed; RTSP server-side inference remains a separate runtime gate from HLS playback.
 
 Project-wide decisions and progress are maintained centrally at repository root.
 

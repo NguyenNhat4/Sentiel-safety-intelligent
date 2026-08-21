@@ -73,6 +73,8 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Multi-zone | [US-27](specs/done/US-27-MULTI-ZONE-SPEC.md) |
 | Dataset/evaluation US-13 | [dataset guide](docs/US-13-task2-datapreparation.md), [evaluation workspace](data/evaluation/README.md) |
 | Operational JSONL metrics | [Operational Metrics](docs/operational-metrics.md) |
+| Hiểu/tải thử streamer nhiều client và bộ nhớ MJPEG | [Streamer concurrency and memory](docs/streamer-concurrency-and-memory.md) |
+| Hiểu hoặc vận hành luồng CCTV RTSP, MediaMTX, Railway và HLS/WebRTC | [RTSP CCTV media solution](docs/RTSP_CCTV_MEDIA_SOLUTION.md), [streamer README](streamer/README.md), [implementation plan](docs/plans/2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md) |
 | Cài Python với uv | [uv Setup Guide](docs/guide/setup/uv-setup.md) |
 | Quy trình phối hợp AI | [AI Team Workflow](docs/AI_TEAM_WORKFLOW.md) |
 

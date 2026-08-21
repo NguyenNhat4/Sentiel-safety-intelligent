@@ -2,8 +2,8 @@ import {getAccessToken} from "./auth";
 import {apiUrl, streamerUrl} from "./config";
 import type {StreamConfiguration} from "../types";
 
-export async function getStreamConfiguration(): Promise<StreamConfiguration> {
-  return authenticatedRequest<StreamConfiguration>("/stream-config");
+export async function getStreamConfiguration(signal?: AbortSignal): Promise<StreamConfiguration> {
+  return authenticatedRequest<StreamConfiguration>("/stream-config", {signal});
 }
 
 export async function updateStreamConfiguration(mappings: StreamConfiguration["mappings"]): Promise<StreamConfiguration> {

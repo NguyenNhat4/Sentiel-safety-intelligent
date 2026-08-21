@@ -1,5 +1,31 @@
 # Project Progress
 
+## 2026-08-21: [Cross-cutting] Implement RTSP publishers and HLS browser delivery
+- Added MediaMTX `1.20.1`, private RTSP/TCP H.264 publishing, one supervised FFmpeg process per uploaded camera, bounded restart, lifecycle cleanup and additive media inventory.
+- Expanded the RTSP solution, canonical architecture, streamer operations, Railway release guidance and decision log with newcomer-oriented control/media-plane explanations, Mermaid architecture/state diagrams, per-camera lifecycle, deployed two-service topology, verification ladder and the explicit private-HLS/browser limitation.
+- Added pinned Hls.js `1.6.13`, native-HLS/MSE playback, cleanup, hidden-tab pause, bounded retry, non-false LIVE states and 15-second jittered mapping polling. MJPEG remains selectable with `VITE_STREAM_TRANSPORT=mjpeg`.
+- Unit/config gates pass: 17 streamer tests, four focused frontend tests, frontend lint/type-check/build, Ruff and Compose validation. The pre-existing five stale `App.test.tsx` failures remain unchanged.
+- Real runtime proof passed for available `cam_1`: MediaMTX received H.264 1280x720 at 10 FPS over RTSP/TCP; HLS master/media playlists and a 205,132-byte fMP4 segment decoded with its init fragment.
+- Deployed the streamer and a separate private MediaMTX `1.20.1` service to Railway. Both deployments reached `SUCCESS`; the streamer health endpoint returned `ok`, inventory reported `cam3`, `cam4`, `fullppe` and `nohat` ready with zero restarts, and MediaMTX logs confirmed all four authenticated RTSP/H.264 paths online. The existing `p047-app` backend was not redeployed.
+- Four-camera, browser DevTools, RTSP-to-model/rule/event and 200-user x four-camera 30-minute soak gates remain open. Only `cam_1` and `cam_2` fixtures exist under required IDs; Chrome DevTools is unavailable; no capacity claim is made.
+
+## 2026-08-21: [Cross-cutting] Specify RTSP-first CCTV media gateway
+- Approved an implementation-ready architecture: FFmpeg simulates one CCTV source per camera, MediaMTX exposes RTSP to backend/vision and HLS to high-scale browser viewers, with WebRTC/WHEP deferred to a separately measured low-latency slice.
+- Added the solution contract for identity, media profile, publisher/player state machines, security, observability, compatibility, capacity, acceptance criteria and rollback.
+- Added an incremental TDD plan from one-path proof through four-camera rollout, real RTSP inference evidence and a 200-user × four-camera soak test.
+- Superseded by the implementation entry above; MJPEG remains the rollback path.
+
+## 2026-08-21: [Documentation] Explain streamer concurrency and memory for new contributors
+- Added a standalone Vietnamese guide covering the original memory problem, current shared-worker/latest-frame architecture, lifecycle, proxy buffering, measured evidence, alternatives and trade-offs.
+- Documented a staged 1/10/25/50/100-client load-test procedure, capacity signals and incident-triage checklist without treating the synthetic allocation test as production proof.
+- Added the guide to the root context map and current filesystem documentation.
+
+## 2026-08-21: [Cross-cutting] Bound streamer memory for 100 concurrent app clients
+- Replaced one `asyncio.Queue` per MJPEG viewer with a lighter single-slot subscription while preserving latest-frame fan-out and one FFmpeg process per active camera.
+- Added no-cache/no-proxy-buffer headers so an HTTP proxy does not accumulate the unbounded MJPEG response.
+- Added 100-viewer regression coverage. A synthetic 100-client x 4-camera measurement with one shared 1 MiB payload dropped traced allocation from 2,393,809 bytes to 1,466,009 bytes (about 39%); live network/RSS load testing remains required before production capacity sign-off.
+- Streamer suite passes 12 tests; Ruff and formatting checks pass. Root `make check` remains blocked by pre-existing whitespace in `backend/tests/test_stream_configuration.py`, outside this change.
+
 ## 2026-08-20: [Documentation] Adopt PostgreSQL-only database contract
 - Updated current onboarding, architecture, backend and migration documentation to make PostgreSQL the only supported database for local, test and deployment environments.
 - Superseded the SQLite-default and SQLite-fallback decisions; documented that Railway private DNS cannot be used from a local process.

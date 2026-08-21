@@ -14,6 +14,7 @@ P-047/
 │       ├── deploy-railway.yml # CI-gated Railway image redeploy and health verification
 │       └── dependency-audit.yml # Non-blocking nightly dependency audit
 ├── alembic.ini          # Alembic entrypoint for backend migrations
+├── docker-compose.yml   # PostgreSQL, backend, streamer and exact-version MediaMTX gateway
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
 │   │   ├── api/         # API Routers (v1 REST endpoints, WebSocket & AI Safety Agent)
@@ -113,10 +114,16 @@ P-047/
 │       └── test_tracking.py
 ├── streamer/            # Standalone mock camera video streamer (port 8001)
 │   ├── README.md
-│   ├── app.py           # Upload API, camera stream manager and test UI
+│   ├── app.py           # Upload API, MJPEG rollback and publisher lifecycle wiring
+│   ├── media_publishers.py # One supervised FFmpeg RTSP publisher per camera
+│   ├── mediamtx.yml     # RTSP/TCP, LL-HLS, auth and observability configuration
+│   ├── mediamtx/        # Minimal Railway deployment context without demo credentials
+│   │   ├── Dockerfile
+│   │   └── README.md
 │   ├── Dockerfile       # FFmpeg + minimal Python runtime
 │   └── tests/
-│       └── test_app.py
+│       ├── test_app.py
+│       └── test_media_publishers.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
@@ -175,9 +182,12 @@ P-047/
 │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
 │   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
+│   ├── streamer-concurrency-and-memory.md # Beginner guide to MJPEG fan-out, memory and 100-client load testing
+│   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   └── plans/                       # Implementation-ready plans and their reading guide
+│       ├── 2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md # RTSP/HLS migration plan
 │       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md

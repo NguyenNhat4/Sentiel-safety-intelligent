@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
     model_config = SettingsConfigDict(
-        env_file=(".env.production", ".env"),
+        env_file=(".env.production"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
