@@ -1,9 +1,8 @@
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.app.api.dependencies import require_authenticated_user, require_roles, require_system_admin, require_token
+from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
 from backend.app.models.user import User, UserRole
 from backend.app.schemas.auth import (
@@ -92,7 +91,7 @@ def create_hls_token(
     actor: User = Depends(require_hls_viewer),
     db: Session = Depends(get_db),
 ):
-    secret = os.getenv("HLS_TOKEN_SECRET", "")
+    secret = get_settings().hls_token_secret
     try:
         cameras = [mapping.stream_camera_id for mapping in StreamConfigurationService(db).get().mappings]
         token, expires_in = issue_hls_access_token(

@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
+    hls_token_secret: str = ""
+    streamer_internal_origin: str = ""
+    streamer_health_timeout_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"

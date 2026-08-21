@@ -1,5 +1,19 @@
 # Benchmark scripts
 
+`configure_railway_hls.sh` synchronizes the shared HLS signing secret and
+Railway service-reference variables to `p047-app` and `streamer`. It reads
+`HLS_TOKEN_SECRET` from the process environment first, otherwise from the
+gitignored `.env.production`, and never prints the value:
+
+```bash
+./scripts/configure_railway_hls.sh
+```
+
+The default environment is `production`, and both services are redeployed only
+after all variables have been written. Use `--no-redeploy` to update variables
+without deploying, or `--project PROJECT_ID` when this checkout is not linked
+to the intended Railway project. Run `--help` for service-name overrides.
+
 `build_streamer.sh` builds the standalone mock camera streamer image from the
 repository root. It defaults to `nguyennaht4/streamer:dev`; pass another image
 tag as the first argument when needed:

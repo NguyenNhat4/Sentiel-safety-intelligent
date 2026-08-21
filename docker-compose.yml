@@ -63,10 +63,13 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://p047_test:p047-test-only@db:5432/p047_compose_test
       RUN_DB_MIGRATIONS_ON_START: "true"
+      STREAMER_INTERNAL_ORIGIN: http://streamer:8001
     ports:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      streamer:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

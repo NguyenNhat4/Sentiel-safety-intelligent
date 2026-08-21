@@ -93,13 +93,88 @@ Kiểm tra streamer trước khi mở Live Monitor:
 ```bash
 STREAMER_PUBLIC_URL=https://your-streamer.up.railway.app
 curl -fsS "$STREAMER_PUBLIC_URL/health"
-curl -fsS "$STREAMER_PUBLIC_URL/api/cameras"
+curl -fsS --user "$STREAMER_ADMIN_USERNAME" "$STREAMER_PUBLIC_URL/api/cameras"
 ```
 
 Thay `your-streamer.up.railway.app` bằng domain Railway cấp cho đúng project,
-giữ giao thức `https://` và không thêm dấu `/` cuối.
+giữ giao thức `https://` và không thêm dấu `/` cuối. Lệnh thứ hai sẽ hỏi
+`STREAMER_ADMIN_PASSWORD`, không đặt password trực tiếp trong command line.
 
 ### Variables của các service Railway
+
+Có thể đồng bộ tự động các biến HLS bên dưới vào cả hai service bằng Railway
+CLI. Script không in secret, ghi toàn bộ variables trước rồi mới redeploy
+`streamer` và `p047-app`.
+
+Yêu cầu trước khi chạy:
+
+1. Cài Railway CLI và đăng nhập bằng `railway login`.
+2. Railway project đã có các service tên `p047-app`, `streamer` và `mediamtx`.
+3. `streamer` đã có Public Domain; `mediamtx` không cần Public Domain.
+4. Đặt một secret ngẫu nhiên tối thiểu 32 ký tự trong `.env.production`:
+
+```bash
+HLS_SECRET="$(openssl rand -hex 32)"
+printf 'HLS_TOKEN_SECRET=%s\n' "$HLS_SECRET" >> .env.production
+unset HLS_SECRET
+```
+
+Không commit `.env.production`. Nếu file đã có `HLS_TOKEN_SECRET`, sửa dòng hiện
+có thay vì thêm dòng thứ hai.
+
+Nếu checkout đã link đúng Railway project, chạy:
+
+```bash
+./scripts/configure_railway_hls.sh
+```
+
+Script sẽ đọc `HLS_TOKEN_SECRET` từ process environment trước, nếu không có thì
+đọc từ `.env.production`. Sau đó script cập nhật cả hai service và tự redeploy.
+
+Nếu checkout chưa link project hoặc muốn tránh phụ thuộc vào project đang link,
+truyền Railway project ID rõ ràng:
+
+```bash
+./scripts/configure_railway_hls.sh --project YOUR_PROJECT_ID
+```
+
+Có thể truyền secret trực tiếp từ shell thay vì dùng file:
+
+```bash
+HLS_TOKEN_SECRET='your-random-secret-at-least-32-characters' \
+  ./scripts/configure_railway_hls.sh --project YOUR_PROJECT_ID
+```
+
+Chỉ cập nhật Variables, chưa redeploy:
+
+```bash
+./scripts/configure_railway_hls.sh --no-redeploy
+```
+
+Nếu tên service khác mặc định:
+
+```bash
+./scripts/configure_railway_hls.sh \
+  --app-service YOUR_APP_SERVICE \
+  --streamer-service YOUR_STREAMER_SERVICE
+```
+
+Sau khi script báo `Redeploys queued`, đợi cả hai deployment thành công rồi kiểm
+tra backend readiness:
+
+```bash
+curl -fsS https://YOUR_APP_DOMAIN/health
+```
+
+Kết quả đạt yêu cầu có `"ready":true` và dependency `streamer` có
+`"ready":true`. Nếu HLS token vẫn trả `503`, kiểm tra deployment mới nhất của
+cả hai service đã dùng cùng `HLS_TOKEN_SECRET`; nếu `/health` báo
+`not_configured`, kiểm tra secret và `STREAMER_INTERNAL_ORIGIN`; nếu báo
+`connection_failed`, kiểm tra private-domain/port và `/health` của streamer.
+
+Xem toàn bộ option bằng `./scripts/configure_railway_hls.sh --help`. Script chỉ
+cấu hình các biến kết nối HLS; RTSP publisher credentials và streamer Basic Auth
+vẫn phải được quản lý riêng trong Railway Variables.
 
 Trong service `streamer`, cấu hình:
 
@@ -127,6 +202,8 @@ VITE_STREAMER_URL=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
 VITE_MEDIA_PUBLIC_ORIGIN=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
 VITE_STREAM_TRANSPORT=hls
 HLS_TOKEN_SECRET=<same-shared-random-secret>
+STREAMER_INTERNAL_ORIGIN=http://${{streamer.RAILWAY_PRIVATE_DOMAIN}}:${{streamer.PORT}}
+STREAMER_HEALTH_TIMEOUT_SECONDS=3
 ```
 
 Service phải có tên chính xác là `streamer` và đã được cấp Public Domain.
@@ -135,6 +212,10 @@ thuộc domain của một tài khoản hoặc project cụ thể. Biến `VITE_
 frontend khi build; sau khi thêm hoặc đổi biến, bấm **Redeploy** `p047-app` để
 build lại frontend.
 
+`STREAMER_INTERNAL_ORIGIN` chỉ dùng server-to-server. Backend gọi
+`<origin>/health` với timeout hữu hạn; thiếu signing secret/private origin trả
+reason `not_configured`, còn không kết nối được streamer trả `connection_failed`.
+
 Không tạo Public Domain cho MediaMTX. Browser đăng nhập P-047 một lần; backend
 cấp token HLS 15 phút cho `system_admin` và `safety_manager`, frontend tự gia hạn,
 và streamer gateway xác thực token trước khi đọc HLS private. `area_manager`
@@ -142,7 +223,10 @@ nhận `403`; token sai hoặc hết hạn nhận `401`. Trang quản trị stre
 dùng `STREAMER_ADMIN_USERNAME`/`STREAMER_ADMIN_PASSWORD`, không dùng tài khoản
 P-047 hoặc RTSP publisher credential.
 
-`/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. PostgreSQL hoặc storage chưa sẵn sàng sẽ trả `degraded`; xem các reason code an toàn trong response, không đưa URL/credential vào log hay ticket.
+`/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật, S3 `HeadBucket`
+thành công, HLS signing đã cấu hình và private streamer trả đúng
+`{"status":"ok"}`. Dependency chưa sẵn sàng sẽ trả `degraded`; response chỉ có
+reason code an toàn, không đưa URL/credential vào log hay ticket.
 
 ## Truy vấn mẫu
 

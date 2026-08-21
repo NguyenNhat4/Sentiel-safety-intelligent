@@ -5,6 +5,7 @@
 - **Direct administration:** Streamer upload/replace/delete UI uses separate Basic Auth credentials from Railway Variables. P-047 users and RTSP publisher credentials are never reused for direct streamer administration.
 - **Security:** Gateway upstream is fixed by deployment configuration, tokens cannot authorize an unmapped camera, production startup fails without a 32-character signing secret and streamer administrator credentials, and secrets never enter frontend build variables.
 - **Compatibility:** MJPEG remains an explicit rollback transport, but the approved production path is authenticated HLS.
+- **Readiness:** Application `/health` requires valid HLS signing configuration and a successful private streamer health probe; missing configuration and connection failure use stable credential-safe reason codes.
 
 ## 2026-08-21: [Cross-cutting] Keep Railway MediaMTX private and deploy it separately (superseded playback consequence)
 - **Choice:** Deploy `streamer` and exact-version MediaMTX as separate Railway services. Streamer remains public for control/MJPEG compatibility; MediaMTX accepts authenticated RTSP publishers only on the Railway private network and has no public domain in the first rollout.

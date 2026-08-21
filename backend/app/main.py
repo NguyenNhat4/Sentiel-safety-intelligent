@@ -3,6 +3,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -130,6 +131,17 @@ def _dependency_readiness(check, unavailable_reason: str) -> DependencyReadiness
     return DependencyReadiness(ready=True)
 
 
+def check_streamer_connection(origin: str) -> None:
+    response = httpx.get(
+        f"{origin.rstrip('/')}/health",
+        timeout=settings.streamer_health_timeout_seconds,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload != {"status": "ok"}:
+        raise RuntimeError("Streamer returned an unexpected health response")
+
+
 @app.get("/health", response_model=HealthResponse, tags=["Health Check"])
 async def health_check() -> HealthResponse:
     if database_runtime.backend != "postgresql" or database_runtime.fallback_active:
@@ -148,7 +160,20 @@ async def health_check() -> HealthResponse:
             "connection_failed",
         )
 
-    ready = bool(getattr(app.state, "ready", False)) and postgresql.ready and snapshot_storage.ready
+    if len(settings.hls_token_secret) < 32 or not settings.streamer_internal_origin:
+        streamer = DependencyReadiness(ready=False, reason="not_configured")
+    else:
+        streamer = _dependency_readiness(
+            lambda: check_streamer_connection(settings.streamer_internal_origin),
+            "connection_failed",
+        )
+
+    ready = (
+        bool(getattr(app.state, "ready", False))
+        and postgresql.ready
+        and snapshot_storage.ready
+        and streamer.ready
+    )
     return HealthResponse(
         status="ok" if ready else "degraded",
         ready=ready,
@@ -156,7 +181,7 @@ async def health_check() -> HealthResponse:
         service=settings.app_name,
         database=database_runtime.backend,
         database_fallback_active=database_runtime.fallback_active,
-        dependencies={"postgresql": postgresql, "snapshot_storage": snapshot_storage},
+        dependencies={"postgresql": postgresql, "snapshot_storage": snapshot_storage, "streamer": streamer},
         runtime_files=getattr(app.state, "runtime_files", {}),
     )
 

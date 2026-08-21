@@ -214,6 +214,7 @@ P-047/
 │       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
+│   ├── configure_railway_hls.sh # Safely sync shared HLS variables to Railway services
 │   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
