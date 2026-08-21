@@ -1,5 +1,16 @@
 # Project Progress
 
+## 2026-08-21: [MediaMTX/Streamer] Publisher account enabled for HLS playback
+
+- Added `read` and `playback` permissions for the existing MediaMTX publisher account across valid camera paths.
+- Wired `streamer` `HLS_UPSTREAM_ORIGIN` to the publisher credentials through Railway service references and redeployed both production services successfully.
+- Production evidence: direct authenticated MediaMTX playlist request returned `200` with 239 bytes; authenticated public streamer HLS gateway request returned `200` with `application/vnd.apple.mpegurl` and 239 bytes; `/health` returned `{"status":"ok"}`.
+
+## 2026-08-21: [Streamer] Follow MediaMTX HLS cookie-check redirects
+- Fixed the authenticated HLS gateway returning `200` with an empty body when MediaMTX redirects the initial playlist request to `?cookieCheck=1`.
+- Added regression coverage proving the gateway follows the redirect and preserves the final playlist body and MIME type.
+- The initial deployment exposed a MediaMTX reader-auth mismatch; this was resolved in the publisher-account configuration entry above.
+
 ## 2026-08-21: [Cross-cutting] Add authenticated HLS-only browser gateway
 - Closed the prebuilt Vite configuration gap: `push_app.sh` now validates and injects concrete streamer URLs, and `configure_railway_hls.sh --publish-app` provides one build, push, variable-sync and redeploy path.
 - Updated `scripts/push_app.sh` to redeploy `p047-app` from the newly published image source automatically, with explicit Railway target overrides and an opt-out for image-only publishing.
@@ -362,3 +373,8 @@ This is the single progress tracker for the repository. Completed work is groupe
 8. Validate or replace the person-head MVP redactor with a dedicated face detector before pilot/production use.
 9. Validate authentication and the complete migration chain against PostgreSQL.
 10. Replace the JSONL writer with a centralized sink before any multi-worker deployment.
+# 2026-08-21: [MediaMTX/Streamer] Publisher account enabled for HLS playback
+
+- Added `read` and `playback` permissions for the existing MediaMTX publisher account across valid camera paths.
+- Wired `streamer` `HLS_UPSTREAM_ORIGIN` to the publisher credentials through Railway service references and redeployed both production services successfully.
+- Production evidence: direct authenticated MediaMTX playlist request returned `200` with 239 bytes; authenticated public streamer HLS gateway request returned `200` with `application/vnd.apple.mpegurl` and 239 bytes; `/health` returned `{"status":"ok"}`.

@@ -5,10 +5,11 @@ import hmac
 import io
 import json
 import time
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncByteStream, AsyncClient, MockTransport, Request, Response
 
 import streamer.app as streamer_app
 from streamer.app import CameraStreamManager, create_app
@@ -41,6 +42,14 @@ class _CompletedProcess:
 
     def kill(self) -> None:
         self.returncode = -9
+
+
+class _AsyncBytes(AsyncByteStream):
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield self.content
 
 
 @pytest.fixture
@@ -233,6 +242,50 @@ async def test_hls_gateway_rejects_missing_expired_and_wrong_camera_tokens(tmp_p
     assert missing.status_code == 401
     assert stale.status_code == 401
     assert wrong_camera.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_hls_gateway_follows_mediamtx_cookie_check_redirect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "test-secret-that-is-at-least-thirty-two-bytes"
+    playlist = b"#EXTM3U\n#EXT-X-VERSION:9\n"
+    upstream_requests: list[Request] = []
+    expected_authorization = "Basic " + base64.b64encode(b"reader:reader-password").decode()
+
+    def upstream(request: Request) -> Response:
+        upstream_requests.append(request)
+        if request.headers.get("Authorization") != expected_authorization:
+            return Response(401, json={"error": "authentication error"})
+        if request.url.params.get("cookieCheck") != "1":
+            return Response(302, headers={"Location": f"{request.url}?cookieCheck=1"})
+        return Response(
+            200,
+            stream=_AsyncBytes(playlist),
+            headers={"Content-Type": "application/vnd.apple.mpegurl"},
+        )
+
+    def upstream_client(**kwargs: object) -> AsyncClient:
+        return AsyncClient(transport=MockTransport(upstream), **kwargs)
+
+    monkeypatch.setattr(streamer_app.httpx, "AsyncClient", upstream_client)
+    app = create_app(
+        tmp_path,
+        hls_token_secret=secret,
+        hls_upstream_origin="http://reader:reader-password@mediamtx:8888",
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            "/hls/cameras/cam_1/index.m3u8",
+            headers={"Authorization": f"Bearer {_hls_token(secret)}"},
+        )
+
+    assert response.status_code == 200
+    assert response.content == playlist
+    assert response.headers["content-type"].startswith("application/vnd.apple.mpegurl")
+    assert [request.url.params.get("cookieCheck") for request in upstream_requests] == [None, "1"]
 
 
 @pytest.mark.asyncio

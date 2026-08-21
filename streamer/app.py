@@ -546,7 +546,7 @@ refresh();
         if not asset_path or ".." in asset_path or not re.fullmatch(r"[A-Za-z0-9_.-]+", asset_path):
             raise HTTPException(status_code=400, detail="Invalid HLS asset path")
         upstream_url = f"{configured_hls_upstream}/cameras/{camera_id}/{asset_path}"
-        client = httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0))
+        client = httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0), follow_redirects=True)
         try:
             upstream_request = client.build_request("GET", upstream_url, params=request.query_params)
             upstream = await client.send(upstream_request, stream=True)
