@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENVIRONMENT="production"
 APP_SERVICE="p047-app"
 STREAMER_SERVICE="streamer"
+STREAMER_PORT="8080"
 PROJECT_ID=""
 SECRET_FILE="$ROOT_DIR/.env.production"
 REDEPLOY=true
@@ -22,6 +23,7 @@ Options:
   --app-service NAME    Backend/frontend service (default: p047-app)
   --streamer-service NAME
                         Stream gateway service (default: streamer)
+  --streamer-port PORT  Streamer's internal listening port (default: 8080)
   --secret-file PATH    File containing HLS_TOKEN_SECRET=... (default: .env.production)
   --no-redeploy         Set variables without redeploying either service
   -h, --help            Show this help
@@ -49,6 +51,10 @@ while [[ "$#" -gt 0 ]]; do
       STREAMER_SERVICE="${2:?Error: --streamer-service requires a name}"
       shift 2
       ;;
+    --streamer-port)
+      STREAMER_PORT="${2:?Error: --streamer-port requires a port}"
+      shift 2
+      ;;
     --secret-file)
       SECRET_FILE="${2:?Error: --secret-file requires a path}"
       shift 2
@@ -73,6 +79,11 @@ command -v railway >/dev/null 2>&1 || {
   printf 'Error: Railway CLI is not installed or not available in PATH.\n' >&2
   exit 1
 }
+
+if [[ ! "$STREAMER_PORT" =~ ^[0-9]+$ ]] || (( STREAMER_PORT < 1 || STREAMER_PORT > 65535 )); then
+  printf 'Error: --streamer-port must be an integer from 1 to 65535.\n' >&2
+  exit 2
+fi
 
 if [[ -z "${HLS_TOKEN_SECRET:-}" ]]; then
   if [[ ! -f "$SECRET_FILE" ]]; then
@@ -106,7 +117,7 @@ if [[ -n "$PROJECT_ID" ]]; then
   COMMON_ARGS+=(--project "$PROJECT_ID")
 fi
 STREAMER_PUBLIC_REF='https://${{'"$STREAMER_SERVICE"'.RAILWAY_PUBLIC_DOMAIN}}'
-STREAMER_PRIVATE_REF='http://${{'"$STREAMER_SERVICE"'.RAILWAY_PRIVATE_DOMAIN}}:${{'"$STREAMER_SERVICE"'.PORT}}'
+STREAMER_PRIVATE_REF='http://${{'"$STREAMER_SERVICE"'.RAILWAY_PRIVATE_DOMAIN}}:'"$STREAMER_PORT"
 APP_PUBLIC_REF='https://${{'"$APP_SERVICE"'.RAILWAY_PUBLIC_DOMAIN}}'
 
 railway whoami --json >/dev/null

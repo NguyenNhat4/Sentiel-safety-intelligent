@@ -156,7 +156,8 @@ Nếu tên service khác mặc định:
 ```bash
 ./scripts/configure_railway_hls.sh \
   --app-service YOUR_APP_SERVICE \
-  --streamer-service YOUR_STREAMER_SERVICE
+  --streamer-service YOUR_STREAMER_SERVICE \
+  --streamer-port 8080
 ```
 
 Sau khi script báo `Redeploys queued`, đợi cả hai deployment thành công rồi kiểm
@@ -202,7 +203,7 @@ VITE_STREAMER_URL=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
 VITE_MEDIA_PUBLIC_ORIGIN=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
 VITE_STREAM_TRANSPORT=hls
 HLS_TOKEN_SECRET=<same-shared-random-secret>
-STREAMER_INTERNAL_ORIGIN=http://${{streamer.RAILWAY_PRIVATE_DOMAIN}}:${{streamer.PORT}}
+STREAMER_INTERNAL_ORIGIN=http://${{streamer.RAILWAY_PRIVATE_DOMAIN}}:8080
 STREAMER_HEALTH_TIMEOUT_SECONDS=3
 ```
 
@@ -215,6 +216,9 @@ build lại frontend.
 `STREAMER_INTERNAL_ORIGIN` chỉ dùng server-to-server. Backend gọi
 `<origin>/health` với timeout hữu hạn; thiếu signing secret/private origin trả
 reason `not_configured`, còn không kết nối được streamer trả `connection_failed`.
+Port `8080` phải khớp dòng `Uvicorn running on http://0.0.0.0:8080` trong
+streamer logs. Không dùng `${{streamer.PORT}}` ở đây vì `PORT` do Railway inject
+lúc chạy container, không phải service variable bảo đảm có thể tham chiếu.
 
 Không tạo Public Domain cho MediaMTX. Browser đăng nhập P-047 một lần; backend
 cấp token HLS 15 phút cho `system_admin` và `safety_manager`, frontend tự gia hạn,

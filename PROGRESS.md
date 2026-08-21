@@ -1,7 +1,7 @@
 # Project Progress
 
 ## 2026-08-21: [Cross-cutting] Add authenticated HLS-only browser gateway
-- Added `scripts/configure_railway_hls.sh` to safely synchronize the shared HLS secret and Railway service-reference variables across `p047-app` and `streamer`, then redeploy both only after the full variable set is written.
+- Added `scripts/configure_railway_hls.sh` to safely synchronize the shared HLS secret and Railway service-reference variables across `p047-app` and `streamer`, then redeploy both only after the full variable set is written. The script uses the streamer's concrete internal listening port (`8080` by default) instead of the non-referenceable Railway runtime `PORT`.
 - Added a 15-minute backend HLS token for `system_admin` and `safety_manager`, scoped to persisted mapped streams; `area_manager` is forbidden.
 - Added streamer Basic Auth for direct administration and a Bearer-protected HLS proxy to private MediaMTX. Production fails closed when administrator credentials or the shared signing secret are missing.
 - Frontend Hls.js sends the token on manifests/segments and renews it two minutes before expiry. Local and Railway templates now route browser HLS through the public streamer while MediaMTX stays private.

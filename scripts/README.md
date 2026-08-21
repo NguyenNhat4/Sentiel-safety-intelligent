@@ -12,7 +12,9 @@ gitignored `.env.production`, and never prints the value:
 The default environment is `production`, and both services are redeployed only
 after all variables have been written. Use `--no-redeploy` to update variables
 without deploying, or `--project PROJECT_ID` when this checkout is not linked
-to the intended Railway project. Run `--help` for service-name overrides.
+to the intended Railway project. The private streamer port defaults to `8080`;
+override it with `--streamer-port PORT` only when the runtime listens elsewhere.
+Run `--help` for service-name overrides.
 
 `build_streamer.sh` builds the standalone mock camera streamer image from the
 repository root. It defaults to `nguyennaht4/streamer:dev`; pass another image
