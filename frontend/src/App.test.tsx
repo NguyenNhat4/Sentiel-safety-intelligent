@@ -115,6 +115,9 @@ describe("Sentinel authentication", () => {
       if (url.includes("/monitoring-zones")) {
         return jsonResponse({camera_id: "uploaded_video", revision: 0, zones: [], updated_at: null});
       }
+      if (url.includes("/stream-config")) {
+        return jsonResponse({mappings: [], updated_at: null});
+      }
       return jsonResponse([]);
     }));
     render(<App />);
@@ -128,9 +131,10 @@ describe("Sentinel authentication", () => {
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
-    expect(screen.getByRole("button", {name: /Camera stream/})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: /Camera stream/}));
-    expect(await screen.findByRole("heading", {name: "Camera stream", level: 2})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Cấu hình camera/})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Cấu hình camera/}));
+    expect(await screen.findByRole("heading", {name: "Cấu hình camera", level: 1})).toBeInTheDocument();
+    expect(screen.getByText("Chưa có camera nào được kết nối trong Live Monitor.")).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
   });
 

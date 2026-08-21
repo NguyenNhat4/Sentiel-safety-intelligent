@@ -41,6 +41,7 @@ describe("PpeRequirementsPanel", () => {
     expect(screen.getByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).not.toBeChecked();
     expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).not.toBeChecked();
     expect(screen.getByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeChecked();
+    expect(screen.getByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).toBeChecked();
     expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
   });
 
@@ -77,7 +78,8 @@ describe("PpeRequirementsPanel", () => {
         profile: "hat_vest_v1",
         hat_required: true,
         vest_required: false,
-        restricted_area_detection_enabled: false
+        restricted_area_detection_enabled: false,
+        zone_intrusion_enabled: true
       }
     ));
     expect(await screen.findByText("Đã lưu cấu hình")).toBeInTheDocument();
@@ -92,6 +94,18 @@ describe("PpeRequirementsPanel", () => {
       "uploaded_video",
       "zone_01",
       expect.objectContaining({restricted_area_detection_enabled: true})
+    ));
+  });
+
+  it("saves the zone-intrusion switch independently", async () => {
+    render(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />);
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Cảnh báo xâm nhập zone"}));
+    fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình"}));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledWith(
+      "uploaded_video",
+      "zone_01",
+      expect.objectContaining({zone_intrusion_enabled: false})
     ));
   });
 

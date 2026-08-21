@@ -1,5 +1,11 @@
 # Project Design Decisions
 
+## 2026-08-21: [Cross-cutting] Configure safety zones and rules per connected camera
+- **Choice:** Keep Live Monitor as the all-camera operational view. Give `system_admin` a separate **Cấu hình camera** sidebar page with one mapped-camera dropdown, that camera's HLS preview, multiple four-point zones, and rules persisted by `(camera_id, zone_id)`.
+- **Rule semantics:** `hat_required` and `vest_required` apply only to tracked people whose foot point is inside that zone and only while the camera-wide machine state is `running`. `restricted_area_detection_enabled` and `zone_intrusion_enabled` are independent per-zone switches; zone intrusion does not depend on machine state.
+- **Compatibility:** Add `zone_intrusion_enabled` with a default of `true`, preserving intrusion behavior for existing rows and clients that omit the field. The server-side RTSP path loads every enabled zone's requirements; the legacy browser-frame inference contract remains accepted.
+- **Boundary:** HLS is display-only. The backend reads the mapped RTSP path, runs inference at the bounded sampling rate, and publishes camera-correlated metadata for overlays.
+
 ## 2026-08-21: [Cross-cutting] Keep MediaMTX private behind an authenticated HLS gateway
 - **Choice:** Browser playback is HLS-only through the public streamer gateway. MediaMTX remains private. Backend issues 15-minute HMAC tokens only to `system_admin` and `safety_manager`; tokens contain the currently mapped stream IDs and the frontend renews them before expiry.
 - **Direct administration:** Streamer upload/replace/delete UI uses separate Basic Auth credentials from Railway Variables. P-047 users and RTSP publisher credentials are never reused for direct streamer administration.

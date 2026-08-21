@@ -1,6 +1,6 @@
 # Sentinel React Frontend
 
-React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns the admin-selected HLS camera viewer with MJPEG rollback, normalized four-point zone editing, sampled binary WebSocket inference compatibility, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Local video upload is removed; RTSP server-side inference remains a separate runtime gate from HLS playback.
+React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. Live Monitor renders all mapped HLS cameras and camera-correlated detection overlays. A separate system-admin **Cấu hình camera** page selects one mapped camera, edits normalized four-point zones, and saves rules per zone. Local video upload is removed; RTSP server-side inference remains a separate runtime gate from HLS playback.
 
 Project-wide decisions and progress are maintained centrally at repository root.
 
@@ -40,7 +40,7 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 1. Load the versioned `hat_vest_v1` default-OFF requirements for `uploaded_video` and `zone_01`; edits remain draft until **Lưu cấu hình** succeeds.
 2. Select a local video; it remains in the browser.
 3. Select up to four normalized zone points. Points can be dragged, deleted, or reset while paused; only four points activate zone evaluation.
-4. Play to open `/api/v1/ws/inference` and receive detections regardless of zone state.
+4. Uploaded-video compatibility opens `/api/v1/ws/inference`; connected HLS cameras use one authenticated `/api/v1/ws/camera-detections` subscription and never upload browser frames.
 5. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
 6. Draw returned canonical person boxes, foot points, and YOLO11m Safety detections `hat`/`vest` in source-video coordinates; only `person`, `hat`, `vest` exist in the new detection contract.
 7. Pause only when `review_required=true`, seek back to that inference result's `video_time`, wait for the browser to render it, then capture the full native video frame for review.

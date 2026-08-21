@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -22,6 +23,7 @@ from backend.app.integrations.snapshot_storage import (
 from backend.app.schemas.health import DependencyReadiness, HealthResponse
 from backend.app.services.auth_service import AuthService
 from backend.app.services.frame_inference_service import frame_inference_service
+from backend.app.services.server_camera_inference_runtime import ServerCameraInferenceRuntime
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -55,8 +57,24 @@ async def lifespan(app: FastAPI):
     logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
     app.state.ready = True
 
+    camera_inference_runtime = None
+    camera_inference_task = None
+    if settings.rtsp_inference_enabled:
+        if not settings.rtsp_reader_origin:
+            raise RuntimeError("RTSP_READER_ORIGIN is required when RTSP inference is enabled")
+        camera_inference_runtime = ServerCameraInferenceRuntime(
+            settings.rtsp_reader_origin,
+            max_fps=settings.rtsp_inference_max_fps,
+            poll_seconds=settings.rtsp_mapping_poll_seconds,
+        )
+        camera_inference_task = asyncio.create_task(camera_inference_runtime.run())
+        logger.info("Server-side RTSP camera inference started.")
+
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield
+    if camera_inference_runtime is not None and camera_inference_task is not None:
+        camera_inference_runtime.stop()
+        await camera_inference_task
     print("Shutting down backend...")
 
 
@@ -168,12 +186,7 @@ async def health_check() -> HealthResponse:
             "connection_failed",
         )
 
-    ready = (
-        bool(getattr(app.state, "ready", False))
-        and postgresql.ready
-        and snapshot_storage.ready
-        and streamer.ready
-    )
+    ready = bool(getattr(app.state, "ready", False)) and postgresql.ready and snapshot_storage.ready and streamer.ready
     return HealthResponse(
         status="ok" if ready else "degraded",
         ready=ready,

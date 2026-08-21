@@ -39,6 +39,7 @@ P-047/
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
+│   │   │   ├── rtsp_frame_source.py # Validated reconnectable RTSP reader and sampling
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
@@ -62,6 +63,10 @@ P-047/
 │   │   │   ├── analysis_service.py
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
+│   │   │   ├── camera_detection_hub.py # Latest-only per-camera metadata fan-out
+│   │   │   ├── camera_inference_supervisor.py # Mapping-to-worker reconciliation
+│   │   │   ├── camera_inference_worker.py # One RTSP inference loop per camera
+│   │   │   ├── server_camera_inference_runtime.py # Lifespan orchestration
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
 │   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
@@ -86,10 +91,14 @@ P-047/
 │   │       ├── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
 │   │       └── 20260819_01_add_stream_configuration.py # Persisted active mock stream
 │   │       └── 20260819_01_add_event_decision_audit.py # Immutable reviewed-event context and retention deadlines
+│   │       └── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_alert_notifications.py
+│       ├── test_camera_detection_hub.py
+│       ├── test_camera_inference_supervisor.py
+│       ├── test_camera_inference_worker.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_event_audit.py
@@ -100,6 +109,7 @@ P-047/
 │       ├── test_ppe_requirements.py
 │       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
+│       ├── test_rtsp_frame_source.py
 │       ├── test_violation_tracking.py
 │       ├── test_statistics.py
 │       └── test_stream_configuration.py
@@ -129,6 +139,7 @@ P-047/
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
+│   │   │   ├── camera-detection-client.ts # Authenticated camera metadata socket
 │   │   │   ├── auth.ts   # Authentication/account transport
 │   │   │   ├── stream-config.ts # Active stream and streamer-container transport
 │   │   │   ├── events.ts  # Reviewed-event list, detail and persistence transport
@@ -138,9 +149,11 @@ P-047/
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
+│   │   │   ├── camera-config/ # Admin camera dropdown, HLS zone editor and per-zone rules
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
 │   │   │   ├── monitor/ # Active MJPEG stream, multi-zone editor and future inference
+│   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over HLS
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
 │   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay

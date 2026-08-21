@@ -48,6 +48,7 @@ class PpeRequirementService:
                 hat_required=False,
                 vest_required=False,
                 restricted_area_detection_enabled=False,
+                zone_intrusion_enabled=True,
                 is_configured=False,
                 updated_at=None,
                 helmet_required=False,
@@ -71,6 +72,7 @@ class PpeRequirementService:
             requirement.hat_required = update.hat_required
             requirement.vest_required = update.vest_required
             requirement.restricted_area_detection_enabled = update.restricted_area_detection_enabled
+            requirement.zone_intrusion_enabled = update.zone_intrusion_enabled
             self._db.commit()
         except SQLAlchemyError as exc:
             self._db.rollback()
@@ -96,6 +98,7 @@ class PpeRequirementService:
             hat_required=requirement.hat_required,
             vest_required=requirement.vest_required,
             restricted_area_detection_enabled=requirement.restricted_area_detection_enabled,
+            zone_intrusion_enabled=requirement.zone_intrusion_enabled,
             is_configured=True,
             updated_at=requirement.updated_at,
             helmet_required=requirement.hat_required,

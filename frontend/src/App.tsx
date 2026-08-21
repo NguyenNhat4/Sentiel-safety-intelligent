@@ -8,6 +8,7 @@ import {AreaManagerPage} from "./features/area/AreaManagerPage";
 import {EventLogPage} from "./features/events/EventLogPage";
 import {MonitorPage} from "./features/monitor/MonitorPage";
 import {OperationalMetricsPage} from "./features/operational-metrics/OperationalMetricsPage";
+import {CameraConfigurationPage} from "./features/camera-config/CameraConfigurationPage";
 import type {AuthenticatedUser} from "./types";
 import {getCurrentUser, logout} from "./api/auth";
 
@@ -42,6 +43,7 @@ export default function App() {
   return (
     <AppShell page={page} onNavigate={setPage} user={user} onLogout={() => void handleLogout()}>
       {page === "monitor" && <MonitorPage role={user.role} />}
+      {page === "camera-config" && user.role === "system_admin" && <CameraConfigurationPage />}
       <EventLogPage active={page === "events"} />
       <OperationalMetricsPage active={page === "operations"} />
       {page === "area" && user.role !== "safety_manager" && <AreaManagerPage />}

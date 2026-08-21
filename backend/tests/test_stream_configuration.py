@@ -37,7 +37,7 @@ def test_stream_configuration_defaults_to_empty_for_authenticated_user(client, d
     # ĐÃ FIX: Truyền token hợp lệ đúng như tên hàm
     sm_headers = _safety_manager_headers(client, db_session)
     response = client.get("/api/v1/stream-config", headers=sm_headers)
-    
+
     assert response.status_code == 200
     assert response.json().get("mappings", []) == []
 

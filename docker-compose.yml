@@ -64,6 +64,8 @@ services:
       DATABASE_URL: postgresql+psycopg2://p047_test:p047-test-only@db:5432/p047_compose_test
       RUN_DB_MIGRATIONS_ON_START: "true"
       STREAMER_INTERNAL_ORIGIN: http://streamer:8001
+      RTSP_INFERENCE_ENABLED: "true"
+      RTSP_READER_ORIGIN: rtsp://mediamtx:8554
     ports:
       - "8000:8000"
     depends_on:

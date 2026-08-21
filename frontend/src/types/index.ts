@@ -112,6 +112,16 @@ export interface InferenceResult {
   rule: InferenceRule;
 }
 
+export interface CameraInferenceResult extends Omit<InferenceResult, "type" | "video_time"> {
+  type: "camera_inference_result";
+  camera_id: string;
+  stream_camera_id: string;
+  source_timestamp_ms: number;
+  captured_at: number;
+  frame_width: number;
+  frame_height: number;
+}
+
 export interface SafetyEvent {
   id: number;
   timestamp: string;
@@ -236,6 +246,7 @@ export interface PpeRequirementUpdate {
   hat_required: boolean;
   vest_required: boolean;
   restricted_area_detection_enabled?: boolean;
+  zone_intrusion_enabled?: boolean;
 }
 
 export interface PpeRequirement extends PpeRequirementUpdate {

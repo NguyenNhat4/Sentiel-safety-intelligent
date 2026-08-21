@@ -1,8 +1,10 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {mediaUrl} from "../../api/config";
-import {getHlsAccessToken} from "../../api/auth";
+import {getAccessToken, getHlsAccessToken} from "../../api/auth";
+import {CameraDetectionClient} from "../../api/camera-detection-client";
 import {cameraStreamUrl, disconnectStream, getStreamConfiguration, listStreamerCameras, updateStreamConfiguration} from "../../api/stream-config";
-import type {StreamMapping, UserRole} from "../../types";
+import type {CameraInferenceResult, StreamMapping, UserRole} from "../../types";
+import {DetectionOverlay} from "./DetectionOverlay";
 import {HlsVideo, type HlsVideoState} from "./HlsVideo";
 import {normalizeMappings, sameMappings} from "./stream-mapping";
 import "./stream.css";
@@ -21,6 +23,7 @@ export function StreamViewer({role}: {role: UserRole}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [hlsToken, setHlsToken] = useState("");
+  const [detections, setDetections] = useState<Record<string, CameraInferenceResult>>({});
   const mappingsRef = useRef(mappings);
   mappingsRef.current = mappings;
 
@@ -93,6 +96,35 @@ export function StreamViewer({role}: {role: UserRole}) {
   }, [applyConfiguration, isAdmin]);
 
   const byCamera = useMemo(() => new Map(mappings.map(mapping => [mapping.camera_id, mapping])), [mappings]);
+
+  useEffect(() => {
+    const accessToken = getAccessToken();
+    if (!accessToken || configuredTransport !== "hls" || mappings.length === 0) return;
+    let disposed = false;
+    let retryTimer: number | undefined;
+    let retryAttempt = 0;
+    const scheduleRetry = () => {
+      if (disposed || retryTimer) return;
+      const delay = Math.min(1000 * 2 ** retryAttempt++, 30_000);
+      retryTimer = window.setTimeout(() => { retryTimer = undefined; void connect(); }, delay);
+    };
+    const client = new CameraDetectionClient({
+      accessToken,
+      cameraIds: mappings.map(mapping => mapping.camera_id),
+      onResult: result => {
+        const current = mappingsRef.current.find(mapping => mapping.camera_id === result.camera_id);
+        if (current?.stream_camera_id !== result.stream_camera_id) return;
+        setDetections(values => ({...values, [result.camera_id]: result}));
+      },
+      onFailure: message => { setError(message); scheduleRetry(); },
+    });
+    const connect = async () => {
+      try { await client.connect(); retryAttempt = 0; }
+      catch (reason) { if (!disposed) { setError(reason instanceof Error ? reason.message : "Không thể nhận detection camera."); scheduleRetry(); } }
+    };
+    void connect();
+    return () => { disposed = true; if (retryTimer) window.clearTimeout(retryTimer); client.close(); };
+  }, [mappings]);
   async function selectStream(cameraId: string, streamCameraId: string) {
     setBusy(true); setError("");
     try {
@@ -112,6 +144,6 @@ export function StreamViewer({role}: {role: UserRole}) {
   return <div className="monitor-stream-shell">
     {isAdmin && <div className="stream-config-panel"><div><p className="eyebrow">SYSTEM ADMIN · STREAM ROUTING</p><h2>Điều phối camera</h2><p>Chọn stream cho từng ô Live Monitor. Chỉ Quản trị hệ thống có thể thay đổi.</p></div><div className="stream-config-grid">{CAMERA_IDS.map((cameraId, index) => { const mapping = byCamera.get(cameraId); const label = cameraLabel(index); return <label className="stream-config-item" key={cameraId}><span>{label}</span><select aria-label={`Stream cho ${label}`} value={mapping?.stream_camera_id ?? ""} disabled={busy} onChange={event => { if (event.target.value) void selectStream(cameraId, event.target.value); }}><option value="">Chọn stream</option>{cameras.map(camera => <option key={camera} value={camera} disabled={mappings.some(item => item.stream_camera_id === camera && item.camera_id !== cameraId)}>{camera}</option>)}</select>{mapping && <button type="button" disabled={busy} onClick={() => void disconnect(cameraId)}>Ngắt kết nối</button>}</label>; })}</div>{error && <p className="stream-config-error" role="alert">{error}</p>}</div>}
     {error && !isAdmin && <div className="stream-empty-state" role="alert"><strong>Không thể tải stream</strong><span>{error}</span></div>}
-    <div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => { const mapping = byCamera.get(cameraId); const state = states[cameraId]; const label = cameraLabel(index); return <article className="active-stream-view" key={cameraId}><h3>{label}</h3>{mapping ? <>{configuredTransport === "hls" ? (hlsToken ? <HlsVideo src={mediaUrl(`/hls/cameras/${encodeURIComponent(mapping.stream_camera_id)}/index.m3u8`)} accessToken={hlsToken} label={`Live stream ${label}`} onStateChange={next => setStates(current => current[cameraId] === next ? current : {...current, [cameraId]: next})} /> : <div className="stream-empty-state"><strong>Đang cấp quyền HLS</strong><span>Đang xác thực phiên xem camera.</span></div>) : <img src={cameraStreamUrl(mapping.stream_camera_id)} alt={`Live stream ${label}`} />}{(configuredTransport === "mjpeg" || state === "live") && <div className="stream-badge"><i className="live-dot" /> LIVE</div>}{configuredTransport === "hls" && hlsToken && state !== "live" && <div className="stream-badge">{state === "paused_hidden" ? "PAUSED" : state === "failed" ? "FAILED" : "CONNECTING"}</div>}</> : <div className="stream-empty-state"><strong>Chưa kết nối</strong><span>Chưa có stream được gán.</span></div>}</article>; })}</div>
+    <div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => { const mapping = byCamera.get(cameraId); const state = states[cameraId]; const label = cameraLabel(index); const detection = detections[cameraId]?.stream_camera_id === mapping?.stream_camera_id ? detections[cameraId] : undefined; return <article className="active-stream-view" key={cameraId}><h3>{label}</h3>{mapping ? <>{configuredTransport === "hls" ? (hlsToken ? <><HlsVideo src={mediaUrl(`/hls/cameras/${encodeURIComponent(mapping.stream_camera_id)}/index.m3u8`)} accessToken={hlsToken} label={`Live stream ${label}`} onStateChange={next => setStates(current => current[cameraId] === next ? current : {...current, [cameraId]: next})} /><DetectionOverlay result={detection} /></> : <div className="stream-empty-state"><strong>Đang cấp quyền HLS</strong><span>Đang xác thực phiên xem camera.</span></div>) : <img src={cameraStreamUrl(mapping.stream_camera_id)} alt={`Live stream ${label}`} />}{(configuredTransport === "mjpeg" || state === "live") && <div className="stream-badge"><i className="live-dot" /> LIVE</div>}{configuredTransport === "hls" && hlsToken && state !== "live" && <div className="stream-badge">{state === "paused_hidden" ? "PAUSED" : state === "failed" ? "FAILED" : "CONNECTING"}</div>}</> : <div className="stream-empty-state"><strong>Chưa kết nối</strong><span>Chưa có stream được gán.</span></div>}</article>; })}</div>
   </div>;
 }

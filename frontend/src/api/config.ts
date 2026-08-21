@@ -34,6 +34,10 @@ export function inferenceWebSocketUrls(): string[] {
   return [...new Set(candidates)];
 }
 
+export function cameraDetectionWebSocketUrls(): string[] {
+  return inferenceWebSocketUrls().map(url => url.replace(/\/ws\/inference$/, "/ws/camera-detections"));
+}
+
 export function setBackendFromSocket(socketUrl: string): void {
   if (configuredBackend) return;
   const backendUrl = new URL(socketUrl);

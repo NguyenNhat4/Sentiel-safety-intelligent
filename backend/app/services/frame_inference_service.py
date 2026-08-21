@@ -82,6 +82,7 @@ class FrameInferenceService:
         request: FrameInferenceRequest,
         *,
         requirements: PpeRequirementResponse | None = None,
+        requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
     ) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
         now = time.monotonic()
@@ -166,37 +167,59 @@ class FrameInferenceService:
                 )
             )
 
-        decision = self._rule_engine.evaluate(
-            people=rule_people,
-            requirements=requirements,
-            machine_state="stopped",
-            zone_active=False,
-        )
-        for person, missing in zip(people, decision.missing_required_ppe, strict=True):
-            person.missing_required_ppe = missing
+        if requirements_by_zone is None:
+            decision = self._rule_engine.evaluate(
+                people=rule_people,
+                requirements=requirements,
+                machine_state="stopped",
+                zone_active=False,
+            )
+            for person, missing in zip(people, decision.missing_required_ppe, strict=True):
+                person.missing_required_ppe = missing
+        else:
+            for person, rule_person in zip(people, rule_people, strict=True):
+                inside_zone_ids = {item.zone_id for item in person.zone_memberships if item.inside}
+                applicable = [
+                    requirement for zone_id, requirement in requirements_by_zone.items() if zone_id in inside_zone_ids
+                ]
+                missing: set[str] = set()
+                if request.machine_state == "running":
+                    for requirement in applicable:
+                        evaluated = self._rule_engine.evaluate(
+                            people=[rule_person],
+                            requirements=requirement,
+                            machine_state="stopped",
+                            zone_active=False,
+                        )
+                        missing.update(evaluated.missing_required_ppe[0])
+                person.missing_required_ppe = sorted(missing)
 
         observed_rules: dict[int, set[str]] = {}
         for person in people:
             rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
-            if requirements.restricted_area_detection_enabled:
-                rules.add("restricted_area_person")
             membership_by_id = {item.zone_id: item.inside for item in person.zone_memberships}
-            for zone in active_zones:
-                if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
-                    rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
+            if requirements_by_zone is None:
+                if requirements.restricted_area_detection_enabled:
+                    rules.add("restricted_area_person")
+                for zone in active_zones:
+                    if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
+                        rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
+            else:
+                for zone in active_zones:
+                    if not membership_by_id.get(zone.zone_id):
+                        continue
+                    zone_requirement = requirements_by_zone.get(zone.zone_id)
+                    if zone_requirement is None:
+                        continue
+                    if zone_requirement.restricted_area_detection_enabled:
+                        rules.add(f"restricted_area_person:{zone.zone_id}")
+                    if zone_requirement.zone_intrusion_enabled:
+                        rules.add(f"zone_intrusion:{zone.zone_id}")
             observed_rules[person.track_id] = rules
 
         if request.monitoring_session_id is not None:
-            required_ppe_items = [
-                item
-                for item, required in (
-                    ("hat", requirements.hat_required),
-                    ("vest", requirements.vest_required),
-                )
-                if required
-            ]
             ppe_present_items = {
-                person.track_id: {item for item in required_ppe_items if getattr(person.ppe, item).status == "present"}
+                person.track_id: {item for item in ("hat", "vest") if getattr(person.ppe, item).status == "present"}
                 for person in people
             }
             active = self._violation_tracker.evaluate(
@@ -243,7 +266,11 @@ class FrameInferenceService:
                     for person in people
                     for membership in person.zone_memberships
                 ),
-                "violation": zone.machine_state == "running"
+                "violation": (
+                    requirements_by_zone.get(zone.zone_id).zone_intrusion_enabled
+                    if requirements_by_zone is not None and requirements_by_zone.get(zone.zone_id) is not None
+                    else zone.machine_state == "running"
+                )
                 and any(
                     membership.zone_id == zone.zone_id and membership.inside
                     for person in people
@@ -277,9 +304,14 @@ class FrameInferenceService:
                     "hat_required": requirements.hat_required,
                     "vest_required": requirements.vest_required,
                     "restricted_area_detection_enabled": requirements.restricted_area_detection_enabled,
+                    "zone_intrusion_enabled": requirements.zone_intrusion_enabled,
+                },
+                "zone_requirements": {
+                    zone_id: requirement.model_dump(mode="json")
+                    for zone_id, requirement in (requirements_by_zone or {}).items()
                 },
                 "restricted_area_alert": any(
-                    violation.rule_key == "restricted_area_person"
+                    violation.rule_key.startswith("restricted_area_person")
                     for person in people
                     for violation in person.active_violations
                 ),
@@ -316,6 +348,8 @@ class FrameInferenceService:
             return rule_key.split(":", 1)[1]
         if rule_key == "restricted_area_person":
             return legacy_zone_id
+        if rule_key.startswith("restricted_area_person:"):
+            return rule_key.split(":", 1)[1]
         return None
 
     @staticmethod

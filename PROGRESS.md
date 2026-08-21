@@ -1,5 +1,18 @@
 # Project Progress
 
+## 2026-08-21: [Backend/Frontend] Add per-camera zone and rule configuration
+
+- Added a `system_admin` sidebar page that selects a connected camera, previews its HLS stream, creates/edits/deactivates revisioned four-point zones, and renders the rule panel below the selected zone. Live Monitor remains the all-camera view.
+- Added persisted `zone_intrusion_enabled` with a reversible migration and compatibility default `true`; server RTSP inference now loads rules by `(camera_id, zone_id)` and applies PPE, restricted-area and intrusion decisions to their configured zones.
+- Focused evidence: PPE API tests `20 passed`; per-zone inference tests `2 passed`; camera/RTSP unit tests `13 passed`; frontend focused tests `15 passed`, plus TypeScript, ESLint and production build. FastAPI lifespan integration still hangs during local model preload, so live RTSP-to-alert and visual browser UAT remain unproven.
+
+## 2026-08-21: [Backend/Frontend/Vision] Add server-side RTSP inference path
+
+- Added validated RTSP source derivation, reconnectable 2 FPS sampling, one worker per persisted camera mapping, replace/disconnect reconciliation and latest-only detection metadata fan-out.
+- Added authenticated `/api/v1/ws/camera-detections` for `system_admin` and `safety_manager`; requests are limited to currently mapped camera IDs and results carry both display and stream identity plus source-frame dimensions/timestamp.
+- Connected the HLS viewer through one WebSocket subscription and source-coordinate SVG overlays. Stale results after mapping replacement are ignored; HLS uses `object-fit: contain` for box alignment.
+- Focused evidence: 13 backend unit tests, frontend TypeScript, 6 focused frontend tests and focused Ruff pass. FastAPI WebSocket integration remains unverified because the existing TestClient lifespan hangs during model preload; no live RTSP-to-alert or capacity claim is made.
+
 ## 2026-08-21: [Cross-cutting] Add one-command production app and streamer release
 
 - Added `scripts/deploy_all_production.sh` to run focused release gates, build/push both Docker images, redeploy `p047-app` and `streamer`, wait for new Railway deployments to reach `SUCCESS`, and verify both health endpoints are reachable.

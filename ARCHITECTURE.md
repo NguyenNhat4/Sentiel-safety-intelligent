@@ -103,9 +103,9 @@ flowchart LR
     scan --> supervisor[One supervised FFmpeg process]
     supervisor -->|RTSP over TCP| mediaPath[MediaMTX camera path]
     mediaPath -->|Path online| ready[Gateway ready]
-    ready -->|Current rollback| mjpeg[Browser via MJPEG]
-    ready -.->|Target HLS| hls[Browser via HTTPS ingress]
-    ready -.->|Target RTSP| inference[Backend and vision inference]
+    ready -->|Rollback| mjpeg[Browser via MJPEG]
+    ready -->|Authenticated HLS| hls[Browser via HTTPS ingress]
+    ready -->|Bounded 2 FPS RTSP| inference[Backend and vision inference]
     supervisor -->|Unexpected exit| backoff[Bounded backoff]
     backoff --> supervisor
 ```
@@ -124,16 +124,17 @@ flowchart LR
 
     subgraph privateNetwork[Railway private network]
         mediamtx["MediaMTX 1.20.1: private RTSP and HLS"]
-        vision[Future backend and vision RTSP reader]
+        vision[Backend and vision RTSP reader]
     end
 
     streamer -->|Authenticated RTSP and H.264| mediamtx
-    mediamtx -.->|Future RTSP read| vision
+    mediamtx -->|Private RTSP read| vision
 
     browser -->|REST control plane| backend["p047-app backend: mapping and RBAC"]
     backend --> postgres[(PostgreSQL)]
 ```
 
-Deployment ngày 2026-08-21 đã chứng minh bốn publisher RTSP/H.264 online. Nó
-chưa chứng minh browser HLS, RTSP-to-inference hoặc tải 200 × 4. MediaMTX được
-giữ private; public HLS chỉ được bật sau khi có ingress TLS và authorization.
+Deployment ngày 2026-08-21 đã chứng minh bốn publisher RTSP/H.264 online và
+authenticated HLS gateway trả playlist thật. Source hiện có server-side RTSP
+reader cùng metadata WebSocket, nhưng chưa có live RTSP-to-model/rule/event UAT
+hoặc tải 200 × 4. MediaMTX vẫn private; browser chỉ đi qua HLS gateway có token.
