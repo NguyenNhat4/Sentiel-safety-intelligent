@@ -49,6 +49,17 @@ Trong GitHub branch protection/ruleset cho `main`, bật các điều kiện sau
 
 Streamer là service triển khai riêng, không chạy trong application service production. Build production injects `STREAMER_PUBLIC_URL` vào frontend dưới dạng `VITE_STREAMER_URL`; streamer service phải expose `GET /api/cameras`, `/stream/{camera_id}` và `/health`. Docker Compose chỉ dành cho local và chạy streamer ở `localhost:8001`.
 
+Media rollout có thêm một service `mediamtx` riêng, pin image `1.20.1` và chỉ nằm
+trong Railway private network. `streamer` publish RTSP/TCP bằng credential reference
+trong Railway Variables; không copy secret thành literal giữa service hoặc vào
+GitHub. Deploy theo thứ tự: MediaMTX healthy → streamer restart nhận credential →
+inventory ready → MediaMTX log xác nhận required paths online. Rollback browser về
+MJPEG không yêu cầu redeploy `p047-app`.
+
+HLS origin hiện là private DNS và chưa phải browser production URL. Không mở public
+MediaMTX chỉ để làm URL chạy được; public HLS cần một thay đổi riêng gồm TLS ingress,
+viewer authorization, CORS allowlist, canary và playback verification.
+
 Trước release đầu, chạy một deploy thử và gọi `<PROD_BASE_URL>/health`. Chỉ tiếp tục khi HTTP thành công và JSON có `ready: true`.
 
 ## Rollback

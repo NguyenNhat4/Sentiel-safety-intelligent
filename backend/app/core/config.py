@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
+    hls_token_secret: str = ""
+    streamer_internal_origin: str = ""
+    streamer_health_timeout_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
+    rtsp_inference_enabled: bool = False
+    rtsp_reader_origin: str = ""
+    rtsp_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
+    rtsp_mapping_poll_seconds: float = Field(default=5.0, ge=1.0, le=60.0)
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
@@ -80,7 +87,7 @@ class Settings(BaseSettings):
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
     model_config = SettingsConfigDict(
-        env_file=(".env.development", ".env"),
+        env_file=(".env.production"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

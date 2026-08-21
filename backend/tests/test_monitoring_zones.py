@@ -189,6 +189,90 @@ def test_multi_zone_inference_evaluates_each_zone_and_runs_ppe_once(monkeypatch)
     ]
 
 
+def test_multi_zone_rules_apply_only_inside_their_configured_zone(monkeypatch):
+    service = FrameInferenceService(
+        ppe_observer=lambda frame, people: [
+            {
+                "hat": {"status": "missing", "confidence": None},
+                "vest": {"status": "present", "confidence": 0.9},
+            }
+            for _ in people
+        ],
+        requirement_loader=_no_ppe_requirements,
+    )
+    service._violation_tracker = ViolationTrackingService(
+        activation_frames=1,
+        ppe_confirmation_frames=1,
+        zone_activation_frames=1,
+    )
+    monkeypatch.setattr(
+        service,
+        "_track_people",
+        lambda session_id, frame: [
+            (20, 10, 20, 40, 0.95, 1),
+            (140, 10, 20, 40, 0.95, 2),
+        ],
+    )
+    left = PpeRequirementResponse(
+        camera_id="cam_1",
+        zone_id="left",
+        profile="hat_vest_v1",
+        hat_required=False,
+        vest_required=False,
+        zone_intrusion_enabled=False,
+        updated_at=None,
+    )
+    right = PpeRequirementResponse(
+        camera_id="cam_1",
+        zone_id="right",
+        profile="hat_vest_v1",
+        hat_required=True,
+        vest_required=False,
+        restricted_area_detection_enabled=True,
+        zone_intrusion_enabled=True,
+        updated_at=None,
+    )
+
+    result = service.infer(
+        FrameInferenceRequest(
+            image_data=_jpeg_data_url(),
+            camera_id="cam_1",
+            monitoring_session_id=uuid4(),
+            frame_id=1,
+            machine_state="running",
+            zones=[
+                _rect("left", 0.05, 0.1, 0.3, 0.8, order=0),
+                _rect("right", 0.65, 0.1, 0.9, 0.8, order=1),
+            ],
+            zone_revision=1,
+        ),
+        requirements_by_zone={"left": left, "right": right},
+    )
+
+    assert result.people[0].missing_required_ppe == []
+    assert result.people[0].active_violations == []
+    assert result.people[1].missing_required_ppe == ["hat"]
+    assert {item.rule_key for item in result.people[1].active_violations} == {
+        "missing_ppe:hat",
+        "restricted_area_person:right",
+        "zone_intrusion:right",
+    }
+    assert result.rule["zone_results"] == [
+        {
+            "zone_id": "left",
+            "machine_state": "stopped",
+            "person_inside_zone": True,
+            "violation": False,
+        },
+        {
+            "zone_id": "right",
+            "machine_state": "stopped",
+            "person_inside_zone": True,
+            "violation": True,
+        },
+    ]
+
+
 def test_multi_zone_request_rejects_legacy_and_new_configuration_together(client):
     response = client.post(
         "/api/v1/analysis/frame",

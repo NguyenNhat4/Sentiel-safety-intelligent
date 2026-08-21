@@ -100,7 +100,7 @@ class ViolationTrackingService:
             if is_ppe_rule and (track_id, rule_key) in suppressed_ppe_rules:
                 continue
             occurrence = self._occurrences.get(key)
-            if is_ppe_rule or rule_key == "restricted_area_person":
+            if is_ppe_rule or rule_key.startswith("restricted_area_person"):
                 activation_frames = None
             elif rule_key.startswith("zone_intrusion"):
                 activation_frames = self._zone_activation_frames or self._activation_frames

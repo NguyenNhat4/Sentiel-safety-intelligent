@@ -5,6 +5,7 @@ from backend.app.api.dependencies import require_authenticated_user, require_sys
 from backend.app.core.database import get_db
 from backend.app.schemas.stream_configuration import StreamConfigurationResponse, StreamConfigurationUpdate
 from backend.app.services.stream_configuration_service import (
+    DuplicateStreamAssignmentError,
     StreamConfigurationPersistenceError,
     StreamConfigurationService,
 )
@@ -25,5 +26,19 @@ def update_stream_configuration(
 ):
     try:
         return StreamConfigurationService(db).update(payload)
+    except DuplicateStreamAssignmentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except StreamConfigurationPersistenceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.delete("/{camera_id}", response_model=StreamConfigurationResponse)
+def disconnect_stream_configuration(
+    camera_id: str,
+    _: object = Depends(require_system_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        return StreamConfigurationService(db).disconnect(camera_id)
     except StreamConfigurationPersistenceError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

@@ -1,5 +1,49 @@
 # Project Design Decisions
 
+## 2026-08-21: [Cross-cutting] Configure safety zones and rules per connected camera
+- **Choice:** Keep Live Monitor as the all-camera operational view. Give `system_admin` a separate **Cấu hình camera** sidebar page with one mapped-camera dropdown, that camera's HLS preview, multiple four-point zones, and rules persisted by `(camera_id, zone_id)`.
+- **Rule semantics:** `hat_required` and `vest_required` apply only to tracked people whose foot point is inside that zone and only while the camera-wide machine state is `running`. `restricted_area_detection_enabled` and `zone_intrusion_enabled` are independent per-zone switches; zone intrusion does not depend on machine state.
+- **Compatibility:** Add `zone_intrusion_enabled` with a default of `true`, preserving intrusion behavior for existing rows and clients that omit the field. The server-side RTSP path loads every enabled zone's requirements; the legacy browser-frame inference contract remains accepted.
+- **Boundary:** HLS is display-only. The backend reads the mapped RTSP path, runs inference at the bounded sampling rate, and publishes camera-correlated metadata for overlays.
+
+## 2026-08-21: [Cross-cutting] Keep MediaMTX private behind an authenticated HLS gateway
+- **Choice:** Browser playback is HLS-only through the public streamer gateway. MediaMTX remains private. Backend issues 15-minute HMAC tokens only to `system_admin` and `safety_manager`; tokens contain the currently mapped stream IDs and the frontend renews them before expiry.
+- **Direct administration:** Streamer upload/replace/delete UI uses separate Basic Auth credentials from Railway Variables. P-047 users and RTSP publisher credentials are never reused for direct streamer administration.
+- **Security:** Gateway upstream is fixed by deployment configuration, tokens cannot authorize an unmapped camera, production startup fails without a 32-character signing secret and streamer administrator credentials, and secrets never enter frontend build variables.
+- **Compatibility:** MJPEG remains an explicit rollback transport, but the approved production path is authenticated HLS.
+- **Readiness:** Application `/health` requires valid HLS signing configuration and a successful private streamer health probe; missing configuration and connection failure use stable credential-safe reason codes.
+
+## 2026-08-21: [Cross-cutting] Keep Railway MediaMTX private and deploy it separately (superseded playback consequence)
+- **Choice:** Deploy `streamer` and exact-version MediaMTX as separate Railway services. Streamer remains public for control/MJPEG compatibility; MediaMTX accepts authenticated RTSP publishers only on the Railway private network and has no public domain in the first rollout.
+- **Reason:** Separating publisher control from protocol fan-out allows independent lifecycle and scaling while avoiding direct public exposure of RTSP/HLS ports or credentials.
+- **Superseded consequence:** The initial MJPEG-only browser consequence is replaced by the authenticated streamer HLS gateway decision above; MediaMTX itself remains private.
+- **Verification boundary:** Streamer health and inventory are necessary but insufficient; deployment requires terminal `SUCCESS` plus MediaMTX evidence that each required path is online. This rollout does not prove RTSP inference or 200 × 4 capacity.
+- **Rollback:** Change browser transport back to MJPEG without deleting uploaded media, persisted mappings or redeploying the backend.
+
+## 2026-08-21: [Cross-cutting] Adopt RTSP-first CCTV simulation with MediaMTX
+- **Choice:** FFmpeg publishes one H.264 RTSP path per simulated camera to exact-version-pinned MediaMTX. Backend/vision reads RTSP; browsers use HLS for high-viewer playback. WebRTC/WHEP is a separate low-latency slice.
+- **Reason:** RTSP models the future CCTV boundary while HLS removes FastAPI from the 200-user × four-camera media delivery path.
+- **Compatibility:** Preserve camera IDs, persisted mapping/RBAC and MJPEG fallback through additive migration. MJPEG removal requires a later decision after browser, inference and capacity gates.
+- **Boundary:** MediaMTX owns protocol gateway/fan-out only. FastAPI remains control plane and never proxies HLS segments or RTSP bytes.
+- **Gate:** No production capacity claim without a real 200 × 4 load/soak report containing CPU, RSS, egress, errors and first-frame latency.
+- **Security:** RTSP/publisher endpoints remain private; public playback uses TLS and an explicit viewer-authorization policy. Credentials never enter frontend configuration or logs.
+
+## 2026-08-20: [Backend] Standardize all environments on PostgreSQL
+- **Supersedes:** “Keep SQLite as the current MVP default” and “PostgreSQL-first runtime with SQLite startup fallback”.
+- **Choice:** PostgreSQL is the only supported relational database for local development, automated tests and deployment. SQLite and automatic database fallback are deprecated and must be removed from runtime configuration, setup scripts and active test requirements.
+- **Reason:** One database engine prevents local/test behavior from masking PostgreSQL-specific failures and avoids writing data into an unsynchronized fallback after a primary connection failure.
+- **Constraint:** `DATABASE_URL` must be reachable from the process environment. Railway private DNS is used only inside the same Railway project/environment; local developers use local PostgreSQL or Railway TCP Proxy details. Migration/startup fails clearly when PostgreSQL is unavailable.
+- **Transition:** Documentation records the approved target first. Runtime code, environment templates and tests remain incomplete until a separate implementation change removes the legacy SQLite path and proves `make setup` plus `make run` against PostgreSQL.
+
+## 2026-08-20: [Backend] Use stream_camera_id and idempotent disconnect
+- **Choice:** A persisted camera mapping uses `camera_id` and `stream_camera_id`; it does not introduce a separate generic `stream_id`. Disconnecting an unknown or already disconnected camera returns `200 OK` and leaves the desired state disconnected.
+- **Reason:** This matches the simulator's camera-based stream contract and makes the Demo Day Disconnect action safe to retry.
+
+## 2026-08-20: [Cross-cutting] Demo Day uses persisted unique stream-to-camera mappings
+- **Choice:** Sys Admin selects registered simulator streams from a dedicated configuration tab and maps each stream to one of four named cameras. A stream cannot be assigned to more than one camera. Mappings persist in the backend; disconnect removes the mapping and stops the stream session.
+- **Reason:** Technical judges need a real, inspectable stream-to-detection path while demo users need a fast, deterministic setup without entering URLs or uploading video.
+- **Boundary:** The streamer owns media transport only. Backend owns mapping, authorization and persistence. Live Monitor consumes the result; it does not invent fallback video or alerts.
+
 ## 2026-08-18: [Cross-cutting] Build the camera streamer before backend integration
 - **Choice:** Add an isolated `streamer/` service on port 8001 for per-camera video upload and looped FFmpeg MJPEG playback. Backend connection, RTSP/HLS, and multi-camera inference integration are deferred until the standalone stream is manually validated.
 - **Reason:** The Product Owner wants to test the mock camera stream independently before changing the existing FastAPI/WebSocket inference flow.

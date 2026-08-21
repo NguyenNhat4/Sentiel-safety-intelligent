@@ -7,8 +7,10 @@ import numpy as np
 import pytest
 
 from backend.app.api.v1.analysis import frame_inference_service
+from backend.app.models.stream_configuration import StreamConfiguration
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.camera_detection_hub import camera_detection_hub
 from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
@@ -68,6 +70,30 @@ def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=
     websocket.send_json({"type": "frame_meta", "frame_id": frame_id, "video_time": video_time})
     websocket.send_bytes(frame if frame is not None else jpeg_bytes())
     return websocket.receive_json()
+
+
+def test_camera_detection_websocket_authenticates_and_routes_mapped_camera(client, db_session):
+    db_session.add(
+        StreamConfiguration(
+            id=1,
+            mappings=[{"camera_id": "cam_1", "stream_camera_id": "line_1"}],
+        )
+    )
+    db_session.commit()
+    token = client.headers["Authorization"].split(" ", 1)[1]
+
+    with client.websocket_connect("/api/v1/ws/camera-detections") as websocket:
+        websocket.send_json({"type": "authenticate", "access_token": token, "camera_ids": ["cam_1"]})
+        assert websocket.receive_json() == {"type": "subscribed", "camera_ids": ["cam_1"]}
+        camera_detection_hub.publish({"type": "camera_inference_result", "camera_id": "cam_1", "frame_id": 3})
+        assert websocket.receive_json()["frame_id"] == 3
+
+
+def test_camera_detection_websocket_rejects_unmapped_camera(client):
+    token = client.headers["Authorization"].split(" ", 1)[1]
+    with client.websocket_connect("/api/v1/ws/camera-detections") as websocket:
+        websocket.send_json({"type": "authenticate", "access_token": token, "camera_ids": ["cam_9"]})
+        assert websocket.receive_json()["code"] == "camera_not_mapped"
 
 
 def test_health_check(client):

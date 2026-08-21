@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   printf 'Usage: %s [IMAGE_NAME] [TAG]\n' "$0"
-  printf 'Default image: %s:dev\n' "${DOCKERHUB_IMAGE:-nguyennaht4/streamer}"
+  printf 'Default image: %s:dev\n' "${DOCKERHUB_IMAGE:-nguyennhat/streamer}"
   printf 'Example: %s mydockeruser/p047-streamer v1.0.0\n' "$0"
   exit 0
 fi
@@ -16,7 +16,7 @@ if [[ "$#" -gt 2 ]]; then
   exit 2
 fi
 
-IMAGE_NAME="${1:-${DOCKERHUB_IMAGE:-nguyennaht4/streamer}}"
+IMAGE_NAME="${1:-${DOCKERHUB_IMAGE:-nguyennhat4/streamer}}"
 IMAGE_TAG="${2:-dev}"
 IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
 

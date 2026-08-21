@@ -13,6 +13,7 @@ class PpeRequirementUpdate(BaseModel):
     hat_required: StrictBool
     vest_required: StrictBool
     restricted_area_detection_enabled: StrictBool = False
+    zone_intrusion_enabled: StrictBool = True
 
     model_config = ConfigDict(extra="forbid")
 
@@ -25,6 +26,7 @@ class PpeRequirementUpdate(BaseModel):
             "profile": "hat_vest_v1",
             "hat_required": value["helmet_required"],
             "vest_required": True,
+            "zone_intrusion_enabled": True,
         }
 
 

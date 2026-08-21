@@ -73,6 +73,12 @@ class SessionResponse(BaseModel):
     expires_at: datetime
 
 
+class HlsTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class ManagedUser(AuthUser):
     is_active: bool
     created_at: datetime

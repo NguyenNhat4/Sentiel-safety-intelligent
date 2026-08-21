@@ -1,10 +1,14 @@
 # Mock Camera Streamer
 
 Standalone camera simulator for local testing. It requires FFmpeg on the local
-machine, runs on port `8001`, and stores one
-uploaded video per camera, and exposes a looped MJPEG stream. This service is
+machine, runs on port `8001`, and stores one uploaded video per camera. It
+preserves the looped MJPEG rollback endpoint and, when
+`MEDIA_RTSP_ENABLED=true`, supervises one FFmpeg H.264 publisher per camera at
+`cameras/<camera_id>` in MediaMTX. This service is
 deliberately independent from the safety backend; it does not run YOLO or save
 events.
+The application can select up to four of these registered camera streams; the
+same stream cannot be assigned to two display cameras.
 
 ## Run locally
 
@@ -27,8 +31,86 @@ or call `DELETE /api/cameras/{camera_id}` directly.
 docker compose up -d --build streamer
 ```
 
-Uploaded files are stored in `data/streamer/`. RTSP, HLS, and backend inference
-integration are intentionally deferred until MJPEG playback is validated.
+Uploaded files are stored in `data/streamer/`. RTSP and HLS use the
+exact-version MediaMTX service in `docker-compose.yml`. MediaMTX remains private;
+browser HLS goes through the streamer's Bearer-protected `/hls/cameras/...`
+gateway.
+`GET /api/media/inventory` returns additive publisher readiness and transport
+metadata. Set `VITE_STREAM_TRANSPORT=mjpeg` and restart the frontend to roll back.
+
+## Cách RTSP mode hoạt động
+
+Khi `MEDIA_RTSP_ENABLED=true`, startup scan các file `*.mp4` trong storage. Mỗi
+camera có đúng một supervised FFmpeg process:
+
+```mermaid
+flowchart LR
+    video["camera_id.mp4"] --> ffmpeg["FFmpeg: loop and encode H.264"]
+    ffmpeg -->|RTSP publish| path["MediaMTX: cameras/camera_id"]
+```
+
+`GET /api/media/inventory` cho biết publisher state và transport URL. `ready`
+nghĩa là process publisher đang sống; khi vận hành phải đối chiếu thêm MediaMTX
+log `stream is available and online` để chứng minh gateway đã nhận H.264 track.
+Nếu FFmpeg thoát, supervisor retry với bounded backoff. Replace/delete/shutdown
+dừng process cũ để không có hai publisher cùng chiếm một camera path.
+
+Các endpoint cần nhớ:
+
+| Endpoint | Mục đích | Có chứng minh RTSP không? |
+|---|---|---|
+| `GET /health` | HTTP process của streamer sống | Không |
+| `GET /api/cameras` | Danh sách source đã upload | Không |
+| `GET /api/media/inventory` | Publisher state và media path | Một phần |
+| `GET /stream/{camera_id}` | MJPEG compatibility/rollback | Không |
+| MediaMTX log/API | RTSP path và track online | Có |
+
+## Railway: hai service media riêng
+
+Production media gồm hai Railway service, không chạy chung với `p047-app`:
+
+```mermaid
+flowchart LR
+    volume[(Persistent volume)] --> streamer["Streamer: public HTTPS"]
+    streamer -->|Private authenticated RTSP over TCP| mediamtx["MediaMTX 1.20.1: private gateway"]
+```
+
+Streamer cần các Variable sau; giá trị credential chỉ lưu trong Railway và
+không copy vào repository, frontend hoặc log:
+
+| Variable | Ý nghĩa |
+|---|---|
+| `MEDIA_RTSP_ENABLED=true` | Bật supervised RTSP publishers |
+| `MEDIA_RTSP_ORIGIN` | Private RTSP origin, gồm publisher credential reference |
+| `MEDIA_PUBLIC_ORIGIN` | HLS origin do inventory trả về |
+
+MediaMTX dùng internal authentication, chỉ cho publisher đã xác thực publish vào
+`cameras/<validated-id>` và không có public domain. Backend P-047 cấp token HLS
+15 phút cho `system_admin`/`safety_manager`; frontend tự gia hạn và gửi Bearer
+token tới gateway public của streamer. Gateway chỉ đọc origin MediaMTX cố định
+qua private network và chỉ cho các stream ID đã nằm trong token.
+
+Production streamer cần `HLS_TOKEN_SECRET` giống backend,
+`HLS_UPSTREAM_ORIGIN`, `STREAMER_ADMIN_USERNAME` và
+`STREAMER_ADMIN_PASSWORD`. Basic Auth chỉ dùng cho trang/API quản trị trực tiếp;
+người dùng Live Monitor không nhập lại tài khoản streamer.
+
+Checklist sau mỗi deploy:
+
+```bash
+curl -fsS https://<streamer-domain>/health
+curl -fsS https://<streamer-domain>/api/media/inventory
+railway logs --service <streamer-service> --lines 100
+railway logs --service <mediamtx-service> --lines 200
+```
+
+Pass khi deployment của cả hai service là `SUCCESS`, health trả `ok`, required
+camera có `status=ready`, restart không tăng liên tục và MediaMTX log xác nhận
+`path cameras/<id> stream is available and online`. Không in `railway variables`
+ra ticket/chat vì output có thể chứa secret.
+
+Rollback an toàn: đặt frontend về `VITE_STREAM_TRANSPORT=mjpeg`; không xóa video
+volume hoặc mapping. Nếu lỗi chỉ ở MediaMTX, MJPEG vẫn phục vụ qua streamer.
 
 ## Build and publish the streamer image separately
 
@@ -132,3 +214,14 @@ docker run --rm --name p047-streamer \
   -v "$PWD/data/streamer:/app/data/streamer" \
   DOCKERHUB_USERNAME/p047-streamer:dev
 ```
+
+## Concurrency and memory
+
+- Each active camera owns one FFmpeg process, regardless of viewer count.
+- Every viewer reads the same immutable latest-frame payload. Slow viewers skip stale
+  frames instead of accumulating a per-client backlog.
+- Stream responses disable HTTP caching and reverse-proxy buffering. Keep a single
+  Uvicorn worker/replica unless the stream registry is moved out of process; multiple
+  workers would each start their own FFmpeg process.
+- The 100-client target must still be load-tested on the deployment network because
+  MJPEG bandwidth grows with `clients × cameras × frame size × FPS`.

@@ -42,7 +42,7 @@ graph TB
 
 ### 4. Database
 
-- **Type:** PostgreSQL (production) / SQLite (dev)
+- **Type:** PostgreSQL (local, test, production)
 - **ORM:** SQLAlchemy (nếu cần)
 - **Migrations:** Alembic (nếu cần)
 
@@ -67,5 +67,5 @@ graph TB
 |----------|--------|--------|
 | Framework | FastAPI | Async, auto-docs, type-safe |
 | Agent | LangGraph | Flexible state machine |
-| Database | SQLite→PostgreSQL | Dev dễ, prod mạnh |
+| Database | PostgreSQL | Một engine nhất quán cho local, test và production |
 | Frontend | Next.js | Full-stack ready |

@@ -30,10 +30,14 @@ Sơ đồ component và data flow runtime nằm trong `docs/architecture_diagram
 
 Luồng phụ thuộc bắt buộc:
 
-```text
-frontend feature → frontend api → backend api → backend service
-                                             → model/schema/core
-                                             → integration → vision facade/provider
+```mermaid
+flowchart LR
+    frontendFeature[Frontend feature] --> frontendApi[Frontend API]
+    frontendApi --> backendApi[Backend API]
+    backendApi --> backendService[Backend service]
+    backendService --> modelCore[Model, schema, core]
+    backendService --> integration[Integration adapter]
+    integration --> visionFacade[Vision facade or provider]
 ```
 
 Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
@@ -52,9 +56,10 @@ Các bất biến an toàn:
 ## Trạng thái triển khai
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
-machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
-event history. PostgreSQL, PPE production model, RBAC và các
-capability nâng cao vẫn là đích cần triển khai.
+machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
+event history, PPE production model và RBAC. PostgreSQL là database duy nhất cho mọi môi trường;
+SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất
+chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
@@ -62,3 +67,74 @@ Thứ tự tiến hóa theo backlog:
 2. **Bổ sung context:** zone/shift và confidence-based HITL.
 3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
 4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.
+
+## Kiến trúc media RTSP-first đã chốt
+
+```mermaid
+flowchart LR
+    react[React] -->|REST| backend[Backend control plane]
+    backend -->|Read and write mapping| postgres[(PostgreSQL)]
+    backend -->|Upload and lifecycle control| streamer[Streamer]
+
+    source[MP4 camera source] --> ffmpeg[FFmpeg publisher]
+    ffmpeg -->|RTSP and H.264| mediamtx[MediaMTX]
+    mediamtx -->|RTSP| vision[Backend and vision]
+    mediamtx -->|HLS| browser[Browser scale path]
+    mediamtx -.->|Optional WHEP| lowLatency[Low-latency browser]
+```
+
+RTSP là contract nguồn camera; HLS chỉ là delivery contract cho browser và không
+được dùng thay bằng chứng inference. MediaMTX sở hữu protocol gateway/fan-out;
+FastAPI giữ upload, registry, lifecycle control, RBAC và mapping nhưng không proxy
+media bytes. Một FFmpeg publisher phục vụ một camera path. MJPEG hiện tại được
+giữ làm compatibility/rollback transport đến khi browser, inference và capacity
+gates hoàn tất.
+
+HLS ưu tiên cho tải lớn vì đi qua HTTP proxy/CDN dễ hơn; WebRTC là slice riêng
+nếu latency requirement thấp hơn khả năng HLS. Production giữ RTSP/publisher
+trong private network, public playback qua TLS, pin MediaMTX exact version và đo
+egress thực tế trước khi tuyên bố đạt 200 người × 4 camera.
+
+### Luồng runtime của một camera
+
+```mermaid
+flowchart LR
+    video["Volume: camera MP4"] --> scan[Streamer scans source]
+    scan --> supervisor[One supervised FFmpeg process]
+    supervisor -->|RTSP over TCP| mediaPath[MediaMTX camera path]
+    mediaPath -->|Path online| ready[Gateway ready]
+    ready -->|Rollback| mjpeg[Browser via MJPEG]
+    ready -->|Authenticated HLS| hls[Browser via HTTPS ingress]
+    ready -->|Bounded 2 FPS RTSP| inference[Backend and vision inference]
+    supervisor -->|Unexpected exit| backoff[Bounded backoff]
+    backoff --> supervisor
+```
+
+Camera identity đi xuyên suốt bằng `stream_camera_id`; `media_path` luôn được
+server derive thành `cameras/<validated-id>`, không nhận URL tùy ý từ browser.
+Mapping `camera_id ↔ stream_camera_id` vẫn thuộc backend/PostgreSQL và độc lập
+với publisher lifecycle.
+
+### Topology Railway hiện tại
+
+```mermaid
+flowchart LR
+    browser[Internet browser] -->|HTTPS and MJPEG rollback| streamer["Streamer: public HTTPS"]
+    volume[(Persistent video volume)] --> streamer
+
+    subgraph privateNetwork[Railway private network]
+        mediamtx["MediaMTX 1.20.1: private RTSP and HLS"]
+        vision[Backend and vision RTSP reader]
+    end
+
+    streamer -->|Authenticated RTSP and H.264| mediamtx
+    mediamtx -->|Private RTSP read| vision
+
+    browser -->|REST control plane| backend["p047-app backend: mapping and RBAC"]
+    backend --> postgres[(PostgreSQL)]
+```
+
+Deployment ngày 2026-08-21 đã chứng minh bốn publisher RTSP/H.264 online và
+authenticated HLS gateway trả playlist thật. Source hiện có server-side RTSP
+reader cùng metadata WebSocket, nhưng chưa có live RTSP-to-model/rule/event UAT
+hoặc tải 200 × 4. MediaMTX vẫn private; browser chỉ đi qua HLS gateway có token.

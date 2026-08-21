@@ -3,12 +3,19 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class StreamMapping(BaseModel):
+    camera_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    stream_camera_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class StreamConfigurationUpdate(BaseModel):
-    camera_id: str | None = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    mappings: list[StreamMapping] = Field(default_factory=list, max_length=4)
 
     model_config = ConfigDict(extra="forbid")
 
 
 class StreamConfigurationResponse(BaseModel):
-    active_camera_id: str | None
+    mappings: list[StreamMapping]
     updated_at: datetime | None

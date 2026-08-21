@@ -12,6 +12,9 @@ def _set_ready_runtime(monkeypatch):
         SimpleNamespace(backend="postgresql", fallback_active=False),
     )
     monkeypatch.setattr(main.settings, "snapshot_storage_backend", "s3")
+    monkeypatch.setattr(main.settings, "hls_token_secret", "test-secret-that-is-at-least-thirty-two-bytes")
+    monkeypatch.setattr(main.settings, "streamer_internal_origin", "http://streamer.internal:8001")
+    monkeypatch.setattr(main, "check_streamer_connection", lambda _: None)
     main.app.state.ready = True
     main.app.state.runtime_files = {"data_writable": True, "models_verified": True}
 
@@ -28,6 +31,37 @@ async def test_health_is_ready_only_when_postgresql_and_s3_are_available(monkeyp
     assert response.ready is True
     assert response.dependencies["postgresql"].ready is True
     assert response.dependencies["snapshot_storage"].ready is True
+    assert response.dependencies["streamer"].ready is True
+
+
+@pytest.mark.asyncio
+async def test_health_is_degraded_when_streamer_cannot_be_reached(monkeypatch):
+    _set_ready_runtime(monkeypatch)
+    monkeypatch.setattr(main, "check_database_connection", lambda _: None)
+    monkeypatch.setattr(main, "check_snapshot_storage_connection", lambda _: None)
+    monkeypatch.setattr(
+        main, "check_streamer_connection", lambda _: (_ for _ in ()).throw(ConnectionError("private host"))
+    )
+
+    response = await main.health_check()
+
+    assert response.ready is False
+    assert response.dependencies["streamer"].ready is False
+    assert response.dependencies["streamer"].reason == "connection_failed"
+    assert "private host" not in str(response)
+
+
+@pytest.mark.asyncio
+async def test_health_is_degraded_when_hls_signing_is_not_configured(monkeypatch):
+    _set_ready_runtime(monkeypatch)
+    monkeypatch.setattr(main, "check_database_connection", lambda _: None)
+    monkeypatch.setattr(main, "check_snapshot_storage_connection", lambda _: None)
+    monkeypatch.setattr(main.settings, "hls_token_secret", "short")
+
+    response = await main.health_check()
+
+    assert response.ready is False
+    assert response.dependencies["streamer"].reason == "not_configured"
 
 
 @pytest.mark.asyncio

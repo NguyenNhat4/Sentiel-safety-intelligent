@@ -17,7 +17,9 @@ REST routes are interactive at <http://localhost:8000/docs>. The inference WebSo
 
 Operational monitoring is deliberately lightweight: one process writes rotated, privacy-safe JSONL events to `data/operational-metrics.jsonl`; `GET /api/v1/operational-metrics?window_minutes=60` returns bounded request latency, inference outcomes, and stable error-kind aggregates. The stream never contains frames, snapshots, IDs, raw URLs/query strings, credentials, addresses, or exception text. This file-backed writer is single-process only; use a centralized sink before enabling multiple backend workers.
 
-PostgreSQL from `DATABASE_URL` is the primary database. Local settings load `.env.development` first and then `.env`, so an existing PostgreSQL URL in `.env` remains authoritative during the compatibility period. If PostgreSQL is unreachable during process startup and `DATABASE_FALLBACK_ENABLED=true`, the backend uses `DATABASE_FALLBACK_URL` (local SQLite by default), creates the schema, and seeds development accounts when the database is empty. The selected database remains fixed until restart and is exposed by `/health`. SQLite fallback data is local and is not automatically synchronized back to PostgreSQL, so production deployments that require strict consistency should disable fallback. Supabase is optional; any standard managed PostgreSQL service is sufficient. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
+PostgreSQL from `DATABASE_URL` is the only supported database for local, test and deployment environments. Local settings load `.env.development` first and then `.env`; the effective URL must be reachable from the process that runs Alembic or FastAPI. A Railway private hostname (`*.railway.internal`) is valid only inside the same Railway project/environment, not from a developer machine; local execution must use local PostgreSQL or the Railway TCP Proxy URL. Database fallback must remain disabled, and an unavailable PostgreSQL dependency must fail migration/startup instead of selecting SQLite. Supabase is optional; any standard managed PostgreSQL service is sufficient. Snapshots are redacted in memory before writing; if privacy processing or database persistence fails, the backend does not create the event and removes any unreferenced redacted snapshot.
+
+The repository is transitioning from a legacy SQLite-compatible path. Until `bootstrap_legacy_sqlite.py`, fallback settings and SQLite-specific tests are removed, treat them as deprecated implementation debt rather than a supported operating mode.
 
 PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minute connection recycling. `DATABASE_POOL_PRE_PING` defaults to `false` so a warm connection checkout does not add a database round-trip to every request. Enable it only for a provider that repeatedly drops idle sessions. ORM sessions keep loaded values after commit, avoiding an automatic response-time reload; explicit queries remain the source of truth for subsequent requests.
 
@@ -28,9 +30,15 @@ The baseline uses two transports with separate responsibilities:
 - WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
 - REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
 
+Connected cameras use a server-owned path when `RTSP_INFERENCE_ENABLED=true`:
+one worker per persisted mapping reads
+`RTSP_READER_ORIGIN/cameras/<stream_camera_id>` at no more than 2 FPS. Browser
+viewers authenticate once on `/api/v1/ws/camera-detections` and receive metadata
+for mapped cameras; they never upload HLS frames back to the backend.
+
 Reviewed-event and statistics endpoints require a logged-in user. Safety officers and system administrators can record reviews; an area manager receives only events and statistics for their assigned `managed_area_id`. A Telegram alert is queued for that matching manager only when a review is saved as `acknowledged`, never when the AI merely opens a candidate.
 
-US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision; PPE requirements continue to use the unchanged `uploaded_video/zone_01` resource.
+US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision. Connected-camera inference loads safety requirements for each saved `(camera_id, zone_id)` pair.
 
 The versioned `hat_vest_v1` profile uses a shared persisted PPE requirement resource for the fixed MVP camera–zone pair:
 
@@ -39,7 +47,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns `profile`, `hat_required`, `vest_required`, and additive `restricted_area_detection_enabled`; a missing record materializes as all OFF values with `is_configured=false`. PUT accepts the same additive boolean (omitting it keeps compatibility and saves OFF). When the per-zone restricted-area switch is ON, every detected canonical person anywhere in the camera frame opens an immediate critical `restricted_area_person` occurrence, independent of polygon geometry and machine state. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
+GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans. In the connected-camera path, PPE rules apply to a person inside the configured zone while the camera-wide machine state is running; restricted-area and intrusion switches are evaluated independently for that zone. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 

@@ -1,5 +1,106 @@
 # Project Progress
 
+## 2026-08-21: [Backend/Frontend] Add per-camera zone and rule configuration
+
+- Added a `system_admin` sidebar page that selects a connected camera, previews its HLS stream, creates/edits/deactivates revisioned four-point zones, and renders the rule panel below the selected zone. Live Monitor remains the all-camera view.
+- Added persisted `zone_intrusion_enabled` with a reversible migration and compatibility default `true`; server RTSP inference now loads rules by `(camera_id, zone_id)` and applies PPE, restricted-area and intrusion decisions to their configured zones.
+- Focused evidence: PPE API tests `20 passed`; per-zone inference tests `2 passed`; camera/RTSP unit tests `13 passed`; frontend focused tests `15 passed`, plus TypeScript, ESLint and production build. FastAPI lifespan integration still hangs during local model preload, so live RTSP-to-alert and visual browser UAT remain unproven.
+
+## 2026-08-21: [Backend/Frontend/Vision] Add server-side RTSP inference path
+
+- Added validated RTSP source derivation, reconnectable 2 FPS sampling, one worker per persisted camera mapping, replace/disconnect reconciliation and latest-only detection metadata fan-out.
+- Added authenticated `/api/v1/ws/camera-detections` for `system_admin` and `safety_manager`; requests are limited to currently mapped camera IDs and results carry both display and stream identity plus source-frame dimensions/timestamp.
+- Connected the HLS viewer through one WebSocket subscription and source-coordinate SVG overlays. Stale results after mapping replacement are ignored; HLS uses `object-fit: contain` for box alignment.
+- Focused evidence: 13 backend unit tests, frontend TypeScript, 6 focused frontend tests and focused Ruff pass. FastAPI WebSocket integration remains unverified because the existing TestClient lifespan hangs during model preload; no live RTSP-to-alert or capacity claim is made.
+
+## 2026-08-21: [Cross-cutting] Add one-command production app and streamer release
+
+- Added `scripts/deploy_all_production.sh` to run focused release gates, build/push both Docker images, redeploy `p047-app` and `streamer`, wait for new Railway deployments to reach `SUCCESS`, and verify both health endpoints are reachable.
+- Added a no-network regression harness and documented the command and environment-variable overrides.
+
+## 2026-08-21: [Backend/Streamer/Frontend] Authorize all valid HLS camera IDs
+
+- HLS tokens for `system_admin` and `safety_manager` now carry `cameras: ["*"]` instead of a snapshot of stream mappings; streamer accepts the wildcard while retaining signature, expiry, role, camera-ID validation and authentication checks.
+- Stabilized the frontend HLS state callback so ordinary React rerenders do not destroy and recreate active players.
+- Production deployments succeeded for `p047-app` (`ffa10050-7657-4bab-8014-a411d044b09a`) and `streamer` (`851de566-1c31-492d-8d68-04f234c0b914`). Public wildcard-token smoke returned `200` and a non-empty HLS manifest for both `xuong1` and `xuong2`.
+- Focused backend tests passed `2`, streamer tests passed `21`, frontend HLS tests passed `5`, and frontend lint/build passed. Production app health remains degraded only because required S3 snapshot storage is not ready; PostgreSQL and streamer dependencies are ready.
+
+## 2026-08-21: [MediaMTX/Streamer] Publisher account enabled for HLS playback
+
+- Added `read` and `playback` permissions for the existing MediaMTX publisher account across valid camera paths.
+- Wired `streamer` `HLS_UPSTREAM_ORIGIN` to the publisher credentials through Railway service references and redeployed both production services successfully.
+- Production evidence: direct authenticated MediaMTX playlist request returned `200` with 239 bytes; authenticated public streamer HLS gateway request returned `200` with `application/vnd.apple.mpegurl` and 239 bytes; `/health` returned `{"status":"ok"}`.
+
+## 2026-08-21: [Streamer] Follow MediaMTX HLS cookie-check redirects
+- Fixed the authenticated HLS gateway returning `200` with an empty body when MediaMTX redirects the initial playlist request to `?cookieCheck=1`.
+- Added regression coverage proving the gateway follows the redirect and preserves the final playlist body and MIME type.
+- The initial deployment exposed a MediaMTX reader-auth mismatch; this was resolved in the publisher-account configuration entry above.
+
+## 2026-08-21: [Cross-cutting] Add authenticated HLS-only browser gateway
+- Closed the prebuilt Vite configuration gap: `push_app.sh` now validates and injects concrete streamer URLs, and `configure_railway_hls.sh --publish-app` provides one build, push, variable-sync and redeploy path.
+- Updated `scripts/push_app.sh` to redeploy `p047-app` from the newly published image source automatically, with explicit Railway target overrides and an opt-out for image-only publishing.
+- Added `scripts/configure_railway_hls.sh` to safely synchronize the shared HLS secret and Railway service-reference variables across `p047-app` and `streamer`, then redeploy both only after the full variable set is written. The script uses the streamer's concrete internal listening port (`8080` by default) instead of the non-referenceable Railway runtime `PORT`.
+- Added a 15-minute backend HLS token for `system_admin` and `safety_manager`, scoped to persisted mapped streams; `area_manager` is forbidden.
+- Added streamer Basic Auth for direct administration and a Bearer-protected HLS proxy to private MediaMTX. Production fails closed when administrator credentials or the shared signing secret are missing.
+- Frontend Hls.js sends the token on manifests/segments and renews it two minutes before expiry. Local and Railway templates now route browser HLS through the public streamer while MediaMTX stays private.
+- Focused evidence: streamer tests `14 passed`, HLS backend tests `2 passed`, HlsVideo tests `3 passed`, frontend type-check and focused Ruff pass. Full `make check` remains blocked by pre-existing whitespace in `backend/tests/test_stream_configuration.py:40`.
+- Backend readiness additionally requires a valid HLS secret and a successful bounded private streamer health probe; focused readiness and HLS tests pass `7 passed`.
+
+## 2026-08-21: [Cross-cutting] Implement RTSP publishers and HLS browser delivery
+- Added MediaMTX `1.20.1`, private RTSP/TCP H.264 publishing, one supervised FFmpeg process per uploaded camera, bounded restart, lifecycle cleanup and additive media inventory.
+- Expanded the RTSP solution, canonical architecture, streamer operations, Railway release guidance and decision log with newcomer-oriented control/media-plane explanations, Mermaid architecture/state diagrams, per-camera lifecycle, deployed two-service topology, verification ladder and the explicit private-HLS/browser limitation.
+- Added pinned Hls.js `1.6.13`, native-HLS/MSE playback, cleanup, hidden-tab pause, bounded retry, non-false LIVE states and 15-second jittered mapping polling. MJPEG remains selectable with `VITE_STREAM_TRANSPORT=mjpeg`.
+- Unit/config gates pass: 17 streamer tests, four focused frontend tests, frontend lint/type-check/build, Ruff and Compose validation. The pre-existing five stale `App.test.tsx` failures remain unchanged.
+- Real runtime proof passed for available `cam_1`: MediaMTX received H.264 1280x720 at 10 FPS over RTSP/TCP; HLS master/media playlists and a 205,132-byte fMP4 segment decoded with its init fragment.
+- Deployed the streamer and a separate private MediaMTX `1.20.1` service to Railway. Both deployments reached `SUCCESS`; the streamer health endpoint returned `ok`, inventory reported `cam3`, `cam4`, `fullppe` and `nohat` ready with zero restarts, and MediaMTX logs confirmed all four authenticated RTSP/H.264 paths online. The existing `p047-app` backend was not redeployed.
+- Four-camera, browser DevTools, RTSP-to-model/rule/event and 200-user x four-camera 30-minute soak gates remain open. Only `cam_1` and `cam_2` fixtures exist under required IDs; Chrome DevTools is unavailable; no capacity claim is made.
+
+## 2026-08-21: [Cross-cutting] Specify RTSP-first CCTV media gateway
+- Approved an implementation-ready architecture: FFmpeg simulates one CCTV source per camera, MediaMTX exposes RTSP to backend/vision and HLS to high-scale browser viewers, with WebRTC/WHEP deferred to a separately measured low-latency slice.
+- Added the solution contract for identity, media profile, publisher/player state machines, security, observability, compatibility, capacity, acceptance criteria and rollback.
+- Added an incremental TDD plan from one-path proof through four-camera rollout, real RTSP inference evidence and a 200-user × four-camera soak test.
+- Superseded by the implementation entry above; MJPEG remains the rollback path.
+
+## 2026-08-21: [Documentation] Explain streamer concurrency and memory for new contributors
+- Added a standalone Vietnamese guide covering the original memory problem, current shared-worker/latest-frame architecture, lifecycle, proxy buffering, measured evidence, alternatives and trade-offs.
+- Documented a staged 1/10/25/50/100-client load-test procedure, capacity signals and incident-triage checklist without treating the synthetic allocation test as production proof.
+- Added the guide to the root context map and current filesystem documentation.
+
+## 2026-08-21: [Cross-cutting] Bound streamer memory for 100 concurrent app clients
+- Replaced one `asyncio.Queue` per MJPEG viewer with a lighter single-slot subscription while preserving latest-frame fan-out and one FFmpeg process per active camera.
+- Added no-cache/no-proxy-buffer headers so an HTTP proxy does not accumulate the unbounded MJPEG response.
+- Added 100-viewer regression coverage. A synthetic 100-client x 4-camera measurement with one shared 1 MiB payload dropped traced allocation from 2,393,809 bytes to 1,466,009 bytes (about 39%); live network/RSS load testing remains required before production capacity sign-off.
+- Streamer suite passes 12 tests; Ruff and formatting checks pass. Root `make check` remains blocked by pre-existing whitespace in `backend/tests/test_stream_configuration.py`, outside this change.
+
+## 2026-08-20: [Documentation] Adopt PostgreSQL-only database contract
+- Updated current onboarding, architecture, backend and migration documentation to make PostgreSQL the only supported database for local, test and deployment environments.
+- Superseded the SQLite-default and SQLite-fallback decisions; documented that Railway private DNS cannot be used from a local process.
+- Runtime removal is still pending: Makefile bootstrap, environment defaults, backend fallback code and SQLite-specific tests must be changed and verified before the migration is complete.
+
+## 2026-08-20: [Cross-cutting] Share streamer FFmpeg workers per camera
+- Changed MJPEG streaming so one camera uses one FFmpeg reader shared across connected clients; each client receives the latest buffered JPEG frame and the worker stops when the last client disconnects.
+- Hardened worker lifecycle so FFmpeg exit/start failure closes clients, reconnect cannot create duplicate workers, camera replacement/deletion and application shutdown stop active processes, and malformed MJPEG output has a bounded buffer.
+- Bounded uploads at 512 MiB, moved file writes off the event loop, cleaned partial uploads, and reused one complete multipart payload across all clients.
+- Replaced the deadlocking Starlette `TestClient` path with async ASGI transport coverage. All 10 streamer tests, Ruff, Python compilation and `git diff --check` pass.
+
+## 2026-08-20: [Frontend] Merge stream routing into Live Monitor
+- Removed the separate Camera stream navigation/page from the rendered app.
+- Moved the system-admin-only stream dropdown and disconnect controls into the Live Monitor above the four-camera 2×2 grid; non-admin roles remain view-only.
+- Frontend type-check and production build pass. Existing App.test.tsx still has five stale failures expecting the pre-multi-camera monitor controls and separate Camera stream page.
+
+## 2026-08-20: [Cross-cutting] Demo Day multi-camera stream specification
+- Added `specs/US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md` for four-camera stream selection, unique mappings, disconnect semantics, real inference requirements and acceptance criteria.
+- Added a concise TDD test plan covering mapping, RBAC, streamer lifecycle, UI states and real-inference smoke verification.
+- Next step: reconcile the existing single-active-camera implementation/plan with US-29 before implementation.
+
+## 2026-08-20: [Cross-cutting] US-29 multi-camera implementation in progress
+- Implemented persisted up-to-four camera mappings, unique stream validation, per-camera disconnect, admin camera selection and Live Monitor 2×2 rendering.
+- Frontend type-check, 63 frontend tests, production build, Ruff app check and fresh SQLite Alembic upgrade pass.
+- Backend/streamer pytest startup remains unverified because the FastAPI lifespan hangs while preloading runtime models in this environment.
+- Live Monitor is now camera-only: it renders the four-camera 2×2 grid; zone/PPE/machine/inference controls are not rendered there.
+- Added `make e2e-demo`, a real-HTTP smoke test with no mocks. Live run reached the Docker streamer and backend, but stopped because only `cam_1`, `cam_2`, `cam_3` exist; one real fourth media asset is required. Backend `/health` is also `degraded` because development S3 is not configured.
+- Added `make e2e-streaming`, which reads real bytes from each MJPEG endpoint and validates multipart content plus complete JPEG markers. One-camera live run passed (`cam_1`, 63,978 bytes); the four-camera run correctly fails while the running streamer exposes only `cam_1`.
+
 ## 2026-08-19: [Cross-cutting] Restore US-16 audit onto current develop2
 - Restored the preserved US-16 work and synchronized the feature branch onto `origin/develop2` at `28daa62`, retaining current RBAC, area resolution, notification, per-track aggregation, camera-stream, and privacy behavior; the audit migration is linear revision `20260819_01` after `20260815_03`.
 - Added immutable `decision_context_v1`, Event Detail, false-alarm audit, server-owned review actor and retention deadlines; resolved events remain in official statistics while false alarms do not.
@@ -297,3 +398,8 @@ This is the single progress tracker for the repository. Completed work is groupe
 8. Validate or replace the person-head MVP redactor with a dedicated face detector before pilot/production use.
 9. Validate authentication and the complete migration chain against PostgreSQL.
 10. Replace the JSONL writer with a centralized sink before any multi-worker deployment.
+# 2026-08-21: [MediaMTX/Streamer] Publisher account enabled for HLS playback
+
+- Added `read` and `playback` permissions for the existing MediaMTX publisher account across valid camera paths.
+- Wired `streamer` `HLS_UPSTREAM_ORIGIN` to the publisher credentials through Railway service references and redeployed both production services successfully.
+- Production evidence: direct authenticated MediaMTX playlist request returned `200` with 239 bytes; authenticated public streamer HLS gateway request returned `200` with `application/vnd.apple.mpegurl` and 239 bytes; `/health` returned `{"status":"ok"}`.
