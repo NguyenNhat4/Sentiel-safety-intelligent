@@ -64,6 +64,66 @@ display-camera mappings; only `system_admin` may connect or disconnect them.
 Live Monitor renders the four mappings in a 2×2 grid and shows an empty state
 for an unmapped camera.
 
+### Kết nối môi trường local với streamer đã deploy trên Railway
+
+Railway production chạy `streamer` và `mediamtx` thành hai service riêng:
+
+- Browser gọi `streamer` qua public HTTPS.
+- `streamer` publish RTSP tới `mediamtx` qua private network của Railway.
+- Browser bên ngoài Railway không truy cập được hostname `*.railway.internal`.
+
+Để frontend chạy local đọc camera từ streamer Railway hiện tại, thêm vào
+`.env.development`:
+
+```dotenv
+LOG_LEVEL=INFO
+MEDIA_RTSP_ENABLED=false
+VITE_STREAMER_URL=https://streamer-production-9180.up.railway.app
+VITE_STREAM_TRANSPORT=mjpeg
+```
+
+Không đặt `MEDIA_RTSP_ORIGIN`, `MEDIA_PUBLIC_ORIGIN` hoặc
+`VITE_MEDIA_PUBLIC_ORIGIN` thành `localhost` trong cấu hình này. MJPEG được tải
+trực tiếp từ public streamer nên không cần browser kết nối MediaMTX. Sau khi sửa
+biến `VITE_*`, dừng và chạy lại frontend vì Vite đọc các biến này lúc build/start.
+
+Kiểm tra streamer trước khi mở Live Monitor:
+
+```bash
+curl -fsS https://streamer-production-9180.up.railway.app/health
+curl -fsS https://streamer-production-9180.up.railway.app/api/cameras
+```
+
+Nếu Railway tạo domain mới, thay giá trị `VITE_STREAMER_URL` bằng public domain
+của service `streamer`, giữ giao thức `https://` và không thêm dấu `/` cuối.
+
+### Variables của các service Railway
+
+Trong service `streamer`, cấu hình:
+
+```dotenv
+MEDIA_RTSP_ENABLED=true
+MEDIA_RTSP_ORIGIN=rtsp://<publisher-user>:<publisher-password>@mediamtx.railway.internal:8554
+MEDIA_PUBLIC_ORIGIN=http://mediamtx.railway.internal:8888
+```
+
+`<publisher-user>` và `<publisher-password>` phải khớp cấu hình xác thực của
+service `mediamtx`. Chỉ lưu chúng trong Railway Variables; không copy credential
+vào `.env.example`, frontend, Git, log hoặc tài liệu.
+
+Trong service `p047-app`, cấu hình build frontend:
+
+```dotenv
+VITE_STREAMER_URL=https://streamer-production-9180.up.railway.app
+VITE_STREAM_TRANSPORT=mjpeg
+```
+
+Biến `VITE_*` được đóng vào frontend khi build, vì vậy phải redeploy `p047-app`
+sau khi thay đổi. Không đặt `VITE_MEDIA_PUBLIC_ORIGIN` thành
+`http://mediamtx.railway.internal:8888`: địa chỉ private này chỉ truy cập được
+giữa các service Railway. Chỉ chuyển sang `VITE_STREAM_TRANSPORT=hls` sau khi
+MediaMTX có HTTPS playback ingress public và viewer authorization phù hợp.
+
 `/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. PostgreSQL hoặc storage chưa sẵn sàng sẽ trả `degraded`; xem các reason code an toàn trong response, không đưa URL/credential vào log hay ticket.
 
 ## Truy vấn mẫu
