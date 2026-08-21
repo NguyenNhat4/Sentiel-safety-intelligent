@@ -245,6 +245,33 @@ async def test_hls_gateway_rejects_missing_expired_and_wrong_camera_tokens(tmp_p
 
 
 @pytest.mark.asyncio
+async def test_hls_gateway_accepts_wildcard_camera_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "test-secret-that-is-at-least-thirty-two-bytes"
+    playlist = b"#EXTM3U\n"
+
+    def upstream(_request: Request) -> Response:
+        return Response(200, stream=_AsyncBytes(playlist))
+
+    def upstream_client(**kwargs: object) -> AsyncClient:
+        return AsyncClient(transport=MockTransport(upstream), **kwargs)
+
+    monkeypatch.setattr(streamer_app.httpx, "AsyncClient", upstream_client)
+    app = create_app(tmp_path, hls_token_secret=secret, hls_upstream_origin="http://mediamtx:8888")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            "/hls/cameras/xuong1/index.m3u8",
+            headers={"Authorization": f"Bearer {_hls_token(secret, cameras=['*'])}"},
+        )
+
+    assert response.status_code == 200
+    assert response.content == playlist
+
+
+@pytest.mark.asyncio
 async def test_hls_gateway_follows_mediamtx_cookie_check_redirect(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

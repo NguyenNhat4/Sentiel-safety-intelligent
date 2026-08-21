@@ -1,5 +1,12 @@
 # Project Progress
 
+## 2026-08-21: [Backend/Streamer/Frontend] Authorize all valid HLS camera IDs
+
+- HLS tokens for `system_admin` and `safety_manager` now carry `cameras: ["*"]` instead of a snapshot of stream mappings; streamer accepts the wildcard while retaining signature, expiry, role, camera-ID validation and authentication checks.
+- Stabilized the frontend HLS state callback so ordinary React rerenders do not destroy and recreate active players.
+- Production deployments succeeded for `p047-app` (`ffa10050-7657-4bab-8014-a411d044b09a`) and `streamer` (`851de566-1c31-492d-8d68-04f234c0b914`). Public wildcard-token smoke returned `200` and a non-empty HLS manifest for both `xuong1` and `xuong2`.
+- Focused backend tests passed `2`, streamer tests passed `21`, frontend HLS tests passed `5`, and frontend lint/build passed. Production app health remains degraded only because required S3 snapshot storage is not ready; PostgreSQL and streamer dependencies are ready.
+
 ## 2026-08-21: [MediaMTX/Streamer] Publisher account enabled for HLS playback
 
 - Added `read` and `playback` permissions for the existing MediaMTX publisher account across valid camera paths.

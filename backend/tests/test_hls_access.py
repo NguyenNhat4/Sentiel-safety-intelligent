@@ -15,7 +15,7 @@ def _decode_payload(token: str) -> dict[str, object]:
     return json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
 
 
-def test_safety_manager_receives_fifteen_minute_hls_token_for_mapped_streams(db_session, monkeypatch) -> None:
+def test_safety_manager_receives_fifteen_minute_hls_token_for_all_cameras(db_session, monkeypatch) -> None:
     monkeypatch.setenv("HLS_TOKEN_SECRET", "test-secret-that-is-at-least-thirty-two-bytes")
     db_session.add(
         StreamConfiguration(
@@ -41,7 +41,7 @@ def test_safety_manager_receives_fifteen_minute_hls_token_for_mapped_streams(db_
     assert response.token_type == "bearer"
     payload = _decode_payload(response.access_token)
     assert payload["role"] == "safety_manager"
-    assert payload["cameras"] == ["line_a"]
+    assert payload["cameras"] == ["*"]
     assert int(payload["exp"]) - int(payload["iat"]) == 900
 
 

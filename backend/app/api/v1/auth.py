@@ -27,7 +27,6 @@ from backend.app.services.auth_service import (
     UserManagementError,
 )
 from backend.app.services.hls_access_service import issue_hls_access_token
-from backend.app.services.stream_configuration_service import StreamConfigurationService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -93,12 +92,11 @@ def create_hls_token(
 ):
     secret = get_settings().hls_token_secret
     try:
-        cameras = [mapping.stream_camera_id for mapping in StreamConfigurationService(db).get().mappings]
         token, expires_in = issue_hls_access_token(
             secret=secret,
             user_id=actor.id,
             role=actor.role,
-            cameras=cameras,
+            cameras=["*"],
         )
     except ValueError as exc:
         raise HTTPException(status_code=503, detail="HLS access is not configured") from exc

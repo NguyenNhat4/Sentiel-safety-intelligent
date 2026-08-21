@@ -356,7 +356,7 @@ def create_app(
             )
         payload = _decode_hls_token(token, configured_hls_secret)
         cameras = payload.get("cameras")
-        if not isinstance(cameras, list) or camera_id not in cameras:
+        if not isinstance(cameras, list) or ("*" not in cameras and camera_id not in cameras):
             raise HTTPException(status_code=403, detail="HLS token does not permit this camera")
         return payload
 
