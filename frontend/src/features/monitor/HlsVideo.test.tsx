@@ -70,6 +70,17 @@ describe("HlsVideo", () => {
     expect(xhr.setRequestHeader).toHaveBeenCalledWith("Authorization", "Bearer hls-token");
   });
 
+  it("does not reload when only the state callback identity changes", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const {rerender} = render(<HlsVideo src="http://media/cameras/cam_1/index.m3u8" label="cam_1" onStateChange={first} />);
+
+    rerender(<HlsVideo src="http://media/cameras/cam_1/index.m3u8" label="cam_1" onStateChange={second} />);
+
+    expect(hlsInstances).toHaveLength(1);
+    expect(hlsInstances[0].destroy).not.toHaveBeenCalled();
+  });
+
   it("disconnects while hidden and reconnects when visible", () => {
     Object.defineProperty(document, "visibilityState", {configurable: true, value: "visible"});
     render(<HlsVideo src="http://media/cameras/cam_1/index.m3u8" label="cam_1" hiddenGraceMs={1000} />);

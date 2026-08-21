@@ -21,8 +21,10 @@ export function HlsVideo({src, label, accessToken = "", hiddenGraceMs = 5_000, o
   const hiddenTimer = useRef<number | null>(null);
   const retryAttempt = useRef(0);
   const [generation, setGeneration] = useState(0);
+  const onStateChangeRef = useRef(onStateChange);
+  onStateChangeRef.current = onStateChange;
 
-  const updateState = useCallback((state: HlsVideoState) => onStateChange?.(state), [onStateChange]);
+  const updateState = useCallback((state: HlsVideoState) => onStateChangeRef.current?.(state), []);
   const clearTimer = (timer: MutableRefObject<number | null>) => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
