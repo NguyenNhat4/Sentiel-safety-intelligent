@@ -7,13 +7,14 @@ export type HlsVideoState = "connecting" | "live" | "retrying" | "paused_hidden"
 interface HlsVideoProps {
   src: string;
   label: string;
+  accessToken?: string;
   hiddenGraceMs?: number;
   onStateChange?: (state: HlsVideoState) => void;
 }
 
 const MAX_RETRY_DELAY_MS = 30_000;
 
-export function HlsVideo({src, label, hiddenGraceMs = 5_000, onStateChange}: HlsVideoProps) {
+export function HlsVideo({src, label, accessToken = "", hiddenGraceMs = 5_000, onStateChange}: HlsVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const retryTimer = useRef<number | null>(null);
@@ -60,12 +61,17 @@ export function HlsVideo({src, label, hiddenGraceMs = 5_000, onStateChange}: Hls
       retryTimer.current = window.setTimeout(() => setGeneration(value => value + 1), jitter);
     };
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    if (!accessToken && video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
       video.addEventListener("loadeddata", live, {once: true});
       video.addEventListener("error", scheduleRetry, {once: true});
     } else if (Hls.isSupported()) {
-      const hls = new Hls({maxBufferLength: 12, maxMaxBufferLength: 20, backBufferLength: 6});
+      const hls = new Hls({
+        maxBufferLength: 12,
+        maxMaxBufferLength: 20,
+        backBufferLength: 6,
+        xhrSetup: xhr => xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`),
+      });
       hlsRef.current = hls;
       hls.attachMedia(video);
       hls.loadSource(src);
@@ -88,7 +94,7 @@ export function HlsVideo({src, label, hiddenGraceMs = 5_000, onStateChange}: Hls
       video.removeAttribute("src");
       video.load();
     };
-  }, [dispose, generation, src, updateState]);
+  }, [accessToken, dispose, generation, src, updateState]);
 
   useEffect(() => {
     const visibilityChanged = () => {

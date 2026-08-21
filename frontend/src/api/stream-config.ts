@@ -17,8 +17,10 @@ export async function disconnectStream(cameraId: string): Promise<StreamConfigur
   return authenticatedRequest<StreamConfiguration>(`/stream-config/${encodeURIComponent(cameraId)}`, {method: "DELETE"});
 }
 
-export async function listStreamerCameras(): Promise<string[]> {
-  const response = await fetch(streamerUrl("/api/cameras"));
+export async function listStreamerCameras(hlsToken = ""): Promise<string[]> {
+  const response = await fetch(streamerUrl("/api/cameras"), {
+    headers: {Authorization: `Bearer ${hlsToken}`},
+  });
   if (!response.ok) throw new Error(`Không thể tải danh sách camera (HTTP ${response.status})`);
   return await response.json() as string[];
 }

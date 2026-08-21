@@ -2,6 +2,7 @@ import {act, render, screen} from "@testing-library/react";
 import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 
 const hlsInstances: Array<{attachMedia: ReturnType<typeof vi.fn>; loadSource: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>}> = [];
+const hlsConfigs: Array<{xhrSetup?: (xhr: XMLHttpRequest) => void}> = [];
 
 vi.mock("hls.js", () => {
   class MockHls {
@@ -14,7 +15,7 @@ vi.mock("hls.js", () => {
     on = vi.fn();
     startLoad = vi.fn();
     recoverMediaError = vi.fn();
-    constructor() { hlsInstances.push(this); }
+    constructor(config: {xhrSetup?: (xhr: XMLHttpRequest) => void}) { hlsInstances.push(this); hlsConfigs.push(config); }
   }
   return {default: MockHls};
 });
@@ -25,6 +26,7 @@ describe("HlsVideo", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     hlsInstances.length = 0;
+    hlsConfigs.length = 0;
     vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("");
     vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
@@ -57,6 +59,15 @@ describe("HlsVideo", () => {
 
     expect(hlsInstances[0].destroy).toHaveBeenCalledOnce();
     expect(hlsInstances[1].loadSource).toHaveBeenCalledWith("http://media/cameras/cam_2/index.m3u8");
+  });
+
+  it("adds the short-lived HLS bearer token to every hls.js request", () => {
+    render(<HlsVideo src="http://media/hls/cameras/cam_1/index.m3u8" accessToken="hls-token" label="cam_1" />);
+    const xhr = {setRequestHeader: vi.fn()} as unknown as XMLHttpRequest;
+
+    hlsConfigs[0].xhrSetup?.(xhr);
+
+    expect(xhr.setRequestHeader).toHaveBeenCalledWith("Authorization", "Bearer hls-token");
   });
 
   it("disconnects while hidden and reconnects when visible", () => {

@@ -11,6 +11,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir \
     "fastapi>=0.115.0" \
     "uvicorn[standard]>=0.34.0" \
+    "httpx>=0.28.0" \
     "python-multipart>=0.0.20"
 
 COPY streamer ./streamer

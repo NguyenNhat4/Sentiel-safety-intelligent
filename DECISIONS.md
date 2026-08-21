@@ -1,9 +1,15 @@
 # Project Design Decisions
 
-## 2026-08-21: [Cross-cutting] Keep Railway MediaMTX private and deploy it separately
+## 2026-08-21: [Cross-cutting] Keep MediaMTX private behind an authenticated HLS gateway
+- **Choice:** Browser playback is HLS-only through the public streamer gateway. MediaMTX remains private. Backend issues 15-minute HMAC tokens only to `system_admin` and `safety_manager`; tokens contain the currently mapped stream IDs and the frontend renews them before expiry.
+- **Direct administration:** Streamer upload/replace/delete UI uses separate Basic Auth credentials from Railway Variables. P-047 users and RTSP publisher credentials are never reused for direct streamer administration.
+- **Security:** Gateway upstream is fixed by deployment configuration, tokens cannot authorize an unmapped camera, production startup fails without a 32-character signing secret and streamer administrator credentials, and secrets never enter frontend build variables.
+- **Compatibility:** MJPEG remains an explicit rollback transport, but the approved production path is authenticated HLS.
+
+## 2026-08-21: [Cross-cutting] Keep Railway MediaMTX private and deploy it separately (superseded playback consequence)
 - **Choice:** Deploy `streamer` and exact-version MediaMTX as separate Railway services. Streamer remains public for control/MJPEG compatibility; MediaMTX accepts authenticated RTSP publishers only on the Railway private network and has no public domain in the first rollout.
 - **Reason:** Separating publisher control from protocol fan-out allows independent lifecycle and scaling while avoiding direct public exposure of RTSP/HLS ports or credentials.
-- **Current consequence:** Four authenticated H.264 paths are online, but the private HLS origin is not browser-reachable. Production browser playback remains on MJPEG until an HTTPS playback ingress with viewer authorization and CORS allowlisting is approved and canaried.
+- **Superseded consequence:** The initial MJPEG-only browser consequence is replaced by the authenticated streamer HLS gateway decision above; MediaMTX itself remains private.
 - **Verification boundary:** Streamer health and inventory are necessary but insufficient; deployment requires terminal `SUCCESS` plus MediaMTX evidence that each required path is online. This rollout does not prove RTSP inference or 200 × 4 capacity.
 - **Rollback:** Change browser transport back to MJPEG without deleting uploaded media, persisted mappings or redeploying the backend.
 

@@ -56,6 +56,7 @@ P-047/
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
+│   │   │   ├── hls_access_service.py # Signed 15-minute mapped-camera HLS access tokens
 │   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
 │   │   │   ├── auth_service.py
 │   │   │   ├── analysis_service.py
@@ -94,6 +95,7 @@ P-047/
 │       ├── test_event_audit.py
 │       ├── test_event_audit_migration.py
 │       ├── test_frame_inference_ppe.py
+│       ├── test_hls_access.py # HLS token TTL, role and mapped-stream scope
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
 │       ├── test_ppe_profile_migration.py

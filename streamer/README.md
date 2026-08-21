@@ -32,8 +32,9 @@ docker compose up -d --build streamer
 ```
 
 Uploaded files are stored in `data/streamer/`. RTSP and HLS use the
-exact-version MediaMTX service in `docker-compose.yml`. Browser HLS is served
-directly on port `8888`; FastAPI never proxies manifests or segments.
+exact-version MediaMTX service in `docker-compose.yml`. MediaMTX remains private;
+browser HLS goes through the streamer's Bearer-protected `/hls/cameras/...`
+gateway.
 `GET /api/media/inventory` returns additive publisher readiness and transport
 metadata. Set `VITE_STREAM_TRANSPORT=mjpeg` and restart the frontend to roll back.
 
@@ -84,10 +85,15 @@ không copy vào repository, frontend hoặc log:
 | `MEDIA_PUBLIC_ORIGIN` | HLS origin do inventory trả về |
 
 MediaMTX dùng internal authentication, chỉ cho publisher đã xác thực publish vào
-`cameras/<validated-id>`. Service không có public domain ở rollout hiện tại.
-Do `MEDIA_PUBLIC_ORIGIN` dùng `*.railway.internal`, browser ngoài Railway không
-thể tải HLS; frontend production phải giữ MJPEG cho đến khi có HTTPS playback
-ingress và viewer authorization.
+`cameras/<validated-id>` và không có public domain. Backend P-047 cấp token HLS
+15 phút cho `system_admin`/`safety_manager`; frontend tự gia hạn và gửi Bearer
+token tới gateway public của streamer. Gateway chỉ đọc origin MediaMTX cố định
+qua private network và chỉ cho các stream ID đã nằm trong token.
+
+Production streamer cần `HLS_TOKEN_SECRET` giống backend,
+`HLS_UPSTREAM_ORIGIN`, `STREAMER_ADMIN_USERNAME` và
+`STREAMER_ADMIN_PASSWORD`. Basic Auth chỉ dùng cho trang/API quản trị trực tiếp;
+người dùng Live Monitor không nhập lại tài khoản streamer.
 
 Checklist sau mỗi deploy:
 

@@ -72,30 +72,32 @@ Railway production chạy `streamer` và `mediamtx` thành hai service riêng:
 - `streamer` publish RTSP tới `mediamtx` qua private network của Railway.
 - Browser bên ngoài Railway không truy cập được hostname `*.railway.internal`.
 
-Để frontend chạy local đọc camera từ streamer Railway hiện tại, thêm vào
+Để frontend chạy local đọc camera từ streamer Railway, lấy **Public Domain** của
+service `streamer` trong Railway (`Settings` → `Networking`), rồi thêm vào
 `.env.development`:
 
 ```dotenv
 LOG_LEVEL=INFO
 MEDIA_RTSP_ENABLED=false
-VITE_STREAMER_URL=https://streamer-production-9180.up.railway.app
-VITE_STREAM_TRANSPORT=mjpeg
+VITE_STREAMER_URL=https://your-streamer.up.railway.app
+VITE_MEDIA_PUBLIC_ORIGIN=https://your-streamer.up.railway.app
+VITE_STREAM_TRANSPORT=hls
 ```
 
-Không đặt `MEDIA_RTSP_ORIGIN`, `MEDIA_PUBLIC_ORIGIN` hoặc
-`VITE_MEDIA_PUBLIC_ORIGIN` thành `localhost` trong cấu hình này. MJPEG được tải
-trực tiếp từ public streamer nên không cần browser kết nối MediaMTX. Sau khi sửa
-biến `VITE_*`, dừng và chạy lại frontend vì Vite đọc các biến này lúc build/start.
+Browser gọi authenticated HLS gateway tại public streamer; MediaMTX vẫn private.
+Sau khi sửa biến `VITE_*`, dừng và chạy lại frontend vì Vite đọc các biến này
+lúc build/start.
 
 Kiểm tra streamer trước khi mở Live Monitor:
 
 ```bash
-curl -fsS https://streamer-production-9180.up.railway.app/health
-curl -fsS https://streamer-production-9180.up.railway.app/api/cameras
+STREAMER_PUBLIC_URL=https://your-streamer.up.railway.app
+curl -fsS "$STREAMER_PUBLIC_URL/health"
+curl -fsS "$STREAMER_PUBLIC_URL/api/cameras"
 ```
 
-Nếu Railway tạo domain mới, thay giá trị `VITE_STREAMER_URL` bằng public domain
-của service `streamer`, giữ giao thức `https://` và không thêm dấu `/` cuối.
+Thay `your-streamer.up.railway.app` bằng domain Railway cấp cho đúng project,
+giữ giao thức `https://` và không thêm dấu `/` cuối.
 
 ### Variables của các service Railway
 
@@ -103,26 +105,42 @@ Trong service `streamer`, cấu hình:
 
 ```dotenv
 MEDIA_RTSP_ENABLED=true
-MEDIA_RTSP_ORIGIN=rtsp://<publisher-user>:<publisher-password>@mediamtx.railway.internal:8554
-MEDIA_PUBLIC_ORIGIN=http://mediamtx.railway.internal:8888
+MEDIA_RTSP_ORIGIN=rtsp://${{RTSP_PUBLISH_USER}}:${{RTSP_PUBLISH_PASSWORD}}@${{mediamtx.RAILWAY_PRIVATE_DOMAIN}}:8554
+MEDIA_PUBLIC_ORIGIN=http://${{mediamtx.RAILWAY_PRIVATE_DOMAIN}}:8888
+HLS_UPSTREAM_ORIGIN=http://${{mediamtx.RAILWAY_PRIVATE_DOMAIN}}:8888
+HLS_TOKEN_SECRET=<shared-random-secret-minimum-32-characters>
+STREAMER_ADMIN_USERNAME=<operations-username>
+STREAMER_ADMIN_PASSWORD=<strong-operations-password>
+STREAMER_CORS_ORIGINS=https://${{p047-app.RAILWAY_PUBLIC_DOMAIN}}
+APP_ENV=production
 ```
 
-`<publisher-user>` và `<publisher-password>` phải khớp cấu hình xác thực của
-service `mediamtx`. Chỉ lưu chúng trong Railway Variables; không copy credential
-vào `.env.example`, frontend, Git, log hoặc tài liệu.
+`RTSP_PUBLISH_USER` và `RTSP_PUBLISH_PASSWORD` phải khớp cấu hình xác thực của
+service `mediamtx`. Railway tự resolve private domain từ service có tên chính
+xác là `mediamtx`, nên không cần hard-code hostname. Chỉ lưu credential trong
+Railway Variables; không copy vào `.env.example`, frontend, Git, log hoặc tài liệu.
 
-Trong service `p047-app`, cấu hình build frontend:
+Trong service `p047-app`, đặt các Variables sau **trước khi Railway build/deploy**:
 
 ```dotenv
-VITE_STREAMER_URL=https://streamer-production-9180.up.railway.app
-VITE_STREAM_TRANSPORT=mjpeg
+VITE_STREAMER_URL=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
+VITE_MEDIA_PUBLIC_ORIGIN=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
+VITE_STREAM_TRANSPORT=hls
+HLS_TOKEN_SECRET=<same-shared-random-secret>
 ```
 
-Biến `VITE_*` được đóng vào frontend khi build, vì vậy phải redeploy `p047-app`
-sau khi thay đổi. Không đặt `VITE_MEDIA_PUBLIC_ORIGIN` thành
-`http://mediamtx.railway.internal:8888`: địa chỉ private này chỉ truy cập được
-giữa các service Railway. Chỉ chuyển sang `VITE_STREAM_TRANSPORT=hls` sau khi
-MediaMTX có HTTPS playback ingress public và viewer authorization phù hợp.
+Service phải có tên chính xác là `streamer` và đã được cấp Public Domain.
+Railway tự resolve `${{streamer.RAILWAY_PUBLIC_DOMAIN}}`, nên cấu hình không phụ
+thuộc domain của một tài khoản hoặc project cụ thể. Biến `VITE_*` được đóng vào
+frontend khi build; sau khi thêm hoặc đổi biến, bấm **Redeploy** `p047-app` để
+build lại frontend.
+
+Không tạo Public Domain cho MediaMTX. Browser đăng nhập P-047 một lần; backend
+cấp token HLS 15 phút cho `system_admin` và `safety_manager`, frontend tự gia hạn,
+và streamer gateway xác thực token trước khi đọc HLS private. `area_manager`
+nhận `403`; token sai hoặc hết hạn nhận `401`. Trang quản trị streamer trực tiếp
+dùng `STREAMER_ADMIN_USERNAME`/`STREAMER_ADMIN_PASSWORD`, không dùng tài khoản
+P-047 hoặc RTSP publisher credential.
 
 `/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. PostgreSQL hoặc storage chưa sẵn sàng sẽ trả `degraded`; xem các reason code an toàn trong response, không đưa URL/credential vào log hay ticket.
 

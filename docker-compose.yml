@@ -25,6 +25,10 @@ services:
       MEDIA_RTSP_ENABLED: "true"
       MEDIA_RTSP_ORIGIN: rtsp://p047_local_publisher:p047_local_only_change_me@mediamtx:8554
       MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8888}
+      HLS_UPSTREAM_ORIGIN: http://mediamtx:8888
+      HLS_TOKEN_SECRET: ${HLS_TOKEN_SECRET:-p047_local_hls_signing_secret_change_me}
+      STREAMER_ADMIN_USERNAME: ${STREAMER_ADMIN_USERNAME:-p047_local_admin}
+      STREAMER_ADMIN_PASSWORD: ${STREAMER_ADMIN_PASSWORD:-p047_local_admin_only_change_me}
     depends_on:
       - mediamtx
     restart: unless-stopped
@@ -52,7 +56,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_STREAMER_URL: ${VITE_STREAMER_URL:-}
-        VITE_MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8888}
+        VITE_MEDIA_PUBLIC_ORIGIN: ${VITE_MEDIA_PUBLIC_ORIGIN:-http://localhost:8001}
         VITE_STREAM_TRANSPORT: ${VITE_STREAM_TRANSPORT:-hls}
     env_file:
       - .env.development

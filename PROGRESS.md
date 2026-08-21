@@ -1,5 +1,11 @@
 # Project Progress
 
+## 2026-08-21: [Cross-cutting] Add authenticated HLS-only browser gateway
+- Added a 15-minute backend HLS token for `system_admin` and `safety_manager`, scoped to persisted mapped streams; `area_manager` is forbidden.
+- Added streamer Basic Auth for direct administration and a Bearer-protected HLS proxy to private MediaMTX. Production fails closed when administrator credentials or the shared signing secret are missing.
+- Frontend Hls.js sends the token on manifests/segments and renews it two minutes before expiry. Local and Railway templates now route browser HLS through the public streamer while MediaMTX stays private.
+- Focused evidence: streamer tests `14 passed`, HLS backend tests `2 passed`, HlsVideo tests `3 passed`, frontend type-check and focused Ruff pass. Full `make check` remains blocked by pre-existing whitespace in `backend/tests/test_stream_configuration.py:40`.
+
 ## 2026-08-21: [Cross-cutting] Implement RTSP publishers and HLS browser delivery
 - Added MediaMTX `1.20.1`, private RTSP/TCP H.264 publishing, one supervised FFmpeg process per uploaded camera, bounded restart, lifecycle cleanup and additive media inventory.
 - Expanded the RTSP solution, canonical architecture, streamer operations, Railway release guidance and decision log with newcomer-oriented control/media-plane explanations, Mermaid architecture/state diagrams, per-camera lifecycle, deployed two-service topology, verification ladder and the explicit private-HLS/browser limitation.

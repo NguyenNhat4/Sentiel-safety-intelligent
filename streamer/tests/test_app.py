@@ -1,5 +1,10 @@
 import asyncio
+import base64
+import hashlib
+import hmac
 import io
+import json
+import time
 from pathlib import Path
 
 import pytest
@@ -7,6 +12,19 @@ from httpx import ASGITransport, AsyncClient
 
 import streamer.app as streamer_app
 from streamer.app import CameraStreamManager, create_app
+
+
+def _hls_token(secret: str, *, role: str = "safety_manager", cameras: list[str] | None = None) -> str:
+    payload = {
+        "sub": "user-1",
+        "role": role,
+        "cameras": cameras or ["cam_1"],
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 900,
+    }
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
+    signature = base64.urlsafe_b64encode(hmac.new(secret.encode(), encoded, hashlib.sha256).digest()).rstrip(b"=")
+    return f"{encoded.decode()}.{signature.decode()}"
 
 
 class _CompletedProcess:
@@ -172,6 +190,49 @@ async def test_health_and_camera_list(tmp_path: Path) -> None:
     assert health_response.json() == {"status": "ok"}
     assert cameras_response.json() == []
     assert inventory_response.json() == {"version": "camera_inventory_v1", "cameras": []}
+
+
+@pytest.mark.asyncio
+async def test_streamer_admin_routes_require_basic_auth(tmp_path: Path) -> None:
+    app = create_app(tmp_path, admin_username="operator", admin_password="strong-password")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        anonymous = await client.get("/")
+        authenticated = await client.get("/", auth=("operator", "strong-password"))
+        mjpeg = await client.get("/stream/cam_1")
+        health = await client.get("/health")
+
+    assert anonymous.status_code == 401
+    assert anonymous.headers["www-authenticate"] == 'Basic realm="P-047 Streamer"'
+    assert authenticated.status_code == 200
+    assert mjpeg.status_code == 401
+    assert health.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_hls_gateway_rejects_missing_expired_and_wrong_camera_tokens(tmp_path: Path) -> None:
+    secret = "test-secret-that-is-at-least-thirty-two-bytes"
+    app = create_app(tmp_path, hls_token_secret=secret, hls_upstream_origin="http://mediamtx:8888")
+    expired = _hls_token(secret)
+    payload, _ = expired.split(".")
+    decoded = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    decoded["exp"] = int(time.time()) - 1
+    encoded = base64.urlsafe_b64encode(json.dumps(decoded, separators=(",", ":")).encode()).rstrip(b"=")
+    signature = base64.urlsafe_b64encode(hmac.new(secret.encode(), encoded, hashlib.sha256).digest()).rstrip(b"=")
+    expired = f"{encoded.decode()}.{signature.decode()}"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        missing = await client.get("/hls/cameras/cam_1/index.m3u8")
+        stale = await client.get(
+            "/hls/cameras/cam_1/index.m3u8", headers={"Authorization": f"Bearer {expired}"}
+        )
+        wrong_camera = await client.get(
+            "/hls/cameras/cam_2/index.m3u8",
+            headers={"Authorization": f"Bearer {_hls_token(secret)}"},
+        )
+
+    assert missing.status_code == 401
+    assert stale.status_code == 401
+    assert wrong_camera.status_code == 403
 
 
 @pytest.mark.asyncio
