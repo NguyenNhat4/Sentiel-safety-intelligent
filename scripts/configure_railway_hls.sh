@@ -9,6 +9,7 @@ STREAMER_PORT="8080"
 PROJECT_ID=""
 SECRET_FILE="$ROOT_DIR/.env.production"
 REDEPLOY=true
+PUBLISH_APP=false
 
 usage() {
   cat <<'EOF'
@@ -25,6 +26,8 @@ Options:
                         Stream gateway service (default: streamer)
   --streamer-port PORT  Streamer's internal listening port (default: 8080)
   --secret-file PATH    File containing HLS_TOKEN_SECRET=... (default: .env.production)
+  --publish-app         Build and push the app image with VITE_* from the secret file,
+                        then redeploy p047-app from the latest image source
   --no-redeploy         Set variables without redeploying either service
   -h, --help            Show this help
 
@@ -58,6 +61,10 @@ while [[ "$#" -gt 0 ]]; do
     --secret-file)
       SECRET_FILE="${2:?Error: --secret-file requires a path}"
       shift 2
+      ;;
+    --publish-app)
+      PUBLISH_APP=true
+      shift
       ;;
     --no-redeploy)
       REDEPLOY=false
@@ -147,11 +154,27 @@ railway variable set \
 
 printf 'Variables configured successfully; the secret was not printed.\n'
 
+if [[ "$PUBLISH_APP" == true ]]; then
+  printf 'Building and publishing the app with frontend production URLs...\n'
+  PRODUCTION_ENV_FILE="$SECRET_FILE" \
+    SKIP_RAILWAY_REDEPLOY=true \
+    "$ROOT_DIR/scripts/push_app.sh"
+fi
+
 if [[ "$REDEPLOY" == true ]]; then
   printf 'Redeploying %s and %s...\n' "$STREAMER_SERVICE" "$APP_SERVICE"
   railway redeploy --yes --service "$STREAMER_SERVICE" "${COMMON_ARGS[@]}" >/dev/null
-  railway redeploy --yes --service "$APP_SERVICE" "${COMMON_ARGS[@]}" >/dev/null
+  APP_REDEPLOY_ARGS=(--yes --service "$APP_SERVICE" "${COMMON_ARGS[@]}")
+  if [[ "$PUBLISH_APP" == true ]]; then
+    APP_REDEPLOY_ARGS+=(--from-source)
+  fi
+  railway redeploy "${APP_REDEPLOY_ARGS[@]}" >/dev/null
   printf 'Redeploys queued. Verify both deployments and then check p047-app /health.\n'
 else
   printf 'Redeploy skipped. Redeploy both services before testing HLS.\n'
+fi
+
+if [[ "$PUBLISH_APP" == false ]]; then
+  printf 'Note: Railway runtime variables were updated, but an existing prebuilt frontend image is unchanged.\n'
+  printf 'Run again with --publish-app when VITE_* values changed.\n'
 fi

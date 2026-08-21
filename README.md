@@ -102,80 +102,94 @@ giữ giao thức `https://` và không thêm dấu `/` cuối. Lệnh thứ hai
 
 ### Variables của các service Railway
 
-Có thể đồng bộ tự động các biến HLS bên dưới vào cả hai service bằng Railway
-CLI. Script không in secret, ghi toàn bộ variables trước rồi mới redeploy
-`streamer` và `p047-app`.
+#### Setup production nhanh từ máy local
 
-Yêu cầu trước khi chạy:
+Chuẩn bị một lần: cài Docker và Railway CLI, chạy `docker login` cùng
+`railway login`, tạo ba service đúng tên `p047-app`, `streamer`, `mediamtx`.
+Public Domain của `streamer` phải target port `8080`; không public `mediamtx`.
 
-1. Cài Railway CLI và đăng nhập bằng `railway login`.
-2. Railway project đã có các service tên `p047-app`, `streamer` và `mediamtx`.
-3. `streamer` đã có Public Domain; `mediamtx` không cần Public Domain.
-4. Đặt một secret ngẫu nhiên tối thiểu 32 ký tự trong `.env.production`:
+Tạo cấu hình local dùng riêng cho deploy:
 
 ```bash
-HLS_SECRET="$(openssl rand -hex 32)"
-printf 'HLS_TOKEN_SECRET=%s\n' "$HLS_SECRET" >> .env.production
-unset HLS_SECRET
+cp .env.production.example .env.production
 ```
 
-Không commit `.env.production`. Nếu file đã có `HLS_TOKEN_SECRET`, sửa dòng hiện
-có thay vì thêm dòng thứ hai.
+Điền tối thiểu các giá trị sau. Hai URL `VITE_*` phải là URL public thật vì
+chúng được đóng vào JavaScript tại thời điểm `docker build`; không dùng Railway
+reference `${{...}}` trong file local này:
 
-Nếu checkout đã link đúng Railway project, chạy:
+```dotenv
+VITE_STREAMER_URL=https://streamer-production-3002.up.railway.app
+VITE_MEDIA_PUBLIC_ORIGIN=https://streamer-production-3002.up.railway.app
+VITE_STREAM_TRANSPORT=hls
+
+HLS_TOKEN_SECRET=<random-secret-at-least-32-characters>
+```
+
+Tạo secret mới bằng `openssl rand -hex 32`. Không commit `.env.production` và
+không đặt password/secret trong biến bắt đầu bằng `VITE_`.
+
+Bốn giá trị trên là phần tối thiểu mà hai release scripts đọc từ máy local.
+Các runtime secret khác như `DATABASE_URL`, `SNAPSHOT_STORAGE_*`, streamer Basic
+Auth và RTSP publisher credentials phải tồn tại trong đúng Railway service;
+`configure_railway_hls.sh` không sao chép toàn bộ `.env.production` lên Railway.
+
+Chạy một lệnh để build frontend đúng URL, push image, đồng bộ HLS Variables và
+queue redeploy cả app lẫn streamer:
 
 ```bash
-./scripts/configure_railway_hls.sh
+./scripts/configure_railway_hls.sh --publish-app
 ```
 
-Script sẽ đọc `HLS_TOKEN_SECRET` từ process environment trước, nếu không có thì
-đọc từ `.env.production`. Sau đó script cập nhật cả hai service và tự redeploy.
-
-Nếu checkout chưa link project hoặc muốn tránh phụ thuộc vào project đang link,
-truyền Railway project ID rõ ràng:
+Nếu checkout chưa link đúng Railway project:
 
 ```bash
-./scripts/configure_railway_hls.sh --project YOUR_PROJECT_ID
+./scripts/configure_railway_hls.sh --publish-app --project YOUR_PROJECT_ID
 ```
 
-Có thể truyền secret trực tiếp từ shell thay vì dùng file:
+Image mặc định là `nguyennhat4/p047:latest`. Có thể đổi image:
 
 ```bash
-HLS_TOKEN_SECRET='your-random-secret-at-least-32-characters' \
-  ./scripts/configure_railway_hls.sh --project YOUR_PROJECT_ID
+DOCKERHUB_IMAGE=YOUR_DOCKERHUB_USER/p047 \
+  ./scripts/configure_railway_hls.sh --publish-app --project YOUR_PROJECT_ID
 ```
 
-Chỉ cập nhật Variables, chưa redeploy:
+Luồng của script:
+
+1. Đọc shared `HLS_TOKEN_SECRET` từ process environment hoặc `.env.production`.
+2. Ghi cùng secret vào `p047-app` và `streamer` qua stdin, không in ra log.
+3. Ghi runtime references cho HLS, CORS và private streamer port `8080`.
+4. Với `--publish-app`, `push_app.sh` đọc URL thật từ `.env.production`, truyền
+   ba `VITE_*` vào Docker build, push image rồi redeploy app bằng `--from-source`.
+5. Redeploy streamer sau khi toàn bộ Variables đã được ghi.
+
+Không có `--publish-app`, script chỉ cập nhật server runtime variables; frontend
+đã build sẵn không đổi. Script sẽ cảnh báo điều này. Chỉ muốn cấu hình mà chưa
+redeploy:
 
 ```bash
 ./scripts/configure_railway_hls.sh --no-redeploy
 ```
 
-Nếu tên service khác mặc định:
+Streamer Basic Auth và RTSP publisher credentials vẫn phải đặt riêng trong
+Railway Variables; chúng không được đưa vào Docker build.
+
+Sau khi Railway báo cả hai deployment `SUCCESS`, kiểm tra:
 
 ```bash
-./scripts/configure_railway_hls.sh \
-  --app-service YOUR_APP_SERVICE \
-  --streamer-service YOUR_STREAMER_SERVICE \
-  --streamer-port 8080
-```
-
-Sau khi script báo `Redeploys queued`, đợi cả hai deployment thành công rồi kiểm
-tra backend readiness:
-
-```bash
+curl -fsS https://streamer-production-3002.up.railway.app/health
 curl -fsS https://YOUR_APP_DOMAIN/health
 ```
 
-Kết quả đạt yêu cầu có `"ready":true` và dependency `streamer` có
-`"ready":true`. Nếu HLS token vẫn trả `503`, kiểm tra deployment mới nhất của
-cả hai service đã dùng cùng `HLS_TOKEN_SECRET`; nếu `/health` báo
-`not_configured`, kiểm tra secret và `STREAMER_INTERNAL_ORIGIN`; nếu báo
-`connection_failed`, kiểm tra private-domain/port và `/health` của streamer.
+Trong browser DevTools → Network, `/api/cameras` phải gọi public streamer. Nếu
+nó vẫn gọi `p047-app:8001`, frontend image vẫn là bản cũ: kiểm tra Docker push
+thành công và Railway deployment mới dùng image digest mới nhất.
 
-Xem toàn bộ option bằng `./scripts/configure_railway_hls.sh --help`. Script chỉ
-cấu hình các biến kết nối HLS; RTSP publisher credentials và streamer Basic Auth
-vẫn phải được quản lý riêng trong Railway Variables.
+Khi chỉ muốn phát hành app image mà không đồng bộ HLS Variables:
+
+```bash
+RAILWAY_PROJECT_ID=YOUR_PROJECT_ID ./scripts/push_app.sh
+```
 
 Trong service `streamer`, cấu hình:
 
@@ -196,7 +210,9 @@ service `mediamtx`. Railway tự resolve private domain từ service có tên ch
 xác là `mediamtx`, nên không cần hard-code hostname. Chỉ lưu credential trong
 Railway Variables; không copy vào `.env.example`, frontend, Git, log hoặc tài liệu.
 
-Trong service `p047-app`, đặt các Variables sau **trước khi Railway build/deploy**:
+Trong service `p047-app`, giữ các runtime Variables sau. Hai biến `VITE_*` ở
+đây giúp mô tả cấu hình trên Railway nhưng không thể thay đổi một Docker image
+đã build sẵn; image-based deployment vẫn phải chạy `--publish-app` như trên:
 
 ```dotenv
 VITE_STREAMER_URL=https://${{streamer.RAILWAY_PUBLIC_DOMAIN}}
@@ -208,10 +224,9 @@ STREAMER_HEALTH_TIMEOUT_SECONDS=3
 ```
 
 Service phải có tên chính xác là `streamer` và đã được cấp Public Domain.
-Railway tự resolve `${{streamer.RAILWAY_PUBLIC_DOMAIN}}`, nên cấu hình không phụ
-thuộc domain của một tài khoản hoặc project cụ thể. Biến `VITE_*` được đóng vào
-frontend khi build; sau khi thêm hoặc đổi biến, bấm **Redeploy** `p047-app` để
-build lại frontend.
+Railway tự resolve `${{streamer.RAILWAY_PUBLIC_DOMAIN}}` cho runtime Variables.
+Với service lấy source trực tiếp từ Docker image, nút **Redeploy** không chạy lại
+Vite build; phải build/push image mới với URL public cụ thể.
 
 `STREAMER_INTERNAL_ORIGIN` chỉ dùng server-to-server. Backend gọi
 `<origin>/health` với timeout hữu hạn; thiếu signing secret/private origin trả

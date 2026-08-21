@@ -1,20 +1,25 @@
 # Benchmark scripts
 
 `configure_railway_hls.sh` synchronizes the shared HLS signing secret and
-Railway service-reference variables to `p047-app` and `streamer`. It reads
-`HLS_TOKEN_SECRET` from the process environment first, otherwise from the
-gitignored `.env.production`, and never prints the value:
+Railway service-reference variables to `p047-app` and `streamer`. For a complete
+image-based release, `--publish-app` also builds the frontend with concrete
+production URLs, pushes the app image and redeploys from the latest image:
 
 ```bash
-./scripts/configure_railway_hls.sh
+./scripts/configure_railway_hls.sh --publish-app
 ```
 
-The default environment is `production`, and both services are redeployed only
-after all variables have been written. Use `--no-redeploy` to update variables
-without deploying, or `--project PROJECT_ID` when this checkout is not linked
-to the intended Railway project. The private streamer port defaults to `8080`;
-override it with `--streamer-port PORT` only when the runtime listens elsewhere.
-Run `--help` for service-name overrides.
+Both scripts read the gitignored root `.env.production`; process environment
+values take precedence. Local `VITE_STREAMER_URL` and
+`VITE_MEDIA_PUBLIC_ORIGIN` must be concrete public URLs, not Railway `${{...}}`
+references. Secrets are never Docker build arguments. Without `--publish-app`,
+runtime variables are updated but an existing prebuilt frontend is unchanged.
+
+Run the no-network mock regression after editing either deployment script:
+
+```bash
+./scripts/test_railway_hls_scripts.sh
+```
 
 `build_streamer.sh` builds the standalone mock camera streamer image from the
 repository root. It defaults to `nguyennaht4/streamer:dev`; pass another image
@@ -42,14 +47,35 @@ change the default image name without passing an argument:
 DOCKERHUB_IMAGE=DOCKERHUB_USERNAME/p047-streamer ./scripts/push_streamer.sh
 ```
 
-`push_app.sh` builds and publishes the main P-047 app image from the root
-`Dockerfile`. Its default image is `nguyennaht4/p047:latest`:
+`push_app.sh` reads the three `VITE_*` build values from `.env.production`,
+builds and publishes the main P-047 image, then asks Railway service `p047-app`
+to redeploy from the latest configured image source. Its default image is
+`nguyennhat4/p047:latest`:
 
 ```bash
 docker login
 ./scripts/push_app.sh
 ./scripts/push_app.sh DOCKERHUB_USERNAME/p047 v1.0.0
 ```
+
+The Railway CLI must be installed, authenticated and linked to the intended
+project. Prefer an explicit project ID in automation:
+
+```bash
+RAILWAY_PROJECT_ID=YOUR_PROJECT_ID ./scripts/push_app.sh
+```
+
+Override the target or publish without a Railway mutation when needed:
+
+```bash
+RAILWAY_APP_SERVICE=web RAILWAY_ENVIRONMENT=staging ./scripts/push_app.sh
+SKIP_RAILWAY_REDEPLOY=true ./scripts/push_app.sh
+```
+
+`railway redeploy --from-source` is intentional: it pulls the newly published
+image instead of restarting the deployment that still references the previous
+image digest. The command queues a deployment; verify its final status and
+`/health` before treating the release as successful.
 
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
