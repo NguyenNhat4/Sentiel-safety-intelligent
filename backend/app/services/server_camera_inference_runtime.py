@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from backend.app.core.database import SessionLocal
-from backend.app.integrations.hls_frame_source import HlsFrameSource, build_hls_camera_url
+from backend.app.integrations.media_source_factory import create_media_frame_source
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.services.camera_detection_hub import camera_detection_hub
 from backend.app.services.camera_inference_supervisor import CameraInferenceSupervisor
@@ -57,11 +57,8 @@ class ServerCameraInferenceRuntime:
         self._supervisor.reconcile(mappings)
 
     def _create_worker(self, camera_id: str, stream_camera_id: str) -> CameraInferenceWorker:
-        if self._media_protocol != "hls":
-            raise ValueError("Only HLS inference is enabled")
-        source = HlsFrameSource(
-            build_hls_camera_url(self._media_origin, stream_camera_id),
-            max_fps=self._max_fps,
+        source = create_media_frame_source(
+            self._media_protocol, self._media_origin, stream_camera_id, max_fps=self._max_fps
         )
         return CameraInferenceWorker(
             camera_id,
