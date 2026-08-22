@@ -12,6 +12,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.
 - The implemented safety flow covers camera mapping, per-camera zones/rules, server-side RTSP inference, Human-in-the-Loop review, immutable decision context, privacy-redacted evidence, event history, and area-scoped follow-up.
+- Documentation under `docs/` is organized into `docs/architecture/`, `docs/ops/`, and `docs/data/` subdirectories; root `context-map.md` and `docs/PROJECT_STRUCTURE.md` are updated to reflect the new paths.
 
 ### Backend
 

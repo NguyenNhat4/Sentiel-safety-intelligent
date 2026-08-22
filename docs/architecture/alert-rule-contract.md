@@ -2,29 +2,31 @@
 
 ## Trạng thái
 
-Đây là contract đã được Product Owner xác nhận ngày 2026-08-16, dùng để triển khai và review team. Cho đến khi code và test được cập nhật, runtime hiện tại vẫn còn điều kiện `machine_state=running` cho zone alert.
+Bản chốt theo `DECISIONS.md` (2026-08-21):
+- **Zone Intrusion (`zone_intrusion_enabled=true`)**: Xâm nhập vùng nguy hiểm luôn báo vi phạm (`violate`), bất kể trạng thái máy `running` hay `stopped`.
+- **PPE Requirements (`hat_required`, `vest_required`)**: Thiếu PPE chỉ báo vi phạm khi người nằm trong zone có yêu cầu PPE và trạng thái máy đang hoạt động (`machine_state=running`). Trạng thái `stopped` chỉ là ngữ cảnh vận hành và không gate cảnh báo PPE.
 
 ## Rule sau khi triển khai
 
 Một frame là `violate` khi có ít nhất một điều kiện sau:
 
-- Có ít nhất một người trong một zone đang `enabled`.
-- Có ít nhất một người thiếu PPE đang được yêu cầu (`hat_required` hoặc `vest_required`).
-
-Zone alert không phụ thuộc `machine_state`: cả `running` và `stopped` đều alert. `machine_state` vẫn được giữ trong request, zone config, response và event details để làm context/audit.
+- Có ít nhất một người nằm trong zone có `zone_intrusion_enabled=true` (bất kể máy `running` hay `stopped`).
+- Có ít nhất một người nằm trong zone khi máy `running` mà thiếu PPE bắt buộc (`hat_required` hoặc `vest_required`).
+- Có ít nhất một người thuộc vùng nguy hiểm bị kích hoạt `restricted_area_detection_enabled=true`.
 
 Không có người thì frame luôn `normal`; không đánh giá thiếu PPE khi không có person detection.
 
 ## Ma trận hành vi
 
-| Có người | Trong zone enabled | Thiếu PPE bắt buộc | Máy | Kết quả |
+| Có người | Trong zone intrusion | Thiếu PPE bắt buộc | Trạng thái máy | Kết quả frame |
 |---|---:|---:|---|---|
-| Không | — | — | ON/OFF | `normal` |
-| Có | Không | Không | ON/OFF | `normal` |
-| Có | Có | Không | ON | `violate` |
-| Có | Có | Không | OFF | `violate` |
-| Có | Không | Có | ON/OFF | `violate` |
-| Có | Có | Có | ON/OFF | `violate` |
+| Không | — | — | ON / OFF | `normal` |
+| Có | Không | Không | ON / OFF | `normal` |
+| Có | Có (`intrusion=true`) | Không | ON / OFF | `violate` |
+| Có | Không | Có | OFF | `normal` |
+| Có | Không | Có | ON | `violate` |
+| Có | Có (`intrusion=true`) | Có | OFF | `violate` (bởi zone intrusion) |
+| Có | Có (`intrusion=true`) | Có | ON | `violate` |
 
 Với nhiều người, chỉ cần một người vi phạm là toàn frame `violate` và UI mở một review popup. Backend vẫn giữ `track_id`, `occurrence_id` và `zone_id` riêng để dedup, audit, thống kê và persist event theo zone.
 

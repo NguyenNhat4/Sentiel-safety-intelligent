@@ -201,14 +201,21 @@ P-047/
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
-│   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
-│   ├── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
-│   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
-│   ├── streamer-concurrency-and-memory.md # Beginner guide to MJPEG fan-out, memory and 100-client load testing
-│   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
-│   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook
-│   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
-│   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
+│   ├── architecture/                # Architecture diagrams, problem statement and alert contracts
+│   │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
+│   │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
+│   │   └── project-problem-statement.md # Safety monitoring problem formulation
+│   ├── ops/                         # Operations, CI/CD, RTSP/CCTV media solution and metrics
+│   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines
+│   │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
+│   │   ├── local-docker-postgres.md     # Local Docker PostgreSQL configuration
+│   │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
+│   │   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
+│   │   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook
+│   │   └── streamer-concurrency-and-memory.md # Beginner guide to MJPEG fan-out, memory and 100-client load testing
+│   ├── data/                        # Dataset preparation and annotation guides
+│   │   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
+│   ├── guide/                       # Setup guides and reference materials
 │   └── plans/                       # Implementation-ready plans and their reading guide
 │       ├── 2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md # RTSP/HLS migration plan
 │       ├── 2026-08-21-001-feat-remote-vision-service-plan.md # Remote worker implementation plan
