@@ -24,7 +24,7 @@ FROM python:3.11-slim AS python-builder
 WORKDIR /app
 
 COPY requirements.docker.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=s/7eb9053b-6d90-41f8-a72c-7535329155f1-/root/.cache/pip,target=/root/.cache/pip \
     python -m venv /opt/venv && \
     /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
         --index-url https://download.pytorch.org/whl/cpu \

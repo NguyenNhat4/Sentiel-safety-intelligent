@@ -42,7 +42,8 @@ P-047/
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
-│   │   │   ├── rtsp_frame_source.py # Validated reconnectable RTSP reader and sampling
+│   │   │   ├── hls_frame_source.py # Validated reconnectable HLS reader and sampling
+│   │   │   ├── rtsp_frame_source.py # Legacy/target RTSP reader and sampling
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── event.py
@@ -96,7 +97,8 @@ P-047/
 │   │       ├── 20260815_03_add_event_track_identity.py # One event per session-local tracked person
 │   │       └── 20260819_01_add_stream_configuration.py # Persisted active mock stream
 │   │       └── 20260819_01_add_event_decision_audit.py # Immutable reviewed-event context and retention deadlines
-│   │       └── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
+│   │       ├── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
+│   │       └── 20260822_01_camera_wide_machine_state.py # Camera mapping machine-state compatibility contract
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py

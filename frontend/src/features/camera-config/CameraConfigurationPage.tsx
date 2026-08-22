@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from "react";
 import {getHlsAccessToken} from "../../api/auth";
 import {mediaUrl} from "../../api/config";
 import {loadMonitoringZones, saveMonitoringZones} from "../../api/monitoring-zones";
-import {getStreamConfiguration} from "../../api/stream-config";
+import {getStreamConfiguration, updateStreamConfiguration} from "../../api/stream-config";
 import type {MonitoringZone, StreamMapping, ZonePoint} from "../../types";
 import {HlsVideo} from "../monitor/HlsVideo";
 import {createZoneDraft, zoneGeometryConflict} from "../monitor/zone-editor";
@@ -47,10 +47,11 @@ export function CameraConfigurationPage() {
       .then(collection => {
         if (!active) return;
         const visible = collection.zones.filter(zone => zone.enabled);
+        const initialZones = visible.length ? visible : [createZoneDraft([])];
         setRevision(collection.revision);
         setSavedZones(visible);
-        setZones(visible);
-        setSelectedZoneId(visible[0]?.zone_id || "");
+        setZones(initialZones);
+        setSelectedZoneId(initialZones[0]?.zone_id || "");
       })
       .catch(reason => active && setError(errorText(reason, "Không thể tải vùng")))
       .finally(() => active && setLoading(false));
@@ -58,6 +59,7 @@ export function CameraConfigurationPage() {
   }, [cameraId]);
 
   const mapping = mappings.find(item => item.camera_id === cameraId);
+  const machineRunning = mapping?.machine_state === "running";
   const selectedZone = zones.find(zone => zone.zone_id === selectedZoneId);
   const dirty = JSON.stringify(zones) !== JSON.stringify(savedZones);
   const conflict = zoneGeometryConflict(zones);
@@ -119,6 +121,22 @@ export function CameraConfigurationPage() {
     }
   }
 
+  async function toggleMachine() {
+    if (!mapping) return;
+    setError("");
+    try {
+      const response = await updateStreamConfiguration(mappings.map(item => item.camera_id === cameraId
+        ? {...item, machine_state: machineRunning ? "stopped" : "running"}
+        : {...item, machine_state: item.machine_state ?? "stopped"}));
+      setMappings(response.mappings);
+      setMessage(response.mappings.find(item => item.camera_id === cameraId)?.machine_state === "running"
+        ? "Đã bật trạng thái máy. PPE sẽ được kiểm tra."
+        : "Đã tắt trạng thái máy. Hệ thống bỏ qua PPE.");
+    } catch (reason) {
+      setError(errorText(reason, "Không thể cập nhật trạng thái máy"));
+    }
+  }
+
   const title = useMemo(() => mapping ? `${mapping.camera_id} — ${mapping.stream_camera_id}` : cameraId, [cameraId, mapping]);
   if (loading && !mappings.length) return <section className="camera-config-page page active" role="status">Đang tải cấu hình camera…</section>;
 
@@ -142,6 +160,10 @@ export function CameraConfigurationPage() {
         <strong className="camera-config-title">{title}</strong>
       </div>
       <div className="zone-config-panel">
+        <div className="machine-state-control">
+          <div><strong>Trạng thái máy</strong><small>{machineRunning ? "Máy đang chạy · kiểm tra PPE" : "Máy đã dừng · bỏ qua PPE"}</small></div>
+          <button type="button" role="switch" aria-checked={machineRunning} aria-label="Trạng thái máy" onClick={() => void toggleMachine()}>{machineRunning ? "Đang chạy" : "Đã dừng"}</button>
+        </div>
         <div className="zone-config-actions">
           <label>Vùng<select aria-label="Chọn vùng" value={selectedZoneId} onChange={event => setSelectedZoneId(event.target.value)}>
             {!zones.length && <option value="">Chưa có vùng nào</option>}
@@ -156,7 +178,7 @@ export function CameraConfigurationPage() {
         {!error && message && <p role="status">{message}</p>}
         <div className="zone-save-actions"><button type="button" className="secondary-btn" disabled={!dirty || saving} onClick={() => { setZones(savedZones); setSelectedZoneId(savedZones[0]?.zone_id || ""); }}>Hủy</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || hasIncompleteZone || Boolean(conflict)} onClick={() => void saveZones()}>{saving ? "Đang lưu…" : "Lưu vùng"}</button></div>
       </div>
-      {selectedZone?.points.length === 4 && <PpeRequirementsPanel cameraId={cameraId} zoneId={selectedZone.zone_id} />}
+      <PpeRequirementsPanel cameraId={cameraId} zoneId={selectedZone?.zone_id ?? "zone_01"} />
     </>}
   </section>;
 }

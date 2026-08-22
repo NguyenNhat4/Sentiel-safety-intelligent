@@ -307,6 +307,9 @@ def create_app(
     admin_password: str | None = None,
     hls_token_secret: str | None = None,
     hls_upstream_origin: str | None = None,
+    hls_service_username: str | None = None,
+    hls_service_password: str | None = None,
+    hls_auth_disabled: bool | None = None,
 ) -> FastAPI:
     manager = CameraStreamManager(media_dir or Path("data/streamer"))
     media_publishers = MediaPublisherManager(
@@ -327,6 +330,9 @@ def create_app(
         if hls_upstream_origin is not None
         else os.getenv("HLS_UPSTREAM_ORIGIN", "http://mediamtx:8888")
     ).rstrip("/")
+    configured_hls_service_username = hls_service_username if hls_service_username is not None else os.getenv("HLS_SERVICE_USERNAME", "")
+    configured_hls_service_password = hls_service_password if hls_service_password is not None else os.getenv("HLS_SERVICE_PASSWORD", "")
+    disable_hls_auth = hls_auth_disabled if hls_auth_disabled is not None else os.getenv("HLS_AUTH_DISABLED", "false").lower() == "true"
     cors_origins = [
         origin.strip()
         for origin in os.getenv("STREAMER_CORS_ORIGINS", "http://localhost:8000,http://localhost:5173").split(",")
@@ -352,10 +358,19 @@ def create_app(
             )
 
     def require_hls_camera(request: Request, camera_id: str) -> dict[str, object]:
+        if disable_hls_auth:
+            return {"role": "public_demo", "cameras": [camera_id]}
         if len(configured_hls_secret) < 32:
             raise HTTPException(status_code=503, detail="HLS gateway is not configured")
         authorization = request.headers.get("authorization", "")
         scheme, _, token = authorization.partition(" ")
+        if scheme.lower() == "basic" and token and configured_hls_service_username and configured_hls_service_password:
+            try:
+                username, password = base64.b64decode(token, validate=True).decode("utf-8").split(":", 1)
+            except (binascii.Error, ValueError, UnicodeDecodeError):
+                username = password = ""
+            if secrets.compare_digest(username, configured_hls_service_username) and secrets.compare_digest(password, configured_hls_service_password):
+                return {"role": "service", "cameras": [camera_id]}
         if scheme.lower() != "bearer" or not token:
             raise HTTPException(
                 status_code=401,

@@ -22,6 +22,19 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-22: [Backend/Vision] Temporary HLS reader for server-side inference
+
+- Until RTSP reader authentication is provisioned, backend server-side camera inference reads the authenticated MediaMTX HLS playlist.
+- `HLS_READER_ORIGIN` is server-only and must point to `http(s)://<reader>:<password>@<mediamtx-private-domain>:8888`; the reader requires MediaMTX `playback` permission for camera paths.
+- Frontend playback remains HLS. This is an operational bridge for model proof, not a capacity or low-latency claim; RTSP remains the target CCTV source contract.
+
+
+### 2026-08-22: [Cross-cutting] Camera-wide machine state and disconnect cleanup
+
+- Each connected camera mapping carries `machine_state` (`running` or `stopped`), defaulting to `stopped`; legacy per-zone fields remain only for compatibility and are not used by camera inference.
+- Enabled zone intrusion is a violation whenever a person is inside, regardless of machine state. Required PPE is evaluated only while that camera is `running`.
+- `system_admin` disconnect removes the mapping and that camera's zones and PPE requirements in one database transaction; other cameras remain unchanged.
+
 ### 2026-08-21: [Cross-cutting] RTSP-first private media plane
 
 - FFmpeg publishes one H.264 RTSP path per simulated camera to exact-version-pinned MediaMTX. Backend/Vision reads RTSP; browsers use HLS.

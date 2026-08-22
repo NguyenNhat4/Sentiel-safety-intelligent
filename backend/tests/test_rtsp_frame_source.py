@@ -3,6 +3,10 @@ from collections import deque
 import numpy as np
 import pytest
 
+from backend.app.integrations.hls_frame_source import (
+    HlsFrameSource,
+    build_hls_camera_url,
+)
 from backend.app.integrations.rtsp_frame_source import (
     InvalidMediaSourceError,
     RtspFrameSource,
@@ -69,4 +73,22 @@ def test_frame_source_reconnects_after_a_failed_read():
 
     assert source.read_sample() is None
     assert failed.released is True
+    assert source.read_sample() is frame
+
+
+def test_build_hls_camera_url_derives_media_mtx_playlist():
+    assert build_hls_camera_url("http://mediamtx:8888", "line_1") == (
+        "http://mediamtx:8888/cameras/line_1/index.m3u8"
+    )
+
+
+def test_hls_frame_source_samples_from_playlist():
+    frame = np.zeros((8, 8, 3), dtype=np.uint8)
+    capture = FakeCapture([(True, frame)])
+    source = HlsFrameSource(
+        "http://mediamtx:8888/cameras/cam_1/index.m3u8",
+        capture_factory=lambda _: capture,
+        monotonic=lambda: 1.0,
+    )
+
     assert source.read_sample() is frame

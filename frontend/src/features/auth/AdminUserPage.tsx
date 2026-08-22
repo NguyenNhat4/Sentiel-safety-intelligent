@@ -97,7 +97,7 @@ function StreamTab({onError, onMessage}: {onError: (message: string) => void; on
     setRefreshing(true); onError("");
     try {
       if (mappings.some(mapping => mapping.stream_camera_id === streamCameraId && mapping.camera_id !== cameraId)) throw new Error("Stream này đã được gán cho camera khác.");
-      const next = [...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId}];
+      const next = [...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId, machine_state: "stopped" as const}];
       const configuration = await updateStreamConfiguration(next);
       setMappings(configuration.mappings); onMessage(`Đã kết nối ${cameraId}.`);
     } catch (reason) { onError(errorMessage(reason)); }

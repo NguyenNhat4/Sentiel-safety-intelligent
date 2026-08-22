@@ -10,7 +10,7 @@ Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành 
 
 `telegram_notifications.py` chỉ chuyển nội dung cảnh báo đã được backend quyết định sang Telegram Bot API. Routing theo khu vực và người nhận vẫn thuộc backend service; lỗi nhà cung cấp không được làm gián đoạn inference.
 
-`rtsp_frame_source.py` là adapter media đầu vào cho backend/vision. Nó chỉ derive
-path `cameras/<stream_camera_id>` từ RTSP origin cấu hình phía server, giới hạn
-tần suất lấy frame và reconnect sau lỗi đọc; browser không được cung cấp URL
-RTSP tùy ý.
+`hls_frame_source.py` là adapter media đầu vào tạm thời cho backend/vision. Nó
+chỉ derive playlist `cameras/<stream_camera_id>/index.m3u8` từ HLS origin cấu
+hình phía server, giới hạn tần suất lấy frame và reconnect sau lỗi đọc; browser
+không được cung cấp URL media tùy ý.

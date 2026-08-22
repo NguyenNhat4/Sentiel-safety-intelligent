@@ -1,17 +1,21 @@
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, expect, it, vi} from "vitest";
-import {getStreamConfiguration} from "../../api/stream-config";
+import {getStreamConfiguration, updateStreamConfiguration} from "../../api/stream-config";
 import {loadMonitoringZones, saveMonitoringZones} from "../../api/monitoring-zones";
 import {getHlsAccessToken} from "../../api/auth";
 import {CameraConfigurationPage} from "./CameraConfigurationPage";
 
-vi.mock("../../api/stream-config", () => ({getStreamConfiguration: vi.fn()}));
+vi.mock("../../api/stream-config", async () => ({
+  getStreamConfiguration: vi.fn(),
+  updateStreamConfiguration: vi.fn(),
+}));
 vi.mock("../../api/monitoring-zones", () => ({loadMonitoringZones: vi.fn(), saveMonitoringZones: vi.fn()}));
 vi.mock("../../api/auth", () => ({getHlsAccessToken: vi.fn().mockResolvedValue({access_token: "hls", expires_in: 900})}));
 vi.mock("../monitor/HlsVideo", () => ({HlsVideo: ({label}: {label: string}) => <video aria-label={label} />}));
-vi.mock("../rules/PpeRequirementsPanel", () => ({PpeRequirementsPanel: ({cameraId, zoneId}: {cameraId: string; zoneId: string}) => <div>{cameraId}:{zoneId}</div>}));
+vi.mock("../rules/PpeRequirementsPanel", () => ({PpeRequirementsPanel: ({cameraId, zoneId}: {cameraId: string; zoneId: string}) => <div>{cameraId}:{zoneId}<span>Yêu cầu mũ bảo hộ</span><span>Yêu cầu áo phản quang</span></div>}));
 
 const getConfigMock = vi.mocked(getStreamConfiguration);
+const updateConfigMock = vi.mocked(updateStreamConfiguration);
 const loadZonesMock = vi.mocked(loadMonitoringZones);
 const hlsTokenMock = vi.mocked(getHlsAccessToken);
 const saveZonesMock = vi.mocked(saveMonitoringZones);
@@ -19,6 +23,7 @@ const saveZonesMock = vi.mocked(saveMonitoringZones);
 beforeEach(() => {
   vi.resetAllMocks();
   hlsTokenMock.mockResolvedValue({access_token: "hls", token_type: "bearer", expires_in: 900});
+  updateConfigMock.mockImplementation(async mappings => ({mappings, updated_at: null}));
   getConfigMock.mockResolvedValue({
     mappings: [
       {camera_id: "cam_1", stream_camera_id: "xuong1"},
@@ -46,7 +51,11 @@ it("draws four points and persists the selected camera zone", async () => {
   loadZonesMock.mockResolvedValue({camera_id: "cam_1", revision: 0, zones: [], updated_at: null});
   const {container} = render(<CameraConfigurationPage />);
   await screen.findByRole("combobox", {name: "Chọn camera"});
-  fireEvent.click(screen.getByRole("button", {name: "Tạo vùng"}));
+  await screen.findByRole("option", {name: "Vùng 1"});
+  expect(screen.getByRole("switch", {name: "Trạng thái máy"})).toBeInTheDocument();
+  expect(screen.getByText("cam_1:zone_1")).toBeInTheDocument();
+  expect(screen.getByText("Yêu cầu mũ bảo hộ")).toBeInTheDocument();
+  expect(screen.getByText("Yêu cầu áo phản quang")).toBeInTheDocument();
   const overlay = container.querySelector(".zone-config-overlay") as SVGSVGElement;
   vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({left: 0, top: 0, width: 100, height: 100} as DOMRect);
   for (const [clientX, clientY] of [[10, 10], [40, 10], [40, 50], [10, 50]]) {
@@ -75,7 +84,7 @@ it("selects a mapped camera and shows its video, zones and rules", async () => {
   fireEvent.change(screen.getByRole("combobox", {name: "Chọn camera"}), {target: {value: "cam_2"}});
   await waitFor(() => expect(loadZonesMock).toHaveBeenLastCalledWith("cam_2"));
   expect(screen.getByLabelText("Cấu hình Camera 2")).toBeInTheDocument();
-  expect(screen.getByText("Chưa có vùng nào")).toBeInTheDocument();
+  expect(screen.getByRole("option", {name: "Vùng 1"})).toBeInTheDocument();
 });
 
 it("removes a zone locally and persists the deletion only when saved", async () => {

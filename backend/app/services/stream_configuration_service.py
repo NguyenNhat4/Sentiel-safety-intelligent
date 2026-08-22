@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from backend.app.models.monitoring_zone import MonitoringZoneCollection, MonitoringZoneRecord
+from backend.app.models.ppe_requirement import PpeRequirement
 from backend.app.models.stream_configuration import StreamConfiguration
 from backend.app.schemas.stream_configuration import StreamConfigurationResponse, StreamConfigurationUpdate
 
@@ -23,7 +25,9 @@ class StreamConfigurationService:
             return StreamConfigurationResponse(mappings=[], updated_at=None)
         mappings = configuration.mappings or []
         if not mappings and configuration.active_camera_id:
-            mappings = [{"camera_id": "cam_1", "stream_camera_id": configuration.active_camera_id}]
+            mappings = [
+                {"camera_id": "cam_1", "stream_camera_id": configuration.active_camera_id, "machine_state": "stopped"}
+            ]
         return StreamConfigurationResponse(
             mappings=mappings,
             updated_at=configuration.updated_at,
@@ -51,6 +55,16 @@ class StreamConfigurationService:
     def disconnect(self, camera_id: str) -> StreamConfigurationResponse:
         configuration = self.db.get(StreamConfiguration, self.CONFIGURATION_ID)
         if configuration is None:
+            self.db.query(PpeRequirement).filter(PpeRequirement.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
+            self.db.query(MonitoringZoneRecord).filter(MonitoringZoneRecord.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
+            self.db.query(MonitoringZoneCollection).filter(MonitoringZoneCollection.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
+            self.db.commit()
             return self.get()
         configuration.mappings = [
             mapping for mapping in (configuration.mappings or []) if mapping.get("camera_id") != camera_id
@@ -58,6 +72,15 @@ class StreamConfigurationService:
         configuration.active_camera_id = None
         configuration.updated_at = datetime.now(UTC)
         try:
+            self.db.query(PpeRequirement).filter(PpeRequirement.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
+            self.db.query(MonitoringZoneRecord).filter(MonitoringZoneRecord.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
+            self.db.query(MonitoringZoneCollection).filter(MonitoringZoneCollection.camera_id == camera_id).delete(
+                synchronize_session=False
+            )
             self.db.commit()
             self.db.refresh(configuration)
         except SQLAlchemyError as exc:

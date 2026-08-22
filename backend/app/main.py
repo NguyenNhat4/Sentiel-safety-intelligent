@@ -59,16 +59,17 @@ async def lifespan(app: FastAPI):
 
     camera_inference_runtime = None
     camera_inference_task = None
-    if settings.rtsp_inference_enabled:
-        if not settings.rtsp_reader_origin:
-            raise RuntimeError("RTSP_READER_ORIGIN is required when RTSP inference is enabled")
+    if settings.hls_inference_enabled:
+        if not settings.hls_reader_origin:
+            raise RuntimeError("HLS_READER_ORIGIN is required when HLS inference is enabled")
         camera_inference_runtime = ServerCameraInferenceRuntime(
-            settings.rtsp_reader_origin,
-            max_fps=settings.rtsp_inference_max_fps,
-            poll_seconds=settings.rtsp_mapping_poll_seconds,
+            settings.hls_reader_origin,
+            max_fps=settings.hls_inference_max_fps,
+            poll_seconds=settings.hls_mapping_poll_seconds,
+            media_protocol="hls",
         )
         camera_inference_task = asyncio.create_task(camera_inference_runtime.run())
-        logger.info("Server-side RTSP camera inference started.")
+        logger.info("Server-side HLS camera inference started.")
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield

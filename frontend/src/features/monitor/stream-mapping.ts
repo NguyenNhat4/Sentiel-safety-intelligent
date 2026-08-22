@@ -1,7 +1,8 @@
 import type {StreamConfiguration, StreamMapping} from "../../types";
 
 export function normalizeMappings(configuration: StreamConfiguration): StreamMapping[] {
-  return configuration.mappings ?? (configuration.active_camera_id ? [{camera_id: "cam_1", stream_camera_id: configuration.active_camera_id}] : []);
+  return (configuration.mappings ?? (configuration.active_camera_id ? [{camera_id: "cam_1", stream_camera_id: configuration.active_camera_id, machine_state: "stopped"}] : []))
+    .map(mapping => ({...mapping, machine_state: mapping.machine_state ?? "stopped"}));
 }
 
 export function sameMappings(left: StreamMapping[], right: StreamMapping[]): boolean {

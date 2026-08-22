@@ -129,7 +129,7 @@ export function StreamViewer({role}: {role: UserRole}) {
     setBusy(true); setError("");
     try {
       if (mappings.some(mapping => mapping.stream_camera_id === streamCameraId && mapping.camera_id !== cameraId)) throw new Error("Stream này đã được gán cho camera khác.");
-      applyConfiguration((await updateStreamConfiguration([...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId}])).mappings);
+      applyConfiguration((await updateStreamConfiguration([...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId, machine_state: "stopped"}])).mappings);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Không thể kết nối stream."); }
     finally { setBusy(false); }
   }

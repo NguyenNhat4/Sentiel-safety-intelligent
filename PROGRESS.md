@@ -40,11 +40,21 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `system_admin` has a separate camera configuration page for selecting a mapped camera, previewing HLS, and editing zones and rules.
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
 - Area managers have a server-scoped compliance/event workspace and may resolve or mark false alarm only for events in their assigned area.
+- Camera configuration now exposes camera-wide machine state immediately after camera selection; PPE controls appear for a selected draft zone before its four points are complete.
+
+### 2026-08-22 Camera-wide machine state implementation
+
+- [Cross-cutting] Camera mapping responses carry per-camera `machine_state`; disconnect cleanup removes that camera's zones and PPE requirements.
+- [Backend] Camera inference gates missing PPE on camera `running` state and treats enabled zone intrusion as a violation independent of machine state.
+- [Verification] Frontend lint/type-check/build and 22 test files / 72 tests pass; safety-rule regression passes 15 tests. Backend stream-config integration remains blocked by the existing TestClient/lifespan hang locally; direct collection also points to unavailable Railway PostgreSQL (`gondola.proxy.rlwy.net`).
+- [Deployment] `p047-app` deployment `b02cf258-040b-4c54-8775-f3e616b7331a` reached `SUCCESS`. Public `/health` confirms PostgreSQL and streamer ready; overall readiness remains degraded because production snapshot storage requires S3 configuration.
+- [Frontend] Cameras without persisted zones now receive an unsaved empty zone draft so PPE toggles are visible before any polygon point is placed. Follow-up deployment `c1d06a02-31a5-4737-b981-971df5ff16af` reached `SUCCESS`.
 
 ### Media And Delivery
 
 - FFmpeg publishes one private H.264 RTSP path per simulated camera to pinned MediaMTX `1.20.1`.
 - Backend/Vision consumes RTSP at a bounded 2 FPS sample rate. Browsers consume authenticated HLS through the public streamer gateway; MJPEG remains the rollback transport.
+- Temporary inference bridge is implemented behind `HLS_INFERENCE_ENABLED` and `HLS_READER_ORIGIN`; backend reads MediaMTX `index.m3u8` playlists at a bounded 2 FPS rate while frontend remains HLS.
 - MediaMTX is private. Streamer administration uses Basic Auth; P-047 browser playback uses short-lived Bearer tokens. Secrets remain outside frontend build variables.
 - `scripts/deploy_all_production.sh` gates, publishes, redeploys, waits for Railway success, and checks both health endpoints.
 - `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.

@@ -190,7 +190,7 @@ class FrameInferenceService:
             decision = self._rule_engine.evaluate(
                 people=rule_people,
                 requirements=requirements,
-                machine_state="stopped",
+                machine_state=request.machine_state,
                 zone_active=False,
             )
             for person, missing in zip(people, decision.missing_required_ppe, strict=True):
@@ -207,7 +207,7 @@ class FrameInferenceService:
                         evaluated = self._rule_engine.evaluate(
                             people=[rule_person],
                             requirements=requirement,
-                            machine_state="stopped",
+                            machine_state=request.machine_state,
                             zone_active=False,
                         )
                         missing.update(evaluated.missing_required_ppe[0])
@@ -221,7 +221,7 @@ class FrameInferenceService:
                 if requirements.restricted_area_detection_enabled:
                     rules.add("restricted_area_person")
                 for zone in active_zones:
-                    if membership_by_id.get(zone.zone_id) and zone.machine_state == "running":
+                    if membership_by_id.get(zone.zone_id) and requirements.zone_intrusion_enabled:
                         rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             else:
                 for zone in active_zones:
@@ -279,7 +279,7 @@ class FrameInferenceService:
         zone_results = [
             {
                 "zone_id": zone.zone_id,
-                "machine_state": zone.machine_state,
+                "machine_state": request.machine_state,
                 "person_inside_zone": any(
                     membership.zone_id == zone.zone_id and membership.inside
                     for person in people
@@ -288,7 +288,7 @@ class FrameInferenceService:
                 "violation": (
                     requirements_by_zone.get(zone.zone_id).zone_intrusion_enabled
                     if requirements_by_zone is not None and requirements_by_zone.get(zone.zone_id) is not None
-                    else zone.machine_state == "running"
+                    else True
                 )
                 and any(
                     membership.zone_id == zone.zone_id and membership.inside
@@ -300,7 +300,7 @@ class FrameInferenceService:
         ]
         person_inside_zone = any(item["person_inside_zone"] for item in zone_results)
         primary_zone = self._primary_zone(active_zones, people)
-        primary_machine_state = primary_zone.machine_state if primary_zone else request.machine_state
+        primary_machine_state = request.machine_state
         primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
 
         return FrameInferenceResponse(
@@ -353,7 +353,6 @@ class FrameInferenceService:
                 zone_id=request.zone_id,
                 display_name=request.zone_id,
                 points=request.zone_points,
-                machine_state=request.machine_state,
                 enabled=True,
                 order=0,
             )

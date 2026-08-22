@@ -1,3 +1,5 @@
+from backend.app.models.monitoring_zone import MonitoringZoneCollection
+from backend.app.models.ppe_requirement import PpeRequirement
 from backend.app.models.user import User, UserRole
 from backend.app.services.auth_service import AuthService, hash_password
 
@@ -66,12 +68,25 @@ def test_system_admin_can_persist_four_unique_camera_stream_mappings(client, db_
 
     saved = client.put("/api/v1/stream-config", headers=admin_headers, json={"mappings": mappings})
     assert saved.status_code == 200
-    assert saved.json()["mappings"] == mappings
+    assert saved.json()["mappings"] == [{**mapping, "machine_state": "stopped"} for mapping in mappings]
 
     # Kiểm tra tính bền vững qua GET
     reread = client.get("/api/v1/stream-config", headers=admin_headers)
     assert reread.status_code == 200
-    assert reread.json()["mappings"] == mappings
+    assert reread.json()["mappings"] == [{**mapping, "machine_state": "stopped"} for mapping in mappings]
+
+
+def test_machine_state_is_persisted_per_camera(client, db_session):
+    admin_headers = _admin_headers(client, db_session)
+    response = client.put(
+        "/api/v1/stream-config",
+        headers=admin_headers,
+        json={"mappings": [{"camera_id": "cam_1", "stream_camera_id": "stream_gate", "machine_state": "running"}]},
+    )
+    assert response.status_code == 200
+    assert response.json()["mappings"] == [
+        {"camera_id": "cam_1", "stream_camera_id": "stream_gate", "machine_state": "running"}
+    ]
 
 
 def test_stream_configuration_rejects_a_stream_assigned_to_two_cameras(client, db_session):
@@ -135,11 +150,37 @@ def test_disconnect_removes_only_the_selected_camera_mapping(client, db_session)
     # Thực hiện disconnect cam_1
     disconnected = client.delete("/api/v1/stream-config/cam_1", headers=admin_headers)
     assert disconnected.status_code == 200
-    assert disconnected.json()["mappings"] == [{"camera_id": "cam_2", "stream_camera_id": "stream_line"}]
+    assert disconnected.json()["mappings"] == [
+        {"camera_id": "cam_2", "stream_camera_id": "stream_line", "machine_state": "stopped"}
+    ]
 
     # ĐÃ FIX: Đọc lại DB qua GET để chứng minh cam_1 đã biến mất hoàn toàn
     reread = client.get("/api/v1/stream-config", headers=admin_headers)
-    assert reread.json()["mappings"] == [{"camera_id": "cam_2", "stream_camera_id": "stream_line"}]
+    assert reread.json()["mappings"] == [
+        {"camera_id": "cam_2", "stream_camera_id": "stream_line", "machine_state": "stopped"}
+    ]
+
+
+def test_disconnect_deletes_selected_camera_rules_and_zones(client, db_session):
+    admin_headers = _admin_headers(client, db_session)
+    db_session.add(MonitoringZoneCollection(camera_id="cam_1"))
+    db_session.add(PpeRequirement(camera_id="cam_1", zone_id="press", hat_required=True, vest_required=False))
+    db_session.add(PpeRequirement(camera_id="cam_2", zone_id="gate", hat_required=True, vest_required=False))
+    db_session.commit()
+    client.put(
+        "/api/v1/stream-config",
+        headers=admin_headers,
+        json={
+            "mappings": [
+                {"camera_id": "cam_1", "stream_camera_id": "stream_gate"},
+                {"camera_id": "cam_2", "stream_camera_id": "stream_line"},
+            ]
+        },
+    )
+    client.delete("/api/v1/stream-config/cam_1", headers=admin_headers)
+    assert db_session.get(MonitoringZoneCollection, "cam_1") is None
+    assert db_session.query(PpeRequirement).filter_by(camera_id="cam_1").count() == 0
+    assert db_session.query(PpeRequirement).filter_by(camera_id="cam_2").count() == 1
 
 
 def test_admin_disconnect_of_unknown_camera_is_idempotent(client, db_session):

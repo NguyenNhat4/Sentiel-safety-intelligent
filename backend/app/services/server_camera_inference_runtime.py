@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from backend.app.core.database import SessionLocal
-from backend.app.integrations.rtsp_frame_source import RtspFrameSource, build_rtsp_camera_url
+from backend.app.integrations.hls_frame_source import HlsFrameSource, build_hls_camera_url
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.services.camera_detection_hub import camera_detection_hub
 from backend.app.services.camera_inference_supervisor import CameraInferenceSupervisor
@@ -22,10 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class ServerCameraInferenceRuntime:
-    """Reconcile mappings and run one RTSP inference worker per connected camera."""
+    """Reconcile mappings and run one HLS inference worker per connected camera."""
 
-    def __init__(self, rtsp_origin: str, *, max_fps: float = 2.0, poll_seconds: float = 5.0) -> None:
-        self._rtsp_origin = rtsp_origin
+    def __init__(self, media_origin: str, *, max_fps: float = 2.0, poll_seconds: float = 5.0, media_protocol: str = "hls") -> None:
+        self._media_origin = media_origin
+        self._media_protocol = media_protocol
         self._max_fps = max_fps
         self._poll_seconds = poll_seconds
         self._model_lock = threading.Lock()
@@ -56,8 +57,10 @@ class ServerCameraInferenceRuntime:
         self._supervisor.reconcile(mappings)
 
     def _create_worker(self, camera_id: str, stream_camera_id: str) -> CameraInferenceWorker:
-        source = RtspFrameSource(
-            build_rtsp_camera_url(self._rtsp_origin, stream_camera_id),
+        if self._media_protocol != "hls":
+            raise ValueError("Only HLS inference is enabled")
+        source = HlsFrameSource(
+            build_hls_camera_url(self._media_origin, stream_camera_id),
             max_fps=self._max_fps,
         )
         return CameraInferenceWorker(
@@ -80,8 +83,16 @@ class ServerCameraInferenceRuntime:
         if not ok:
             raise ValueError("RTSP frame could not be encoded as JPEG")
         image_data = f"data:image/jpeg;base64,{base64.b64encode(encoded).decode()}"
-        session_id = uuid5(NAMESPACE_URL, f"p047:rtsp:{camera_id}:{stream_camera_id}")
+        session_id = uuid5(NAMESPACE_URL, f"p047:hls:{camera_id}:{stream_camera_id}")
         with SessionLocal() as db:
+            machine_state = next(
+                (
+                    mapping.machine_state
+                    for mapping in StreamConfigurationService(db).get().mappings
+                    if mapping.camera_id == camera_id
+                ),
+                "stopped",
+            )
             zones = MonitoringZoneService(db).get(camera_id)
             requirement_service = PpeRequirementService(db)
             requirements_by_zone = {
@@ -95,6 +106,7 @@ class ServerCameraInferenceRuntime:
             zone_revision=zones.revision,
             monitoring_session_id=session_id,
             frame_id=frame_id,
+            machine_state=machine_state,
         )
         with self._model_lock:
             result = frame_inference_service.infer(
