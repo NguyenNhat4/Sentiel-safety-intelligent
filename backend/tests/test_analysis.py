@@ -102,7 +102,7 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] in {"ok", "degraded"}
     assert isinstance(data["ready"], bool)
-    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage"}
+    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage", "streamer"}
 
 
 def test_frontend_is_served(client):
