@@ -57,6 +57,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 |---|---|
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
 | Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/ops/CI_CD.md) |
+| Xem luồng deployment và sơ đồ vận hành cho team | [Quy trình deployment](docs/ops/DEPLOYMENT_FLOW.md) |
 | Tách/deploy YOLO worker CPU hoặc RunPod | [Safety Vision worker deployment](docs/ops/RUNPOD_VISION_DEPLOYMENT.md) |
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/architecture/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |

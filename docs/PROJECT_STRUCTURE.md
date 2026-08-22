@@ -208,6 +208,7 @@ P-047/
 │   ├── ops/                         # Operations, CI/CD, RTSP/CCTV media solution and metrics
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines
 │   │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
+│   │   ├── DEPLOYMENT_FLOW.md           # Visual deployment flow diagrams, service matrix and team runbook
 │   │   ├── local-docker-postgres.md     # Local Docker PostgreSQL configuration
 │   │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   │   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
