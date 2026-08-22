@@ -49,6 +49,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- `VISION_PROVIDER=local make check` passes after rebasing the remote Vision worker onto `develop2`: Ruff/ESLint/type-check/build pass, frontend `72 passed`, core/streamer `46 passed`, and backend/Vision `210 passed`.
+- The standalone `p047-vision:dev` CPU image builds successfully and its live `/ping` smoke returns `safety_vision_v1`; frontend dependency audit reports zero known vulnerabilities after the compatible `nanoid` patch update.
 - Production `p047-app` deployment `ffa10050-7657-4bab-8014-a411d044b09a` and streamer deployment `851de566-1c31-492d-8d68-04f234c0b914` reached `SUCCESS`.
 - Public authenticated HLS smoke returned non-empty manifests for `xuong1` and `xuong2`; direct authenticated MediaMTX and streamer-gateway playlist checks returned `200`.
 - Latest focused evidence: PPE API `20 passed`, per-zone inference `2 passed`, camera/RTSP backend `13 passed`, frontend focused tests `15 passed`, plus TypeScript, ESLint, production build, and focused Ruff checks.
