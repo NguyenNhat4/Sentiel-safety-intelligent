@@ -45,7 +45,7 @@ export function AppShell({page, onNavigate, user, onLogout, children}: AppShellP
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
         <div className="header-actions">
           <div className="clock"><span>{clock}</span><small>Safety shirt baseline</small></div>
-          <button className="icon-btn">⌕</button><button className="icon-btn notification">♢<i /></button>
+          <button className="icon-btn" aria-label="Tìm kiếm">⌕</button><button className="icon-btn notification" aria-label="Thông báo">♢<i /></button>
         </div>
       </header>
       {children}
