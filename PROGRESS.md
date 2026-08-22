@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-08-21
+Updated: 2026-08-22
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
@@ -26,6 +26,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Vision
 
 - `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
+- Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
 - Missing PPE is derived by deterministic backend rules, not emitted by the model.
 - PPE review opens after six consecutive missing frames for the same session track/item. An unreviewed warning retracts only after two continuous seconds of explicit presence.
 - Zone intrusion opens after four consecutive sampled frames in the same active zone. Restricted-area detection remains immediate.
@@ -44,6 +45,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Backend/Vision consumes RTSP at a bounded 2 FPS sample rate. Browsers consume authenticated HLS through the public streamer gateway; MJPEG remains the rollback transport.
 - MediaMTX is private. Streamer administration uses Basic Auth; P-047 browser playback uses short-lived Bearer tokens. Secrets remain outside frontend build variables.
 - `scripts/deploy_all_production.sh` gates, publishes, redeploys, waits for Railway success, and checks both health endpoints.
+- `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.
 
 ## Latest Verification
 
@@ -62,6 +64,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Complete US-13 protocol, representative ground truth, calibration/final split, accuracy thresholds, association/tracking evidence, and target-device latency.
 - Configure S3 snapshot storage so production application health can become fully ready.
 - Configure and exercise the GitHub production environment, first protected release PR, and immutable rollback procedure.
+- Deploy one remote Vision worker, verify backend-to-worker health/inference, and benchmark the Railway/RunPod hop before GPU optimization.
 
 ## Known Limitations
 
@@ -79,3 +82,4 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 4. Finalize and execute the US-13 evaluation protocol.
 5. Run the four-camera capacity soak and close production readiness dependencies.
 6. Implement retention cleanup and automate the proven US-08 browser sequence.
+7. Deploy and benchmark the single-worker remote Safety Vision path before adding GPU or worker affinity.

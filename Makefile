@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run streamer-run streamer-test e2e-demo e2e-streaming test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+.PHONY: setup py-setup env-setup db-upgrade run streamer-run streamer-test vision-worker-run vision-worker-image e2e-demo e2e-streaming test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -26,6 +26,12 @@ streamer-run:
 
 streamer-test:
 	PYTHONPATH=. $(VENV_BIN)/pytest streamer/tests/ -v
+
+vision-worker-run:
+	$(VENV_BIN)/uvicorn backend.app.vision_worker:app --reload --host 0.0.0.0 --port 8100
+
+vision-worker-image:
+	docker build -f Dockerfile.ai -t p047-vision:dev .
 
 e2e-demo:
 	PYTHONPATH=. $(VENV_BIN)/python scripts/e2e_demo.py

@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-21
+Updated: 2026-08-22
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -42,6 +42,13 @@ This file contains only decisions that currently constrain implementation. Super
 - HLS is display-only. Backend reads mapped RTSP and publishes camera-correlated source-coordinate metadata for overlays.
 
 ## Detection, Tracking, And Privacy
+
+### 2026-08-21: [Vision/Backend] Optional remote Safety Vision worker
+
+- `FrameInferenceService` selects the in-process facade by default or the versioned `safety_vision_v1` HTTP provider when `VISION_PROVIDER=remote`; browser and server-side RTSP inference contracts remain unchanged.
+- The worker owns YOLO11m Safety and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
+- Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
+- The first deployment uses one worker. Multiple workers require affinity or an explicit decision to relocate tracker state.
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 

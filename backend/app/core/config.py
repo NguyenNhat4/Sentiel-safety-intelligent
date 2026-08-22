@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
+    vision_provider: Literal["local", "remote"] = "local"
+    vision_remote_url: str = ""
+    vision_remote_api_key: SecretStr = SecretStr("")
+    vision_remote_timeout_seconds: float = Field(default=5.0, ge=0.1, le=30.0)
     face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
@@ -107,6 +111,18 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ValueError(f"S3 snapshot storage requires {', '.join(missing)}")
+
+    @model_validator(mode="after")
+    def validate_remote_vision(self):
+        if self.vision_provider == "remote" and not self.vision_remote_url:
+            raise ValueError("VISION_REMOTE_URL is required when VISION_PROVIDER=remote")
+        if (
+            self.app_env == "production"
+            and self.vision_provider == "remote"
+            and not self.vision_remote_api_key.get_secret_value()
+        ):
+            raise ValueError("VISION_REMOTE_API_KEY is required for remote vision in production")
+        return self
 
 
 @lru_cache

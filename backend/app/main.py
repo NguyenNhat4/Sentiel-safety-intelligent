@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Could not connect to database on startup: {e}")
 
     frame_inference_service.preload_models()
-    logger.info("Unified YOLO11m Safety person/hat/vest inference model loaded.")
+    logger.info("Safety vision inference provider is ready.")
     get_configured_privacy_vision_adapter().preload()
     logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
     app.state.ready = True

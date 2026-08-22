@@ -41,6 +41,34 @@ def test_default_inference_uses_only_the_safety_model(monkeypatch):
     assert service._model_path == "models/yolo11m_safety.pt"
 
 
+def test_remote_provider_routes_inference_through_http_adapter(monkeypatch):
+    class FakeRemoteAdapter:
+        def analyze(self, frame, monitoring_session_id, now):
+            return {"canonical_people": [], "people": [], "detections": []}
+
+        def preload(self):
+            return None
+
+    remote_adapter = FakeRemoteAdapter()
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(
+            vision_provider="remote",
+            vision_remote_url="https://vision.example",
+            vision_remote_api_key="secret-token",
+        ),
+    )
+    monkeypatch.setattr(
+        "backend.app.services.frame_inference_service.get_remote_vision_adapter",
+        lambda **kwargs: remote_adapter,
+    )
+
+    service = FrameInferenceService()
+
+    assert service._vision_analyzer == remote_adapter.analyze
+    assert service._model_preloader == remote_adapter.preload
+
+
 def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     calls = 0
 
