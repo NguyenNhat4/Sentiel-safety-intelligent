@@ -16,6 +16,7 @@ P-047/
 ├── alembic.ini          # Alembic entrypoint for backend migrations
 ├── docker-compose.yml   # PostgreSQL, backend, streamer and exact-version MediaMTX gateway
 ├── Dockerfile.ai        # CPU proof image for the standalone Safety Vision worker
+├── Dockerfile.ai.gpu    # CUDA 12.8 image for the RunPod Safety Vision worker
 ├── requirements.ai.txt  # Minimal runtime dependencies for the worker image
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
@@ -148,6 +149,7 @@ P-047/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── camera-detection-client.ts # Authenticated camera metadata socket
 │   │   │   ├── auth.ts   # Authentication/account transport
+│   │   │   ├── vision-worker-compare.ts # Dev-only typed CPU/CUDA worker client and latency summary
 │   │   │   ├── stream-config.ts # Active stream and streamer-container transport
 │   │   │   ├── events.ts  # Reviewed-event list, detail and persistence transport
 │   │   │   ├── events.test.ts
@@ -172,12 +174,14 @@ P-047/
 │   │   │   │   └── EventLogPage.test.tsx
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page
 │   │   │   ├── rules/   # PPE requirement switches and explicit-save state
+│   │   │   ├── vision-worker-compare/ # Dev-only image/video overlays and CPU/CUDA RTT comparison
 │   │   │   └── dashboard/ # Reserved dashboard boundary
 │   │   ├── styles/      # React CSS entrypoint composing Sentinel styles
 │   │   ├── types/       # Typed REST/WebSocket contracts
 │   │   ├── App.tsx
 │   │   └── main.tsx
 │   ├── index.html       # Vite HTML entrypoint
+│   ├── vision-worker-compare.html # Separate noindex developer benchmark entrypoint
 │   ├── styles.css       # Sentinel visual system
 │   ├── baseline.css     # Video and Canvas overrides
 │   ├── event-log.css    # Violation history styles
@@ -250,6 +254,7 @@ P-047/
 │   ├── test_railway_hls_scripts.sh # No-network regression for HLS build/deploy wiring
 │   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
+│   ├── run_vision_compare_ui.sh # Lifecycle for local CPU/GPU workers plus Vite comparison UI
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
 │   ├── build_streamer.sh # Build the standalone streamer image
 │   ├── push_streamer.sh # Build and publish the streamer image to Docker Hub

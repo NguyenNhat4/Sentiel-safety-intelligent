@@ -49,6 +49,9 @@ This file contains only decisions that currently constrain implementation. Super
 - The worker owns YOLO11m Safety and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
 - Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
 - The first deployment uses one worker. Multiple workers require affinity or an explicit decision to relocate tracker state.
+- Keep the CPU worker image as the rollback artifact. The RunPod image separately pins PyTorch `2.9.1`, torchvision `0.24.1`, and CUDA `12.8`, passes `cuda:0` explicitly to every Ultralytics predict/track call, and fails startup when CUDA is unavailable rather than silently running CPU inference.
+- CPU/GPU performance claims use the same CUDA image, checkpoint, input, classes and ByteTrack pipeline on one machine, run sequentially after warm-up, and report mean/P50/P95 plus throughput. Model load, media decode and network latency remain separate measurements.
+- The developer comparison UI is a separate, noindex Vite entrypoint. It sends the same browser frame to CPU and GPU concurrently, allows only one comparison cycle in flight, and counts skipped video frames; its RTT is an end-to-end responsiveness diagnostic, not the controlled sequential model-performance claim.
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 

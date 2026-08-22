@@ -103,21 +103,74 @@ VISION_REMOTE_TIMEOUT_SECONDS=5
 
 Redeploy backend rồi gọi lại flow inference hiện hữu. Nếu cần rollback tức thời, chỉ đổi `VISION_PROVIDER=local` và redeploy; browser contract không thay đổi.
 
-## Đưa cùng image lên RunPod Serverless sau đó
+## Build image GPU cho RunPod
 
-RunPod Load Balancer nhận custom FastAPI image và forward trực tiếp HTTP, phù hợp hơn queue endpoint cho frame realtime. Quy trình proof:
+Image GPU là artifact riêng; image CPU phía trên vẫn được giữ để test local và rollback:
 
-1. Push `p047-vision:cpu-v1` lên Docker Hub hoặc registry mà RunPod đọc được.
-2. Tạo Serverless Load Balancer endpoint từ image đó, expose container port `8000`, health path `/ping`, và cấp đủ container disk cho image/model.
-3. Giữ một worker để bảo toàn ByteTrack của một camera. `active workers = 0` tiết kiệm chi phí nhưng request đầu chịu cold start; `active workers = 1` giảm latency nhưng tính phí liên tục.
+```bash
+make vision-worker-gpu-image
+docker tag p047-vision:gpu-dev DOCKERHUB_USERNAME/p047-vision:gpu-v1
+docker login
+docker push DOCKERHUB_USERNAME/p047-vision:gpu-v1
+```
+
+Trước khi thuê RunPod, có thể đưa nhánh cho một máy Linux có NVIDIA GPU và chạy đúng một lệnh:
+
+```bash
+make vision-worker-benchmark
+```
+
+Lệnh tự build image rồi đo cùng YOLO11m Safety + ByteTrack trên CPU và `cuda:0`, mặc định warm-up
+10 lần và đo 50 lần trên frame tổng hợp 640×640. Kết quả in mean/P50/P95, FPS và hệ số GPU nhanh
+hơn CPU. Để đo sát camera hơn, đặt một ảnh đã được phép sử dụng trong repository rồi chạy:
+
+```bash
+make vision-worker-benchmark BENCHMARK_INPUT=data/authorized-test.jpg
+```
+
+Máy test phải chạy được `nvidia-smi` và Docker phải được cấu hình NVIDIA Container Toolkit.
+Benchmark này loại trừ model load, warm-up, decode video và network; nó đo Ultralytics
+preprocess, YOLO inference, postprocess và ByteTrack. Không dùng kết quả này để suy ra cold start
+hoặc độ trễ Railway–RunPod.
+
+`Dockerfile.ai.gpu` pin Python 3.11, PyTorch `2.9.1`, torchvision `0.24.1` và CUDA wheel `cu128`. Image đặt sẵn `VISION_DEVICE=cuda:0`; worker sẽ từ chối startup nếu container không nhìn thấy CUDA. Vì vậy có thể build image trên máy CPU, nhưng chỉ chạy API đầy đủ khi Docker host được cấp NVIDIA GPU.
+
+Có thể xác nhận image chứa đúng CUDA runtime mà không khởi động API:
+
+```bash
+docker run --rm --entrypoint python p047-vision:gpu-dev \
+  -c "import torch; print(torch.__version__, torch.version.cuda)"
+```
+
+Kết quả mong đợi là Torch `2.9.1` và CUDA `12.8`. `torch.cuda.is_available()` chỉ trả `true` khi container thực sự được RunPod cấp GPU.
+
+## Deploy GPU lên RunPod Serverless Load Balancer
+
+Load Balancer nhận custom FastAPI image và forward trực tiếp HTTP, phù hợp hơn queue endpoint cho frame realtime. Quy trình triển khai:
+
+1. Push tag immutable `DOCKERHUB_USERNAME/p047-vision:gpu-v1` lên Docker Hub hoặc registry mà RunPod đọc được.
+2. Tạo Serverless Load Balancer endpoint từ image đó, expose HTTP container port `8000`, health path `/ping`, chọn GPU tương thích CUDA 12.8 và cấp đủ container disk cho image/model.
+3. Trong giai đoạn test, đặt `active workers = 0` và `max workers = 1` để GPU scale về 0 khi không có request. Request đầu sau thời gian idle sẽ chịu cold start. Khi cần đo latency realtime ổn định mới đổi `active workers = 1`; vẫn giữ `max workers = 1` để ByteTrack của một camera ở cùng process.
 4. Đặt `VISION_REMOTE_URL` trên Railway thành URL Load Balancer endpoint và `VISION_REMOTE_API_KEY` thành RunPod API key. Không đặt `VISION_WORKER_API_KEY` trong container nếu RunPod đã kiểm soát `Authorization` ở gateway.
 5. Kiểm tra `/ping`, sau đó gửi một JPEG nhỏ qua `/v1/infer` trước khi bật `VISION_PROVIDER=remote` trên backend.
 
-RunPod Serverless hiện vẫn yêu cầu chọn GPU cho endpoint worker. Image CPU này chạy được để kiểm tra contract nhưng không tận dụng GPU và không phải cấu hình kinh tế/latency cuối cùng. Bước sau mới thay base image/PyTorch bằng CUDA, benchmark vùng gần Railway/streamer, cấu hình worker affinity và đặt active worker theo SLA.
+Các biến tối thiểu trên RunPod:
+
+```dotenv
+PORT=8000
+PPE_MODEL_PATH=models/yolo11m_safety.pt
+VISION_DEVICE=cuda:0
+VISION_MODEL_VERSION=yolo11m_safety-gpu-v1
+```
+
+Không đưa `DATABASE_URL`, S3, Telegram hoặc credential Railway vào worker. Nếu dùng private registry, khai báo registry credential trong RunPod thay vì bake vào image.
+
+RunPod tính GPU Serverless theo thời gian worker thực sự chạy. `active workers = 0` phù hợp cho thử nghiệm vì không giữ GPU khi idle; cần đặt spending limit/billing alert trong tài khoản và kiểm tra bảng giá hiện hành trước khi bật worker luôn ấm.
 
 ## Điều kiện xác nhận deploy thành công
 
 - `/ping` trả `healthy`, `safety_vision_v1` và đúng model version.
+- Log startup không có lỗi CUDA và một lần infer thực tế xác nhận `torch.cuda.is_available()` là `true` trong worker.
 - Backend khởi động thành công ở `VISION_PROVIDER=remote`; nếu worker không sẵn sàng thì backend fail-closed thay vì âm thầm dùng local model.
 - Một frame từ REST/WebSocket hoặc vòng RTSP server-side giữ nguyên response/metadata hiện tại và có bbox/track ID hợp lệ.
 - Worker không có credential PostgreSQL, S3, Telegram hoặc OpenAI.

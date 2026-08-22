@@ -8,6 +8,7 @@ from uuid import UUID
 
 import cv2
 import numpy as np
+import torch
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 
 from backend.app.schemas.remote_vision import (
@@ -37,14 +38,21 @@ def create_app(
     analyzer: VisionAnalyzer | None = None,
     model_version: str | None = None,
     worker_api_key: str | None = None,
+    compute_device: str | None = None,
 ) -> FastAPI:
     configured_model_path = os.getenv("PPE_MODEL_PATH", "models/yolo11m_safety.pt")
-    configured_analyzer = analyzer or PpeVisionFacade(configured_model_path)
+    configured_device_value = compute_device if compute_device is not None else os.getenv("VISION_DEVICE", "")
+    configured_device = configured_device_value.strip() or None
+    configured_analyzer = analyzer or PpeVisionFacade(
+        configured_model_path,
+        device=configured_device,
+    )
     configured_model_version = model_version or os.getenv("VISION_MODEL_VERSION", "yolo11m_safety")
     configured_api_key = worker_api_key or os.getenv("VISION_WORKER_API_KEY", "")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        _ensure_compute_device_available(configured_device)
         configured_analyzer.preload()
         app.state.ready = True
         yield
@@ -106,6 +114,13 @@ def create_app(
         )
 
     return app
+
+
+def _ensure_compute_device_available(device: str | None) -> None:
+    if device is None or not device.lower().startswith("cuda"):
+        return
+    if not torch.cuda.is_available():
+        raise RuntimeError(f"VISION_DEVICE={device} requires an NVIDIA GPU with a working CUDA runtime")
 
 
 app = create_app()

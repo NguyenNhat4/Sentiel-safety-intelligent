@@ -16,6 +16,16 @@ make frontend-dev
 
 Open <http://localhost:5173>. Vite proxies `/api` and `/snapshots` to port 8000, including the inference WebSocket. Set `VITE_BACKEND_URL` only when the backend is hosted at another origin.
 
+To compare the same JPEG or browser-sampled video frames on local CPU and NVIDIA CUDA workers:
+
+```bash
+make vision-worker-compare-ui
+```
+
+Open <http://127.0.0.1:5173/vision-worker-compare.html>. This developer-only page starts two
+isolated worker containers, reports rolling browser-to-worker latency and skipped video frames,
+and removes both containers on `Ctrl+C`. It is not linked from or built into the production UI.
+
 For the integrated production-style runtime:
 
 ```bash
@@ -67,6 +77,7 @@ frontend/
     │   ├── alerts/   # Rule result and Human-in-the-Loop review UI
     │   ├── events/   # Acknowledged violation history
     │   ├── rules/    # Persisted PPE requirement controls and draft/save state
+    │   ├── vision-worker-compare/ # Developer-only CPU/CUDA image/video probe
     │   └── dashboard/# Reserved legacy boundary; active dashboard is owned by area/
     ├── styles/       # React CSS entrypoint
     └── types/        # Typed backend contracts

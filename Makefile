@@ -1,4 +1,8 @@
-.PHONY: setup py-setup env-setup db-upgrade run streamer-run streamer-test vision-worker-run vision-worker-image e2e-demo e2e-streaming test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+.PHONY: setup py-setup env-setup db-upgrade run streamer-run streamer-test vision-worker-run vision-worker-image vision-worker-gpu-image vision-worker-benchmark vision-worker-compare-ui e2e-demo e2e-streaming test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+
+BENCHMARK_INPUT ?=
+BENCHMARK_WARMUP ?= 10
+BENCHMARK_ITERATIONS ?= 50
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -32,6 +36,15 @@ vision-worker-run:
 
 vision-worker-image:
 	docker build -f Dockerfile.ai -t p047-vision:dev .
+
+vision-worker-gpu-image:
+	docker build --platform linux/amd64 -f Dockerfile.ai.gpu -t p047-vision:gpu-dev .
+
+vision-worker-benchmark: vision-worker-gpu-image
+	docker run --rm --gpus all --volume "$(CURDIR):/workspace:ro" --workdir /workspace --entrypoint python p047-vision:gpu-dev scripts/benchmark_model.py --pipeline --tracking --compare-cpu-gpu $(if $(BENCHMARK_INPUT),--source "/workspace/$(BENCHMARK_INPUT)",--synthetic) --warmup $(BENCHMARK_WARMUP) --iterations $(BENCHMARK_ITERATIONS) --frames 1
+
+vision-worker-compare-ui: vision-worker-gpu-image
+	bash scripts/run_vision_compare_ui.sh
 
 e2e-demo:
 	PYTHONPATH=. $(VENV_BIN)/python scripts/e2e_demo.py

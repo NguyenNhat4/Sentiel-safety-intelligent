@@ -2,8 +2,11 @@ from uuid import uuid4
 
 import cv2
 import numpy as np
+import pytest
+import torch
 from fastapi.testclient import TestClient
 
+from backend.app import vision_worker
 from backend.app.vision_worker import MAX_IMAGE_BYTES, create_app
 
 
@@ -151,3 +154,32 @@ def test_worker_can_require_bearer_auth_for_direct_deployments():
     assert denied.status_code == 401
     assert allowed.status_code == 200
     assert len(analyzer.analyze_calls) == 1
+
+
+def test_worker_fails_startup_when_cuda_is_required_but_unavailable(monkeypatch):
+    analyzer = FakeVisionAnalyzer()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="cuda:0"):
+        with TestClient(create_app(analyzer=analyzer, compute_device="cuda:0")):
+            pass
+
+    assert analyzer.preload_calls == 0
+
+
+def test_worker_constructs_facade_with_device_from_environment(monkeypatch):
+    captured = {}
+
+    class CapturingAnalyzer(FakeVisionAnalyzer):
+        def __init__(self, model_path: str, *, device: str | None = None) -> None:
+            super().__init__()
+            captured.update(model_path=model_path, device=device)
+
+    monkeypatch.setenv("VISION_DEVICE", "cuda:0")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(vision_worker, "PpeVisionFacade", CapturingAnalyzer)
+
+    with TestClient(vision_worker.create_app(model_version="gpu-test")) as client:
+        assert client.get("/ping").status_code == 200
+
+    assert captured == {"model_path": "models/yolo11m_safety.pt", "device": "cuda:0"}

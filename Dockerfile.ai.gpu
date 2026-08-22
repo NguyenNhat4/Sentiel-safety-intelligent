@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY requirements.ai.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
+        --index-url https://download.pytorch.org/whl/cu128 \
+        torch==2.9.1 torchvision==0.24.1 && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --no-compile \
+        -r requirements.ai.txt && \
+    /opt/venv/bin/python -m pip uninstall --yes opencv-python opencv-python-headless && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --no-compile --no-deps \
+        opencv-python-headless==5.0.0.93
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN useradd --create-home appuser
+
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PORT=8000 \
+    PPE_MODEL_PATH=models/yolo11m_safety.pt \
+    VISION_DEVICE=cuda:0 \
+    VISION_MODEL_VERSION=yolo11m_safety-gpu
+
+COPY --chown=appuser:appuser backend ./backend
+COPY --chown=appuser:appuser vision ./vision
+COPY --chown=appuser:appuser models/yolo11m_safety.pt ./models/yolo11m_safety.pt
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD python -c "import json, os, urllib.request; port=os.getenv('PORT', '8000'); assert json.load(urllib.request.urlopen(f'http://127.0.0.1:{port}/ping'))['status'] == 'healthy'" || exit 1
+
+CMD ["sh", "-c", "exec uvicorn backend.app.vision_worker:app --host 0.0.0.0 --port ${PORT:-8000}"]

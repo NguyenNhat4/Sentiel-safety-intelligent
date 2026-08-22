@@ -55,12 +55,14 @@ class PpeVisionFacade:
         person_confidence_threshold: float = 0.5,
         session_ttl_seconds: float = 300.0,
         model_factory: Callable[[str], Any] | None = None,
+        device: str | None = None,
     ) -> None:
         self._model_path = model_path
         self._confidence_threshold = confidence_threshold
         self._person_confidence_threshold = person_confidence_threshold
         self._session_ttl_seconds = session_ttl_seconds
         self._model_factory = model_factory
+        self._device = device.strip() if device and device.strip() else None
         self._model = None
         self._sessions: dict[str, tuple[Any, float]] = {}
 
@@ -77,6 +79,7 @@ class PpeVisionFacade:
                 classes=[0, 3, 4],
                 conf=self._confidence_threshold,
                 verbose=False,
+                **self._device_options(),
             )[0]
             return self._safety_result(result, require_track_ids=False)
 
@@ -92,6 +95,7 @@ class PpeVisionFacade:
             classes=[0, 3, 4],
             conf=self._confidence_threshold,
             verbose=False,
+            **self._device_options(),
         )[0]
         return self._safety_result(result, require_track_ids=True)
 
@@ -196,6 +200,7 @@ class PpeVisionFacade:
             classes=[0, 3, 4],
             conf=self._confidence_threshold,
             verbose=False,
+            **self._device_options(),
         )[0]
         names = result.names
         selected_boxes: list[tuple[int, str, list[int], float]] = []
@@ -242,6 +247,10 @@ class PpeVisionFacade:
         from ultralytics import YOLO
 
         return YOLO(str(Path(self._model_path)))
+
+    def _device_options(self) -> dict[str, str]:
+        """Return an Ultralytics device override only when explicitly configured."""
+        return {"device": self._device} if self._device is not None else {}
 
     def _expire_sessions(self, now: float) -> None:
         expired = [

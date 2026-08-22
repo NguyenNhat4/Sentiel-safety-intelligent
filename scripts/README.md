@@ -125,6 +125,47 @@ The report includes mean/min/max/P50/P95/P99 latency in milliseconds and through
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing
 inside Ultralytics are included. Run the same command on the same hardware when comparing models.
 
+For a one-command CPU versus NVIDIA GPU comparison on another Linux machine, run:
+
+```bash
+make vision-worker-benchmark
+```
+
+The target builds the CUDA image, requires Docker GPU access, then runs the same YOLO11m Safety
+checkpoint, classes `[0, 3, 4]`, ByteTrack pipeline, deterministic 640×640 frame, 10 warm-up calls
+and 50 measured calls first on CPU and then on `cuda:0`. It prints mean/P50/P95 latency, FPS and
+the GPU speedup. Model loading, warm-up, video decoding and HTTP/network time are excluded.
+
+Use one authorized, repository-relative camera image for a more representative result:
+
+```bash
+make vision-worker-benchmark \
+  BENCHMARK_INPUT=data/authorized-test.jpg \
+  BENCHMARK_WARMUP=20 \
+  BENCHMARK_ITERATIONS=100
+```
+
+Do not commit media containing personal data. CPU and GPU are intentionally measured sequentially
+inside the same image and machine; compare runs only when `torch.cuda.is_available()` is true.
+
+For an interactive image/video comparison with browser-to-worker latency, run:
+
+```bash
+make vision-worker-compare-ui
+```
+
+The target builds the same CUDA image, starts one container forced to `cpu` on port `8101` and one
+container on `cuda:0` on port `8102`, waits for both `/ping` endpoints, and serves the developer UI
+at <http://127.0.0.1:5173/vision-worker-compare.html>. Press `Ctrl+C` to stop and remove exactly
+those two containers. Set `VISION_WORKER_API_KEY` before the command to enable the same worker key
+on both, then enter it in both password fields in the page.
+
+The page submits an image once or samples a locally played video at 1/2/5/10 FPS. It sends the same
+frame to CPU and GPU concurrently, keeps at most one comparison cycle in flight, and reports
+latest/mean/P50/P95 RTT, an indicative `1000 / mean` ceiling, GPU speedup, and skipped frames. Use
+this for end-to-end responsiveness and visual overlays; use `make vision-worker-benchmark` for the
+controlled sequential model-only comparison.
+
 `benchmark_privacy.py` measures the server-side privacy stage: one YuNet call, face/person fallback blur and JPEG encoding. It uses a generated 1280×720 frame by default or the first frame from an image/video:
 
 ```bash

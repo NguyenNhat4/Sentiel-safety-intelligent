@@ -29,6 +29,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 - `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
 - Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
+- The remote worker accepts an explicit Ultralytics compute device. The RunPod image uses `cuda:0` for both inference and tracking and fails startup when CUDA is unavailable instead of silently falling back to CPU.
+- `make vision-worker-benchmark` provides a reproducible same-machine CPU/CUDA comparison for YOLO11m Safety + ByteTrack, with deterministic synthetic input by default and an optional authorized camera image.
 - Missing PPE is derived by deterministic backend rules, not emitted by the model.
 - PPE review opens after six consecutive missing frames for the same session track/item. An unreviewed warning retracts only after two continuous seconds of explicit presence.
 - Zone intrusion opens after four consecutive sampled frames in the same active zone. Restricted-area detection remains immediate.
@@ -37,6 +39,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Frontend
 
 - Live Monitor is the all-camera HLS view with source-coordinate SVG detection overlays.
+- A separate developer-only Vision Compare Lab accepts JPEG/video, sends identical frames to isolated CPU and CUDA workers, renders either overlay, and reports rolling RTT, speedup, completed cycles, and skipped frames without changing the production camera path.
 - `system_admin` has a separate camera configuration page for selecting a mapped camera, previewing HLS, and editing zones and rules.
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
 - Area managers have a server-scoped compliance/event workspace and may resolve or mark false alarm only for events in their assigned area.
@@ -47,12 +50,14 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Backend/Vision consumes RTSP at a bounded 2 FPS sample rate. Browsers consume authenticated HLS through the public streamer gateway; MJPEG remains the rollback transport.
 - MediaMTX is private. Streamer administration uses Basic Auth; P-047 browser playback uses short-lived Bearer tokens. Secrets remain outside frontend build variables.
 - `scripts/deploy_all_production.sh` gates, publishes, redeploys, waits for Railway success, and checks both health endpoints.
-- `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.
+- `Dockerfile.ai` remains the CPU proof/rollback worker. `Dockerfile.ai.gpu` packages the same `/ping` and `/v1/infer` contract with pinned PyTorch `2.9.1+cu128` for RunPod; deployment remains a separate rollout step.
 
 ## Latest Verification
 
 - `VISION_PROVIDER=local make check` passes after rebasing the remote Vision worker onto `develop2`: Ruff/ESLint/type-check/build pass, frontend `72 passed`, core/streamer `46 passed`, and backend/Vision `210 passed`.
 - The standalone `p047-vision:dev` CPU image builds successfully and its live `/ping` smoke returns `safety_vision_v1`; frontend dependency audit reports zero known vulnerabilities after the compatible `nanoid` patch update.
+- `make check` passes for the CUDA worker and benchmark change: frontend `72 passed`, core/streamer `50 passed`, and backend/Vision `213 passed`. The `p047-vision:gpu-dev` image builds for `linux/amd64`, reports Torch `2.9.1+cu128` with CUDA runtime `12.8`, runs as `appuser`, and fails fast as expected on a host without an NVIDIA GPU. The benchmark has `4 passed` focused tests and completes a real synthetic CPU/ByteTrack smoke; a CUDA measurement remains intentionally pending on NVIDIA hardware.
+- `make check` passes with Vision Compare Lab included: frontend `79 passed`, core/streamer `50 passed`, and backend/Vision `213 passed`; Ruff, formatting, ESLint, type-check, and production build pass. Its focused contract/UI coverage is `7 passed`, the real Vite entrypoint serves successfully, and the launcher passes shell syntax/dry-run checks. Real browser/GPU measurement remains pending because this workstation has no NVIDIA runtime and browser DevTools automation is not configured.
 - Production `p047-app` deployment `ffa10050-7657-4bab-8014-a411d044b09a` and streamer deployment `851de566-1c31-492d-8d68-04f234c0b914` reached `SUCCESS`.
 - Public authenticated HLS smoke returned non-empty manifests for `xuong1` and `xuong2`; direct authenticated MediaMTX and streamer-gateway playlist checks returned `200`.
 - Latest focused evidence: PPE API `20 passed`, per-zone inference `2 passed`, camera/RTSP backend `13 passed`, frontend focused tests `15 passed`, plus TypeScript, ESLint, production build, and focused Ruff checks.
@@ -68,7 +73,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Complete US-13 protocol, representative ground truth, calibration/final split, accuracy thresholds, association/tracking evidence, and target-device latency.
 - Configure S3 snapshot storage so production application health can become fully ready.
 - Configure and exercise the GitHub production environment, first protected release PR, and immutable rollback procedure.
-- Deploy one remote Vision worker, verify backend-to-worker health/inference, and benchmark the Railway/RunPod hop before GPU optimization.
+- Push the immutable GPU worker image, deploy one RunPod Load Balancer worker with `active workers = 0` and `max workers = 1`, then verify real CUDA inference and benchmark the Railway/RunPod hop.
 
 ## Known Limitations
 
@@ -86,4 +91,4 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 4. Finalize and execute the US-13 evaluation protocol.
 5. Run the four-camera capacity soak and close production readiness dependencies.
 6. Implement retention cleanup and automate the proven US-08 browser sequence.
-7. Deploy and benchmark the single-worker remote Safety Vision path before adding GPU or worker affinity.
+7. Push and deploy the single-worker CUDA Safety Vision image on RunPod, verify one real GPU frame, and benchmark cold/warm Railway-to-RunPod latency before changing worker count or affinity.

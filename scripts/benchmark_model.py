@@ -14,6 +14,7 @@ import numpy as np
 
 DEFAULT_SOURCE = "data/test.mp4"
 DEFAULT_MODEL = "models/yolo11m_safety.pt"
+SYNTHETIC_SIZE = 640
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -50,6 +51,24 @@ def load_frames(source: Path, limit: int | None) -> list[np.ndarray]:
     return frames
 
 
+def create_synthetic_frames(limit: int | None) -> list[np.ndarray]:
+    """Create a deterministic input when no authorized camera frame is available."""
+    frame = np.zeros((SYNTHETIC_SIZE, SYNTHETIC_SIZE, 3), dtype=np.uint8)
+    frame[:, :, 0] = np.arange(SYNTHETIC_SIZE, dtype=np.uint8)[None, :]
+    frame[:, :, 1] = np.arange(SYNTHETIC_SIZE, dtype=np.uint8)[:, None]
+    cv2.rectangle(frame, (160, 80), (480, 600), (40, 180, 220), thickness=-1)
+    return [frame.copy() for _ in range(limit or 1)]
+
+
+def load_benchmark_frames(
+    source: Path,
+    limit: int | None,
+    *,
+    synthetic: bool,
+) -> list[np.ndarray]:
+    return create_synthetic_frames(limit) if synthetic else load_frames(source, limit)
+
+
 def synchronize_device(device: str) -> None:
     if device == "cpu":
         return
@@ -62,7 +81,7 @@ def synchronize_device(device: str) -> None:
 def summarize(
     *,
     model: str,
-    source: Path,
+    source: Path | str,
     frames: list[np.ndarray],
     warmup: int,
     iterations: int,
@@ -100,10 +119,11 @@ def benchmark(
     frame_limit: int | None,
     confidence: float,
     device: str,
+    synthetic: bool = False,
 ) -> dict[str, Any]:
     from ultralytics import YOLO
 
-    frames = load_frames(source, frame_limit)
+    frames = load_benchmark_frames(source, frame_limit, synthetic=synthetic)
     model = YOLO(str(model_path))
     predict_options: dict[str, Any] = {"conf": confidence, "verbose": False}
     if device != "auto":
@@ -124,7 +144,7 @@ def benchmark(
 
     return summarize(
         model=str(model_path),
-        source=source,
+        source="synthetic://640x640" if synthetic else source,
         frames=frames,
         warmup=warmup,
         iterations=total_iterations,
@@ -143,17 +163,28 @@ def benchmark_pipeline(
     frame_limit: int | None,
     confidence: float,
     device: str,
+    synthetic: bool = False,
+    tracking: bool = False,
 ) -> dict[str, Any]:
     from ultralytics import YOLO
 
-    frames = load_frames(source, frame_limit)
+    frames = load_benchmark_frames(source, frame_limit, synthetic=synthetic)
     model = YOLO(str(model_path))
     predict_options: dict[str, Any] = {"conf": confidence, "verbose": False}
     if device != "auto":
         predict_options["device"] = device
 
     def run(frame: np.ndarray) -> None:
-        model.predict(frame, classes=[0, 3, 4], **predict_options)
+        if tracking:
+            model.track(
+                frame,
+                persist=True,
+                tracker="bytetrack.yaml",
+                classes=[0, 3, 4],
+                **predict_options,
+            )
+        else:
+            model.predict(frame, classes=[0, 3, 4], **predict_options)
 
     for index in range(warmup):
         run(frames[index % len(frames)])
@@ -169,7 +200,7 @@ def benchmark_pipeline(
 
     report = summarize(
         model=str(model_path),
-        source=source,
+        source="synthetic://640x640" if synthetic else source,
         frames=frames,
         warmup=warmup,
         iterations=total_iterations,
@@ -179,7 +210,69 @@ def benchmark_pipeline(
     )
     report["pipeline"] = [str(model_path)]
     report["pipeline_classes"] = [[0, 3, 4]]
+    report["tracking"] = tracking
     return report
+
+
+def build_device_comparison(
+    *,
+    cpu_report: dict[str, Any],
+    gpu_report: dict[str, Any],
+    gpu_info: dict[str, Any],
+) -> dict[str, Any]:
+    cpu_mean = float(cpu_report["latency_ms"]["mean"])
+    gpu_mean = float(gpu_report["latency_ms"]["mean"])
+    cpu_fps = float(cpu_report["throughput_fps"])
+    gpu_fps = float(gpu_report["throughput_fps"])
+    return {
+        "comparison": "cpu_vs_cuda",
+        "gpu": gpu_info,
+        "cpu_report": cpu_report,
+        "gpu_report": gpu_report,
+        "speedup": {
+            "mean_latency": cpu_mean / gpu_mean if gpu_mean else 0.0,
+            "throughput": gpu_fps / cpu_fps if cpu_fps else 0.0,
+        },
+    }
+
+
+def cuda_device_info() -> dict[str, Any]:
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is unavailable. Check nvidia-smi, NVIDIA Container Toolkit, and docker --gpus all.")
+    properties = torch.cuda.get_device_properties(0)
+    return {
+        "name": torch.cuda.get_device_name(0),
+        "memory_gb": round(properties.total_memory / 1024**3, 2),
+        "torch": torch.__version__,
+        "cuda_runtime": torch.version.cuda,
+    }
+
+
+def render_comparison_summary(report: dict[str, Any]) -> str:
+    cpu = report["cpu_report"]
+    gpu = report["gpu_report"]
+    speedup = report["speedup"]
+    return "\n".join(
+        [
+            "=== P-047 CPU vs NVIDIA GPU benchmark ===",
+            f"GPU: {report['gpu']['name']} ({report['gpu']['memory_gb']:.2f} GB)",
+            "Device    Mean ms    P50 ms    P95 ms    FPS",
+            _summary_row("CPU", cpu),
+            _summary_row("CUDA", gpu),
+            f"GPU mean-latency speedup: {speedup['mean_latency']:.2f}x",
+            f"GPU throughput speedup:   {speedup['throughput']:.2f}x",
+        ]
+    )
+
+
+def _summary_row(label: str, report: dict[str, Any]) -> str:
+    latency = report["latency_ms"]
+    return (
+        f"{label:<8} {latency['mean']:>8.2f} {latency['p50']:>9.2f} "
+        f"{latency['p95']:>9.2f} {report['throughput_fps']:>7.2f}"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -189,6 +282,21 @@ def parse_args() -> argparse.Namespace:
         "--pipeline",
         action="store_true",
         help="Match runtime with one Safety model call for person, hat and vest.",
+    )
+    parser.add_argument(
+        "--tracking",
+        action="store_true",
+        help="Include session-style ByteTrack work in pipeline mode.",
+    )
+    parser.add_argument(
+        "--compare-cpu-gpu",
+        action="store_true",
+        help="Run the same benchmark on CPU and cuda:0, then report the speedup.",
+    )
+    parser.add_argument(
+        "--synthetic",
+        action="store_true",
+        help="Use a deterministic 640x640 frame instead of reading --source.",
     )
     parser.add_argument("--source", type=Path, default=Path(DEFAULT_SOURCE))
     parser.add_argument("--warmup", type=int, default=5)
@@ -207,33 +315,40 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if not args.source.exists():
+    if not args.synthetic and not args.source.exists():
         raise SystemExit(f"Source not found: {args.source}")
 
+    if not args.model.exists():
+        raise SystemExit(f"Model not found: {args.model}")
+
+    common_options = {
+        "model_path": args.model,
+        "source": args.source,
+        "warmup": args.warmup,
+        "iterations": args.iterations,
+        "frame_limit": args.frames,
+        "confidence": args.confidence,
+        "synthetic": args.synthetic,
+    }
+    runner = benchmark_pipeline if args.pipeline else benchmark
     if args.pipeline:
-        if not args.model.exists():
-            raise SystemExit(f"Model not found: {args.model}")
-        result = benchmark_pipeline(
-            model_path=args.model,
-            source=args.source,
-            warmup=args.warmup,
-            iterations=args.iterations,
-            frame_limit=args.frames,
-            confidence=args.confidence,
-            device=args.device,
+        common_options["tracking"] = args.tracking
+
+    if args.compare_cpu_gpu:
+        try:
+            gpu_info = cuda_device_info()
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+        cpu_report = runner(device="cpu", **common_options)
+        gpu_report = runner(device="cuda:0", **common_options)
+        result = build_device_comparison(
+            cpu_report=cpu_report,
+            gpu_report=gpu_report,
+            gpu_info=gpu_info,
         )
+        print(render_comparison_summary(result))
     else:
-        if not args.model.exists():
-            raise SystemExit(f"Model not found: {args.model}")
-        result = benchmark(
-            model_path=args.model,
-            source=args.source,
-            warmup=args.warmup,
-            iterations=args.iterations,
-            frame_limit=args.frames,
-            confidence=args.confidence,
-            device=args.device,
-        )
+        result = runner(device=args.device, **common_options)
     rendered = json.dumps(result, ensure_ascii=False, indent=2)
     print(rendered)
     if args.output:
