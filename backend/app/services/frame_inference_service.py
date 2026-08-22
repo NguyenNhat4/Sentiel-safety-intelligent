@@ -12,6 +12,7 @@ from backend.app.integrations.ppe_vision import (
     SafetyVisionAnalyzer,
     get_ppe_vision_adapter,
 )
+from backend.app.integrations.remote_vision import get_remote_vision_adapter
 from backend.app.schemas.analysis import (
     ActiveViolation as ActiveViolationSchema,
 )
@@ -39,7 +40,7 @@ class StaleFrameError(ValueError):
 
 
 class FrameInferenceService:
-    """Small baseline detector for the browser video review flow."""
+    """Evaluate one frame for browser compatibility and server-side camera flows."""
 
     def __init__(
         self,
@@ -54,10 +55,28 @@ class FrameInferenceService:
         settings = get_settings()
         self._model_path = model_path or settings.ppe_model_path
         self._fallback_model = None
-        adapter = get_ppe_vision_adapter(self._model_path)
-        self._vision_analyzer = vision_analyzer or (adapter.analyze if ppe_observer is None else None)
-        self._ppe_observer = ppe_observer or adapter.observe
-        self._model_preloader = adapter.preload if vision_analyzer is None and ppe_observer is None else lambda: None
+        if vision_analyzer is not None:
+            self._vision_analyzer = vision_analyzer
+            self._ppe_observer = ppe_observer
+            self._model_preloader = lambda: None
+        elif ppe_observer is not None:
+            self._vision_analyzer = None
+            self._ppe_observer = ppe_observer
+            self._model_preloader = lambda: None
+        elif settings.vision_provider == "remote":
+            adapter = get_remote_vision_adapter(
+                base_url=settings.vision_remote_url,
+                api_key=settings.vision_remote_api_key.get_secret_value(),
+                timeout_seconds=settings.vision_remote_timeout_seconds,
+            )
+            self._vision_analyzer = adapter.analyze
+            self._ppe_observer = None
+            self._model_preloader = adapter.preload
+        else:
+            adapter = get_ppe_vision_adapter(self._model_path)
+            self._vision_analyzer = adapter.analyze
+            self._ppe_observer = adapter.observe
+            self._model_preloader = adapter.preload
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)

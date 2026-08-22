@@ -50,6 +50,8 @@ Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. V�
 | `DATABASE_FALLBACK_ENABLED` | Cờ tương thích cũ đang chờ xóa | Luôn đặt `false`; PostgreSQL lỗi thì startup/migration phải fail |
 | `SNAPSHOT_STORAGE_*` | S3-compatible bucket cho snapshot đã redact | Điền bucket, endpoint và credential ở môi trường có S3; không đưa secrets vào tài liệu |
 | `PPE_MODEL_PATH` | Checkpoint an toàn | Phải trỏ đến `models/yolo11m_safety.pt` |
+| `VISION_PROVIDER` | Nơi chạy Safety Vision | `local` mặc định; `remote` gọi worker HTTP độc lập |
+| `VISION_REMOTE_*` | URL, bearer key và timeout của worker | Chỉ đặt trên backend; không đưa key vào frontend |
 | `FACE_DETECTOR_MODEL_PATH` | YuNet privacy detector | Phải trỏ đến `models/face_detection_yunet_2023mar.onnx` |
 | `FACE_DETECTOR_SCORE_THRESHOLD` | Ngưỡng face YuNet | Mặc định `0.6`; person không có face sẽ dùng fallback 40% |
 | `FACE_REDACTION_MARGIN_RATIO` | Biên mở rộng face trước blur | Mặc định `0.2` |
@@ -307,6 +309,8 @@ nghĩa từng tham số Docker.
 ## CI/CD và release
 
 Pipeline GitHub Actions kiểm tra PR vào `main`, deploy Railway chỉ sau CI xanh và hỗ trợ rollback theo SHA/tag. Thành viên mới cấu hình Environment, Railway Variables, branch protection và vận hành release theo [CI/CD và Railway release](docs/CI_CD.md).
+
+Image CPU và quy trình tách model sang service riêng/RunPod nằm trong [hướng dẫn triển khai Safety Vision worker](docs/RUNPOD_VISION_DEPLOYMENT.md).
 
 ## Kiểm tra
 

@@ -5,6 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from backend.app.api.v1.auth import create_hls_token, require_hls_viewer
+from backend.app.core.config import get_settings
 from backend.app.models.stream_configuration import StreamConfiguration
 from backend.app.models.user import User, UserRole
 from backend.app.services.auth_service import hash_password
@@ -17,6 +18,7 @@ def _decode_payload(token: str) -> dict[str, object]:
 
 def test_safety_manager_receives_fifteen_minute_hls_token_for_all_cameras(db_session, monkeypatch) -> None:
     monkeypatch.setenv("HLS_TOKEN_SECRET", "test-secret-that-is-at-least-thirty-two-bytes")
+    get_settings.cache_clear()
     db_session.add(
         StreamConfiguration(
             id=1,
@@ -35,7 +37,10 @@ def test_safety_manager_receives_fifteen_minute_hls_token_for_all_cameras(db_ses
         )
         db_session.add(actor)
         db_session.commit()
-    response = create_hls_token(actor=actor, db=db_session)
+    try:
+        response = create_hls_token(actor=actor, db=db_session)
+    finally:
+        get_settings.cache_clear()
 
     assert response.expires_in == 900
     assert response.token_type == "bearer"

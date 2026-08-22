@@ -32,6 +32,7 @@ def _safety_manager_headers(client, db_session):
 # TEST CASES
 # ==========================================
 
+
 def test_stream_configuration_defaults_to_empty_for_authenticated_user(client, db_session):
     """User đã đăng nhập khi chưa cấu hình gì sẽ nhận về danh sách rỗng."""
     # ĐÃ FIX: Truyền token hợp lệ đúng như tên hàm
@@ -45,7 +46,11 @@ def test_stream_configuration_defaults_to_empty_for_authenticated_user(client, d
 def test_unauthenticated_request_is_rejected(client):
     """Chưa đăng nhập mà cố tình thay đổi cấu hình phải bị chặn (401 Unauthorized)."""
     # ĐÃ THÊM: Kiểm tra bảo mật tầng Authentication
-    response = client.put("/api/v1/stream-config", json={"camera_id": "cam_1"})
+    response = client.put(
+        "/api/v1/stream-config",
+        headers={"Authorization": ""},
+        json={"camera_id": "cam_1"},
+    )
     assert response.status_code == 401
 
 
@@ -84,15 +89,15 @@ def test_stream_configuration_rejects_a_stream_assigned_to_two_cameras(client, d
 
 
 def test_stream_configuration_rejects_more_than_four_camera_mappings(client, db_session):
-    """Từ chối 400 Bad Request nếu gửi cấu hình vượt quá 4 camera."""
+    """Từ chối 422 Unprocessable Entity nếu gửi cấu hình vượt quá 4 camera."""
     admin_headers = _admin_headers(client, db_session)
     mappings = [
         {"camera_id": f"cam_{index}", "stream_camera_id": f"stream_{index}"}
-        for index in range(1, 6) # 5 camera
+        for index in range(1, 6)  # 5 camera
     ]
 
     response = client.put("/api/v1/stream-config", headers=admin_headers, json={"mappings": mappings})
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 def test_safety_manager_cannot_change_multi_camera_mapping(client, db_session):

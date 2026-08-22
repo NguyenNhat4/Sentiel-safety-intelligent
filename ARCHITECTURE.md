@@ -37,7 +37,9 @@ flowchart LR
     backendApi --> backendService[Backend service]
     backendService --> modelCore[Model, schema, core]
     backendService --> integration[Integration adapter]
-    integration --> visionFacade[Vision facade or provider]
+    integration --> localVision[Local vision facade]
+    integration --> remoteWorker[Remote safety vision HTTP worker]
+    remoteWorker --> workerVision[Worker vision facade]
 ```
 
 Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
@@ -57,9 +59,7 @@ Các bất biến an toàn:
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
 machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
-event history, PPE production model và RBAC. PostgreSQL là database duy nhất cho mọi môi trường;
-SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất
-chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
+event history, PPE production model và RBAC. Safety Vision có thể chạy trong backend hoặc qua worker HTTP `safety_vision_v1`; cả REST/WebSocket browser và vòng RTSP server-side đều tiếp tục đi qua `FrameInferenceService`, còn rule, occurrence, HITL và persistence vẫn thuộc backend. PostgreSQL là database duy nhất cho mọi môi trường; SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 

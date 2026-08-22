@@ -31,7 +31,7 @@ Baseline hiện có:
 
 - React 19 + TypeScript + Vite cho monitor, FastAPI cho REST/WebSocket và frontend build.
 - Upload video local; tạo, lưu nhiều vùng bốn điểm không chồng nhau; zone intrusion đang bật luôn cảnh báo, còn machine state chỉ gate PPE.
-- YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; `person` là nguồn canonical cho tracking/zone, PPE công khai chỉ dùng `hat`/`vest`.
+- YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
 - PostgreSQL là database duy nhất cho local, test và deployment; không dùng SQLite hoặc database fallback. Session authentication hỗ trợ ba role.
 
@@ -41,8 +41,10 @@ Các khoảng trống lớn là benchmark/calibration trên dữ liệu nhà má
 React frontend
     ↓ REST / WebSocket contract
 FastAPI modular monolith
-    ↓ public facade
-Vision pipeline (YOLO + tracking + zone + privacy)
+    ↓ integration adapter
+Local vision facade hoặc remote Safety Vision worker
+    ↓ backend rule/privacy
+Tracking result + zone/rule + privacy
     ↓
 PostgreSQL / blurred object storage
 ```
@@ -55,6 +57,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 |---|---|
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
 | Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/CI_CD.md) |
+| Tách/deploy YOLO worker CPU hoặc RunPod | [Safety Vision worker deployment](docs/RUNPOD_VISION_DEPLOYMENT.md) |
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
 | Chọn story và acceptance criteria | [User Story Backlog](specs/USER_STORIES_LIST.md) |

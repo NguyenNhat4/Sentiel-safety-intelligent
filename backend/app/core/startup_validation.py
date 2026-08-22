@@ -38,7 +38,9 @@ def validate_runtime_files(settings: Settings) -> dict[str, bool]:
     if not hasattr(cv2, "FaceDetectorYN_create"):
         raise RuntimeError("Installed OpenCV build does not provide FaceDetectorYN")
 
-    model_paths = (Path(settings.ppe_model_path), Path(settings.face_detector_model_path))
+    model_paths = [Path(settings.face_detector_model_path)]
+    if settings.vision_provider == "local":
+        model_paths.append(Path(settings.ppe_model_path))
     for model_path in model_paths:
         expected = REQUIRED_MODEL_CHECKSUMS.get(model_path.name)
         if expected is None:

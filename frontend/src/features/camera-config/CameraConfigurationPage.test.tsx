@@ -77,3 +77,16 @@ it("selects a mapped camera and shows its video, zones and rules", async () => {
   expect(screen.getByLabelText("Cấu hình Camera 2")).toBeInTheDocument();
   expect(screen.getByText("Chưa có vùng nào")).toBeInTheDocument();
 });
+
+it("removes a zone locally and persists the deletion only when saved", async () => {
+  render(<CameraConfigurationPage />);
+
+  expect(await screen.findByRole("option", {name: "Máy dập"})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Xóa vùng"}));
+
+  expect(screen.getByRole("option", {name: "Chưa có vùng nào"})).toBeInTheDocument();
+  expect(saveZonesMock).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", {name: "Lưu vùng"}));
+  await waitFor(() => expect(saveZonesMock).toHaveBeenCalledWith("cam_1", 1, []));
+});

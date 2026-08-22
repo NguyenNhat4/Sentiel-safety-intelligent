@@ -78,3 +78,23 @@ def test_validate_runtime_files_rejects_wrong_yunet_checksum(tmp_path, monkeypat
                 operational_metrics_log_path="data/operational-metrics.jsonl",
             )
         )
+
+
+def test_remote_vision_does_not_require_local_ppe_checkpoint(tmp_path, monkeypatch):
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    yunet = model_dir / "face_detection_yunet_2023mar.onnx"
+    yunet.write_bytes(b"yunet")
+    monkeypatch.setitem(REQUIRED_MODEL_CHECKSUMS, yunet.name, hashlib.sha256(b"yunet").hexdigest())
+    monkeypatch.chdir(tmp_path)
+
+    result = validate_runtime_files(
+        Settings(
+            vision_provider="remote",
+            vision_remote_url="https://vision.example",
+            face_detector_model_path=str(yunet),
+            operational_metrics_log_path="data/operational-metrics.jsonl",
+        )
+    )
+
+    assert result == {"data_writable": True, "models_verified": True}

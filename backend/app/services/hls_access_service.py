@@ -23,7 +23,7 @@ def issue_hls_access_token(
     encoded = base64.urlsafe_b64encode(
         json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).rstrip(b"=")
-    signature = base64.urlsafe_b64encode(
-        hmac.new(secret.encode("utf-8"), encoded, hashlib.sha256).digest()
-    ).rstrip(b"=")
+    signature = base64.urlsafe_b64encode(hmac.new(secret.encode("utf-8"), encoded, hashlib.sha256).digest()).rstrip(
+        b"="
+    )
     return f"{encoded.decode()}.{signature.decode()}", HLS_TOKEN_TTL_SECONDS

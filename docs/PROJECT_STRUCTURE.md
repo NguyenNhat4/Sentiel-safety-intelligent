@@ -15,6 +15,8 @@ P-047/
 │       └── dependency-audit.yml # Non-blocking nightly dependency audit
 ├── alembic.ini          # Alembic entrypoint for backend migrations
 ├── docker-compose.yml   # PostgreSQL, backend, streamer and exact-version MediaMTX gateway
+├── Dockerfile.ai        # CPU proof image for the standalone Safety Vision worker
+├── requirements.ai.txt  # Minimal runtime dependencies for the worker image
 ├── backend/             # Modular Monolith FastAPI Backend
 │   ├── app/
 │   │   ├── api/         # API Routers (v1 REST endpoints, WebSocket & AI Safety Agent)
@@ -38,6 +40,7 @@ P-047/
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
+│   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   │   ├── rtsp_frame_source.py # Validated reconnectable RTSP reader and sampling
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
@@ -45,6 +48,7 @@ P-047/
 │   │   │   ├── event.py
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
+│   │   │   ├── remote_vision.py # Worker health/inference wire contract
 │   │   │   ├── stream_configuration.py
 │   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
@@ -74,6 +78,7 @@ P-047/
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
+│   │   ├── vision_worker.py # Standalone FastAPI Safety Vision worker entrypoint
 │   │   └── main.py      # FastAPI App entrypoint
 │   ├── migrations/      # Alembic DB Migrations
 │   │   ├── README.md
@@ -105,6 +110,8 @@ P-047/
 │       ├── test_event_audit_migration.py
 │       ├── test_frame_inference_ppe.py
 │       ├── test_hls_access.py # HLS token TTL, role and mapped-stream scope
+│       ├── test_remote_vision.py # Outbound worker adapter contract
+│       ├── test_vision_worker.py # Standalone worker API contract
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
 │       ├── test_ppe_profile_migration.py
@@ -199,10 +206,12 @@ P-047/
 │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   ├── streamer-concurrency-and-memory.md # Beginner guide to MJPEG fan-out, memory and 100-client load testing
 │   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
+│   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook
 │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   └── plans/                       # Implementation-ready plans and their reading guide
 │       ├── 2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md # RTSP/HLS migration plan
+│       ├── 2026-08-21-001-feat-remote-vision-service-plan.md # Remote worker implementation plan
 │       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md
 ├── specs/               # Product requirements and PRD-aligned user story backlog
 │   ├── README.md
