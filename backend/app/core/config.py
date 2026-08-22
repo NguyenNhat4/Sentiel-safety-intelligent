@@ -65,11 +65,14 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
-    violation_frame: int = Field(default=5, ge=1, le=60)
+    person_detection_confidence: float = Field(default=0.6, gt=0.0, le=1.0)
+    ppe_detection_confidence: float = Field(default=0.2, gt=0.0, le=1.0)
+    yolo_inference_image_size: int = Field(default=960, ge=32, le=4096, multiple_of=32)
+    ppe_temporal_frames: int = Field(default=10, ge=1, le=60)
+    violation_frame: int = Field(default=4, ge=1, le=60)
     # Local commands load development defaults. Docker and managed platforms pass
     # production settings as process environment variables.
     model_config = SettingsConfigDict(env_file=".env.development", env_file_encoding="utf-8", extra="ignore")
-    # Violate frame least confidence threshold for PPE & Danger Zone detection
 
     def validate_snapshot_storage(self) -> None:
         if self.snapshot_storage_backend != "s3":

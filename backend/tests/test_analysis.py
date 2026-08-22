@@ -9,6 +9,7 @@ import pytest
 from backend.app.api.v1.analysis import frame_inference_service
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.ppe_requirement_service import PpeRequirementService
 from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
@@ -23,6 +24,7 @@ def jpeg_bytes(width=160, height=120):
 def use_stubbed_vision_observations(monkeypatch):
     """Keep analysis rule tests independent from the installed vision model."""
     monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
+    monkeypatch.setattr(frame_inference_service, "_model_preloader", lambda: None)
     monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
     monkeypatch.setattr(
         frame_inference_service,
@@ -358,3 +360,108 @@ def test_inference_websocket_rejects_stale_frame_id(client, monkeypatch):
 
     assert stale["type"] == "error"
     assert stale["code"] == "stale_frame"
+
+
+def test_inference_websocket_opens_ppe_review_on_fourth_raw_miss(client, monkeypatch):
+    observations = iter(
+        [
+            ("present", 0.91, False),
+            ("present", 0.91, False),
+            ("present", 0.91, False),
+            ("present", None, False),
+            ("present", None, False),
+            ("present", None, False),
+            ("unknown", None, True),
+        ]
+    )
+
+    def analyze(frame, monitoring_session_id, now):
+        status, confidence, absence_confirmed = next(observations)
+        return {
+            "canonical_people": [(40, 60, 40, 50, 0.95, 7)],
+            "people": [
+                {
+                    "hat": {"status": status, "confidence": confidence},
+                    "vest": {"status": "present", "confidence": 0.88},
+                }
+            ],
+            "detections": [],
+            "absence_confirmed": [{"hat": absence_confirmed, "vest": False}],
+        }
+
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", analyze)
+    monkeypatch.setattr(
+        PpeRequirementService,
+        "get",
+        lambda self, camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    upper_zone = [
+        {"x": 0.1, "y": 0.05},
+        {"x": 0.9, "y": 0.05},
+        {"x": 0.9, "y": 0.5},
+        {"x": 0.1, "y": 0.5},
+    ]
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, upper_zone)
+        results = [send_inference_websocket_frame(websocket, frame_id=frame_id) for frame_id in range(1, 8)]
+
+    assert [result["result"] for result in results] == ["normal"] * 6 + ["violate"]
+    assert [result["review_required"] for result in results] == [False] * 6 + [True]
+    assert results[-1]["people"][0]["active_violations"][0]["rule_key"] == "missing_ppe:hat"
+
+
+def test_inference_websocket_waits_for_three_initial_ppe_misses(client, monkeypatch):
+    confirmations = iter([False, False, True])
+
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(40, 60, 40, 50, 0.95, 7)],
+            "people": [
+                {
+                    "hat": {"status": "unknown", "confidence": None},
+                    "vest": {"status": "present", "confidence": 0.88},
+                }
+            ],
+            "detections": [],
+            "absence_confirmed": [{"hat": next(confirmations), "vest": False}],
+        }
+
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", analyze)
+    monkeypatch.setattr(
+        PpeRequirementService,
+        "get",
+        lambda self, camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    upper_zone = [
+        {"x": 0.1, "y": 0.05},
+        {"x": 0.9, "y": 0.05},
+        {"x": 0.9, "y": 0.5},
+        {"x": 0.1, "y": 0.5},
+    ]
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, upper_zone)
+        results = [send_inference_websocket_frame(websocket, frame_id=frame_id) for frame_id in range(1, 4)]
+
+    assert [result["people"][0]["ppe"]["hat"]["status"] for result in results] == [
+        "unknown",
+        "unknown",
+        "missing",
+    ]
+    assert [result["result"] for result in results] == ["normal", "normal", "violate"]
+    assert [result["review_required"] for result in results] == [False, False, True]

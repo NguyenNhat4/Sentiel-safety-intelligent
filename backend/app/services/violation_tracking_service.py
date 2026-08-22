@@ -27,6 +27,7 @@ class ViolationTrackingService:
         self,
         *,
         activation_frames: int = 1,
+        activation_frames_by_rule_prefix: dict[str, int] | None = None,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 2.0,
@@ -35,7 +36,11 @@ class ViolationTrackingService:
     ) -> None:
         if activation_frames < 1:
             raise ValueError("activation_frames must be at least 1")
+        activation_overrides = activation_frames_by_rule_prefix or {}
+        if any(not prefix or frames < 1 for prefix, frames in activation_overrides.items()):
+            raise ValueError("rule activation prefixes must be non-empty and frame counts must be at least 1")
         self._activation_frames = activation_frames
+        self._activation_frames_by_rule_prefix = dict(activation_overrides)
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
@@ -89,7 +94,7 @@ class ViolationTrackingService:
                     occurrence = _Occurrence(occurrence_id=str(uuid4()))
                     self._occurrences[key] = occurrence
                 occurrence.consecutive_frames += 1
-                is_new = occurrence.consecutive_frames >= self._activation_frames
+                is_new = occurrence.consecutive_frames >= self._activation_frames_for(rule_key)
                 if is_new:
                     occurrence.active = True
                 else:
@@ -140,6 +145,14 @@ class ViolationTrackingService:
         occurrence.lost_frames = 0
         occurrence.cooldown_until = now + self._cooldown_seconds
         occurrence.consecutive_frames = 0
+
+    def _activation_frames_for(self, rule_key: str) -> int:
+        matches = [
+            (len(prefix), frames)
+            for prefix, frames in self._activation_frames_by_rule_prefix.items()
+            if rule_key.startswith(prefix)
+        ]
+        return max(matches)[1] if matches else self._activation_frames
 
     def _handoff_nearby_tracks(
         self,

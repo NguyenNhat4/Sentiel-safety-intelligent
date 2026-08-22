@@ -53,15 +53,28 @@ class FrameInferenceService:
 
         settings = get_settings()
         self._model_path = model_path or settings.ppe_model_path
+        self._person_detection_confidence = settings.person_detection_confidence
+        self._ppe_detection_confidence = settings.ppe_detection_confidence
+        self._inference_image_size = settings.yolo_inference_image_size
+        self._ppe_temporal_frames = settings.ppe_temporal_frames
         self._fallback_model = None
-        adapter = get_ppe_vision_adapter(self._model_path)
+        adapter = get_ppe_vision_adapter(
+            self._model_path,
+            person_confidence_threshold=self._person_detection_confidence,
+            ppe_confidence_threshold=self._ppe_detection_confidence,
+            inference_image_size=self._inference_image_size,
+            temporal_frames=self._ppe_temporal_frames,
+        )
         self._vision_analyzer = vision_analyzer or (adapter.analyze if ppe_observer is None else None)
         self._ppe_observer = ppe_observer or adapter.observe
         self._model_preloader = adapter.preload if vision_analyzer is None and ppe_observer is None else lambda: None
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
-        self._violation_tracker = ViolationTrackingService(activation_frames=settings.violation_frame)
+        self._violation_tracker = ViolationTrackingService(
+            activation_frames=settings.violation_frame,
+            activation_frames_by_rule_prefix={"missing_ppe:": 1},
+        )
 
     def preload_models(self) -> None:
         self._model_preloader()
@@ -99,6 +112,7 @@ class FrameInferenceService:
             for zone in active_zones
         }
 
+        absence_confirmations = None
         if self._vision_analyzer is not None:
             vision_result = self._vision_analyzer(
                 frame,
@@ -107,7 +121,8 @@ class FrameInferenceService:
             )
             detected_people = vision_result["canonical_people"]
             observations = vision_result["people"]
-            detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+            detections = self._public_detections(vision_result["detections"])
+            absence_confirmations = vision_result.get("absence_confirmed")
         else:
             if request.monitoring_session_id is None:
                 detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
@@ -116,7 +131,7 @@ class FrameInferenceService:
             vision_result = self._ppe_observer(frame, [person[:5] for person in detected_people])
             if isinstance(vision_result, dict) and "people" in vision_result:
                 observations = vision_result["people"]
-                detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+                detections = self._public_detections(vision_result["detections"])
             else:
                 observations = vision_result
                 detections = []
@@ -146,6 +161,11 @@ class FrameInferenceService:
                 person_confidence=confidence,
                 box_width=box_width,
                 box_height=box_height,
+                absence_confirmed=(
+                    absence_confirmations[index]
+                    if absence_confirmations is not None and index < len(absence_confirmations)
+                    else None
+                ),
             )
             rule_people.append(RulePersonObservation(confidence=confidence, inside_zone=inside_zone, ppe=ppe))
             people.append(
@@ -303,14 +323,21 @@ class FrameInferenceService:
         person_confidence: float,
         box_width: int,
         box_height: int,
+        absence_confirmed: dict[str, bool] | None = None,
     ) -> PersonPpeObservations:
         if person_confidence < self._missing_ppe_threshold or box_width <= 0 or box_height <= 0:
             return ppe
         values = ppe.model_dump()
         for name, observation in values.items():
-            if observation["status"] == "unknown":
+            if observation["status"] == "unknown" and (absence_confirmed is None or absence_confirmed.get(name, True)):
                 values[name] = {"status": "missing", "confidence": None}
         return PersonPpeObservations.model_validate(values)
+
+    @staticmethod
+    def _public_detections(detections: list[dict]) -> list[ModelDetection]:
+        """Defensively expose only detections associated with a canonical person."""
+        validated = [ModelDetection.model_validate(item) for item in detections]
+        return [detection for detection in validated if detection.person_index is not None]
 
     def _track_people(self, session_id: str, frame: np.ndarray):
         return [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
@@ -326,7 +353,13 @@ class FrameInferenceService:
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
         model = self._load_fallback_model()
 
-        results = model.predict(frame, classes=[3], conf=0.35, verbose=False)
+        results = model.predict(
+            frame,
+            classes=[3],
+            conf=self._person_detection_confidence,
+            imgsz=self._inference_image_size,
+            verbose=False,
+        )
         people = []
         for box in results[0].boxes:
             x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())

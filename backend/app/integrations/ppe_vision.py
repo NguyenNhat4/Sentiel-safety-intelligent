@@ -9,8 +9,21 @@ from vision.api import PpeVisionFacade, PpeVisionResult, SafetyVisionResult
 class PpeVisionAdapter:
     """Backend adapter for unified person/tracking/PPE Safety inference."""
 
-    def __init__(self, model_path: str) -> None:
-        self._facade = PpeVisionFacade(model_path)
+    def __init__(
+        self,
+        model_path: str,
+        person_confidence_threshold: float = 0.6,
+        ppe_confidence_threshold: float = 0.2,
+        inference_image_size: int = 960,
+        temporal_frames: int = 10,
+    ) -> None:
+        self._facade = PpeVisionFacade(
+            model_path,
+            confidence_threshold=ppe_confidence_threshold,
+            person_confidence_threshold=person_confidence_threshold,
+            inference_image_size=inference_image_size,
+            temporal_frames=temporal_frames,
+        )
 
     def observe(
         self,
@@ -32,9 +45,21 @@ class PpeVisionAdapter:
 
 
 @cache
-def get_ppe_vision_adapter(model_path: str) -> PpeVisionAdapter:
+def get_ppe_vision_adapter(
+    model_path: str,
+    person_confidence_threshold: float = 0.6,
+    ppe_confidence_threshold: float = 0.2,
+    inference_image_size: int = 960,
+    temporal_frames: int = 10,
+) -> PpeVisionAdapter:
     """Reuse the validated three-class PPE facade for frame inference."""
-    return PpeVisionAdapter(model_path)
+    return PpeVisionAdapter(
+        model_path,
+        person_confidence_threshold=person_confidence_threshold,
+        ppe_confidence_threshold=ppe_confidence_threshold,
+        inference_image_size=inference_image_size,
+        temporal_frames=temporal_frames,
+    )
 
 
 PpeObserver = Callable[
