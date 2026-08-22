@@ -40,9 +40,11 @@ def _decode_hls_token(token: str, secret: str) -> dict[str, object]:
     try:
         encoded, supplied_signature = token.split(".", 1)
         encoded_bytes = encoded.encode("ascii")
-        expected = base64.urlsafe_b64encode(
-            hmac.new(secret.encode("utf-8"), encoded_bytes, hashlib.sha256).digest()
-        ).rstrip(b"=").decode("ascii")
+        expected = (
+            base64.urlsafe_b64encode(hmac.new(secret.encode("utf-8"), encoded_bytes, hashlib.sha256).digest())
+            .rstrip(b"=")
+            .decode("ascii")
+        )
         if not hmac.compare_digest(supplied_signature, expected):
             raise ValueError
         payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
@@ -313,11 +315,17 @@ def create_app(
         public_hls_origin=public_hls_origin or os.getenv("MEDIA_PUBLIC_ORIGIN", "http://localhost:8888"),
     )
     use_rtsp = rtsp_enabled if rtsp_enabled is not None else os.getenv("MEDIA_RTSP_ENABLED", "false").lower() == "true"
-    configured_admin_username = admin_username if admin_username is not None else os.getenv("STREAMER_ADMIN_USERNAME", "")
-    configured_admin_password = admin_password if admin_password is not None else os.getenv("STREAMER_ADMIN_PASSWORD", "")
+    configured_admin_username = (
+        admin_username if admin_username is not None else os.getenv("STREAMER_ADMIN_USERNAME", "")
+    )
+    configured_admin_password = (
+        admin_password if admin_password is not None else os.getenv("STREAMER_ADMIN_PASSWORD", "")
+    )
     configured_hls_secret = hls_token_secret if hls_token_secret is not None else os.getenv("HLS_TOKEN_SECRET", "")
     configured_hls_upstream = (
-        hls_upstream_origin if hls_upstream_origin is not None else os.getenv("HLS_UPSTREAM_ORIGIN", "http://mediamtx:8888")
+        hls_upstream_origin
+        if hls_upstream_origin is not None
+        else os.getenv("HLS_UPSTREAM_ORIGIN", "http://mediamtx:8888")
     ).rstrip("/")
     cors_origins = [
         origin.strip()

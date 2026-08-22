@@ -32,6 +32,7 @@ def _safety_manager_headers(client, db_session):
 # TEST CASES
 # ==========================================
 
+
 def test_stream_configuration_defaults_to_empty_for_authenticated_user(client, db_session):
     """User đã đăng nhập khi chưa cấu hình gì sẽ nhận về danh sách rỗng."""
     # ĐÃ FIX: Truyền token hợp lệ đúng như tên hàm
@@ -88,7 +89,7 @@ def test_stream_configuration_rejects_more_than_four_camera_mappings(client, db_
     admin_headers = _admin_headers(client, db_session)
     mappings = [
         {"camera_id": f"cam_{index}", "stream_camera_id": f"stream_{index}"}
-        for index in range(1, 6) # 5 camera
+        for index in range(1, 6)  # 5 camera
     ]
 
     response = client.put("/api/v1/stream-config", headers=admin_headers, json={"mappings": mappings})

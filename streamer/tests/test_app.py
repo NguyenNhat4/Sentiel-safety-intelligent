@@ -231,9 +231,7 @@ async def test_hls_gateway_rejects_missing_expired_and_wrong_camera_tokens(tmp_p
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         missing = await client.get("/hls/cameras/cam_1/index.m3u8")
-        stale = await client.get(
-            "/hls/cameras/cam_1/index.m3u8", headers={"Authorization": f"Bearer {expired}"}
-        )
+        stale = await client.get("/hls/cameras/cam_1/index.m3u8", headers={"Authorization": f"Bearer {expired}"})
         wrong_camera = await client.get(
             "/hls/cameras/cam_2/index.m3u8",
             headers={"Authorization": f"Bearer {_hls_token(secret)}"},
