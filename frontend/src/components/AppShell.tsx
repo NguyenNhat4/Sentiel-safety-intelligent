@@ -9,11 +9,12 @@ interface AppShellProps {
   user: AuthenticatedUser;
   onLogout: () => void;
   children: ReactNode;
+  selectedCameraId?: string;
 }
 
-export function AppShell({page, onNavigate, user, onLogout, children}: AppShellProps) {
+export function AppShell({page, onNavigate, user, onLogout, children, selectedCameraId}: AppShellProps) {
   const clock = useClock();
-  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "media-library" ? "Thư viện media" : page === "camera-config" ? "Cấu hình camera" : "Quản trị hệ thống";
+  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "media-library" ? "Thư viện media" : page === "camera-config" ? `Cấu hình Camera ${cameraNumber(selectedCameraId)}` : "Quản trị hệ thống";
   const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map(part => part[0]).join("").toUpperCase();
 
   return <>
@@ -52,6 +53,8 @@ export function AppShell({page, onNavigate, user, onLogout, children}: AppShellP
     </main>
 </>;
 }
+
+function cameraNumber(cameraId?: string): string { return cameraId?.replace("cam_", "") || ""; }
 
 function useClock(): string {
   const [clock, setClock] = useState("--:--:--");

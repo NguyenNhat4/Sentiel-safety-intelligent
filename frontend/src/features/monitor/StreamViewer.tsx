@@ -230,6 +230,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
       snapshot={pendingReview?.snapshot_data}
       people={pendingReview?.people}
       detections={pendingReview?.detections}
+      zones={pendingReview ? configurations[pendingReview.camera_id]?.zones : undefined}
       timer={reviewTimer}
       reviewSaving={reviewSaving}
       alertTitle={reviewTitle}

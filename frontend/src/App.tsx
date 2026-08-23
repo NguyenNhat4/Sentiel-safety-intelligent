@@ -43,9 +43,9 @@ export default function App() {
   if (user.must_change_password) return <ForcedPasswordChangePage user={user} onChanged={handleLogout} />;
 
   return (
-    <AppShell page={page} onNavigate={setPage} user={user} onLogout={() => void handleLogout()}>
-      {page === "monitor" && user.role === "safety_manager" && <MonitorPage role={user.role} onConfigure={cameraId => { setSelectedCameraId(cameraId); setPage("camera-config"); }} />}
-      {page === "camera-config" && user.role === "safety_manager" && selectedCameraId && <CameraConfigurationPage cameraId={selectedCameraId} onBack={() => setPage("monitor")} onSaved={() => setPage("monitor")} />}
+    <AppShell page={page} onNavigate={setPage} user={user} selectedCameraId={selectedCameraId} onLogout={() => void handleLogout()}>
+      {user.role === "safety_manager" && <MonitorPage active={page === "monitor"} role={user.role} onConfigure={cameraId => { setSelectedCameraId(cameraId); setPage("camera-config"); }} />}
+      {user.role === "safety_manager" && selectedCameraId && <CameraConfigurationPage active={page === "camera-config"} cameraId={selectedCameraId} showTitle={false} onBack={() => setPage("monitor")} onSaved={() => setPage("monitor")} />}
       {page === "media-library" && user.role === "system_admin" && <MediaLibraryPage />}
       {page === "events" && <EventLogPage active />}
       {page === "operations" && <OperationalMetricsPage active />}

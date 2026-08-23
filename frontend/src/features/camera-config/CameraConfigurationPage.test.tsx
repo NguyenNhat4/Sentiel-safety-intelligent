@@ -16,6 +16,7 @@ const zone = {
   ppe_requirements: {profile: "hat_vest_v1" as const, hat_required: false, vest_required: false, restricted_area_detection_enabled: false, zone_intrusion_enabled: true},
 };
 const configuration = {camera_id: "cam_3", revision: 7, asset_id: "asset-1", machine_state: "stopped" as const, zones: [zone], updated_at: null};
+const emptyConfiguration = {...configuration, zones: []};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -60,4 +61,20 @@ it("keeps the controlled draft and reports a revision conflict", async () => {
   fireEvent.click(vest); fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình"}));
   expect(await screen.findByRole("alert")).toHaveTextContent("Cấu hình đã thay đổi ở nơi khác.");
   expect(vest).toBeChecked();
+});
+
+it("saves PPE changes without requiring a zone and does not show zone-only switches", async () => {
+  loadMock.mockResolvedValue(emptyConfiguration);
+  saveMock.mockResolvedValue({...emptyConfiguration, revision: 8});
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  const hat = await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"});
+  expect(screen.queryByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).not.toBeInTheDocument();
+  fireEvent.click(hat);
+
+  const save = screen.getByRole("button", {name: "Lưu cấu hình"});
+  expect(save).toBeEnabled();
+  fireEvent.click(save);
+  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({zones: []})));
 });

@@ -175,6 +175,7 @@ describe("Sentinel React application", () => {
     expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: "Cấu hình Camera 2"}));
     expect(await screen.findByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+    expect(screen.queryAllByText("Cấu hình Camera 2")).toHaveLength(1);
     expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   });
 
