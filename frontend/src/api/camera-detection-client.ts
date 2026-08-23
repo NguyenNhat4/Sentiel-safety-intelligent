@@ -1,10 +1,11 @@
-import type {CameraInferenceResult} from "../types";
+import type {CameraInferenceResult, CameraSessionStatusEvent} from "../types";
 import {cameraDetectionWebSocketUrls} from "./config";
 
 interface Options {
   accessToken: string;
   cameraIds: string[];
   onResult: (result: CameraInferenceResult) => void;
+  onSessionStatus?: (status: CameraSessionStatusEvent) => void;
   onFailure: (message: string) => void;
   socketFactory?: (url: string) => WebSocket;
   socketUrls?: string[];
@@ -53,13 +54,15 @@ export class CameraDetectionClient {
       socket.addEventListener("message", event => {
         if (this.socket !== socket) return;
         try {
-          const message = JSON.parse(String(event.data)) as CameraInferenceResult | {type: "subscribed"} | {type: "error"; message?: string};
+          const message = JSON.parse(String(event.data)) as CameraInferenceResult | CameraSessionStatusEvent | {type: "subscribed"} | {type: "error"; message?: string};
           if (message.type === "subscribed") {
             subscribed = true;
             window.clearTimeout(timeout);
             resolve();
           } else if (message.type === "camera_inference_result") {
             this.options.onResult(message);
+          } else if (message.type === "camera_session_status") {
+            this.options.onSessionStatus?.(message);
           } else {
             const detail = message.message || "Detection subscription thất bại";
             if (subscribed) this.options.onFailure(detail); else reject(new Error(detail));

@@ -1,12 +1,13 @@
-# US-29 implementation checklist
+# US-29 Implementation Checklist
 
-- [x] T1 persistence migration/model
-- [x] T2 backend contract/service
-- [ ] T3 backend tests (blocked by app lifespan startup hang)
-- [x] T4 frontend API/types
-- [x] T5 admin configuration UI
-- [x] T6 Live Monitor 2×2 UI
-- [x] T7 frontend tests
-- [x] T8 runtime/deployment docs
-- [ ] T9 full local verification
-- [ ] T10 deployed streamer/app smoke proof
+- [x] Backend media asset registry, upload/content/delete RBAC
+- [x] Atomic fixed-camera configuration persistence
+- [x] Explicit direct image/video session runtime
+- [x] Image one-shot and video EOF/Replay lifecycle
+- [x] Four-slot Live Monitor and hidden configuration navigation
+- [x] System Admin media library
+- [x] Remove Streamer/MediaMTX/HLS/RTSP source and deployment wiring
+- [x] Focused backend/frontend tests
+- [x] Full repository verification
+- [x] Railway deployment and authenticated API smoke
+- [ ] Browser UAT with a real uploaded violation video and HITL review

@@ -30,6 +30,9 @@ class PpeVisionAdapter:
     def preload(self) -> None:
         self._facade.preload()
 
+    def end_session(self, monitoring_session_id: str) -> None:
+        self._facade.end_session(monitoring_session_id)
+
 
 @cache
 def get_ppe_vision_adapter(model_path: str) -> PpeVisionAdapter:

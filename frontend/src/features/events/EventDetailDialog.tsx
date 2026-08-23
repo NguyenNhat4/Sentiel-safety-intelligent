@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from "react";
 import {assetUrl} from "../../api/config";
 import {loadEventDetail} from "../../api/events";
 import type {EventDetail, StoredDecisionContext} from "../../types";
+import "./event-detail.css";
 
 interface EventDetailDialogProps {
   eventId: number | null;
@@ -86,8 +87,7 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
   const maxConfidence = people.length ? Math.max(...people.map(person => person.confidence)) : null;
   return <div className="event-audit-chain">
     <section>
-      <small>BƯỚC 1</small>
-      <h3>1. AI quan sát</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">1</span> AI quan sát</h3>
       <p>{people.length} người được ghi nhận{maxConfidence === null ? "" : ` · Confidence cao nhất ${formatPercent(maxConfidence)}`}.</p>
       <div className="audit-facts">
         <span>Frame #{context.scene.frame_id}</span>
@@ -96,8 +96,7 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
       </div>
     </section>
     <section>
-      <small>BƯỚC 2</small>
-      <h3>2. Rule quyết định</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">2</span> Rule quyết định</h3>
       <p>{context.system_decision.result === "violate" ? "Hệ thống yêu cầu review" : "Hệ thống đánh giá bình thường"} · Mức độ {context.system_decision.severity}.</p>
       <div className="audit-facts">
         <span>{context.rule.rule_version}</span>
@@ -108,8 +107,7 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
       <ul>{context.rule.triggered_rule_keys.map(rule => <li key={rule}>{rule}</li>)}</ul>
     </section>
     <section>
-      <small>BƯỚC 3</small>
-      <h3>3. Human review</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">3</span> Human review</h3>
       <p><strong>{context.human_review.actor_name}</strong> xác nhận: {context.human_review.outcome === "actual_violation" ? "Vi phạm thực tế" : "Báo sai"}.</p>
       <time>{new Date(context.human_review.reviewed_at).toLocaleString("vi-VN", {hour12: false})}</time>
     </section>

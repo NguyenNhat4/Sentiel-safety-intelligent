@@ -1,0 +1,2 @@
+.event-audit-chain .audit-step-title{display:flex;align-items:center;gap:8px;color:#08785b;font:800 14px Manrope,Arial,sans-serif}
+.audit-step-title span{display:inline-grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:#e9f5f1;color:#08785b;font:800 12px "DM Mono",monospace}

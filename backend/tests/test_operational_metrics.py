@@ -121,6 +121,26 @@ def test_operational_metrics_summary_groups_websocket_connections(tmp_path):
     assert [sample.duration_ms for sample in summary.inference_latency_samples] == [20, 40]
 
 
+def test_operational_metrics_counts_stale_frame_drops(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    log_path.write_text(
+        json.dumps(
+            {
+                "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                "event_type": "inference_dropped",
+                "route": "/camera-inference",
+                "outcome": "stale_frame",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = OperationalMetricsService(Settings(operational_metrics_log_path=str(log_path))).summary(window_minutes=5)
+
+    assert summary.inference_outcomes == {"stale_frame": 1}
+
+
 def test_operational_metrics_endpoint_validates_window_and_excludes_itself(client):
     assert client.get("/api/v1/operational-metrics?window_minutes=0").status_code == 422
 

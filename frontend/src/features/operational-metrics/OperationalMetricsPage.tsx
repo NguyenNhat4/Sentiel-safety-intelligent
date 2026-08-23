@@ -1,17 +1,24 @@
-import {useCallback, useEffect, useState} from "react";
+import {memo, useCallback, useEffect, useState} from "react";
 import {loadOperationalMetrics} from "../../api/operational-metrics";
 import type {OperationalMetricsSummary} from "../../types";
 
 interface OperationalMetricsPageProps {active: boolean}
 
-export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
+const metricsCache = new Map<number, OperationalMetricsSummary>();
+
+export const OperationalMetricsPage = memo(function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
   const [windowMinutes, setWindowMinutes] = useState(60);
-  const [metrics, setMetrics] = useState<OperationalMetricsSummary>();
-  const [status, setStatus] = useState("Đang chờ dữ liệu metrics");
+  const [metrics, setMetrics] = useState<OperationalMetricsSummary | undefined>(() => metricsCache.get(60));
+  const [status, setStatus] = useState(() => metricsCache.get(60) ? "" : "Đang chờ dữ liệu metrics");
+
   const load = useCallback(async () => {
-    setStatus("Đang tải metrics vận hành...");
+    const cached = metricsCache.get(windowMinutes);
+    if (!cached) {
+      setStatus("Đang tải metrics vận hành...");
+    }
     try {
       const summary = await loadOperationalMetrics(windowMinutes);
+      metricsCache.set(windowMinutes, summary);
       setMetrics(summary);
       setStatus("");
     } catch (error) {
@@ -20,6 +27,18 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
   }, [windowMinutes]);
 
   useEffect(() => { if (active) void load(); }, [active, load]);
+
+  function handleWindowChange(nextMinutes: number) {
+    setWindowMinutes(nextMinutes);
+    const cached = metricsCache.get(nextMinutes);
+    if (cached) {
+      setMetrics(cached);
+      setStatus("");
+    } else {
+      setMetrics(undefined);
+      setStatus("Đang tải metrics vận hành...");
+    }
+  }
   const requests = metrics?.requests.reduce((total, item) => total + item.count, 0) ?? 0;
   const errors = metrics ? Object.values(metrics.errors_by_kind).reduce((total, count) => total + count, 0) : 0;
 
@@ -27,7 +46,7 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
     <div className="operations-toolbar">
       <div><p className="eyebrow">Aggregate từ JSONL đã xoay file; không hiển thị raw log hoặc dữ liệu video.</p></div>
       <div className="operations-actions">
-        <label>Khoảng thời gian<select value={windowMinutes} onChange={event => setWindowMinutes(Number(event.target.value))}>
+        <label>Khoảng thời gian<select value={windowMinutes} onChange={event => handleWindowChange(Number(event.target.value))}>
           <option value={5}>5 phút</option><option value={60}>1 giờ</option><option value={360}>6 giờ</option><option value={1440}>24 giờ</option>
         </select></label>
         <button className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
@@ -51,7 +70,7 @@ export function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
       <section className="operations-breakdown"><Breakdown title="Inference outcomes" values={metrics?.inference_outcomes ?? {}} /><Breakdown title="Errors" values={metrics?.errors_by_kind ?? {}} /></section>
     </>}
   </section>;
-}
+});
 
 function MetricCard({label, value, detail}: {label: string; value: string; detail: string}) { return <article className="operations-kpi"><small>{label}</small><strong>{value}</strong><span>{detail}</span></article>; }
 function Breakdown({title, values}: {title: string; values: Record<string, number>}) { const rows = Object.entries(values); return <section className="operations-table-card"><h3>{title}</h3>{rows.length ? <ul>{rows.map(([key, value]) => <li key={key}><span>{key}</span><strong>{value}</strong></li>)}</ul> : <p>Chưa có dữ liệu.</p>}</section>; }

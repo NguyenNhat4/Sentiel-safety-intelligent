@@ -49,7 +49,7 @@ def test_returns_violate_and_review_for_required_missing_ppe():
     assert result.missing_required_ppe == [["hat"]]
 
 
-def test_required_ppe_alerts_are_independent_of_machine_state():
+def test_stopped_machine_skips_required_ppe_alerts():
     result = SafetyRuleEngine().evaluate(
         people=[person(hat="missing")],
         requirements=requirements(hat_required=True),
@@ -57,10 +57,10 @@ def test_required_ppe_alerts_are_independent_of_machine_state():
         zone_active=False,
     )
 
-    assert result.outcome == "violate"
-    assert result.review_required is True
-    assert result.ppe_alert is True
-    assert result.missing_required_ppe == [["hat"]]
+    assert result.outcome == "normal"
+    assert result.review_required is False
+    assert result.ppe_alert is False
+    assert result.missing_required_ppe == [[]]
 
 
 def test_evaluates_hat_and_vest_independently_for_multiple_people():
@@ -75,8 +75,8 @@ def test_evaluates_hat_and_vest_independently_for_multiple_people():
     assert result.ppe_alert is True
 
 
-@pytest.mark.parametrize(("machine_state", "expected"), [("running", "violate"), ("stopped", "normal")])
-def test_active_zone_requires_a_running_machine(machine_state, expected):
+@pytest.mark.parametrize(("machine_state", "expected"), [("running", "violate"), ("stopped", "violate")])
+def test_active_zone_is_always_a_violation(machine_state, expected):
     result = SafetyRuleEngine().evaluate(
         people=[person(inside_zone=True)], requirements=requirements(), machine_state=machine_state, zone_active=True
     )
@@ -99,9 +99,9 @@ def test_active_zone_requires_a_running_machine(machine_state, expected):
         (True, True, [], "running", False, "normal"),
         # Any person can trigger the aggregate result.
         (True, True, [person(), person(hat="missing")], "running", False, "violate"),
-        # Zone entry is a violation only while its machine is running.
+        # Zone entry is a violation regardless of machine state.
         (False, False, [person(inside_zone=True)], "running", True, "violate"),
-        (False, False, [person(inside_zone=True)], "stopped", True, "normal"),
+        (False, False, [person(inside_zone=True)], "stopped", True, "violate"),
     ],
 )
 def test_evaluates_hat_vest_zone_and_person_count_truth_table(
