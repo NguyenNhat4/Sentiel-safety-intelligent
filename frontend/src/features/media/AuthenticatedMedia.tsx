@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {loadMediaContent} from "../../api/media-assets";
+import {loadMediaSource} from "../../api/media-assets";
 import type {MediaType} from "../../types";
 
 interface AuthenticatedMediaProps {
@@ -17,23 +17,23 @@ export function AuthenticatedMedia({assetId, mediaType, label, playing = false, 
 
   useEffect(() => {
     const controller = new AbortController();
-    let objectUrl = "";
+    let revocableUrl = "";
     setSource("");
     setError("");
-    void loadMediaContent(assetId, controller.signal)
-      .then(blob => {
+    void loadMediaSource(assetId, controller.signal)
+      .then(mediaSource => {
         if (controller.signal.aborted) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
+        if (mediaSource.revoke) revocableUrl = mediaSource.url;
+        setSource(mediaSource.url);
       })
       .catch(reason => {
         if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Không thể tải media.");
       });
     return () => {
       controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (revocableUrl) URL.revokeObjectURL(revocableUrl);
     };
-  }, [assetId]);
+  }, [assetId, playbackKey]);
 
   if (error) return <div className="stream-empty-state" role="alert"><strong>Không thể tải media</strong><span>{error}</span></div>;
   if (!source) return <div className="stream-empty-state" role="status"><strong>Đang tải media</strong></div>;

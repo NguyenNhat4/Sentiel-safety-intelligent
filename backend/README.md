@@ -27,7 +27,12 @@ PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minut
 
 US-29 uses backend-owned media and explicit sessions:
 
-- `POST /api/v1/media-assets` accepts System Admin image/video uploads into `MEDIA_ASSET_DIR`.
+- `POST /api/v1/media-assets/upload-requests` lets System Admin upload directly to the
+  configured Railway Bucket with a short-lived presigned POST; completion validates
+  metadata and the first decoded frame before publishing `READY`.
+- `POST /api/v1/media-assets` remains the compatible server-proxied upload contract.
+- Bucket playback uses a short-lived presigned GET with byte ranges; OpenCV keeps a
+  server-owned read-through cache under `MEDIA_ASSET_DIR` for inference.
 - `PUT /api/v1/camera-configurations/{camera_id}` atomically saves asset, machine state, zones and PPE for fixed `cam_1` through `cam_4`.
 - `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
 - `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.

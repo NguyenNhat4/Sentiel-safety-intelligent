@@ -24,9 +24,16 @@ This file contains only decisions that currently constrain implementation. Super
 
 ### 2026-08-23: [Backend] Explicit direct-file simulation runtime
 
-- Backend stores system-admin media uploads on `MEDIA_ASSET_DIR`, assigns READY assets uniquely to fixed `cam_1` through `cam_4`, and reads image/video files directly with OpenCV for explicit run/replay sessions.
+- Backend owns system-admin media uploads, assigns READY assets uniquely to fixed `cam_1` through `cam_4`, and reads validated image/video cache files directly with OpenCV for explicit run/replay sessions.
 - Saving camera configuration does not start inference. Sessions never auto-resume after process restart, and the new flow has no streamer, RTSP, HLS, or mapping-supervisor runtime dependency.
 - Reviewed events, existing zones/PPE records, and Alembic history remain authoritative; media assets referenced by a configuration or session cannot be deleted.
+
+### 2026-08-23: [Backend/Frontend] Railway Bucket direct media delivery
+
+- New production media uploads use a backend-authorized presigned POST directly from the browser to the Singapore Railway Bucket; credentials never enter frontend code.
+- Backend verifies object size/type and decodes the first frame before `READY`. PostgreSQL stores each asset's canonical backend/key; legacy volume rows remain readable until the one-time copy migration completes.
+- Playback uses a short-lived presigned GET so video byte ranges bypass the application service. `MEDIA_ASSET_DIR` remains a server-owned OpenCV read-through cache.
+- Run starts fresh inference for every valid configured camera. Replay starts only the selected camera and its new session ID resets playback, tracking and overlays.
 
 ### 2026-08-23: [Backend/Frontend] Fixed camera configuration and per-zone rules
 
@@ -36,7 +43,7 @@ This file contains only decisions that currently constrain implementation. Super
 - `hat_required` and `vest_required` apply to a person whose foot point is inside the zone and only while camera-wide machine state is `running`.
 - `zone_intrusion_enabled` is per zone, defaults to `true` for compatibility, ignores machine state, and opens after four consecutive sampled frames in that zone.
 - `restricted_area_detection_enabled` is a per-zone configuration switch, defaults OFF, treats any canonical person in the camera as an immediate critical occurrence, and ignores polygon and machine state.
-- Backend reads the assigned volume-backed asset directly and publishes session-correlated source-coordinate metadata for overlays.
+- Backend reads the assigned server-owned cached asset directly and publishes session-correlated source-coordinate metadata for overlays.
 
 ## Detection, Tracking, And Privacy
 

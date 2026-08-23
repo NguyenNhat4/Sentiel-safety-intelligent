@@ -27,6 +27,7 @@ def validate_runtime_files(settings: Settings) -> dict[str, bool]:
     """Fail before serving traffic when runtime files are missing or corrupt."""
     data_dir = Path(settings.operational_metrics_log_path).parent
     settings.validate_snapshot_storage()
+    settings.validate_media_storage()
     snapshot_dir = Path(settings.snapshot_dir)
     media_asset_dir = Path(settings.media_asset_dir)
     data_dir.mkdir(parents=True, exist_ok=True)

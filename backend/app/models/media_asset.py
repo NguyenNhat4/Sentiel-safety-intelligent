@@ -32,6 +32,7 @@ class MediaAsset(Base):
     content_type = Column(String(100), nullable=False)
     size_bytes = Column(BigInteger, nullable=False, default=0)
     storage_filename = Column(String(80), nullable=False, unique=True)
+    storage_backend = Column(String(16), nullable=False, default="filesystem")
     uploaded_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
     assigned_configuration = relationship("CameraConfiguration", back_populates="asset", uselist=False)
     sessions = relationship("CameraSession", back_populates="asset")

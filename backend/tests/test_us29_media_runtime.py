@@ -5,6 +5,9 @@ from uuid import uuid4
 import cv2
 import numpy as np
 
+import backend.app.api.v1.camera_sessions as camera_sessions_api
+import backend.app.services.media_asset_service as media_asset_service_module
+from backend.app.integrations.media_storage import PresignedUpload, StoredObjectMetadata
 from backend.app.models.user import UserRole
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
@@ -100,6 +103,93 @@ def test_safety_manager_lists_only_ready_assets(client, db_session, tmp_path, mo
 
     _set_role(client, db_session, UserRole.SAFETY_MANAGER)
     assert [item["id"] for item in client.get("/api/v1/media-assets").json()] == [ready["id"]]
+
+
+def test_direct_bucket_upload_validates_object_and_returns_presigned_playback(
+    client, db_session, tmp_path, monkeypatch
+):
+    content = _png_bytes()
+
+    class Storage:
+        def prepare_upload(self, key, content_type, max_bytes):
+            assert key.startswith("media-assets/")
+            assert content_type == "image/png"
+            assert max_bytes >= len(content)
+            return PresignedUpload("https://bucket.example/upload", {"key": key})
+
+        def head(self, key):
+            return StoredObjectMetadata(len(content), "image/png")
+
+        def download(self, key, path):
+            path.write_bytes(content)
+
+        def delete(self, key):
+            raise AssertionError("valid upload must not be deleted")
+
+        def playback_url(self, key):
+            return f"https://bucket.example/{key}?signed=1"
+
+    monkeypatch.setattr(media_asset_settings, "media_asset_dir", str(tmp_path))
+    monkeypatch.setattr(media_asset_settings, "media_storage_backend", "s3")
+    monkeypatch.setattr(media_asset_service_module, "create_media_storage", lambda _: Storage())
+    _set_role(client, db_session, UserRole.SYSTEM_ADMIN)
+
+    prepared = client.post(
+        "/api/v1/media-assets/upload-requests",
+        json={
+            "display_name": "Bucket still",
+            "filename": "still.png",
+            "content_type": "image/png",
+            "size_bytes": len(content),
+        },
+    )
+    assert prepared.status_code == 201
+    assert prepared.json()["asset"]["status"] == "UPLOADING"
+    assert prepared.json()["upload_url"] == "https://bucket.example/upload"
+
+    asset_id = prepared.json()["asset"]["id"]
+    completed = client.post(f"/api/v1/media-assets/{asset_id}/complete")
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "READY"
+    playback = client.get(f"/api/v1/media-assets/{asset_id}/playback-url")
+    assert playback.status_code == 200
+    assert playback.json()["url"].startswith("https://bucket.example/media-assets/")
+
+
+def test_run_starts_every_configured_camera_and_replay_starts_only_requested_camera(client, monkeypatch):
+    calls = []
+
+    def start(db, camera_id):
+        calls.append(camera_id)
+        if camera_id in {"cam_3", "cam_4"}:
+            from backend.app.services.camera_session_runtime import CameraSessionStartError
+
+            raise CameraSessionStartError("camera_not_configured")
+        return {
+            "id": str(uuid4()),
+            "camera_id": camera_id,
+            "asset_id": str(uuid4()),
+            "media_type": "video",
+            "status": "STARTING",
+            "config_revision": 1,
+            "inference_fps": 0,
+            "started_at": "2026-08-23T00:00:00Z",
+            "running_at": None,
+            "completed_at": None,
+            "error_code": None,
+        }
+
+    monkeypatch.setattr(camera_sessions_api.camera_session_runtime, "start", start)
+    run = client.post("/api/v1/simulation-runs")
+    assert run.status_code == 200
+    assert [item["camera_id"] for item in run.json()["sessions"]] == ["cam_1", "cam_2"]
+    assert calls == ["cam_1", "cam_2", "cam_3", "cam_4"]
+
+    calls.clear()
+    replay = client.post("/api/v1/camera-sessions/cam_2/replay")
+    assert replay.status_code == 200
+    assert replay.json()["camera_id"] == "cam_2"
+    assert calls == ["cam_2"]
 
 
 def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session, tmp_path, monkeypatch):

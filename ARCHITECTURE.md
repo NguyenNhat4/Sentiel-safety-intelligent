@@ -74,9 +74,10 @@ Thứ tự tiến hóa theo backlog:
 flowchart LR
     react[React] -->|REST| backend[Backend control plane]
     backend -->|Asset, configuration, session| postgres[(PostgreSQL)]
-    admin[Sys Admin] -->|Upload image or video| backend
-    volume[(Application media volume)] --> backend
-    backend -->|Authenticated media content| react
+    admin[Sys Admin] -->|Authorize upload| backend
+    react -->|Presigned upload and playback| bucket[(Railway Bucket)]
+    bucket -->|Validate and cache| backend
+    volume[(Inference cache volume)] --> backend
     backend -->|Decoded sampled frame| vision[Local or remote Vision]
     vision -->|Observations| backend
     backend -->|Session status and detections| react
@@ -84,8 +85,10 @@ flowchart LR
 
 Backend là owner duy nhất của asset registry, file content, camera configuration và
 inference-session lifecycle. Browser chỉ gửi `asset_id` và camera command, không gửi
-filesystem path hoặc URL nguồn tùy ý. Railway gắn persistent volume vào
-`MEDIA_ASSET_DIR`; PostgreSQL giữ metadata, assignment và lifecycle evidence.
+filesystem path hoặc URL nguồn tùy ý. Railway Bucket là canonical storage cho upload
+mới; browser chỉ nhận presigned URL ngắn hạn sau khi backend kiểm tra quyền. Backend
+xác minh object và frame đầu, sau đó dùng volume tại `MEDIA_ASSET_DIR` làm read-through
+cache cho OpenCV. PostgreSQL giữ storage backend/key, metadata, assignment và lifecycle evidence.
 
 ### Luồng runtime của một camera
 
@@ -110,7 +113,8 @@ Sau restart, cấu hình được giữ nhưng phiên đang chạy chuyển `STO
 ```mermaid
 flowchart LR
     browser[Internet browser] -->|HTTPS REST and WebSocket| backend["p047-app"]
-    volume[(Persistent media volume)] --> backend
+    bucket[(Railway Bucket Singapore)] --> backend
+    volume[(OpenCV media cache)] --> backend
     backend --> postgres[(PostgreSQL)]
     backend --> vision[Optional Safety Vision worker]
 ```

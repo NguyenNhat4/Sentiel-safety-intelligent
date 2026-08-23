@@ -10,5 +10,6 @@ Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành 
 
 `telegram_notifications.py` chỉ chuyển nội dung cảnh báo đã được backend quyết định sang Telegram Bot API. Routing theo khu vực và người nhận vẫn thuộc backend service; lỗi nhà cung cấp không được làm gián đoạn inference.
 
-Media assets are opened by the backend session runtime from validated server-owned
-volume paths. This integration layer no longer contains HLS/RTSP transport adapters.
+`media_storage.py` cấp presigned POST/GET cho Railway Bucket, xác minh metadata object
+và download vào cache server-owned khi OpenCV bắt đầu inference. Asset cũ trên volume
+vẫn đọc được trong quá trình migration; browser không nhận credential bucket.

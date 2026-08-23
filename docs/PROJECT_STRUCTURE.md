@@ -44,6 +44,7 @@ P-047/
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
+│   │   │   ├── media_storage.py # Railway Bucket presigned media and cache transfer adapter
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── camera_configuration.py # Fixed camera configuration and session lifecycle
@@ -101,6 +102,7 @@ P-047/
 │   │       ├── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
 │   │       └── 20260822_01_camera_wide_machine_state.py # Camera mapping machine-state compatibility contract
 │   │       └── 20260823_01_add_media_assets_and_camera_sessions.py # US-29 direct media runtime
+│   │       └── 20260823_02_add_media_storage_backend.py # Per-asset filesystem/S3 storage marker
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -243,6 +245,7 @@ P-047/
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
 │   ├── test_snapshot_bucket.py # S3-compatible snapshot bucket write/read/delete check
+│   ├── migrate_media_assets_to_s3.py # One-time verified volume-to-bucket media copy
 │   ├── backup_data.py # Timestamped archive of persistent Docker data
 │   ├── restore_data.py # Safe restore into empty persistent Docker data
 │   └── validate_us13_dataset.py # Validate US-13 evaluation manifest and checksums

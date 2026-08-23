@@ -16,12 +16,15 @@ media decoding dependencies. It does not contain a Streamer or MediaMTX service.
 
 - `p047-app`: application and direct-file inference runtime.
 - PostgreSQL: configuration, sessions and events.
-- Persistent volume mounted at `/app/data/media-assets`: uploaded images/videos.
+- Railway Bucket in Singapore: canonical uploaded images/videos and redacted snapshots.
+- Persistent volume mounted at `/app/data/media-assets`: legacy assets and OpenCV read-through cache.
 - Optional Safety Vision worker.
 - Optional S3-compatible storage for reviewed redacted snapshots.
 
-Set `MEDIA_ASSET_DIR=/app/data/media-assets`. Do not store uploaded media only on
-the image filesystem because Railway deployment filesystems are ephemeral.
+Set `MEDIA_ASSET_DIR=/app/data/media-assets` and `MEDIA_STORAGE_BACKEND=s3`. Browser
+uploads and playback use presigned bucket requests; credentials stay in Railway
+variables. Do not store uploaded media only on the image filesystem because Railway
+deployment filesystems are ephemeral.
 
 ## Release Contract
 

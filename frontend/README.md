@@ -37,12 +37,15 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 ## Runtime Flow
 
-1. System Admin uploads a named image/video through **Thư viện media**; only `READY` assets are selectable.
+1. System Admin uploads a named image/video directly to the configured Railway Bucket
+   through a presigned request; only backend-validated `READY` assets are selectable.
 2. Safety Manager selects a Live Monitor slot, previews its asset, edits normalized zones and PPE, then saves one atomic draft.
 3. Save returns to Live Monitor and does not start inference.
 4. **Chạy mô phỏng** starts fresh server-owned sessions for valid cameras; Replay starts one completed video again.
 5. `/api/v1/ws/camera-detections` carries lifecycle, session ID, source time, rolling inference FPS and detections.
 6. The UI ignores stale session output and draws canonical person/hat/vest observations in source coordinates.
+7. Run creates fresh sessions for every valid configured camera. Replay creates one
+   fresh session for only the selected camera and remounts playback at the beginning.
 
 ## Source Boundaries
 

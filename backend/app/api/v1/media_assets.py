@@ -2,13 +2,18 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.app.api.dependencies import require_authenticated_user, require_system_admin
 from backend.app.core.database import get_db
 from backend.app.models.user import User, UserRole
-from backend.app.schemas.media_asset import MediaAssetResponse
+from backend.app.schemas.media_asset import (
+    MediaAssetResponse,
+    MediaPlaybackResponse,
+    MediaUploadRequest,
+    MediaUploadResponse,
+)
 from backend.app.services.media_asset_service import (
     MediaAssetConflictError,
     MediaAssetNotFoundError,
@@ -40,6 +45,56 @@ async def upload_media_asset(
         raise HTTPException(status_code=422, detail={"code": "invalid_media_asset", "message": str(exc)}) from exc
 
 
+@router.post("/upload-requests", response_model=MediaUploadResponse, status_code=status.HTTP_201_CREATED)
+def prepare_media_upload(
+    request: MediaUploadRequest,
+    _: User = Depends(require_system_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        asset, upload = MediaAssetService(db).prepare_direct_upload(
+            request.display_name,
+            request.filename,
+            request.content_type,
+            request.size_bytes,
+        )
+    except MediaAssetConflictError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc
+    except MediaAssetValidationError as exc:
+        raise HTTPException(status_code=422, detail={"code": "invalid_media_asset", "message": str(exc)}) from exc
+    return MediaUploadResponse(asset=asset, upload_url=upload.url, fields=upload.fields)
+
+
+@router.post("/{asset_id}/complete", response_model=MediaAssetResponse)
+def complete_media_upload(
+    asset_id: str,
+    _: User = Depends(require_system_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        return MediaAssetService(db).complete_direct_upload(asset_id)
+    except MediaAssetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Media asset not found") from exc
+    except MediaAssetConflictError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc
+    except MediaAssetValidationError as exc:
+        raise HTTPException(status_code=422, detail={"code": "invalid_media_asset", "message": str(exc)}) from exc
+
+
+@router.get("/{asset_id}/playback-url", response_model=MediaPlaybackResponse)
+def get_media_playback_url(
+    asset_id: str,
+    _: User = Depends(require_authenticated_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return MediaPlaybackResponse(url=MediaAssetService(db).playback_url(asset_id))
+    except MediaAssetConflictError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc
+    except MediaAssetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Media asset not found") from exc
+
+
 @router.get("/{asset_id}/content")
 def get_media_asset_content(
     asset_id: str,
@@ -48,7 +103,11 @@ def get_media_asset_content(
     db: Session = Depends(get_db),
 ):
     try:
-        asset, path = MediaAssetService(db).get_ready_path(asset_id)
+        service = MediaAssetService(db)
+        asset = service.get_ready_asset(asset_id)
+        if asset.storage_backend == "s3":
+            return RedirectResponse(service.playback_url(asset_id), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        _, path = service.get_ready_path(asset_id)
     except MediaAssetNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Media asset not found") from exc
     size = asset.size_bytes

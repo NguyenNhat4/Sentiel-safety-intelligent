@@ -90,6 +90,15 @@ The defaults target this project's production app service and image. Override
 URL, or `DEPLOY_TIMEOUT_SECONDS` through environment variables when needed.
 Production must mount a persistent volume at `MEDIA_ASSET_DIR`.
 
+`migrate_media_assets_to_s3.py` copies legacy canonical files from that volume into
+the configured media bucket, verifies object size, then updates one database row at
+a time. Preview first, then apply after the S3 variables and migration are deployed:
+
+```bash
+python -m scripts.migrate_media_assets_to_s3
+python -m scripts.migrate_media_assets_to_s3 --apply --delete-local
+```
+
 `container_entrypoint.sh` runs as container root only long enough to ensure the
 Railway-mounted media directory belongs to `appuser`, then uses `gosu` so the
 application and all media writes run without root privileges.
