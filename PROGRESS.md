@@ -6,6 +6,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
+### 2026-08-23 Conflict resolution
+
+- [Cross-cutting] Đã hợp nhất conflict camera configuration: `asset_id` nullable, disconnect ngoài dropdown, preview empty state và lưu được trạng thái null.
+- [Vision] Đã hợp nhất rule zone/PPE: zone intrusion không phụ thuộc machine state; PPE chỉ áp dụng cho người inside zone khi máy running; bỏ fallback requirement của zone khác.
+- [Cross-cutting] Đã thêm cảnh báo contract bắt buộc đọc trong `docs/architecture/alert-rule-contract.md`.
+
 ### Cross-cutting
 
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.

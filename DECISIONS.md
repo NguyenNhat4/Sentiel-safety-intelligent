@@ -22,6 +22,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-23: [Cross-cutting] Camera disconnect và rule contract
+
+- Camera configuration cho phép `asset_id=null`; UI có nút “Ngắt kết nối nguồn media” ngoài dropdown và vẫn lưu được trạng thái null.
+- Zone intrusion là violation bất kể `machine_state`; thiếu PPE chỉ được xét khi người nằm trong zone có requirement và máy đang `running`.
+- `docs/architecture/alert-rule-contract.md` là business contract bắt buộc đọc; không tự ý đổi rule nếu chưa có product approval, decision record và regression tests.
+
 ### 2026-08-23: [Backend] One violation alert per person per video session
 
 - A person may remain active, clear, and violate again during one `monitoring_session_id`, but the session emits at most one new alert/review for that person.

@@ -2,6 +2,11 @@
 
 ## Trạng thái
 
+Đây là business contract bắt buộc đọc trước khi sửa `SafetyRuleEngine`,
+`FrameInferenceService`, camera configuration PPE hoặc các payload inference.
+Không được tự ý thay đổi các quy tắc dưới đây chỉ để làm xanh một test; mọi
+thay đổi cần xác nhận sản phẩm, decision record và regression tests.
+
 Bản chốt theo `DECISIONS.md` (2026-08-21):
 - **Zone Intrusion (`zone_intrusion_enabled=true`)**: Xâm nhập vùng nguy hiểm luôn báo vi phạm (`violate`), bất kể trạng thái máy `running` hay `stopped`.
 - **PPE Requirements (`hat_required`, `vest_required`)**: Thiếu PPE chỉ báo vi phạm khi người nằm trong zone có yêu cầu PPE và trạng thái máy đang hoạt động (`machine_state=running`). Trạng thái `stopped` chỉ là ngữ cảnh vận hành và không gate cảnh báo PPE.

@@ -241,8 +241,6 @@ class FrameInferenceService:
                 applicable = [
                     requirement for zone_id, requirement in requirements_by_zone.items() if zone_id in inside_zone_ids
                 ]
-                if not applicable:
-                    applicable = list(requirements_by_zone.values())
                 missing: set[str] = set()
                 if request.machine_state == "running":
                     for requirement in applicable:
@@ -269,6 +267,8 @@ class FrameInferenceService:
             else:
                 if request.machine_state == "running":
                     for zone in active_zones:
+                        if not membership_by_id.get(zone.zone_id):
+                            continue
                         zone_requirement = requirements_by_zone.get(zone.zone_id)
                         if zone_requirement is None:
                             continue
