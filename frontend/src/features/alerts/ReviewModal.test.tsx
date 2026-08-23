@@ -86,4 +86,38 @@ describe("ReviewModal", () => {
     expect(screen.getByLabelText("Bounding box của khung hình review")).toBeInTheDocument();
     expect(screen.getAllByTestId("snapshot-box")).toHaveLength(3);
   });
+
+  it("draws configured zones over a review snapshot", () => {
+    render(
+      <ReviewModal
+        isOpen
+        onClose={vi.fn()}
+        snapshot="data:image/jpeg;base64,1234"
+        zones={[{
+          zone_id: "zone_01", display_name: "Khu vực máy dập", enabled: true, order: 0,
+          points: [{x: 0.1, y: 0.2}, {x: 0.8, y: 0.2}, {x: 0.8, y: 0.9}, {x: 0.1, y: 0.9}],
+        }]}
+        people={[{
+          bbox: [10, 15, 80, 90], confidence: 0.9, inside_zone: true,
+          ppe: {hat: {status: "unknown", confidence: null}, vest: {status: "unknown", confidence: null}},
+          missing_required_ppe: [], active_violations: [{occurrence_id: "occ-1", rule_key: "zone_intrusion", zone_id: "zone_01", is_new: true}],
+        }]}
+        timer="00:12"
+        reviewSaving={false}
+        alertTitle="Review"
+        alertSummary="Summary"
+        onReview={vi.fn()}
+      />
+    );
+
+    const image = screen.getByRole("img", {name: "Khung hình vi phạm cần xác minh"});
+    Object.defineProperties(image, {
+      naturalWidth: {configurable: true, value: 100},
+      naturalHeight: {configurable: true, value: 100},
+    });
+    fireEvent.load(image);
+
+    expect(screen.getByTestId("snapshot-zone")).toBeInTheDocument();
+    expect(screen.getByText("Khu vực máy dập")).toBeInTheDocument();
+  });
 });

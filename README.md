@@ -1,116 +1,94 @@
-# P-047 — Chạy và dùng dự án
+# P-047 Safety Monitoring
 
-P-047 là ứng dụng giám sát an toàn PPE và vùng nguy hiểm bằng Computer Vision. Tài liệu này dành cho việc cài đặt, chạy local và gọi thử API. Xem [context-map.md](context-map.md) khi cần hiểu sản phẩm, kiến trúc, contract hoặc tài liệu theo task.
+P-047 is a React 19 and FastAPI prototype that evaluates uploaded image/video
+assets for person, PPE and danger-zone safety rules. PostgreSQL stores
+configuration, sessions and reviewed events; the backend reads media directly
+from a private application volume and calls the local or remote Vision facade.
 
-## Yêu cầu
+## Requirements
 
-- Python 3.11 và [uv](https://docs.astral.sh/uv/)
-- Node.js/npm tương thích với `frontend/package-lock.json`
-- Git LFS nếu clone model checkpoint lần đầu
+- Python 3.11 with `uv`
+- Node.js 22
+- PostgreSQL
+- Docker for container workflows
 
-Python 3.11 là runtime duy nhất được lock, Docker và CI hỗ trợ; `make setup` dùng `.python-version` để chọn đúng runtime.
-
-## Cài đặt và chạy local
+## Setup
 
 ```bash
-git clone https://github.com/AI20K-Build-Cohort-2/P-047.git
-cd P-047
 make setup
 make run
 ```
 
-`make setup` đồng bộ Python dependencies, cài frontend dependencies, tạo `.env.development` từ `.env.development.example` nếu chưa có, rồi bootstrap/migrate local database. `make run` migrate lại an toàn, build frontend và khởi động FastAPI tại cổng 8000.
+`make setup` installs locked dependencies, creates `.env.development` when
+missing and applies Alembic migrations. `make run` rebuilds the frontend and
+starts FastAPI at <http://localhost:8000>.
 
-Mở sau khi server sẵn sàng:
+The local media library defaults to `data/media-assets`. Configure:
 
-- App: <http://localhost:8000/>
-- Swagger: <http://localhost:8000/docs>
-- ReDoc: <http://localhost:8000/redoc>
-- OpenAPI: <http://localhost:8000/openapi.json>
-- Health: <http://localhost:8000/health>
-
-Để phát triển frontend riêng, chạy `make frontend-dev` rồi mở <http://localhost:5173>. Vite proxy `/api` và WebSocket về backend cổng 8000.
-
-## Biến môi trường
-
-Chỉ sửa `.env.development` trên máy local; file này bị Git bỏ qua. Với deployment, lấy `.env.production.example` làm mẫu và đặt các giá trị thật trong secret/Variables của nền tảng, không commit credential.
-
-| Biến | Dùng cho | Local / lưu ý |
-|---|---|---|
-| `APP_ENV` | Chế độ runtime | `development` local; `production` khi deploy |
-| `CORS_ORIGINS` | Origin được phép gọi API | Mặc định `http://localhost:8000`; thêm `http://localhost:5173` khi dùng Vite riêng |
-| `DATABASE_URL` | PostgreSQL managed | Chỉ điền URL PostgreSQL thực khi dùng nó; Docker Compose tự ghi đè bằng DB disposable |
-| `DATABASE_FALLBACK_ENABLED` | Cho phép fallback database khi PostgreSQL không khả dụng | Giữ `false` cho deployment cần persistence chặt chẽ |
-| `SNAPSHOT_STORAGE_*` | S3-compatible bucket cho snapshot đã redact | Điền bucket, endpoint và credential ở môi trường có S3; không đưa secrets vào tài liệu |
-| `PPE_MODEL_PATH` | Checkpoint an toàn | Phải trỏ đến `models/yolo11m_safety.pt` |
-| `VIOLATION_FRAME` | Số frame vi phạm liên tiếp trước khi cảnh báo | Mặc định `4`; một frame không vi phạm sẽ reset pending count |
-| `OPENAI_API_KEY` | Gợi ý AI tùy chọn | Để trống dùng offline safety recommendation |
-
-`/health` chỉ báo `ready: true` khi runtime có PostgreSQL thật và S3 `HeadBucket` thành công. Vì vậy local SQLite hoặc storage chưa cấu hình có thể trả `degraded` dù server vẫn đang chạy để phát triển; xem các reason code an toàn trong response, không cần đưa URL/credential vào log hay ticket.
-
-## Truy vấn mẫu
-
-Các lệnh bên dưới giả định `make run` đang chạy trong terminal khác.
-
-```bash
-# Kiểm tra process và dependency readiness
-curl http://localhost:8000/health
-
-# Lấy PPE requirement hiện tại của camera/zone MVP
-curl http://localhost:8000/api/v1/ppe-requirements/uploaded_video/zone_01
-
-# Lưu contract canonical hat/vest
-curl -X PUT http://localhost:8000/api/v1/ppe-requirements/uploaded_video/zone_01 \
-  -H 'Content-Type: application/json' \
-  -d '{"profile":"hat_vest_v1","hat_required":true,"vest_required":true}'
+```dotenv
+MEDIA_ASSET_DIR=data/media-assets
+MAX_MEDIA_ASSET_BYTES=1073741824
+MEDIA_INFERENCE_MAX_FPS=2
 ```
 
-Local database rỗng được seed demo accounts. Ví dụ đăng nhập `system_admin` và gọi endpoint cần bearer token:
+## Demo Workflow
 
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@sentinel.local","password":"Sentinel123!"}'
+1. Sign in as `system_admin` and upload a named image/video in **Thư viện media**.
+2. Sign in as `safety_manager`; Live Monitor always displays Camera 1 through 4.
+3. Select a camera slot to open its internal configuration page. This page has no sidebar item.
+4. Select a READY asset, preview it, configure zones/PPE and choose **Lưu cấu hình**.
+5. Back on Live Monitor, choose **Chạy mô phỏng** to start all valid cameras.
+6. Video sessions stop at EOF and expose Replay per camera; images infer exactly once.
 
-# Dán access_token từ response vào biến shell, không commit token.
-TOKEN='paste-access-token-here'
-curl http://localhost:8000/api/v1/auth/me \
-  -H "Authorization: Bearer $TOKEN"
-```
+Streamer, MediaMTX, HLS, RTSP, MJPEG and Connect/Disconnect are not part of the
+runtime or deployment.
 
-Demo password chỉ dành cho local development. Hãy thay đổi hoặc tạo tài khoản phù hợp trước khi dùng môi trường được chia sẻ. Swagger là nguồn HTTP API tương tác; WebSocket inference tại `ws://localhost:8000/api/v1/ws/inference` không xuất hiện trong OpenAPI. Protocol đầy đủ nằm trong [backend README](backend/README.md#frame-inference-contract).
-
-## Docker Compose smoke
-
-```bash
-make setup
-make docker-up
-make docker-smoke
-```
-
-Compose nạp `.env.development` nhưng dùng PostgreSQL `db` nội bộ disposable, tách biệt với `DATABASE_URL` của developer. Dùng credential development/staging cho smoke test, không dùng credential production.
-
-## CI/CD và release
-
-Pipeline GitHub Actions kiểm tra PR vào `main`, deploy Railway chỉ sau CI xanh và hỗ trợ rollback theo SHA/tag. Thành viên mới cấu hình Environment, Railway Variables, branch protection và vận hành release theo [CI/CD và Railway release](docs/CI_CD.md).
-
-## Kiểm tra
+## Checks
 
 ```bash
 make check
 ```
 
-Hoặc chạy riêng `make lint`, `make format`, `make test`, `make frontend-lint`, `make frontend-type-check`, `make frontend-test`, và `make frontend-build`.
+Focused commands:
 
-## Đóng góp
+```bash
+PYTHONPATH=. .venv/bin/pytest backend/tests vision/tests -v
+npm --prefix frontend run test
+npm --prefix frontend run type-check
+npm --prefix frontend run build
+```
 
-- Đọc [context-map.md](context-map.md) trước để chọn đúng tài liệu và owner.
-- Đọc README của production owner trước khi sửa implementation trong owner đó.
-- Không đọc `src/` nếu task không yêu cầu trực tiếp.
-- Chỉ commit khi người dùng yêu cầu trực tiếp.
+## Docker
 
-Quy tắc đầy đủ nằm trong [AGENTS.md](AGENTS.md).
+```bash
+docker compose up -d --build
+```
 
-## License
+Compose starts PostgreSQL and the application. It mounts
+`./data/media-assets:/app/data/media-assets` for uploaded assets.
 
-MIT
+## Railway
+
+Production requires:
+
+- `p047-app` with a persistent volume mounted at `/app/data/media-assets`
+- PostgreSQL with `DATABASE_URL`
+- `MEDIA_ASSET_DIR=/app/data/media-assets`
+- Optional S3-compatible snapshot variables for production evidence readiness
+- Optional separate Safety Vision worker when `VISION_PROVIDER=remote`
+
+Release automation deploys only `p047-app`:
+
+```bash
+./scripts/deploy_all_production.sh
+```
+
+A release is successful only after Railway reports terminal `SUCCESS` and the
+public `/health` response is verified. Uploaded media must never rely on the
+ephemeral image filesystem.
+
+## Architecture
+
+Production code has three owners: `backend/`, `frontend/` and `vision/`.
+Executable API, schema, ORM, migration, frontend wire types and tests are the
+runtime source of truth. Start repository context discovery at `context-map.md`.

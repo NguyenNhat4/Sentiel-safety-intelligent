@@ -1,6 +1,6 @@
 # Models (YOLO & PPE Weights)
 
-Thư mục này chứa các checkpoint được pin và quản lý bằng Git LFS. Runtime hiện hành chỉ dùng YOLO11m Safety cho person canonical, tracking và PPE.
+Thư mục này chứa các checkpoint được pin và quản lý bằng Git LFS. Runtime dùng YOLO11m Safety cho person canonical, tracking và PPE; YuNet là detector độc lập chỉ phục vụ privacy snapshot.
 
 ## Checkpoint runtime
 
@@ -17,6 +17,15 @@ Thư mục này chứa các checkpoint được pin và quản lý bằng Git LF
    - Profile public `hat_vest_v1` chỉ chạy/chấp nhận source ID `0`, `3`, `4`, rồi chỉ phát hành `hat`, một `person` canonical và `vest`. `nohat`/`novest` không đi qua contract; backend tự suy luận qualified absence cho requirement đang bật.
    - Model được gọi đúng một lần mỗi frame. Detection `person` class `3` là nguồn canonical duy nhất cho bounding box, `foot_point`, zone rule, ByteTrack và payload; `hat`/`vest` từ cùng call được associate vào person đó.
 
+2. **`models/face_detection_yunet_2023mar.onnx`**
+   - Source: official OpenCV Zoo [`models/face_detection_yunet`](https://github.com/opencv/opencv_zoo/tree/41c69c8506f4ddb038aad0f5da660cbc2a83f58e/models/face_detection_yunet).
+   - Revision pin: `41c69c8506f4ddb038aad0f5da660cbc2a83f58e` (`update yunet to v2`).
+   - File size: `232589` bytes.
+   - SHA-256: `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`.
+   - License: MIT for all files in the OpenCV Zoo YuNet model directory.
+   - Runtime: OpenCV `FaceDetectorYN`, OpenCV DNN backend and CPU target. The 2023 model has static ONNX input dimensions, so this runtime deliberately does not force the OpenCV 5 ONNX Runtime engine.
+   - Privacy only: every detected face is expanded and blurred. A canonical person without an associated face retains the conservative upper-40% fallback; YuNet never affects PPE or violation decisions.
+
 ## Artifact đã retire
 
 `models/yolo11n.pt` là person baseline cũ, SHA-256 `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1`. Artifact không còn được cấu hình, preload hoặc gọi trong runtime sau khi person canonical chuyển sang class `3` của YOLO11m Safety; file chỉ được giữ cho lịch sử/benchmark có kiểm soát.
@@ -26,4 +35,4 @@ Thư mục này chứa các checkpoint được pin và quản lý bằng Git LF
 ## Lưu ý về Git
 
 - Các file `.pt` bị ignore mặc định; checkpoint runtime mới được allowlist rõ ràng trong `.gitignore`.
-- Checkpoint trong thư mục này được Git LFS quản lý theo `.gitattributes`, không lưu trực tiếp vào Git object database.
+- Checkpoint `.pt` và `.onnx` trong thư mục này được Git LFS quản lý theo `.gitattributes`, không lưu trực tiếp vào Git object database.

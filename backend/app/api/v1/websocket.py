@@ -10,11 +10,15 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.core.operational_metrics import record_operational_event
+from backend.app.models.user import UserRole
 from backend.app.schemas.analysis import (
     FrameInferenceRequest,
     InferenceWebSocketConfigure,
     InferenceWebSocketFrameMeta,
 )
+from backend.app.services.auth_service import AuthError, AuthService
+from backend.app.services.camera_configuration_service import CAMERA_IDS
+from backend.app.services.camera_detection_hub import camera_detection_hub
 from backend.app.services.frame_inference_service import (
     InvalidFrameError,
     StaleFrameError,
@@ -56,6 +60,52 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 active_inference_sessions: set[str] = set()
+
+
+@router.websocket("/ws/camera-detections")
+async def websocket_camera_detections_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
+    """Stream server-owned inference metadata for fixed camera slots."""
+    await websocket.accept()
+    subscription = None
+    try:
+        payload = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+        if not isinstance(payload, dict) or payload.get("type") != "authenticate":
+            await send_inference_error(websocket, "authentication_required", "Authenticate before subscribing")
+            return
+        token = payload.get("access_token")
+        camera_ids = payload.get("camera_ids")
+        if not isinstance(token, str) or not token or not isinstance(camera_ids, list):
+            await send_inference_error(websocket, "validation_error", "A token and camera_ids are required")
+            return
+        if not 1 <= len(camera_ids) <= 4 or any(not isinstance(item, str) for item in camera_ids):
+            await send_inference_error(websocket, "validation_error", "camera_ids must contain one to four IDs")
+            return
+        try:
+            user, _ = AuthService(db).get_current_user(token)
+        except AuthError:
+            await send_inference_error(websocket, "unauthorized", "The login session is invalid or expired")
+            return
+        if user.must_change_password or user.role not in {
+            UserRole.SYSTEM_ADMIN.value,
+            UserRole.SAFETY_MANAGER.value,
+        }:
+            await send_inference_error(websocket, "forbidden", "This role cannot view camera detections")
+            return
+        requested = set(camera_ids)
+        if not requested <= set(CAMERA_IDS):
+            await send_inference_error(
+                websocket, "invalid_camera", "Every requested camera must be cam_1 through cam_4"
+            )
+            return
+        subscription = camera_detection_hub.subscribe(requested)
+        await websocket.send_json({"type": "subscribed", "camera_ids": sorted(requested)})
+        while True:
+            await websocket.send_json(await subscription.queue.get())
+    except (TimeoutError, WebSocketDisconnect):
+        pass
+    finally:
+        if subscription is not None:
+            subscription.close()
 
 
 @router.websocket("/ws/alerts")

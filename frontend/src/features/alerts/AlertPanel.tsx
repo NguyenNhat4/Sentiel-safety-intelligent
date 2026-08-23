@@ -1,32 +1,21 @@
-import type {ModelDetection, PersonDetection, ReviewStatus} from "../../types";
-import type {MonitorView} from "../monitor/use-monitor";
-import {getDetectionColor, isDisplayedPpeDetection} from "../monitor/canvas";
+import type {ModelDetection, PersonDetection} from "../../types";
+import type {HitlLogEntry, MonitorView} from "../monitor/use-monitor";
+import {isDisplayedPpeDetection} from "../monitor/canvas";
 
 interface AlertPanelProps {
   view: MonitorView;
-  reviewPending: boolean;
-  reviewSaving: boolean;
+  reviewPending?: boolean;
+  hitlLogs?: HitlLogEntry[];
   people?: PersonDetection[];
   detections?: ModelDetection[];
-  snapshot?: string;
-  timer: string;
-  onReview: (status: ReviewStatus) => void;
-  onOpenModal?: () => void;
+  timer?: string;
+  onOpenModal?: (logId: string) => void;
 }
 
-export function AlertPanel({
-  view,
-  reviewPending,
-  reviewSaving,
-  people = [],
-  detections = [],
-  snapshot,
-  timer,
-  onReview,
-  onOpenModal,
-}: AlertPanelProps) {
-  const displayedDetections = detections.filter(detection => isDisplayedPpeDetection(detection.class_name));
-  const totalDetections = people.length + displayedDetections.length;
+export function AlertPanel({view, hitlLogs = [], people = [], detections = [], onOpenModal}: AlertPanelProps) {
+  const ppeDetections = detections.filter(item => isDisplayedPpeDetection(item.class_name));
+  const count = people.length + ppeDetections.length;
+  const pendingLogCount = hitlLogs.filter(log => log.reviewStatus === "pending").length;
 
   return (
     <aside className={`alert-panel ${view.violation ? "violation" : ""}`} id="alert-panel">
@@ -43,87 +32,25 @@ export function AlertPanel({
         <RuleRow order="03" label="PPE" {...view.ppeRule} />
       </div>
 
-      <div className="detections-section">
-        <div className="detections-header">
-          <span>OBJECT DETECTIONS GROUPED BY PERSON ({totalDetections})</span>
-        </div>
-        {totalDetections === 0 ? (
-          <p className="no-detections">Chưa phát hiện đối tượng trên khung hình</p>
-        ) : (
-          <div className="person-groups-container">
-            {(() => {
-              const personIndices = Array.from(
-                new Set([
-                  ...people.map((_, idx) => idx),
-                  ...displayedDetections
-                    .map(d => d.person_index)
-                    .filter((idx): idx is number => idx !== null),
-                ])
-              ).sort((a, b) => a - b);
+      <section className="hitl-log-section" aria-label="Nhật ký cảnh báo Human in the Loop">
+        <div className="hitl-log-heading"><small>HUMAN IN THE LOOP · LOG CẦN REVIEW</small><strong>{pendingLogCount}</strong></div>
+        {hitlLogs.length === 0 ? <p>Chưa có cảnh báo cần xác minh.</p> : <div className="hitl-log-list">
+          {hitlLogs.map(log => <button type="button" className={`hitl-log ${log.tone}`} key={log.id} onClick={() => onOpenModal?.(log.id)}>
+            <span>{log.tone === "critical" ? "!" : "⚠"}</span><div><strong>{log.title}</strong><small>{log.detail} · {log.reviewStatus === "pending" ? "chờ review" : "đã review"}</small></div>
+          </button>)}
+        </div>}
+      </section>
 
-              return personIndices.map(pIdx => {
-                const person = people[pIdx];
-                const personColor = getDetectionColor("person", pIdx, person?.inside_zone);
-                const associatedDetections = displayedDetections.filter(d => d.person_index === pIdx);
-                return (
-                  <div key={`person-group-${pIdx}`} className="person-group-card" style={{borderLeftColor: personColor}}>
-                    <div className="person-group-header">
-                      <span className="person-group-title" style={{color: personColor}}>
-                        PERSON #{pIdx + 1}
-                      </span>
-                      {person && <span className="person-group-conf">{Math.round(person.confidence * 100)}%</span>}
-                      {person && (
-                        person.inside_zone ? (
-                          <span className="detection-tag danger">TRONG ZONE</span>
-                        ) : (
-                          <span className="detection-tag safe">NGOÀI ZONE</span>
-                        )
-                      )}
-                    </div>
-                    {associatedDetections.length > 0 && (
-                      <div className="person-items-list">
-                        {associatedDetections.map((det, dIdx) => {
-                          const itemColor = getDetectionColor(det.class_name, det.person_index);
-                          return (
-                            <div key={`person-${pIdx}-det-${dIdx}`} className="person-item-chip" style={{borderColor: itemColor}}>
-                              <span className="detection-color-dot" style={{backgroundColor: itemColor}} />
-                              <span className="detection-name">{det.class_name.toUpperCase()}</span>
-                              <span className="detection-conf">{Math.round(det.confidence * 100)}%</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-            {(() => {
-              const unassociated = displayedDetections.filter(d => d.person_index === null);
-              if (!unassociated.length) return null;
-              return (
-                <div className="person-group-card unassociated-card">
-                  <div className="person-group-header">
-                    <span className="person-group-title">SCENE OBJECTS</span>
-                    <span className="person-group-conf">{unassociated.length} vật thể</span>
-                  </div>
-                  <div className="person-items-list">
-                    {unassociated.map((det, uIdx) => {
-                      const itemColor = getDetectionColor(det.class_name, null);
-                      return (
-                        <div key={`unassoc-${uIdx}`} className="person-item-chip" style={{borderColor: itemColor}}>
-                          <span className="detection-color-dot" style={{backgroundColor: itemColor}} />
-                          <span className="detection-name">{det.class_name.toUpperCase()}</span>
-                          <span className="detection-conf">{Math.round(det.confidence * 100)}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+      <div className="detections-section">
+        <div className="detections-header"><span>OBJECT DETECTIONS GROUPED BY PERSON ({count})</span></div>
+        {count === 0 ? <p className="no-detections">Chưa phát hiện đối tượng trên khung hình</p> : <div className="person-groups-container">
+          {people.map((person, index) => <div className="person-group-card" key={`person-${person.track_id ?? index}`}>
+            <div className="person-group-header"><span className="person-group-title">PERSON #{person.track_id ?? index + 1}</span><span className="person-group-conf">{Math.round(person.confidence * 100)}%</span></div>
+          </div>)}
+          {ppeDetections.map((item, index) => <div className="person-item-chip" key={`ppe-${index}`}>
+            <span className="detection-name">{item.class_name.toUpperCase()}</span><span className="detection-conf">{Math.round(item.confidence * 100)}%</span>
+          </div>)}
+        </div>}
       </div>
 
       <div className="confidence">
@@ -131,48 +58,13 @@ export function AlertPanel({
         <div className="confidence-bar"><span style={{width: view.confidenceWidth}} /></div>
         <small>Rule PPE theo cấu hình đã lưu</small>
       </div>
-
-      {snapshot && <img className="snapshot visible" src={snapshot} alt="Khung hình cần xác minh" />}
-
-      <div className="escalation">
-        <div><span>⌁</span><p><small>HUMAN IN THE LOOP</small><strong>{view.reviewMessage}</strong></p></div>
-        <div className="timer"><strong>{timer}</strong><small>Chờ xác nhận</small></div>
-      </div>
-
-      {reviewPending && (
-        <>
-          <div className="review-popup-trigger" onClick={onOpenModal}>
-            <div className="trigger-badge">⚠ CÓ SỰ KIỆN CẦN XÁC MINH</div>
-            <p>Nhấp vào đây để mở Pop-up xác minh <strong>Vi phạm</strong> hay <strong>Normal</strong></p>
-            <button className="open-modal-btn" type="button" onClick={e => { e.stopPropagation(); onOpenModal?.(); }}>
-              🔍 Mở Pop-up xác minh →
-            </button>
-          </div>
-
-          <div className="alert-actions">
-            <button className="ack" disabled={reviewSaving} onClick={() => onReview("acknowledged")}>✓ Vi phạm thực tế</button>
-            <button className="false" disabled={reviewSaving} onClick={() => onReview("false_alarm")}>Bình thường / báo sai</button>
-          </div>
-        </>
-      )}
-      <p className="event-id">{view.eventStatus}</p>
     </aside>
   );
 }
 
-interface RuleRowProps {
-  order: string;
-  label: string;
-  yes: boolean | null;
-  text: string;
-  badge: string;
-}
+interface RuleRowProps { order: string; label: string; yes: boolean | null; text: string; badge: string; }
 
 function RuleRow({order, label, yes, text, badge}: RuleRowProps) {
-  const stateClass = yes === null ? "" : yes ? "yes" : "no";
-  return (
-    <div className={`rule ${stateClass}`}>
-      <span>{order}</span><p><small>{label}</small><strong>{text}</strong></p><b>{badge}</b>
-    </div>
-  );
+  const state = yes === null ? "" : yes ? "yes" : "no";
+  return <div className={`rule ${state}`}><span>{order}</span><p><small>{label}</small><strong>{text}</strong></p><b>{badge}</b></div>;
 }

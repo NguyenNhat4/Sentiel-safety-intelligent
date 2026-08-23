@@ -1,5 +1,138 @@
 # Benchmark scripts
 
+## Đồng bộ code lên Google Drive
+
+`sync_code_to_google_drive.sh` dùng `rclone` để đồng bộ duy nhất các file
+Python (`*.py`) trong `backend/app/` và `vision/`. Script không upload
+`__pycache__`, `*.pyc`, `*.pyo`, test cache, model, media, tài liệu hoặc file
+không phải Python. `rclone sync` cũng xóa trên thư mục Drive đích những file
+Python đã bị xóa ở local, vì vậy hãy dùng một thư mục Drive riêng cho backup này.
+
+### 1. Cài và kết nối Google Drive
+
+Trên Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install rclone
+rclone config
+```
+
+Trong `rclone config`:
+
+1. Chọn `n` để tạo remote mới.
+2. Đặt tên `gdrive`.
+3. Chọn storage `drive` (Google Drive).
+4. Có thể để trống `client_id` và `client_secret` cho tài khoản cá nhân.
+5. Chọn quyền `drive` hoặc quyền phù hợp với tài khoản backup.
+6. Chọn `auto config` và đăng nhập tài khoản Google trong trình duyệt.
+7. Không chọn Shared Drive, trừ khi thư mục đích thuộc Shared Drive.
+
+Kiểm tra kết nối mà không upload:
+
+```bash
+rclone lsd gdrive:
+./scripts/sync_code_to_google_drive.sh --dry-run
+```
+
+### 2. Chạy đồng bộ
+
+Mặc định code được đưa vào `gdrive:P-047-code/`:
+
+```bash
+./scripts/sync_code_to_google_drive.sh
+```
+
+Đổi tên remote hoặc thư mục đích bằng biến môi trường. Tên remote không chứa
+dấu `:`:
+
+```bash
+GOOGLE_DRIVE_REMOTE=company-drive \
+GOOGLE_DRIVE_DESTINATION=backups/P-047-code \
+./scripts/sync_code_to_google_drive.sh
+```
+
+### 3. Tự động chạy mỗi 5 phút bằng cron
+
+Lấy đường dẫn tuyệt đối của repository bằng `pwd`, sau đó mở cron:
+
+```bash
+crontab -e
+```
+
+Thêm một dòng, thay `/absolute/path/to/P-047` bằng đường dẫn thật:
+
+```cron
+*/5 * * * * /absolute/path/to/P-047/scripts/sync_code_to_google_drive.sh >> "$HOME/p047-drive-sync.log" 2>&1
+```
+
+Cron chạy với môi trường tối giản. Nếu `rclone` không nằm trong `PATH` của cron,
+dùng đường dẫn trả về bởi `command -v rclone` trong `PATH` của crontab hoặc cài
+`rclone` vào `/usr/bin`. File cấu hình mặc định nằm tại
+`~/.config/rclone/rclone.conf`; không commit file này vì nó chứa token truy cập.
+
+Chạy regression không dùng mạng sau khi sửa script:
+
+```bash
+./scripts/test_sync_code_to_google_drive.sh
+```
+
+`deploy_all_production.sh` runs the focused release gates, rebuilds and pushes
+the application image, redeploys `p047-app`, waits for the new Railway deployment
+to reach `SUCCESS`, and checks the application health endpoint:
+
+```bash
+./scripts/deploy_all_production.sh
+```
+
+The defaults target this project's production app service and image. Override
+`RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT`, app service, image name/tag, health
+URL, or `DEPLOY_TIMEOUT_SECONDS` through environment variables when needed.
+Production must mount a persistent volume at `MEDIA_ASSET_DIR`.
+
+`migrate_media_assets_to_s3.py` copies legacy canonical files from that volume into
+the configured media bucket, verifies object size, then updates one database row at
+a time. Preview first, then apply after the S3 variables and migration are deployed:
+
+```bash
+python -m scripts.migrate_media_assets_to_s3
+python -m scripts.migrate_media_assets_to_s3 --apply --delete-local
+```
+
+`container_entrypoint.sh` runs as container root only long enough to ensure the
+Railway-mounted media directory belongs to `appuser`, then uses `gosu` so the
+application and all media writes run without root privileges.
+
+`push_app.sh` reads the three `VITE_*` build values from `.env.production`,
+builds and publishes the main P-047 image, then asks Railway service `p047-app`
+to redeploy from the latest configured image source. Its default image is
+`nguyennhat4/p047:latest`:
+
+```bash
+docker login
+./scripts/push_app.sh
+./scripts/push_app.sh DOCKERHUB_USERNAME/p047 v1.0.0
+```
+
+The Railway CLI must be installed, authenticated and linked to the intended
+project. Prefer an explicit project ID in automation:
+
+```bash
+RAILWAY_PROJECT_ID=YOUR_PROJECT_ID ./scripts/push_app.sh
+```
+
+Override the target or publish without a Railway mutation when needed:
+
+```bash
+RAILWAY_APP_SERVICE=web RAILWAY_ENVIRONMENT=staging ./scripts/push_app.sh
+SKIP_RAILWAY_REDEPLOY=true ./scripts/push_app.sh
+```
+
+`railway redeploy --from-source` is intentional: it pulls the newly published
+image instead of restarting the deployment that still references the previous
+image digest. The command queues a deployment; verify its final status and
+`/health` before treating the release as successful.
+
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
 It defaults to the repository test video and the unified YOLO11m Safety runtime model:
 
@@ -35,10 +168,22 @@ The report includes mean/min/max/P50/P95/P99 latency in milliseconds and through
 Video decoding is excluded from the timing; preprocessing, model inference, and postprocessing
 inside Ultralytics are included. Run the same command on the same hardware when comparing models.
 
+`benchmark_privacy.py` measures the server-side privacy stage: one YuNet call, face/person fallback blur and JPEG encoding. It uses a generated 1280×720 frame by default or the first frame from an image/video:
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/benchmark_privacy.py \
+  --input /path/to/authorized-test-image.jpg \
+  --output data/privacy-benchmark.json
+```
+
+The input is treated as one canonical person box so the report also identifies whether YuNet found a face or used the person-head fallback. Do not commit test media containing personal data.
+
 `bootstrap_legacy_sqlite.py` is called by `make db-upgrade`. It recognizes the former local
 SQLite schema that predates Alembic, writes a timestamped `.bak` backup beside the database,
-adds the missing occurrence migration column, and stamps the known schema revision. New and
-already-versioned databases are unchanged; PostgreSQL is never bootstrapped by this script.
+adds only the missing occurrence migration column/index, and stamps the known schema revision.
+It never creates tables from current ORM metadata; later schema remains owned by ordered Alembic
+revisions. New and already-versioned databases are unchanged; PostgreSQL is never bootstrapped
+by this script.
 
 `production_start.py` is the Docker entrypoint. It validates the approved model artifacts and
 persistent data mount, safely adopts a recognized legacy SQLite database, upgrades Alembic to

@@ -6,6 +6,7 @@ import numpy as np
 
 from backend.app.core.config import Settings
 from backend.app.schemas.analysis import FrameInferenceRequest, PpeObservation
+from backend.app.schemas.monitoring_zone import MonitoringZone
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.frame_inference_service import FrameInferenceService
 
@@ -110,6 +111,34 @@ def test_person_detection_confidence_is_forwarded_to_main_and_fallback_detectors
     assert model.calls == [{"classes": [3], "conf": 0.42, "imgsz": 960, "verbose": False}]
 
 
+def test_remote_provider_routes_inference_through_http_adapter(monkeypatch):
+    class FakeRemoteAdapter:
+        def analyze(self, frame, monitoring_session_id, now):
+            return {"canonical_people": [], "people": [], "detections": []}
+
+        def preload(self):
+            return None
+
+    remote_adapter = FakeRemoteAdapter()
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(
+            vision_provider="remote",
+            vision_remote_url="https://vision.example",
+            vision_remote_api_key="secret-token",
+        ),
+    )
+    monkeypatch.setattr(
+        "backend.app.services.frame_inference_service.get_remote_vision_adapter",
+        lambda **kwargs: remote_adapter,
+    )
+
+    service = FrameInferenceService()
+
+    assert service._vision_analyzer == remote_adapter.analyze
+    assert service._model_preloader == remote_adapter.preload
+
+
 def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     calls = 0
 
@@ -161,6 +190,89 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     assert result.people[0].bbox == [40, 10, 80, 90]
     assert result.people[0].ppe.hat.status == "present"
     assert [item.class_name for item in result.detections] == ["person", "hat"]
+
+
+def test_decoded_camera_frame_skips_jpeg_round_trip(monkeypatch):
+    received_shapes = []
+
+    def analyze(frame, monitoring_session_id, now):
+        received_shapes.append(frame.shape)
+        return {"canonical_people": [], "people": [], "detections": []}
+
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
+    )
+    service = FrameInferenceService(
+        vision_analyzer=analyze,
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    monkeypatch.setattr(
+        service,
+        "_decode_frame",
+        lambda _: (_ for _ in ()).throw(AssertionError("decoded camera frames must not be decoded again")),
+    )
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    camera_request = FrameInferenceRequest(image_data="", machine_state="stopped")
+
+    result = service.infer_decoded_frame(camera_request, frame)
+
+    assert result.result == "normal"
+    assert received_shapes == [(360, 640, 3)]
+
+
+def test_inference_resize_preserves_original_frame_coordinates(monkeypatch):
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(100, 50, 200, 250, 0.9, 1)],
+            "people": [
+                {
+                    "hat": {"status": "present", "confidence": 0.9},
+                    "vest": {"status": "present", "confidence": 0.9},
+                }
+            ],
+            "detections": [
+                {
+                    "class_id": 3,
+                    "class_name": "person",
+                    "bbox": [100, 50, 300, 300],
+                    "confidence": 0.9,
+                    "person_index": 0,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
+    )
+    service = FrameInferenceService(
+        vision_analyzer=analyze,
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+
+    result = service.infer_decoded_frame(
+        FrameInferenceRequest(image_data="", machine_state="stopped"),
+        np.zeros((720, 1280, 3), dtype=np.uint8),
+    )
+
+    assert result.people[0].bbox == [200, 100, 600, 600]
+    assert result.people[0].foot_point == [400, 600]
+    assert result.detections[0].bbox == [200, 100, 600, 600]
 
 
 def test_preload_models_warms_the_unified_safety_model(monkeypatch):
@@ -228,6 +340,30 @@ def test_off_requirement_suppresses_missing_ppe_alert_without_removing_observati
     assert result.people[0].missing_required_ppe == []
     assert result.review_required is False
     assert result.result == "normal"
+
+
+def test_restricted_area_detection_alerts_immediately_for_any_detected_person():
+    service = FrameInferenceService(
+        model_path="unused.pt",
+        ppe_observer=lambda frame, people: [],
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            restricted_area_detection_enabled=True,
+            updated_at=None,
+        ),
+    )
+    service._detect_people = lambda frame: [(40, 10, 40, 80, 0.95)]
+
+    result = service.infer(request())
+
+    assert result.result == "violate"
+    assert result.review_required is True
+    assert result.rule["restricted_area_alert"] is True
+    assert result.people[0].active_violations[0].rule_key == "restricted_area_person"
 
 
 def test_qualified_absence_creates_alert_but_drops_unassociated_detection():
@@ -464,3 +600,55 @@ def test_zone_intrusion_still_uses_the_global_four_frame_debounce():
     assert [result.result for result in results] == ["violate"] * 4
     assert [result.review_required for result in results] == [False, False, False, True]
     assert results[-1].people[0].active_violations[0].rule_key == "zone_intrusion"
+
+
+def test_requirements_by_zone_evaluates_ppe_when_machine_running():
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(40, 10, 40, 80, 0.95, 1)],
+            "people": [
+                {
+                    "hat": {"status": "missing", "confidence": None},
+                    "vest": {"status": "present", "confidence": 0.9},
+                }
+            ],
+            "detections": [],
+        }
+
+    service = FrameInferenceService(vision_analyzer=analyze)
+    req = request(with_zone=False, machine_state="running")
+    req.zones = [
+        MonitoringZone(
+            zone_id="zone_01",
+            display_name="Zone 01",
+            points=[
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.9},
+                {"x": 0.1, "y": 0.9},
+            ],
+            enabled=True,
+            order=0,
+        )
+    ]
+    req.monitoring_session_id = None
+    requirements_by_zone = {
+        "zone_01": PpeRequirementResponse(
+            camera_id="cam_1",
+            zone_id="zone_01",
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        )
+    }
+
+    result = service.infer_decoded_frame(
+        req,
+        np.zeros((120, 160, 3), dtype=np.uint8),
+        requirements_by_zone=requirements_by_zone,
+    )
+
+    assert result.result == "violate"
+    assert result.people[0].missing_required_ppe == ["hat"]
+    assert result.people[0].active_violations[0].rule_key == "missing_ppe:hat"

@@ -37,10 +37,29 @@ describe("PpeRequirementsPanel", () => {
     render(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Đang tải cấu hình PPE");
-    expect(await screen.findByRole("heading", {name: "Yêu cầu PPE"})).toBeInTheDocument();
+    expect(await screen.findByRole("heading", {name: "Cấu hình cảnh báo"})).toBeInTheDocument();
     expect(screen.getByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).not.toBeChecked();
     expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).not.toBeChecked();
+    expect(screen.getByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeChecked();
+    expect(screen.getByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).toBeChecked();
     expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+  });
+
+  it("reloads the saved PPE configuration when the selected area changes", async () => {
+    loadMock.mockImplementation(async (_cameraId, zoneId) => ({
+      ...defaultRequirement,
+      zone_id: zoneId,
+      hat_required: zoneId === "zone_03",
+      vest_required: zoneId === "zone_03",
+      is_configured: zoneId === "zone_03",
+    }));
+    const {rerender} = render(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />);
+    await screen.findByRole("heading", {name: "Cấu hình cảnh báo"});
+
+    rerender(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_03" />);
+    await waitFor(() => expect(loadMock).toHaveBeenLastCalledWith("uploaded_video", "zone_03"));
+    expect(screen.getByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).toBeChecked();
+    expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).toBeChecked();
   });
 
   it("keeps edits as draft and saves the versioned values explicitly", async () => {
@@ -58,10 +77,36 @@ describe("PpeRequirementsPanel", () => {
       {
         profile: "hat_vest_v1",
         hat_required: true,
-        vest_required: false
+        vest_required: false,
+        restricted_area_detection_enabled: false,
+        zone_intrusion_enabled: true
       }
     ));
     expect(await screen.findByText("Đã lưu cấu hình")).toBeInTheDocument();
+  });
+
+  it("saves the restricted-area switch with the selected zone configuration", async () => {
+    render(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />);
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Detect vùng cấm"}));
+    fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình"}));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledWith(
+      "uploaded_video",
+      "zone_01",
+      expect.objectContaining({restricted_area_detection_enabled: true})
+    ));
+  });
+
+  it("saves the zone-intrusion switch independently", async () => {
+    render(<PpeRequirementsPanel cameraId="uploaded_video" zoneId="zone_01" />);
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Cảnh báo xâm nhập zone"}));
+    fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình"}));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledWith(
+      "uploaded_video",
+      "zone_01",
+      expect.objectContaining({zone_intrusion_enabled: false})
+    ));
   });
 
   it("retains the draft and offers retry after a save error", async () => {
@@ -83,7 +128,7 @@ describe("PpeRequirementsPanel", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Không thể tải cấu hình PPE");
     fireEvent.click(screen.getByRole("button", {name: "Thử tải lại"}));
-    expect(await screen.findByRole("heading", {name: "Yêu cầu PPE"})).toBeInTheDocument();
+    expect(await screen.findByRole("heading", {name: "Cấu hình cảnh báo"})).toBeInTheDocument();
     expect(loadMock).toHaveBeenCalledTimes(2);
   });
 });

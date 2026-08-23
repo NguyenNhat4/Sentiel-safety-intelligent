@@ -60,8 +60,3 @@
 - Quá trình này thường do Tech Lead hoặc cả team cùng xác nhận.
 - Khi nhánh `develop` đã tích hợp xong nhiều US và **được chạy thử/kiểm tra xác nhận là hoạt động trơn tru (chạy được)**, không có bug nghiêm trọng.
 - Tiến hành tạo PR merge từ `develop` vào `main` để chốt phiên bản.
-
----
-
-Bạn xem bản Quy trình này đã sát với mong đợi chưa nhé. 
-Nếu bạn muốn lưu nó vào dự án, mình có thể dùng công cụ để tự động tạo và lưu nó thành một file ví dụ như `docs/AI_TEAM_WORKFLOW.md` để cả team dễ dàng đọc và tuân thủ. Bạn có muốn mình tạo file luôn không?

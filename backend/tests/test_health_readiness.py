@@ -28,6 +28,7 @@ async def test_health_is_ready_only_when_postgresql_and_s3_are_available(monkeyp
     assert response.ready is True
     assert response.dependencies["postgresql"].ready is True
     assert response.dependencies["snapshot_storage"].ready is True
+    assert set(response.dependencies) == {"postgresql", "snapshot_storage"}
 
 
 @pytest.mark.asyncio

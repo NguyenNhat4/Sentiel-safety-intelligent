@@ -1,3 +1,9 @@
 # Live Monitor
 
-Owns local video playback, the explicit **Tạo vùng** workflow, revisioned multi-zone draft/applied state, normalized four-point editing, frame sampling, Canvas overlays, and grouped review orchestration. Ordinary Canvas clicks never create zones; only saved collections are sent to inference. On violation it pauses, captures the stopped native frame, and forwards typed canonical people plus `hat`/`vest` boxes as transient snapshot-annotation metadata; these do not affect the safety decision or the camera-wide `hat_vest_v1` configuration.
+Owns Live Monitor, four fixed camera slots, explicit Run/Replay commands, server
+session lifecycle, rolling inference FPS and source-coordinate detection overlays.
+
+Safety Manager opens configuration only by selecting a slot; there is no
+camera-configuration sidebar entry. Media is loaded from authenticated backend
+asset content, not HLS/MJPEG or arbitrary URLs. WebSocket results must match the
+latest server-owned session ID; stale output is discarded immediately.

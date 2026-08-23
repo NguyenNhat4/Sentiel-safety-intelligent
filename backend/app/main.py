@@ -12,6 +12,7 @@ from backend.app.api.router import api_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, check_database_connection, database_runtime, engine
 from backend.app.core.operational_metrics import configure_operational_metrics_logger, record_operational_event
+from backend.app.integrations.privacy_vision import get_configured_privacy_vision_adapter
 from backend.app.integrations.snapshot_storage import (
     SnapshotStorageError,
     check_snapshot_storage_connection,
@@ -19,6 +20,7 @@ from backend.app.integrations.snapshot_storage import (
 )
 from backend.app.schemas.health import DependencyReadiness, HealthResponse
 from backend.app.services.auth_service import AuthService
+from backend.app.services.camera_session_runtime import CameraSessionRuntime, camera_session_runtime
 from backend.app.services.frame_inference_service import frame_inference_service
 
 logger = logging.getLogger(__name__)
@@ -43,16 +45,31 @@ async def lifespan(app: FastAPI):
                 AuthService(db).seed_demo_users()
             finally:
                 db.close()
+        db = SessionLocal()
+        try:
+            CameraSessionRuntime.mark_interrupted_stopped(db)
+        finally:
+            db.close()
         logger.info("Database tables verified/created successfully using %s.", database_runtime.backend)
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
 
-    frame_inference_service.preload_models()
-    logger.info("Unified YOLO11m Safety person/hat/vest inference model loaded.")
+    try:
+        frame_inference_service.preload_models()
+        logger.info("Safety vision inference provider is ready.")
+    except Exception as e:
+        logger.warning(f"Could not preload safety models: {e}")
+
+    try:
+        get_configured_privacy_vision_adapter().preload()
+        logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
+    except Exception as e:
+        logger.warning(f"Could not preload privacy vision adapter: {e}")
     app.state.ready = True
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield
+    camera_session_runtime.stop_all()
     print("Shutting down backend...")
 
 

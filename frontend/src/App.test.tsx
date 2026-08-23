@@ -35,6 +35,8 @@ function mockAuthenticatedSession(): void {
       zones: [],
       updated_at: null
     });
+    if (url.includes("/camera-configurations/cam_")) return jsonResponse({camera_id: url.match(/cam_[1-4]/)?.[0], revision: 0, asset_id: null, machine_state: "stopped", zones: [], updated_at: null});
+    if (url.includes("/camera-configurations") || url.includes("/media-assets") || url.includes("/camera-sessions")) return jsonResponse([]);
     return jsonResponse([]);
   }));
 }
@@ -49,6 +51,18 @@ describe("Sentinel authentication", () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<App />);
     await waitFor(() => expect(screen.getByRole("button", {name: /Đăng nhập/})).toBeInTheDocument());
+    expect(screen.getByText("Tài khoản dùng thử")).toBeInTheDocument();
+    expect(screen.getByText("admin@sentinel.local")).toBeInTheDocument();
+    expect(screen.getByText("Mật khẩu chung:")).toBeInTheDocument();
+  });
+
+  it("fills the login form from a demo account shortcut", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    render(<App />);
+    await screen.findByRole("button", {name: /Đăng nhập/});
+    fireEvent.click(screen.getByRole("button", {name: "Dùng tài khoản admin@sentinel.local"}));
+    expect(screen.getByLabelText("Email công việc")).toHaveValue("admin@sentinel.local");
+    expect(screen.getByLabelText("Mật khẩu")).toHaveValue("Sentinel123!");
   });
 
   it("opens the application after the API accepts credentials", async () => {
@@ -110,11 +124,14 @@ describe("Sentinel authentication", () => {
     fireEvent.change(screen.getByLabelText(/Mật khẩu/), {target: {value: "Sentinel123!"}});
     fireEvent.click(screen.getByRole("button", {name: /Đăng nhập/}));
 
-    await screen.findByRole("heading", {name: "Live Monitor"});
+    await screen.findByRole("button", {name: /Thư viện media/});
+    expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Live monitor/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Quản trị hệ thống/}));
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Thư viện media/})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
   });
 
@@ -144,146 +161,30 @@ describe("Sentinel React application", () => {
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
-    expect(screen.getByText("Tải video demo")).toBeInTheDocument();
+    expect(await screen.findAllByText("Bấm vào đây để cấu hình")).toHaveLength(4);
+    expect(screen.getByText(/Đã upload video.*bấm vào camera thêm một lần nữa để mở cấu hình/i)).toBeInTheDocument();
+    expect(screen.queryByText("Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.")).not.toBeInTheDocument();
   });
 
-  it("keeps the camera-wide machine switch available without a selected zone", async () => {
+  it("opens the exact internal camera configuration without a sidebar item", async () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
-    const machineToggle = screen.getByRole("button", {name: "Chuyển trạng thái máy"});
-    expect(machineToggle).toBeEnabled();
-    fireEvent.click(machineToggle);
-    expect(screen.getAllByText("Máy đã dừng")).toHaveLength(2);
+    expect(await screen.findByRole("heading", {name: "Camera 1"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Camera 4"})).toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Cấu hình Camera 2"}));
+    expect(await screen.findByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+    expect(screen.queryAllByText("Cấu hình Camera 2")).toHaveLength(1);
+    expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   });
 
-  it("rewinds an uploaded video so the same file can be replayed after it ends", async () => {
-    mockAuthenticatedSession();
-    vi.stubGlobal("URL", {
-      createObjectURL: vi.fn(() => "blob:uploaded-video"),
-      revokeObjectURL: vi.fn(),
-    });
-    const {container} = render(<App />);
-    await screen.findByRole("heading", {name: "Live Monitor"});
-
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const video = container.querySelector("video") as HTMLVideoElement;
-    Object.defineProperties(video, {
-      videoWidth: {value: 1280},
-      videoHeight: {value: 720},
-      duration: {value: 20},
-      currentTime: {value: 20, writable: true},
-    });
-    vi.spyOn(video, "load").mockImplementation(() => undefined);
-    fireEvent.change(input, {target: {files: [new File(["video"], "shift.mp4", {type: "video/mp4"})]}});
-    fireEvent.loadedMetadata(video);
-    fireEvent.ended(video);
-
-    expect(video.currentTime).toBe(0);
-    expect(screen.getByRole("button", {name: "↻ Phát lại"})).toBeEnabled();
-  });
-
-  it("creates points only after the explicit Tạo vùng action", async () => {
+  it("does not render the removed local video upload controls", async () => {
     mockAuthenticatedSession();
     const {container} = render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
-    const video = container.querySelector("video") as HTMLVideoElement;
-    Object.defineProperties(video, {
-      videoWidth: {value: 1280},
-      videoHeight: {value: 720},
-      duration: {value: 20}
-    });
-    fireEvent.loadedMetadata(video);
-    const canvas = container.querySelector(".camera-scene canvas") as HTMLCanvasElement;
-    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
-      left: 0,
-      top: 0,
-      width: 1000,
-      height: 500,
-      right: 1000,
-      bottom: 500,
-      x: 0,
-      y: 0,
-      toJSON: () => ({})
-    });
-    fireEvent.pointerDown(canvas, {clientX: 100, clientY: 100, pointerId: 1});
-    expect(screen.getByText("0 vùng đã cấu hình")).toBeInTheDocument();
-
-    await waitFor(() => expect(screen.getByRole("button", {name: /Tạo vùng/})).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", {name: /Tạo vùng/}));
-    expect(screen.getByText("Vùng 1 · 0/4 · đang vẽ")).toBeInTheDocument();
-    [[100, 100], [900, 100], [900, 400], [100, 400]].forEach(([clientX, clientY]) => {
-      fireEvent.pointerDown(canvas, {clientX, clientY, pointerId: 1});
-      fireEvent.pointerUp(canvas, {pointerId: 1});
-    });
-    await waitFor(() => expect(screen.getByText("Vùng 1 · 4/4 · kéo điểm để chỉnh")).toBeInTheDocument());
-    expect(screen.getByText((_, node) => node?.textContent === "4/4 · BẬT")).toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).not.toBeInTheDocument();
+    expect(container.querySelector("video")).not.toBeInTheDocument();
   });
 
-  it("removes a confirmed zone from the UI and persists only when configuration is saved", async () => {
-    window.sessionStorage.setItem("sentinel.auth.access_token", "token-1");
-    const points = [{x: 0.1, y: 0.1}, {x: 0.4, y: 0.1}, {x: 0.4, y: 0.4}, {x: 0.1, y: 0.4}];
-    const zones = [
-      {zone_id: "zone_1", display_name: "Vùng 1", points, machine_state: "running", enabled: true, order: 0},
-      {zone_id: "zone_2", display_name: "Vùng 2", points, machine_state: "stopped", enabled: true, order: 1},
-    ];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("/auth/me")) return jsonResponse({user, expires_at: "2026-08-11T00:00:00Z"});
-      if (url.includes("/ppe-requirements/")) return jsonResponse({
-        camera_id: "uploaded_video",
-        zone_id: "zone_01",
-        profile: "hat_vest_v1",
-        hat_required: false,
-        vest_required: false,
-        is_configured: false,
-        updated_at: null,
-      });
-      if (url.includes("/monitoring-zones") && init?.method === "PUT") {
-        return jsonResponse({camera_id: "uploaded_video", revision: 2, zones: [zones[0]], updated_at: null});
-      }
-      if (url.includes("/monitoring-zones")) {
-        return jsonResponse({camera_id: "uploaded_video", revision: 1, zones, updated_at: null});
-      }
-      return jsonResponse([]);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const confirmRemoval = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const canvasLabels = new Set<string>();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      clearRect: () => canvasLabels.clear(),
-      beginPath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      closePath: vi.fn(),
-      fill: vi.fn(),
-      stroke: vi.fn(),
-      arc: vi.fn(),
-      setLineDash: vi.fn(),
-      fillText: (label: string) => canvasLabels.add(label),
-    } as unknown as CanvasRenderingContext2D);
-
-    render(<App />);
-    await screen.findByRole("heading", {name: "Live Monitor"});
-    await screen.findByText("2 vùng đã cấu hình");
-    expect(canvasLabels).toContain("Vùng 2");
-    fireEvent.click(screen.getByRole("button", {name: /Vùng 2/}));
-
-    fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
-    expect(screen.getByText("2 vùng đã cấu hình")).toBeInTheDocument();
-
-    confirmRemoval.mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", {name: "Xóa vùng Vùng 2"}));
-    expect(screen.getByText("1 vùng đã cấu hình")).toBeInTheDocument();
-    expect(screen.queryByRole("button", {name: /Vùng 2/})).not.toBeInTheDocument();
-    expect(canvasLabels).not.toContain("Vùng 2");
-    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
-
-    fireEvent.click(screen.getByRole("button", {name: "Lưu cấu hình vùng"}));
-    await waitFor(() => {
-      const saveCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
-      expect(saveCall).toBeDefined();
-      expect(JSON.parse(String(saveCall?.[1]?.body)).zones).toEqual([zones[0]]);
-    });
-  });
 });

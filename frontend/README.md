@@ -1,6 +1,6 @@
 # Sentinel React Frontend
 
-React 19 + TypeScript + Vite dashboard for the Safety Officer baseline flow. The application owns local video playback, normalized four-point zone editing, sampled binary WebSocket inference, Canvas overlays, Human-in-the-Loop review, and acknowledged-event history. Detection and polygon evaluation remain backend responsibilities.
+React 19 + TypeScript + Vite dashboard for the safety workflow. Live Monitor always renders four logical cameras with backend-owned image/video assets, session-correlated overlays, inference FPS and Replay at video EOF. **Cấu hình camera** is not a sidebar tab: Safety Manager opens the exact camera only by selecting a Live Monitor slot. System Admin owns the separate media library.
 
 Project-wide decisions and progress are maintained centrally at repository root.
 
@@ -37,15 +37,16 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 ## Runtime Flow
 
-1. Load the versioned `hat_vest_v1` default-OFF requirements for `uploaded_video` and `zone_01`; edits remain draft until **Lưu cấu hình** succeeds.
-2. Select a local video; it remains in the browser.
-3. Select up to four normalized zone points. Points can be dragged, deleted, or reset while paused; only four points activate zone evaluation.
-4. Play to open `/api/v1/ws/inference` and receive detections regardless of zone state.
-5. Send at most one JPEG every 0.5 seconds, with only one frame in flight.
-6. Draw returned canonical person boxes, foot points, and YOLO11m Safety detections `hat`/`vest` in source-video coordinates; only `person`, `hat`, `vest` exist in the new detection contract.
-7. Pause only when `review_required=true`, seek back to that inference result's `video_time`, wait for the browser to render it, then capture the full native video frame for review.
-8. Keep that stopped-frame candidate and its detection coordinates in memory until the Safety Officer confirms it or marks it as a false alarm.
-9. Save the review through `POST /api/v1/events`; show only acknowledged events in the violation log.
+1. System Admin uploads a named image/video directly to the configured Railway Bucket
+   through a presigned request; only backend-validated `READY` assets are selectable.
+2. Safety Manager selects a Live Monitor slot, previews its asset, edits normalized zones and PPE, then saves one atomic draft.
+3. Save returns to Live Monitor and does not start inference.
+4. **Chạy mô phỏng** starts fresh server-owned sessions for valid cameras; Replay starts one completed video again.
+5. `/api/v1/ws/camera-detections` carries lifecycle, session ID, source time, rolling inference FPS and detections.
+6. The UI ignores stale session output and draws canonical person/hat/vest observations in source coordinates.
+7. Run creates fresh sessions for every valid configured camera. Replay creates one
+   fresh session for only the selected camera and remounts playback at the beginning.
+8. Newly opened occurrences are queued for mandatory HITL review with their own transient snapshot; each affected tracked person is persisted idempotently as acknowledged or false alarm before the next queued review opens.
 
 ## Source Boundaries
 
@@ -76,4 +77,4 @@ Transport code does not render UI. Canvas utilities do not call the network. Fea
 
 ## Authentication
 
-The login screen calls `POST /api/v1/auth/login`, stores the returned bearer token only in browser `sessionStorage`, restores a tab session through `GET /api/v1/auth/me`, and revokes it through `POST /api/v1/auth/logout`. A `system_admin` retains the safety monitor/event workspace and sees an additional account-management entry whose tabs call RBAC-protected backend endpoints. An `area_manager` lands on the dedicated area dashboard. New and administrator-reset accounts must replace their temporary password before entering a role workspace.
+The login screen calls `POST /api/v1/auth/login`, stores the returned bearer token only in browser `sessionStorage`, restores a tab session through `GET /api/v1/auth/me`, and revokes it through `POST /api/v1/auth/logout`. Local/demo builds show the three seeded demo accounts with copy and one-click fill shortcuts; these credentials must not be used outside local/demo environments. A `system_admin` retains the safety monitor/event workspace, sees account-management navigation, and has a separate **Camera stream** sidebar entry directly below **Quản trị hệ thống**. An `area_manager` lands on the dedicated area dashboard. New and administrator-reset accounts must replace their temporary password before entering a role workspace.

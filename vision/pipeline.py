@@ -5,6 +5,8 @@ from typing import TypedDict
 import cv2
 import numpy as np
 
+from vision.face_detection import FaceDetection
+
 
 class ModelDetection(TypedDict):
     class_id: int
@@ -18,6 +20,9 @@ class PrivacyRedactionResult(TypedDict):
     image: np.ndarray
     redacted_regions: list[list[int]]
     used_person_fallback: bool
+    detected_face_count: int
+    fallback_person_count: int
+    face_detector_failed: bool
 
 
 class SnapshotPerson(TypedDict):
@@ -51,19 +56,48 @@ def redact_person_head_regions(
     rejected so callers cannot persist it by accident. This privacy path is independent
     from the PPE checkpoint and therefore cannot regress when that model changes.
     """
+    return redact_identity_regions(frame, people, [])
+
+
+def redact_identity_regions(
+    frame: np.ndarray,
+    people: list[SnapshotPerson],
+    faces: list[FaceDetection],
+    *,
+    face_margin_ratio: float = 0.2,
+    face_detector_failed: bool = False,
+) -> PrivacyRedactionResult:
+    """Blur YuNet faces and use the person-head fallback for each unmatched person."""
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise PrivacyRedactionError("snapshot must be a three-channel image")
+    if not 0.0 <= face_margin_ratio <= 1.0:
+        raise ValueError("face_margin_ratio must be between 0 and 1")
 
     height, width = frame.shape[:2]
     person_regions = [
         region for person in people if (region := _bounded_region(person["bbox"], width, height)) is not None
     ]
-    unique_regions = _unique_regions([_person_head_region(region) for region in person_regions])
-    if not unique_regions:
+    if not person_regions:
         raise PrivacyRedactionError("no canonical person region was available for redaction")
 
+    bounded_faces = [region for face in faces if (region := _bounded_region(face["bbox"], width, height)) is not None]
+    face_regions = _merged_regions(
+        [_expanded_region(region, face_margin_ratio, width=width, height=height) for region in bounded_faces]
+    )
+    matched_people = {
+        person_index
+        for face_region in bounded_faces
+        if (person_index := _associated_person_index(face_region, person_regions)) is not None
+    }
+    fallback_regions = [
+        _person_head_region(person_region)
+        for person_index, person_region in enumerate(person_regions)
+        if person_index not in matched_people
+    ]
+    redacted_regions = _merged_regions([*face_regions, *fallback_regions])
+
     redacted = frame.copy()
-    for x1, y1, x2, y2 in unique_regions:
+    for x1, y1, x2, y2 in redacted_regions:
         redacted[y1:y2, x1:x2] = cv2.GaussianBlur(
             redacted[y1:y2, x1:x2],
             (0, 0),
@@ -73,8 +107,11 @@ def redact_person_head_regions(
 
     return {
         "image": redacted,
-        "redacted_regions": unique_regions,
-        "used_person_fallback": True,
+        "redacted_regions": redacted_regions,
+        "used_person_fallback": bool(fallback_regions),
+        "detected_face_count": len(bounded_faces),
+        "fallback_person_count": len(fallback_regions),
+        "face_detector_failed": face_detector_failed,
     }
 
 
@@ -126,8 +163,56 @@ def _person_head_region(person_region: list[int]) -> list[int]:
     return [x1, y1, x2, head_bottom]
 
 
-def _unique_regions(regions: list[list[int]]) -> list[list[int]]:
-    return [list(region) for region in dict.fromkeys(tuple(region) for region in regions)]
+def _expanded_region(region: list[int], margin_ratio: float, *, width: int, height: int) -> list[int]:
+    x1, y1, x2, y2 = region
+    margin_x = round((x2 - x1) * margin_ratio)
+    margin_y = round((y2 - y1) * margin_ratio)
+    return [
+        max(0, x1 - margin_x),
+        max(0, y1 - margin_y),
+        min(width, x2 + margin_x),
+        min(height, y2 + margin_y),
+    ]
+
+
+def _associated_person_index(face_region: list[int], person_regions: list[list[int]]) -> int | None:
+    face_center_x = (face_region[0] + face_region[2]) / 2
+    face_center_y = (face_region[1] + face_region[3]) / 2
+    candidates = [
+        (index, (x2 - x1) * (y2 - y1))
+        for index, (x1, y1, x2, y2) in enumerate(person_regions)
+        if x1 <= face_center_x <= x2 and y1 <= face_center_y <= y2
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda candidate: candidate[1])[0]
+
+
+def _merged_regions(regions: list[list[int]]) -> list[list[int]]:
+    """Deduplicate and union overlapping rectangles so pixels are blurred once."""
+    merged: list[list[int]] = []
+    for region in regions:
+        candidate = list(region)
+        index = 0
+        while index < len(merged):
+            existing = merged[index]
+            if not _regions_overlap(candidate, existing):
+                index += 1
+                continue
+            candidate = [
+                min(candidate[0], existing[0]),
+                min(candidate[1], existing[1]),
+                max(candidate[2], existing[2]),
+                max(candidate[3], existing[3]),
+            ]
+            merged.pop(index)
+            index = 0
+        merged.append(candidate)
+    return merged
+
+
+def _regions_overlap(first: list[int], second: list[int]) -> bool:
+    return max(first[0], second[0]) < min(first[2], second[2]) and max(first[1], second[1]) < min(first[3], second[3])
 
 
 def _draw_box(

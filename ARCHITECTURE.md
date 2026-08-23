@@ -30,10 +30,16 @@ Sơ đồ component và data flow runtime nằm trong `docs/architecture_diagram
 
 Luồng phụ thuộc bắt buộc:
 
-```text
-frontend feature → frontend api → backend api → backend service
-                                             → model/schema/core
-                                             → integration → vision facade/provider
+```mermaid
+flowchart LR
+    frontendFeature[Frontend feature] --> frontendApi[Frontend API]
+    frontendApi --> backendApi[Backend API]
+    backendApi --> backendService[Backend service]
+    backendService --> modelCore[Model, schema, core]
+    backendService --> integration[Integration adapter]
+    integration --> localVision[Local vision facade]
+    integration --> remoteWorker[Remote safety vision HTTP worker]
+    remoteWorker --> workerVision[Worker vision facade]
 ```
 
 Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
@@ -52,9 +58,8 @@ Các bất biến an toàn:
 ## Trạng thái triển khai
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
-machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory và SQLite
-event history. PostgreSQL, PPE/face detector production model, RBAC và các
-capability nâng cao vẫn là đích cần triển khai.
+machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
+event history, PPE production model và RBAC. Safety Vision có thể chạy trong backend hoặc qua worker HTTP `safety_vision_v1`; phiên video/ảnh trực tiếp đi qua `FrameInferenceService`, còn rule, occurrence, HITL và persistence vẫn thuộc backend. PostgreSQL là database duy nhất cho mọi môi trường; SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
@@ -62,3 +67,57 @@ Thứ tự tiến hóa theo backlog:
 2. **Bổ sung context:** zone/shift và confidence-based HITL.
 3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
 4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.
+
+## Kiến trúc media trực tiếp
+
+```mermaid
+flowchart LR
+    react[React] -->|REST| backend[Backend control plane]
+    backend -->|Asset, configuration, session| postgres[(PostgreSQL)]
+    admin[Sys Admin] -->|Authorize upload| backend
+    react -->|Presigned upload and playback| bucket[(Railway Bucket)]
+    bucket -->|Validate and cache| backend
+    volume[(Inference cache volume)] --> backend
+    backend -->|Decoded sampled frame| vision[Local or remote Vision]
+    vision -->|Observations| backend
+    backend -->|Session status and detections| react
+```
+
+Backend là owner duy nhất của asset registry, file content, camera configuration và
+inference-session lifecycle. Browser chỉ gửi `asset_id` và camera command, không gửi
+filesystem path hoặc URL nguồn tùy ý. Railway Bucket là canonical storage cho upload
+mới; browser chỉ nhận presigned URL ngắn hạn sau khi backend kiểm tra quyền. Backend
+xác minh object và frame đầu, sau đó dùng volume tại `MEDIA_ASSET_DIR` làm read-through
+cache cho OpenCV. PostgreSQL giữ storage backend/key, metadata, assignment và lifecycle evidence.
+
+### Luồng runtime của một camera
+
+```mermaid
+flowchart LR
+    config[Saved asset, zones and PPE] --> run[Run or Replay command]
+    run --> reset[Fresh session and reset tracking/occurrences]
+    reset --> source[Open validated volume file]
+    source -->|Video sampled and paced| inference[FrameInferenceService]
+    source -->|Image exactly once| inference
+    inference --> first[First real result sets RUNNING]
+    first --> ws[WebSocket detections and rolling FPS]
+    ws --> eof[Video EOF sets COMPLETED and enables Replay]
+```
+
+Camera identity là một trong `cam_1` đến `cam_4`. Mỗi Run/Replay tạo UUID session
+mới; output phiên cũ bị bỏ qua. Save cấu hình không khởi động hoặc dừng inference.
+Sau restart, cấu hình được giữ nhưng phiên đang chạy chuyển `STOPPED` và không tự resume.
+
+### Topology Railway hiện tại
+
+```mermaid
+flowchart LR
+    browser[Internet browser] -->|HTTPS REST and WebSocket| backend["p047-app"]
+    bucket[(Railway Bucket Singapore)] --> backend
+    volume[(OpenCV media cache)] --> backend
+    backend --> postgres[(PostgreSQL)]
+    backend --> vision[Optional Safety Vision worker]
+```
+
+Streamer, MediaMTX, FFmpeg publisher, HLS, RTSP và MJPEG simulation không còn là
+runtime hoặc deployment dependency.

@@ -12,7 +12,9 @@ type LoadState = "loading" | "loaded" | "loadError";
 const EMPTY_REQUIREMENT: PpeRequirementUpdate = {
   profile: "hat_vest_v1",
   hat_required: false,
-  vest_required: false
+  vest_required: false,
+  restricted_area_detection_enabled: false,
+  zone_intrusion_enabled: true
 };
 
 export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelProps) {
@@ -45,7 +47,7 @@ export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelPro
     return () => { active = false; };
   }, [cameraId, reloadKey, zoneId]);
 
-  const update = useCallback((key: "hat_required" | "vest_required", value: boolean) => {
+  const update = useCallback((key: "hat_required" | "vest_required" | "restricted_area_detection_enabled" | "zone_intrusion_enabled", value: boolean) => {
     setDraft(current => ({...current, [key]: value}));
     setError(undefined);
     setMessage(undefined);
@@ -87,14 +89,18 @@ export function PpeRequirementsPanel({cameraId, zoneId}: PpeRequirementsPanelPro
     <section className="ppe-requirements" aria-labelledby="ppe-requirements-title">
       <div className="ppe-requirements-copy">
         <small>CAMERA · KHU VỰC</small>
-        <h2 id="ppe-requirements-title">Yêu cầu PPE</h2>
-        <p>Chỉ cảnh báo loại đang bật khi model phát hiện thiếu.</p>
+        <h2 id="ppe-requirements-title">Cấu hình cảnh báo</h2>
+        <p>Thiết lập riêng cho khu vực đang chọn.</p>
       </div>
       <div className="ppe-requirement-switches">
         <RequirementSwitch label="Yêu cầu mũ bảo hộ" checked={draft.hat_required} disabled={saving}
           onChange={checked => update("hat_required", checked)} />
         <RequirementSwitch label="Yêu cầu áo phản quang" checked={draft.vest_required} disabled={saving}
           onChange={checked => update("vest_required", checked)} />
+        <RequirementSwitch label="Detect vùng cấm" checked={Boolean(draft.restricted_area_detection_enabled)} disabled={saving}
+          onChange={checked => update("restricted_area_detection_enabled", checked)} />
+        <RequirementSwitch label="Cảnh báo xâm nhập zone" checked={draft.zone_intrusion_enabled !== false} disabled={saving}
+          onChange={checked => update("zone_intrusion_enabled", checked)} />
       </div>
       <div className="ppe-requirement-actions">
         <div className="ppe-save-status" aria-live="polite">
@@ -133,14 +139,18 @@ function toUpdate(requirement: PpeRequirement): PpeRequirementUpdate {
   return {
     profile: requirement.profile,
     hat_required: requirement.hat_required,
-    vest_required: requirement.vest_required
+    vest_required: requirement.vest_required,
+    restricted_area_detection_enabled: requirement.restricted_area_detection_enabled ?? false,
+    zone_intrusion_enabled: requirement.zone_intrusion_enabled ?? true
   };
 }
 
 function sameRequirement(left: PpeRequirementUpdate, right: PpeRequirementUpdate): boolean {
   return left.profile === right.profile
     && left.hat_required === right.hat_required
-    && left.vest_required === right.vest_required;
+    && left.vest_required === right.vest_required
+    && left.restricted_area_detection_enabled === right.restricted_area_detection_enabled
+    && left.zone_intrusion_enabled === right.zone_intrusion_enabled;
 }
 
 function errorMessage(error: unknown, fallback: string): string {

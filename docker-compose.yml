@@ -3,6 +3,8 @@
 services:
   db:
     image: postgres:17-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: p047_compose_test
       POSTGRES_USER: p047_test
@@ -19,9 +21,12 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.development
+    volumes:
+      - ./data/media-assets:/app/data/media-assets
     environment:
       DATABASE_URL: postgresql+psycopg2://p047_test:p047-test-only@db:5432/p047_compose_test
       RUN_DB_MIGRATIONS_ON_START: "true"
+      MEDIA_ASSET_DIR: /app/data/media-assets
     ports:
       - "8000:8000"
     depends_on:

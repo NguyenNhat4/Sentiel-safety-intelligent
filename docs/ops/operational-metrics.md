@@ -25,7 +25,9 @@ Mỗi event là một dòng JSON hoàn chỉnh. Backend chỉ ghi event có sche
 - `http_request_completed`: method, route template, status class và duration.
 - `websocket_connection_opened` / `websocket_connection_closed`.
 - `inference_completed`: outcome và duration.
+- `inference_dropped`: frame mẫu đã quá freshness budget nên bị bỏ trước model.
 - `inference_failed`: error kind đã chuẩn hóa.
+- `privacy_redaction_completed`: outcome face/fallback; lỗi YuNet chỉ ghi `yunet_inference_failed`, không ghi ảnh, box hoặc ID.
 
 ## Privacy boundary
 

@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import logging
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 
+from vision.face_detection import FaceDetector, YuNetFaceDetector
 from vision.pipeline import (
     ModelDetection,
     PrivacyRedactionResult,
     SnapshotPerson,
     annotate_snapshot,
+    redact_identity_regions,
     redact_person_head_regions,
 )
+
+logger = logging.getLogger(__name__)
 
 CanonicalPerson = tuple[int, int, int, int, float, int]
 
@@ -199,6 +205,8 @@ class PpeVisionFacade:
         self._sessions: dict[str, tuple[Any, float]] = {}
         # session_id -> PpeTemporalSmoother (only for tracked sessions)
         self._smoothers: dict[str, PpeTemporalSmoother] = {}
+        self._sessions_lock = threading.RLock()
+        self._session_locks: dict[str, threading.Lock] = {}
 
     @property
     def _model_confidence_threshold(self) -> float:
@@ -223,32 +231,30 @@ class PpeVisionFacade:
             # Stateless: geometric validation only, no temporal smoothing
             return self._safety_result(result, require_track_ids=False, smoother=None)
 
-        self._expire_sessions(now)
-        session = self._sessions.get(monitoring_session_id)
-        model = self._create_model() if session is None else session[0]
-        self._validate_model_classes(model.names)
-        self._sessions[monitoring_session_id] = (model, now)
-
-        # Ensure a smoother exists for this tracked session
-        smoother = self._smoothers.setdefault(
-            monitoring_session_id,
-            PpeTemporalSmoother(temporal_frames=self._temporal_frames),
-        )
-
-        result = model.track(
-            frame,
-            persist=True,
-            tracker="bytetrack.yaml",
-            classes=[0, 3, 4],
-            conf=self._model_confidence_threshold,
-            imgsz=self._inference_image_size,
-            verbose=False,
-        )[0]
-        vision_result = self._safety_result(result, require_track_ids=True, smoother=smoother)
-
-        present_track_ids = {person[5] for person in vision_result["canonical_people"]}
-        smoother.advance_tracks(present_track_ids)
-
+        with self._sessions_lock:
+            self._expire_sessions(now)
+            session = self._sessions.get(monitoring_session_id)
+            model = self._create_model() if session is None else session[0]
+            self._validate_model_classes(model.names)
+            self._sessions[monitoring_session_id] = (model, now)
+            smoother = self._smoothers.setdefault(
+                monitoring_session_id,
+                PpeTemporalSmoother(temporal_frames=self._temporal_frames),
+            )
+            session_lock = self._session_locks.setdefault(monitoring_session_id, threading.Lock())
+        with session_lock:
+            result = model.track(
+                frame,
+                persist=True,
+                tracker="bytetrack.yaml",
+                classes=[0, 3, 4],
+                conf=self._model_confidence_threshold,
+                imgsz=self._inference_image_size,
+                verbose=False,
+            )[0]
+            vision_result = self._safety_result(result, require_track_ids=True, smoother=smoother)
+            present_track_ids = {person[5] for person in vision_result["canonical_people"]}
+            smoother.advance_tracks(present_track_ids)
         return vision_result
 
     def observe(
@@ -280,8 +286,10 @@ class PpeVisionFacade:
         self._load_model()
 
     def end_session(self, monitoring_session_id: str) -> None:
-        self._sessions.pop(monitoring_session_id, None)
-        self._smoothers.pop(monitoring_session_id, None)
+        with self._sessions_lock:
+            self._sessions.pop(monitoring_session_id, None)
+            self._smoothers.pop(monitoring_session_id, None)
+            self._session_locks.pop(monitoring_session_id, None)
 
     # ------------------------------------------------------------------
     # Core detection + association
@@ -480,6 +488,7 @@ class PpeVisionFacade:
         for session_id in expired:
             self._sessions.pop(session_id, None)
             self._smoothers.pop(session_id, None)
+            self._session_locks.pop(session_id, None)
 
     # ------------------------------------------------------------------
     # Geometry helpers (US-29)
@@ -572,14 +581,49 @@ class PpeVisionFacade:
 
 
 class PrivacyRedactionFacade:
-    """Redacts identity from canonical person boxes without loading a PPE model."""
+    """Redacts YuNet faces with a per-person conservative fallback."""
 
-    @staticmethod
+    def __init__(
+        self,
+        model_path: str | None = None,
+        *,
+        score_threshold: float = 0.6,
+        face_margin_ratio: float = 0.2,
+        face_detector: FaceDetector | None = None,
+    ) -> None:
+        self._face_detector = face_detector or (
+            YuNetFaceDetector(model_path, score_threshold=score_threshold) if model_path is not None else None
+        )
+        self._face_margin_ratio = face_margin_ratio
+
+    def preload(self) -> None:
+        if self._face_detector is not None:
+            self._face_detector.preload()
+
     def redact_snapshot(
+        self,
         frame: np.ndarray,
         people: list[SnapshotPerson],
     ) -> PrivacyRedactionResult:
-        return redact_person_head_regions(frame, people)
+        if self._face_detector is None:
+            return redact_person_head_regions(frame, people)
+        detector_failed = False
+        try:
+            faces = self._face_detector.detect(frame)
+        except Exception as exc:
+            detector_failed = True
+            faces = []
+            logger.warning(
+                "YuNet face detection failed; using person-head fallback (%s).",
+                type(exc).__name__,
+            )
+        return redact_identity_regions(
+            frame,
+            people,
+            faces,
+            face_margin_ratio=self._face_margin_ratio,
+            face_detector_failed=detector_failed,
+        )
 
     @staticmethod
     def annotate_snapshot(

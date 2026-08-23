@@ -70,3 +70,7 @@ def test_ppe_temporal_frames_loads_from_environment(monkeypatch) -> None:
 def test_ppe_temporal_frames_rejects_invalid_values(value: int) -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, ppe_temporal_frames=value)
+
+
+def test_settings_loads_production_env_file() -> None:
+    assert Settings.model_config["env_file"] == ".env.production"

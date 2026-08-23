@@ -49,7 +49,7 @@ def test_returns_violate_and_review_for_required_missing_ppe():
     assert result.missing_required_ppe == [["hat"]]
 
 
-def test_skips_required_ppe_alerts_when_machine_is_stopped():
+def test_stopped_machine_skips_required_ppe_alerts():
     result = SafetyRuleEngine().evaluate(
         people=[person(hat="missing")],
         requirements=requirements(hat_required=True),
@@ -75,13 +75,13 @@ def test_evaluates_hat_and_vest_independently_for_multiple_people():
     assert result.ppe_alert is True
 
 
-@pytest.mark.parametrize("machine_state", ["running", "stopped"])
-def test_returns_violate_for_person_in_active_zone_regardless_of_machine_state(machine_state):
+@pytest.mark.parametrize(("machine_state", "expected"), [("running", "violate"), ("stopped", "violate")])
+def test_active_zone_is_always_a_violation(machine_state, expected):
     result = SafetyRuleEngine().evaluate(
         people=[person(inside_zone=True)], requirements=requirements(), machine_state=machine_state, zone_active=True
     )
 
-    assert result.outcome == "violate"
+    assert result.outcome == expected
     assert result.person_inside_zone is True
 
 

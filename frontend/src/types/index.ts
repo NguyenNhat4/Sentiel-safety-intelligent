@@ -1,15 +1,76 @@
 export type MachineState = "running" | "stopped";
 export type ReviewStatus = "acknowledged" | "false_alarm";
+export type EventStatus = ReviewStatus | "unacknowledged" | "resolved";
 export type UserRole = "system_admin" | "safety_manager" | "area_manager";
 export type AssignableUserRole = UserRole;
 
-export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; }
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
+export type MediaType = "video" | "image";
+export type MediaAssetStatus = "UPLOADING" | "READY" | "ERROR";
+export type CameraSessionStatus = "STARTING" | "RUNNING" | "COMPLETED" | "ERROR" | "STOPPED";
+
+export interface MediaAsset {
+  id: string;
+  display_name: string;
+  media_type: MediaType;
+  status: MediaAssetStatus;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  assigned_camera_id: string | null;
+  can_delete?: boolean;
+  error_message?: string | null;
+}
+
+export interface CameraConfigurationZone extends MonitoringZone { ppe_requirements: PpeRequirementUpdate; }
+
+export interface CameraConfiguration {
+  camera_id: string;
+  revision: number;
+  asset_id: string | null;
+  machine_state: MachineState;
+  zones: CameraConfigurationZone[];
+  updated_at: string | null;
+}
+
+export interface CameraConfigurationUpdate {
+  expected_revision: number;
+  asset_id: string | null;
+  machine_state: MachineState;
+  zones: CameraConfigurationZone[];
+}
+
+export interface CameraSession {
+  id: string;
+  camera_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  status: CameraSessionStatus;
+  config_revision: number;
+  inference_fps: number;
+  started_at: string;
+  running_at: string | null;
+  completed_at: string | null;
+  error_code: string | null;
+}
+
+export interface CameraSessionStatusEvent {
+  type: "camera_session_status";
+  camera_id: string;
+  session_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  video_time: number;
+  session_status: CameraSessionStatus;
+  inference_fps: number;
+  error_code?: string | null;
+}
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
 export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
-export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; }
+export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export interface PasswordChangeRequest { new_password: string; current_password?: string; }
-export interface UserRoleUpdate { role: AssignableUserRole; }
+export interface UserRoleUpdate { role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 
 export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
 export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
@@ -23,7 +84,8 @@ export interface MonitoringZone {
   zone_id: string;
   display_name: string;
   points: ZonePoint[];
-  machine_state: MachineState;
+  /** @deprecated Camera mapping is the source of truth. */
+  machine_state?: MachineState;
   enabled: boolean;
   order: number;
 }
@@ -90,6 +152,7 @@ export interface InferenceRule {
   zone_id: string;
   ppe_requirements: PpeRequirementUpdate;
   ppe_alert: boolean;
+  restricted_area_alert?: boolean;
   zone_revision?: number | null;
   zone_results?: ZoneResult[];
 }
@@ -108,6 +171,21 @@ export interface InferenceResult {
   rule: InferenceRule;
 }
 
+export interface CameraInferenceResult extends Omit<InferenceResult, "type" | "video_time"> {
+  type: "camera_inference_result";
+  camera_id: string;
+  session_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  video_time: number;
+  session_status: CameraSessionStatus;
+  inference_fps: number;
+  source_timestamp_ms?: number;
+  captured_at?: number;
+  frame_width: number;
+  frame_height: number;
+}
+
 export interface SafetyEvent {
   id: number;
   timestamp: string;
@@ -115,7 +193,7 @@ export interface SafetyEvent {
   camera_id: string;
   event_type: string;
   severity: string;
-  status: ReviewStatus;
+  status: EventStatus;
   acknowledged_by?: string | null;
   snapshot_path?: string | null;
   details?: {
@@ -124,8 +202,64 @@ export interface SafetyEvent {
     review_result?: string;
   };
   monitoring_session_id?: string | null;
+  track_id?: number | null;
   occurrence_ids?: string[];
   batch_id?: string | null;
+  decision_context?: StoredDecisionContext | null;
+  audit_retention_until?: string | null;
+  snapshot_retention_until?: string | null;
+}
+
+export interface EventRuleContextInput {
+  triggered_rule_keys: string[];
+  ppe_profile: "hat_vest_v1";
+  ppe_requirements: PpeRequirementUpdate;
+}
+
+export interface EventSceneContextInput {
+  frame_id: number;
+  video_timestamp_seconds: number;
+  machine_state: MachineState;
+  zone_name: string;
+  zone_revision?: number | null;
+  zone_points: ZonePoint[];
+  people: PersonDetection[];
+  detections: ModelDetection[];
+}
+
+export interface EventSystemDecisionInput {
+  result: "violate";
+  reason_codes: string[];
+}
+
+export interface DecisionContextInput {
+  rule: EventRuleContextInput;
+  scene: EventSceneContextInput;
+  system_decision: EventSystemDecisionInput;
+}
+
+export interface StoredDecisionContext extends DecisionContextInput {
+  schema_version: "decision_context_v1";
+  rule: EventRuleContextInput & {rule_version: "safety_rule_v1"; violation_frame_count: number};
+  scene: EventSceneContextInput & {camera_id: string; zone_id: string};
+  system_decision: EventSystemDecisionInput & {severity: "low" | "medium" | "high" | "critical"};
+  human_review: {
+    outcome: "actual_violation" | "false_alarm";
+    actor_user_id?: string | null;
+    actor_name: string;
+    actor_role?: string | null;
+    reviewed_at: string;
+  };
+}
+
+export interface EventIncidentSummary {
+  text: string;
+  source: "llm" | "deterministic";
+  context_schema_version: "decision_context_v1" | null;
+}
+
+export interface EventDetail extends SafetyEvent {
+  summary: EventIncidentSummary;
 }
 
 export interface EventBatchItem {
@@ -134,6 +268,7 @@ export interface EventBatchItem {
   severity: string;
   occurrence_ids: string[];
   details: Record<string, unknown>;
+  decision_context?: DecisionContextInput;
 }
 
 export interface EventBatchPayload {
@@ -165,13 +300,17 @@ export interface EventPayload {
   snapshot_detections?: ModelDetection[];
   details: Record<string, unknown>;
   monitoring_session_id?: string;
+  track_id?: number;
   occurrence_ids: string[];
+  decision_context?: DecisionContextInput;
 }
 
 export interface PpeRequirementUpdate {
   profile: "hat_vest_v1";
   hat_required: boolean;
   vest_required: boolean;
+  restricted_area_detection_enabled?: boolean;
+  zone_intrusion_enabled?: boolean;
 }
 
 export interface PpeRequirement extends PpeRequirementUpdate {

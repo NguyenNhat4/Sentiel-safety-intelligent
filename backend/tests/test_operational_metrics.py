@@ -1,8 +1,10 @@
 import json
+import logging
 from datetime import UTC, datetime
 
 from backend.app.core.config import Settings
 from backend.app.core.operational_metrics import (
+    LOGGER_NAME,
     configure_operational_metrics_logger,
     record_operational_event,
 )
@@ -11,6 +13,7 @@ from backend.app.services.operational_metrics_service import OperationalMetricsS
 
 def test_operational_metrics_writer_emits_allowlisted_jsonl(tmp_path):
     log_path = tmp_path / "operational-metrics.jsonl"
+    logging.getLogger(LOGGER_NAME).disabled = True
     configure_operational_metrics_logger(log_path, max_bytes=1024, backup_count=1)
 
     record_operational_event(
@@ -28,6 +31,22 @@ def test_operational_metrics_writer_emits_allowlisted_jsonl(tmp_path):
     assert event["event_type"] == "http_request_completed"
     assert event["route"] == "/api/v1/events/{event_id}"
     assert "ignored_secret" not in event
+
+
+def test_operational_metrics_writer_accepts_privacy_fallback_warning(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    configure_operational_metrics_logger(log_path, max_bytes=1024, backup_count=1)
+
+    record_operational_event(
+        "privacy_redaction_completed",
+        outcome="person_fallback",
+        error_kind="yunet_inference_failed",
+    )
+
+    event = json.loads(log_path.read_text(encoding="utf-8"))
+    assert event["event_type"] == "privacy_redaction_completed"
+    assert event["outcome"] == "person_fallback"
+    assert event["error_kind"] == "yunet_inference_failed"
 
 
 def test_operational_metrics_summary_skips_malformed_records_and_uses_nearest_rank(tmp_path):
@@ -100,6 +119,26 @@ def test_operational_metrics_summary_groups_websocket_connections(tmp_path):
     assert summary.websocket_connections[0].inference_latency.p50_ms == 20
     assert summary.websocket_connections[0].inference_latency.p95_ms == 40
     assert [sample.duration_ms for sample in summary.inference_latency_samples] == [20, 40]
+
+
+def test_operational_metrics_counts_stale_frame_drops(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    log_path.write_text(
+        json.dumps(
+            {
+                "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                "event_type": "inference_dropped",
+                "route": "/camera-inference",
+                "outcome": "stale_frame",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = OperationalMetricsService(Settings(operational_metrics_log_path=str(log_path))).summary(window_minutes=5)
+
+    assert summary.inference_outcomes == {"stale_frame": 1}
 
 
 def test_operational_metrics_endpoint_validates_window_and_excludes_itself(client):

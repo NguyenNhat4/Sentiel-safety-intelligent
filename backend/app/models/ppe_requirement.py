@@ -19,6 +19,8 @@ class PpeRequirement(Base):
     zone_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     hat_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     vest_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    restricted_area_detection_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    zone_intrusion_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     updated_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

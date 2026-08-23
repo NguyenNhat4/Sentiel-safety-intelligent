@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+.PHONY: setup py-setup env-setup db-upgrade run vision-worker-run vision-worker-image e2e-demo test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -19,7 +19,16 @@ db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/alembic upgrade head
 
 run: db-upgrade frontend-build
-	$(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+	set -a; . ./.env.development; set +a; $(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+
+vision-worker-run:
+	$(VENV_BIN)/uvicorn backend.app.vision_worker:app --reload --host 0.0.0.0 --port 8100
+
+vision-worker-image:
+	docker build -f Dockerfile.ai -t p047-vision:dev .
+
+e2e-demo:
+	PYTHONPATH=. $(VENV_BIN)/python scripts/e2e_demo.py
 
 frontend-install:
 	npm --prefix frontend ci
@@ -37,7 +46,7 @@ frontend-test:
 	npm --prefix frontend run test
 
 frontend-build:
-	npm --prefix frontend run build
+	set -a; [ ! -f .env.development ] || . ./.env.development; set +a; npm --prefix frontend run build
 
 docker-build:
 	docker compose build

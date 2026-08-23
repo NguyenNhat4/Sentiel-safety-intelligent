@@ -6,6 +6,8 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.core.database import Base, get_db
 from backend.app.main import app
+from backend.app.models.user import User, UserRole
+from backend.app.services.auth_service import AuthService, hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -37,6 +39,17 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    db_session.add(
+        User(
+            email="safety.test@sentinel.local",
+            full_name="Safety Test",
+            role=UserRole.SAFETY_MANAGER.value,
+            password_hash=hash_password("Sentinel123!"),
+        )
+    )
+    db_session.commit()
+    token, _, _ = AuthService(db_session).login("safety.test@sentinel.local", "Sentinel123!")
     with TestClient(app) as test_client:
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
     app.dependency_overrides.clear()

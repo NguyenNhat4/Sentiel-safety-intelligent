@@ -21,7 +21,9 @@ make setup
 Lệnh này sẽ tự động:
 1. Chạy `uv sync` để tạo môi trường `.venv` và cài đặt đúng các phiên bản gói từ `pyproject.toml` và `uv.lock`.
 2. Chạy `npm --prefix frontend ci` để cài đặt dependencies cho phân hệ React Frontend.
-3. Tạo file cấu hình môi trường `.env.development` từ `.env.development.example` (nếu chưa có). Docker Compose dùng `.env.production` riêng.
+3. Tạo file cấu hình môi trường `.env.development` từ `.env.development.example` (nếu chưa có). `DATABASE_URL` phải trỏ đến PostgreSQL truy cập được từ máy local; Docker Compose dùng PostgreSQL disposable nội bộ. Không dùng SQLite hoặc database fallback. Giá trị production được cấu hình trong Railway Variables.
+
+> Trong giai đoạn chuyển đổi, template và Makefile cũ có thể vẫn chứa SQLite bootstrap. Hãy đặt `DATABASE_URL` PostgreSQL và `DATABASE_FALLBACK_ENABLED=false`; không dùng host `*.railway.internal` khi chạy trên máy local. Workflow hai lệnh chỉ được xem là khôi phục hoàn toàn sau khi phần runtime cũ được gỡ bỏ.
 
 ---
 

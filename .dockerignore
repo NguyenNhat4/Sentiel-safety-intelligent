@@ -17,6 +17,7 @@ eval/
 data/
 models/*
 !models/yolo11m_safety.pt
+!models/face_detection_yunet_2023mar.onnx
 .dockerignore
 Dockerfile
 docker-compose.yml
