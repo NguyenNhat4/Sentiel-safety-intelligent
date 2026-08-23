@@ -29,7 +29,7 @@ class CameraConfigurationZone(BaseModel):
 
 class CameraConfigurationUpdate(BaseModel):
     expected_revision: int = Field(ge=0)
-    asset_id: UUID
+    asset_id: UUID | None = None
     machine_state: Literal["running", "stopped"]
     zones: list[CameraConfigurationZone] = Field(default_factory=list)
 

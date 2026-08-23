@@ -80,7 +80,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   }
   async function save() {
     const currentDraft = draft;
-    if (savingRef.current || !currentDraft || !currentDraft.asset_id || incomplete || conflict) return;
+    if (savingRef.current || !currentDraft || incomplete || conflict) return;
     savingRef.current = true; setSaving(true); setError(""); setMessage("");
     try {
       await saveCameraConfiguration(cameraId, {expected_revision: currentDraft.revision, asset_id: currentDraft.asset_id, machine_state: currentDraft.machine_state, zones: currentDraft.zones.map((zone, order) => ({...zone, order}))});
@@ -91,7 +91,10 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
 
   return <section className={`camera-config-page page ${active ? "active" : ""}`}>
     <div className="camera-config-toolbar"><div><p className="eyebrow">CAMERA {cameraNumber(cameraId)} · CONTROLLED DRAFT</p>{showTitle && <h2>Cấu hình Camera {cameraNumber(cameraId)}</h2>}<p>Media, trạng thái máy, vùng và PPE chỉ được áp dụng trong một lần lưu.</p></div><button type="button" className="secondary-btn" onClick={onBack}>Quay lại Live Monitor</button></div>
-    <label className="asset-select-field">Nguồn media<select aria-label="Nguồn media" value={draft.asset_id ?? ""} onChange={event => updateDraft({asset_id: event.target.value || null})}><option value="">Chọn media đã sẵn sàng</option>{assets.map(asset => <option key={asset.id} value={asset.id} disabled={Boolean(asset.assigned_camera_id && asset.assigned_camera_id !== cameraId)}>{asset.display_name} · {asset.media_type === "video" ? "Video" : "Hình ảnh"}</option>)}</select></label>
+    <div className="asset-select-field-group">
+      <label className="asset-select-field">Nguồn media<select aria-label="Nguồn media" value={draft.asset_id ?? ""} onChange={event => updateDraft({asset_id: event.target.value || null})}><option value="">Chọn media đã sẵn sàng</option>{assets.map(asset => <option key={asset.id} value={asset.id} disabled={Boolean(asset.assigned_camera_id && asset.assigned_camera_id !== cameraId)}>{asset.display_name} · {asset.media_type === "video" ? "Video" : "Hình ảnh"}</option>)}</select></label>
+      {draft.asset_id && <button type="button" className="secondary-btn disconnect-asset-btn" aria-label="Ngắt kết nối nguồn media" onClick={() => updateDraft({asset_id: null})}>Ngắt kết nối nguồn</button>}
+    </div>
     <div className="camera-config-media">
       {selectedAsset ? <AuthenticatedMedia assetId={selectedAsset.id} mediaType={selectedAsset.media_type} label={`Preview Camera ${cameraNumber(cameraId)}`} playing /> : <div className="camera-config-empty">Chọn media để xem preview và vẽ vùng.</div>}
       <svg className="zone-config-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" onPointerDown={addPoint} onPointerMove={movePoint} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>{draft.zones.map(zone => <g key={zone.zone_id} className={zone.zone_id === selectedZoneId ? "selected" : ""}>{zone.points.length > 1 && <polyline points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.length === 4 && <polygon points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" onPointerDown={event => { event.stopPropagation(); setSelectedZoneId(zone.zone_id); setDragging(index); }} />)}</g>)}</svg>
@@ -103,7 +106,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
       {selectedZone && <label className="zone-name-field">Tên vùng<input aria-label="Tên vùng" value={selectedZone.display_name} onChange={event => updateSelected({display_name: event.target.value})} /></label>}
       <div className="ppe-requirement-switches camera-rule-switches"><RuleSwitch label="Yêu cầu mũ bảo hộ" checked={rules.hat_required} onChange={value => updateRules({hat_required: value})} /><RuleSwitch label="Yêu cầu áo phản quang" checked={rules.vest_required} onChange={value => updateRules({vest_required: value})} /></div>
       {conflict && <p role="alert">Các vùng đang giao, chạm hoặc chứa nhau: {conflict.join(", ")}.</p>}{error && <p role="alert">{error}</p>}{!error && message && <p role="status">{message}</p>}
-      <div className="zone-save-actions"><button type="button" className="secondary-btn" onClick={onBack}>Quay lại</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || !draft.asset_id || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div>
+      <div className="zone-save-actions"><button type="button" className="secondary-btn" onClick={onBack}>Quay lại</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div>
     </div>
   </section>;
 }

@@ -64,21 +64,22 @@ class CameraConfigurationService:
             current_revision = configuration.revision if configuration else 0
             if payload.expected_revision != current_revision:
                 raise CameraConfigurationConflictError("Camera configuration revision is stale")
-            asset = self.db.get(MediaAsset, str(payload.asset_id), with_for_update=True)
-            if asset is None or asset.status != MediaAssetStatus.READY.value:
-                raise CameraConfigurationInvalidError("A READY media asset is required")
-            assigned = self.db.scalar(
-                select(CameraConfiguration.camera_id).where(
-                    CameraConfiguration.asset_id == str(payload.asset_id),
-                    CameraConfiguration.camera_id != camera_id,
+            if payload.asset_id is not None:
+                asset = self.db.get(MediaAsset, str(payload.asset_id), with_for_update=True)
+                if asset is None or asset.status != MediaAssetStatus.READY.value:
+                    raise CameraConfigurationInvalidError("A READY media asset is required")
+                assigned = self.db.scalar(
+                    select(CameraConfiguration.camera_id).where(
+                        CameraConfiguration.asset_id == str(payload.asset_id),
+                        CameraConfiguration.camera_id != camera_id,
+                    )
                 )
-            )
-            if assigned:
-                raise CameraConfigurationConflictError("Media asset is assigned to another camera")
+                if assigned:
+                    raise CameraConfigurationConflictError("Media asset is assigned to another camera")
             if configuration is None:
                 configuration = CameraConfiguration(camera_id=camera_id)
                 self.db.add(configuration)
-            configuration.asset_id = str(payload.asset_id)
+            configuration.asset_id = str(payload.asset_id) if payload.asset_id is not None else None
             configuration.machine_state = payload.machine_state
             configuration.revision = current_revision + 1
             configuration.updated_at = datetime.now(UTC)

@@ -427,3 +427,42 @@ def test_fewer_observations_than_people_safely_handled():
     assert len(result.people) == 2
     assert result.people[0].ppe.hat.status == "missing"
     assert result.people[1].ppe.hat.status == "missing"
+
+
+def test_requirements_by_zone_evaluates_ppe_when_machine_running():
+  def analyze(frame, monitoring_session_id, now):
+      return {
+          "canonical_people": [(40, 10, 40, 80, 0.95, 1)],
+          "people": [
+              {
+                  "hat": {"status": "missing", "confidence": None},
+                  "vest": {"status": "present", "confidence": 0.9},
+              }
+          ],
+          "detections": [],
+      }
+
+  service = FrameInferenceService(vision_analyzer=analyze)
+  req = request(with_zone=False, machine_state="running")
+  req.zones = []
+  req.monitoring_session_id = None
+  requirements_by_zone = {
+      "zone_01": PpeRequirementResponse(
+          camera_id="cam_1",
+          zone_id="zone_01",
+          profile="hat_vest_v1",
+          hat_required=True,
+          vest_required=False,
+          updated_at=None,
+      )
+  }
+
+  result = service.infer_decoded_frame(
+      req,
+      np.zeros((120, 160, 3), dtype=np.uint8),
+      requirements_by_zone=requirements_by_zone,
+  )
+
+  assert result.result == "violate"
+  assert result.people[0].missing_required_ppe == ["hat"]
+  assert result.people[0].active_violations[0].rule_key == "missing_ppe:hat"

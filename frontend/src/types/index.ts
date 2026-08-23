@@ -35,7 +35,7 @@ export interface CameraConfiguration {
 
 export interface CameraConfigurationUpdate {
   expected_revision: number;
-  asset_id: string;
+  asset_id: string | null;
   machine_state: MachineState;
   zones: CameraConfigurationZone[];
 }
