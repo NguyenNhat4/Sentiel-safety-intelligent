@@ -197,11 +197,14 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   const violationKeys = pendingReview?.people.flatMap(person => person.active_violations
     ?.filter(violation => violation.is_new)
     .map(violation => violation.rule_key) ?? []) ?? [];
-  const reviewTitle = violationKeys.some(key => key.startsWith("restricted_area_person"))
-    ? "Phát hiện người trong phạm vi hạn chế"
-    : violationKeys.some(key => key.startsWith("zone_intrusion"))
-      ? "Phát hiện xâm nhập vùng nguy hiểm"
-      : "Phát hiện thiếu PPE";
+  const hasRestricted = violationKeys.some(key => key.startsWith("restricted_area_person"));
+  const hasZone = violationKeys.some(key => key.startsWith("zone_intrusion"));
+  const hasPpe = violationKeys.some(key => key.startsWith("missing_ppe"));
+  const titles: string[] = [];
+  if (hasRestricted) titles.push("Phát hiện người trong phạm vi hạn chế");
+  if (hasZone) titles.push("Phát hiện xâm nhập vùng nguy hiểm");
+  if (hasPpe) titles.push("Phát hiện thiếu PPE");
+  const reviewTitle = titles.length > 0 ? titles.join(" & ") : "Phát hiện vi phạm an toàn";
 
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 

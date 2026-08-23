@@ -88,6 +88,7 @@ class FrameInferenceService:
             ppe_confirmation_frames=settings.ppe_alert_confirm_frames,
             ppe_revoke_confirmation_seconds=settings.ppe_revoke_confirm_seconds,
             zone_activation_frames=settings.zone_alert_confirm_frames,
+            cooldown_seconds=settings.violation_cooldown_seconds,
         )
 
     def preload_models(self) -> None:
