@@ -49,6 +49,22 @@ def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     assert opened[4][0].is_new is True
 
 
+def test_rule_prefix_can_use_a_shorter_activation_threshold():
+    service = ViolationTrackingService(
+        activation_frames=4,
+        activation_frames_by_rule_prefix={"missing_ppe:": 1},
+    )
+
+    ppe = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=1.0)
+    assert ppe[4][0].is_new is True
+
+    for frame in range(2, 5):
+        zone = service.evaluate("session-a", {9: {"zone_intrusion"}}, {9}, now=float(frame))
+        assert zone[9] == []
+    zone = service.evaluate("session-a", {9: {"zone_intrusion"}}, {9}, now=5.0)
+    assert zone[9][0].is_new is True
+
+
 def test_interrupted_pending_violation_must_restart_its_consecutive_frame_count():
     service = ViolationTrackingService(activation_frames=4)
     for frame in range(1, 4):

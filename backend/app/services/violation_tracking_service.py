@@ -27,6 +27,7 @@ class ViolationTrackingService:
         self,
         *,
         activation_frames: int | None = None,
+        activation_frames_by_rule_prefix: dict[str, int] | None = None,
         zone_activation_frames: int | None = None,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
@@ -38,6 +39,9 @@ class ViolationTrackingService:
     ) -> None:
         if activation_frames is not None and activation_frames < 1:
             raise ValueError("activation_frames must be at least 1")
+        activation_overrides = activation_frames_by_rule_prefix or {}
+        if any(not prefix or frames < 1 for prefix, frames in activation_overrides.items()):
+            raise ValueError("rule activation prefixes must be non-empty and frame counts must be at least 1")
         if zone_activation_frames is not None and zone_activation_frames < 1:
             raise ValueError("zone_activation_frames must be at least 1")
         if ppe_confirmation_frames < 1:
@@ -45,6 +49,7 @@ class ViolationTrackingService:
         if ppe_revoke_confirmation_seconds < 0:
             raise ValueError("ppe_revoke_confirmation_seconds must not be negative")
         self._activation_frames = activation_frames
+        self._activation_frames_by_rule_prefix = dict(activation_overrides)
         self._zone_activation_frames = zone_activation_frames
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
@@ -147,7 +152,11 @@ class ViolationTrackingService:
                 if occurrence is None or not occurrence.active:
                     missing_frames = self._pending_ppe_frames.get(key, 0) + 1
                     self._pending_ppe_frames[key] = missing_frames
-                    if missing_frames < self._ppe_confirmation_frames:
+                    confirmation_frames = self._activation_frames_for(
+                        rule_key,
+                        default=self._ppe_confirmation_frames,
+                    )
+                    if missing_frames < confirmation_frames:
                         continue
                     self._pending_ppe_frames.pop(key, None)
                     item = rule_key.split(":", 1)[1]
@@ -256,6 +265,14 @@ class ViolationTrackingService:
         occurrence.lost_frames = 0
         occurrence.cooldown_until = now + self._cooldown_seconds
 
+    def _activation_frames_for(self, rule_key: str) -> int:
+        matches = [
+            (len(prefix), frames)
+            for prefix, frames in self._activation_frames_by_rule_prefix.items()
+            if rule_key.startswith(prefix)
+        ]
+        return max(matches)[1] if matches else self._activation_frames
+
     def _handoff_nearby_tracks(
         self,
         session_id: str,
@@ -346,6 +363,14 @@ class ViolationTrackingService:
     @staticmethod
     def _requires_ppe_confirmation(rule_key: str) -> bool:
         return rule_key.startswith("missing_ppe:")
+
+    def _activation_frames_for(self, rule_key: str, *, default: int) -> int:
+        matches = [
+            (len(prefix), frames)
+            for prefix, frames in self._activation_frames_by_rule_prefix.items()
+            if rule_key.startswith(prefix)
+        ]
+        return max(matches)[1] if matches else default
 
     def _expire(self, now: float) -> None:
         expired = [

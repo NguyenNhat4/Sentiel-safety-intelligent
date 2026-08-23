@@ -54,8 +54,11 @@ class FrameInferenceService:
         from backend.app.core.config import get_settings
 
         settings = get_settings()
-        self._inference_size = (settings.inference_frame_width, settings.inference_frame_height)
         self._model_path = model_path or settings.ppe_model_path
+        self._person_detection_confidence = settings.person_detection_confidence
+        self._ppe_detection_confidence = settings.ppe_detection_confidence
+        self._inference_image_size = settings.yolo_inference_image_size
+        self._ppe_temporal_frames = settings.ppe_temporal_frames
         self._fallback_model = None
         if vision_analyzer is not None:
             self._vision_analyzer = vision_analyzer
@@ -75,7 +78,13 @@ class FrameInferenceService:
             self._ppe_observer = None
             self._model_preloader = adapter.preload
         else:
-            adapter = get_ppe_vision_adapter(self._model_path)
+            adapter = get_ppe_vision_adapter(
+                self._model_path,
+                person_confidence_threshold=self._person_detection_confidence,
+                ppe_confidence_threshold=self._ppe_detection_confidence,
+                inference_image_size=self._inference_image_size,
+                temporal_frames=self._ppe_temporal_frames,
+            )
             self._vision_analyzer = adapter.analyze
             self._ppe_observer = adapter.observe
             self._model_preloader = adapter.preload
@@ -85,6 +94,7 @@ class FrameInferenceService:
         self._tracker_lock = threading.RLock()
         self._violation_tracker = ViolationTrackingService(
             activation_frames=settings.violation_frame,
+            activation_frames_by_rule_prefix=({"missing_ppe:": 1} if settings.vision_provider == "local" else None),
             ppe_confirmation_frames=settings.ppe_alert_confirm_frames,
             ppe_revoke_confirmation_seconds=settings.ppe_revoke_confirm_seconds,
             zone_activation_frames=settings.zone_alert_confirm_frames,
@@ -139,10 +149,7 @@ class FrameInferenceService:
         requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
         bypass_confirmation: bool = False,
     ) -> FrameInferenceResponse:
-        """Infer from an existing BGR frame without a JPEG/Base64 round trip."""
-        source_height, source_width = frame.shape[:2]
-        if frame.shape[1] > self._inference_size[0] or frame.shape[0] > self._inference_size[1]:
-            frame = cv2.resize(frame, self._inference_size, interpolation=cv2.INTER_AREA)
+        """Infer from the original BGR frame without a JPEG/Base64 or pre-resize round trip."""
         now = time.monotonic()
         if request.monitoring_session_id is not None and request.frame_id is not None:
             with self._tracker_lock:
@@ -164,6 +171,7 @@ class FrameInferenceService:
             for zone in active_zones
         }
 
+        absence_confirmations = None
         if self._vision_analyzer is not None:
             vision_result = self._vision_analyzer(
                 frame,
@@ -172,7 +180,8 @@ class FrameInferenceService:
             )
             detected_people = vision_result["canonical_people"]
             observations = vision_result["people"]
-            detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+            detections = self._public_detections(vision_result["detections"])
+            absence_confirmations = vision_result.get("absence_confirmed")
         else:
             if request.monitoring_session_id is None:
                 detected_people = [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
@@ -181,11 +190,16 @@ class FrameInferenceService:
             vision_result = self._ppe_observer(frame, [person[:5] for person in detected_people])
             if isinstance(vision_result, dict) and "people" in vision_result:
                 observations = vision_result["people"]
-                detections = [ModelDetection.model_validate(item) for item in vision_result["detections"]]
+                detections = self._public_detections(vision_result["detections"])
             else:
                 observations = vision_result
                 detections = []
-        requirements = requirements or self._requirement_loader(request.camera_id, request.zone_id)
+        if requirements is None:
+            requirements = (
+                next(iter(requirements_by_zone.values()))
+                if requirements_by_zone
+                else self._requirement_loader(request.camera_id, request.zone_id)
+            )
         people = []
         rule_people = []
         for index, (x, y, box_width, box_height, confidence, track_id) in enumerate(detected_people):
@@ -211,6 +225,11 @@ class FrameInferenceService:
                 person_confidence=confidence,
                 box_width=box_width,
                 box_height=box_height,
+                absence_confirmed=(
+                    absence_confirmations[index]
+                    if absence_confirmations is not None and index < len(absence_confirmations)
+                    else None
+                ),
             )
             rule_people.append(RulePersonObservation(confidence=confidence, inside_zone=inside_zone, ppe=ppe))
             people.append(
@@ -328,6 +347,7 @@ class FrameInferenceService:
                 ]
 
         has_active_violation = any(person.active_violations for person in people)
+        has_observed_violation = any(observed_rules.values())
         review_required = any(violation.is_new for person in people for violation in person.active_violations)
 
         zone_results = [
@@ -358,7 +378,7 @@ class FrameInferenceService:
         primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
 
         response = FrameInferenceResponse(
-            result="violate" if has_active_violation else "normal",
+            result="violate" if has_observed_violation else "normal",
             review_required=review_required,
             has_active_violation=has_active_violation,
             people=people,
@@ -395,7 +415,6 @@ class FrameInferenceService:
                 ),
             },
         )
-        self._restore_source_coordinates(response, source_width, source_height, width, height)
         return response
 
     def end_session(self, session_id: str) -> None:
@@ -407,36 +426,6 @@ class FrameInferenceService:
         analyzer_owner = getattr(self._vision_analyzer, "__self__", None)
         if analyzer_owner is not None and hasattr(analyzer_owner, "end_session"):
             analyzer_owner.end_session(session_id)
-
-    @staticmethod
-    def _restore_source_coordinates(
-        response: FrameInferenceResponse,
-        source_width: int,
-        source_height: int,
-        inference_width: int,
-        inference_height: int,
-    ) -> None:
-        if source_width == inference_width and source_height == inference_height:
-            return
-        scale_x = source_width / inference_width
-        scale_y = source_height / inference_height
-
-        def scale_box(box: list[int]) -> list[int]:
-            return [
-                round(box[0] * scale_x),
-                round(box[1] * scale_y),
-                round(box[2] * scale_x),
-                round(box[3] * scale_y),
-            ]
-
-        for person in response.people:
-            person.bbox = scale_box(person.bbox)
-            person.foot_point = [
-                round(person.foot_point[0] * scale_x),
-                round(person.foot_point[1] * scale_y),
-            ]
-        for detection in response.detections:
-            detection.bbox = scale_box(detection.bbox)
 
     @staticmethod
     def _normalized_zones(request: FrameInferenceRequest) -> list[MonitoringZone]:
@@ -483,14 +472,21 @@ class FrameInferenceService:
         person_confidence: float,
         box_width: int,
         box_height: int,
+        absence_confirmed: dict[str, bool] | None = None,
     ) -> PersonPpeObservations:
         if person_confidence < self._missing_ppe_threshold or box_width <= 0 or box_height <= 0:
             return ppe
         values = ppe.model_dump()
         for name, observation in values.items():
-            if observation["status"] == "unknown":
+            if observation["status"] == "unknown" and (absence_confirmed is None or absence_confirmed.get(name, True)):
                 values[name] = {"status": "missing", "confidence": None}
         return PersonPpeObservations.model_validate(values)
+
+    @staticmethod
+    def _public_detections(detections: list[dict]) -> list[ModelDetection]:
+        """Defensively expose only detections associated with a canonical person."""
+        validated = [ModelDetection.model_validate(item) for item in detections]
+        return [detection for detection in validated if detection.person_index is not None]
 
     def _track_people(self, session_id: str, frame: np.ndarray):
         return [(*person, index + 1) for index, person in enumerate(self._detect_people(frame))]
@@ -506,7 +502,14 @@ class FrameInferenceService:
     def _detect_people(self, frame: np.ndarray) -> list[tuple[int, int, int, int, float]]:
         model = self._load_fallback_model()
 
-        results = model.predict(frame, classes=[3], conf=0.35, verbose=False)
+        results = model.predict(
+            frame,
+            classes=[3],
+            conf=self._person_detection_confidence,
+            imgsz=self._inference_image_size,
+            rect=False,
+            verbose=False,
+        )
         people = []
         for box in results[0].boxes:
             x1, y1, x2, y2 = (int(value) for value in box.xyxy[0].tolist())

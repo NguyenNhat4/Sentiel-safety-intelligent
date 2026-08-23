@@ -103,6 +103,7 @@ P-047/
 │   │       └── 20260822_01_camera_wide_machine_state.py # Camera mapping machine-state compatibility contract
 │   │       └── 20260823_01_add_media_assets_and_camera_sessions.py # US-29 direct media runtime
 │   │       └── 20260823_02_add_media_storage_backend.py # Per-asset filesystem/S3 storage marker
+│   │       └── 20260824_01_repair_sqlite_camera_session_index.py # Repair SQLite active-session partial index
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -119,6 +120,7 @@ P-047/
 │       ├── test_ppe_requirements.py
 │       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
+│       ├── test_camera_session_index_migration.py # SQLite replay-after-completion migration regression
 │       ├── test_violation_tracking.py
 │       ├── test_statistics.py
 │       └── test_us29_media_runtime.py # Upload, aggregate save and direct-file sessions

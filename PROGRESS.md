@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
@@ -36,9 +36,11 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Vision
 
 - `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
+- Decoded camera frames retain their source resolution until Ultralytics performs the sole resize/letterbox operation at the configured `960x960` YOLO input boundary.
+- The runtime checkpoint is the optimizer-stripped EMA FP16 artifact (`40543303` bytes, SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`) under Git LFS.
 - Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
 - Missing PPE is derived by deterministic backend rules, not emitted by the model.
-- PPE review opens after six consecutive missing frames for the same session track/item. An unreviewed warning retracts only after two continuous seconds of explicit presence.
+- Local inference uses anatomical PPE association and ten-frame temporal confirmation without a second backend debounce. Remote v1 inference retains six-frame backend confirmation because its contract has no local absence-confirmation metadata. An unreviewed warning retracts only after two continuous seconds of explicit presence.
 - Zone intrusion opens after four consecutive sampled frames in the same active zone. Restricted-area detection remains immediate.
 - Snapshot persistence runs YuNet face redaction first, falls back per person, then annotates and persists. Failure remains closed.
 - Fixed-camera sessions now use isolated YOLO/ByteTrack instances concurrently, serialize only same-session access, and release model state on completion/error while retaining occurrence context for queued review.
@@ -46,6 +48,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Frontend
 
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
+- Live Monitor reloads camera configuration, media inventory, and compatible sessions whenever the page becomes active; disconnected cameras and sessions belonging to a previously assigned asset are removed from the rendered slot.
 - Camera configuration is hidden from the sidebar and opens only when `safety_manager` selects a Live Monitor slot; `system_admin` owns the media library.
 - Camera configuration binds hat/vest draft state directly to the selected zone, reloads persisted switches correctly, and no longer offers unsaveable PPE controls when no zone exists.
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
@@ -64,11 +67,16 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- `.env.development` now includes every active field from `.env.development.example`; runtime loading confirms local Vision, media paths, retention defaults, and a `4.0` per-camera inference FPS cap.
+- Removed the backend `640x360` pre-resize and its coordinate-restoration pass so YOLO receives the original decoded frame; tests were updated for the new contract but not run per user request.
+- Live Monitor stale-media reconciliation was updated for camera disconnect and media replacement; the production frontend bundle builds successfully, automated tests were not run per user request, and browser verification is pending.
+- SQLite revision `20260824_01` repairs the US-29 active-session partial unique index, so a completed camera session no longer blocks Replay while concurrent `STARTING`/`RUNNING` sessions remain prohibited. The migration regression, Ruff, formatting, frontend lint/type-check, 76 frontend tests, and production build pass; full `make check` again stalls in the pre-existing root agent/TestClient suite after its first test.
+- Local no-commit merge verification against `origin/develop2@86d34e2`: Ruff, frontend type-check, 76 frontend tests/build, 23 non-agent root tests, and 156 service/backend/vision tests pass. One pre-existing `test_settings_loads_production_env_file` assertion still conflicts with the development env-file runtime setting. Starlette `TestClient` hangs in `__enter__` even for an empty FastAPI app under the locked dependency set, so TestClient-backed suites and the two legacy agent tests could not complete locally.
 - Camera-configuration regression coverage passes with both hat and vest enabled through save/reload; all 75 frontend tests and the production build pass. Full `make check` remains blocked only by the pre-existing `.env.production` expectation in `backend/tests/test_config.py`; ESLint has only the pre-existing `App.tsx` exhaustive-deps warning.
 - Repository verification passes: 25 root tests, 199 backend/Vision tests, 72 frontend tests, Ruff, ESLint, TypeScript and production build.
 - Railway deployment `4b593f2a-18c8-49b0-811a-d2297a2e5ad3` reached `SUCCESS`; PostgreSQL is at `20260823_01`, the app media volume is writable, `/health` is ready in production, and authenticated media/configuration/session smoke passed.
 - Production Streamer and MediaMTX services were removed, the old Streamer volume was scheduled for deletion, and obsolete HLS/RTSP/Streamer variables were removed from `p047-app`.
-- Server-camera inference now bypasses the internal JPEG/Base64 encode-decode round trip, downsizes oversized frames to the configured inference size, and restores detections to source-frame coordinates. The focused inference/media suite passes `24 passed`; a 1080p synthetic micro-benchmark measured the removed round trip at `39.36 ms/frame` versus `0.99 ms/frame` for the retained resize on this workstation.
+- Server-camera inference bypasses the internal JPEG/Base64 encode-decode round trip and now preserves the original decoded frame through the backend; Ultralytics alone resize/letterboxes at the configured `960x960` model boundary. The earlier focused suite and micro-benchmark predate removal of the backend `640x360` downscale.
 - The standalone `p047-vision:dev` CPU image builds successfully and its live `/ping` smoke returns `safety_vision_v1`; frontend dependency audit reports zero known vulnerabilities after the compatible `nanoid` patch update.
 - Railway deployment `bfe08eab-c477-4e9f-b211-bba93166ccd0` reached `SUCCESS`; PostgreSQL is at `20260823_02`, `/health` is ready, and production completed a 31,389,527-byte direct bucket upload with `POST .../complete` returning 200 in 1.882 seconds.
 - The existing `cbucket` is shared safely by prefixes: `snapshots/` for redacted evidence and `media-assets/` for uploaded media. The one legacy 26,193,014-byte volume asset was copied, size-verified, switched to S3 in PostgreSQL, and removed from canonical volume storage.

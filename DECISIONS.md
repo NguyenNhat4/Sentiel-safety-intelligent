@@ -69,16 +69,24 @@ This file contains only decisions that currently constrain implementation. Super
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 
-- Pin `models/yolo11m_safety.pt` at upstream revision `95ffeeb1e0897d60564c811ace5935bcd43d982b`, SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`.
+- Pin source revision `95ffeeb1e0897d60564c811ace5935bcd43d982b` and source SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`; runtime uses the optimizer-stripped EMA FP16 artifact with SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`.
 - Run source classes `[0,3,4]` once per sampled frame. Class `3` is canonical `person`; classes `0` and `4` provide `hat` and `vest`.
+- Local inference uses separate person/PPE confidence thresholds, `960` image size, anatomical hat/vest association, per-person/class cardinality, and session-local temporal smoothing.
 - The public PPE profile is `hat_vest_v1`. Missing PPE is qualified absence derived by backend rules and requires US-13 calibration before non-demo use.
 - ByteTrack IDs are monitoring-session-local technical associations, never identity or cross-camera recognition.
+
+### 2026-08-24: [Vision/Backend] Preserve source frames until the YOLO boundary
+
+- Backend direct-camera inference passes each decoded frame at its original resolution to the configured Vision provider; it does not pre-resize to `640x360`.
+- Ultralytics owns the only resize/letterbox step, with `YOLO_INFERENCE_IMAGE_SIZE=960` producing the current `960x960` model tensor.
+- Detection boxes, foot points, and zone geometry remain in source-frame coordinates without a backend scale-down/restore round trip.
+- This favors source detail and PPE recall; four-camera latency and memory must be measured with representative media before production capacity claims.
 
 ### 2026-08-16: [Cross-cutting] Occurrence confirmation and reconciliation
 
 - Event occurrences are keyed by monitoring session, track, and rule; database persistence is idempotent by occurrence ID.
-- Missing hat/vest opens after six consecutive missing sampled frames for the same track/item. Present or unknown breaks an unconfirmed sequence.
-- An unreviewed PPE warning retracts only after two continuous seconds of explicit presence; missing or unknown resets that timer. Six new missing frames are required to reopen it.
+- Local vision confirms initial PPE absence and holds established presence using `PPE_TEMPORAL_FRAMES` (default 10); a locally confirmed absence opens without a second backend debounce. The remote provider, whose v1 contract has no absence-confirmation field, retains six-frame backend confirmation.
+- An unreviewed PPE warning retracts only after two continuous seconds of explicit presence; missing or unknown resets that timer.
 - Zone intrusion opens after four consecutive sampled frames. Restricted-area detection remains immediate.
 - Nearby track-ID handoff may transfer active occurrence state during the lost-track grace window. Distant, different-rule, expired, or cross-session tracks remain independent.
 - Submitted `acknowledged` and `false_alarm` outcomes are human-authoritative and cannot be rewritten by later AI observations.
