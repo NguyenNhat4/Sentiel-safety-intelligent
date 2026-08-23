@@ -54,10 +54,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
 
-    frame_inference_service.preload_models()
-    logger.info("Safety vision inference provider is ready.")
-    get_configured_privacy_vision_adapter().preload()
-    logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
+    try:
+        frame_inference_service.preload_models()
+        logger.info("Safety vision inference provider is ready.")
+    except Exception as e:
+        logger.warning(f"Could not preload safety models: {e}")
+
+    try:
+        get_configured_privacy_vision_adapter().preload()
+        logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
+    except Exception as e:
+        logger.warning(f"Could not preload privacy vision adapter: {e}")
     app.state.ready = True
 
     print(f"Starting {settings.app_name} in {settings.app_env} mode")

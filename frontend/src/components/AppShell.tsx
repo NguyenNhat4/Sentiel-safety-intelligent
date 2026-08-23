@@ -1,4 +1,4 @@
-import {useEffect, useState, type ReactNode} from "react";
+import {memo, useEffect, useState, type ReactNode} from "react";
 import type {AuthenticatedUser} from "../types";
 
 export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "media-library" | "camera-config";
@@ -12,8 +12,7 @@ interface AppShellProps {
   selectedCameraId?: string;
 }
 
-export function AppShell({page, onNavigate, user, onLogout, children, selectedCameraId}: AppShellProps) {
-  const clock = useClock();
+export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout, children, selectedCameraId}: AppShellProps) {
   const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "media-library" ? "Thư viện media" : page === "camera-config" ? `Cấu hình Camera ${cameraNumber(selectedCameraId)}` : "Quản trị hệ thống";
   const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map(part => part[0]).join("").toUpperCase();
 
@@ -45,18 +44,18 @@ export function AppShell({page, onNavigate, user, onLogout, children, selectedCa
       <header>
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
         <div className="header-actions">
-          <div className="clock"><span>{clock}</span><small>Safety shirt baseline</small></div>
+          <ClockDisplay />
           <button className="icon-btn">⌕</button><button className="icon-btn notification">♢<i /></button>
         </div>
       </header>
       {children}
     </main>
 </>;
-}
+});
 
 function cameraNumber(cameraId?: string): string { return cameraId?.replace("cam_", "") || ""; }
 
-function useClock(): string {
+function ClockDisplay() {
   const [clock, setClock] = useState("--:--:--");
   useEffect(() => {
     const update = () => setClock(new Date().toLocaleTimeString("vi-VN", {hour12: false}));
@@ -64,5 +63,11 @@ function useClock(): string {
     const interval = window.setInterval(update, 1000);
     return () => clearInterval(interval);
   }, []);
-  return clock;
+
+  return (
+    <div className="clock">
+      <span>{clock}</span>
+      <small>Safety shirt baseline</small>
+    </div>
+  );
 }

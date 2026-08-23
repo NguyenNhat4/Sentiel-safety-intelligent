@@ -1,10 +1,10 @@
-import {useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
+import {memo, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
 import {changePassword, createUser, deleteUser, listUsers, updateUserRole} from "../../api/auth";
 import {loadMonitoringZones} from "../../api/monitoring-zones";
 import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, UserRole} from "../../types";
 import "./admin-user.css";
 
-interface AdminUserPageProps { currentUser: AuthenticatedUser; onLogout: () => void; }
+interface AdminUserPageProps { currentUser: AuthenticatedUser; active?: boolean; onLogout: () => void; }
 type AdminTab = "accounts" | "roles" | "security";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -13,32 +13,47 @@ const ROLE_LABELS: Record<UserRole, string> = {
   area_manager: "Quản lý khu vực"
 };
 
-export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
+let adminUsersCache: ManagedUser[] | null = null;
+let adminAreasCache: MonitoringZone[] | null = null;
+
+export const AdminUserPage = memo(function AdminUserPage({currentUser, active = true, onLogout}: AdminUserPageProps) {
   const [tab, setTab] = useState<AdminTab>("accounts");
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [users, setUsers] = useState<ManagedUser[]>(() => adminUsersCache ?? []);
   const [selectedId, setSelectedId] = useState(currentUser.id);
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<UserRole | "">("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => adminUsersCache === null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [areas, setAreas] = useState<MonitoringZone[]>([]);
+  const [areas, setAreas] = useState<MonitoringZone[]>(() => adminAreasCache ?? []);
   const selected = useMemo(() => users.find(user => user.id === selectedId) ?? users[0], [users, selectedId]);
 
   const load = useCallback(async () => {
-    setLoading(true); setError("");
+    if (!adminUsersCache) setLoading(true);
+    setError("");
     try {
       const result = await listUsers(query, filterRole);
+      adminUsersCache = result;
       setUsers(result);
       setSelectedId(current => result.some(user => user.id === current) ? current : result[0]?.id ?? "");
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setLoading(false); }
   }, [query, filterRole]);
 
-  useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    loadMonitoringZones("uploaded_video").then(collection => setAreas(collection.zones)).catch(reason => setError(errorMessage(reason)));
-  }, []);
+    if (active) void load();
+  }, [active, load]);
+
+  useEffect(() => {
+    if (active) {
+      loadMonitoringZones("uploaded_video")
+        .then(collection => {
+          adminAreasCache = collection.zones;
+          setAreas(collection.zones);
+        })
+        .catch(reason => setError(errorMessage(reason)));
+    }
+  }, [active]);
 
   async function remove(user: ManagedUser) {
     if (!window.confirm(`Xóa tài khoản ${user.email}? Hành động này không thể hoàn tác.`)) return;
@@ -47,7 +62,7 @@ export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
     catch (reason) { setError(errorMessage(reason)); }
   }
 
-  return <section className="page active admin-page">
+  return <section className={`page admin-page ${active ? "active" : ""}`}>
     <div className="admin-heading">
       <div><p className="eyebrow">SYSTEM ADMIN</p><h2>Quản trị hệ thống</h2><p>Quản lý tài khoản, vai trò và thông tin xác thực tập trung.</p></div>
       <div className="admin-summary"><strong>{users.length}</strong><span>tài khoản</span></div>
@@ -62,7 +77,7 @@ export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
     {tab === "roles" && <RoleTab areas={areas} users={users} selected={selected} onSelect={setSelectedId} onUpdated={async user => { setMessage(`Đã cập nhật vai trò cho ${user.email}.`); await load(); }} onError={setError} />}
     {tab === "security" && <SecurityTab users={users} selected={selected} currentUser={currentUser} onSelect={setSelectedId} onChanged={async user => { if (user.id === currentUser.id) { await onLogout(); return; } setMessage(`Đã cấp mật khẩu tạm cho ${user.email}. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.`); }} onError={setError} />}
   </section>;
-}
+});
 
 function AccountsTab({areas, users, loading, currentUserId, query, filterRole, onQuery, onFilterRole, onCreated, onDelete, onError}: {
   areas: MonitoringZone[];

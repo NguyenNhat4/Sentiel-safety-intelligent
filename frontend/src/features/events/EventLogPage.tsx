@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from "react";
+import {memo, useCallback, useEffect, useState} from "react";
 import {assetUrl} from "../../api/config";
 import {loadReviewedEvents} from "../../api/events";
 import type {ReviewStatus, SafetyEvent} from "../../types";
@@ -6,17 +6,26 @@ import {EventDetailDialog} from "./EventDetailDialog";
 
 interface EventLogPageProps {active: boolean}
 
-export function EventLogPage({active}: EventLogPageProps) {
-  const [events, setEvents] = useState<SafetyEvent[]>([]);
-  const [status, setStatus] = useState("Đang chờ dữ liệu");
+const eventCache = new Map<ReviewStatus, SafetyEvent[]>();
+
+export const EventLogPage = memo(function EventLogPage({active}: EventLogPageProps) {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("acknowledged");
+  const [events, setEvents] = useState<SafetyEvent[]>(() => eventCache.get("acknowledged") ?? []);
+  const [status, setStatus] = useState(() => {
+    const cached = eventCache.get("acknowledged");
+    if (!cached) return "Đang chờ dữ liệu";
+    return cached.length ? "" : emptyState("acknowledged");
+  });
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const loadEvents = useCallback(async () => {
-    setStatus("Đang tải nhật ký vi phạm...");
-    setEvents([]);
+    const cached = eventCache.get(reviewStatus);
+    if (!cached) {
+      setStatus("Đang tải nhật ký vi phạm...");
+    }
     try {
       const loaded = await loadReviewedEvents(reviewStatus);
+      eventCache.set(reviewStatus, loaded);
       setEvents(loaded);
       setStatus(loaded.length ? "" : emptyState(reviewStatus));
     } catch (error) {
@@ -28,6 +37,18 @@ export function EventLogPage({active}: EventLogPageProps) {
     if (active) void loadEvents();
   }, [active, loadEvents]);
 
+  function handleSelectStatus(nextStatus: ReviewStatus) {
+    setReviewStatus(nextStatus);
+    const cached = eventCache.get(nextStatus);
+    if (cached) {
+      setEvents(cached);
+      setStatus(cached.length ? "" : emptyState(nextStatus));
+    } else {
+      setEvents([]);
+      setStatus("Đang tải nhật ký vi phạm...");
+    }
+  }
+
   return (
     <section className={`page ${active ? "active" : ""}`} id="violation-log">
       <div className="log-toolbar">
@@ -38,15 +59,15 @@ export function EventLogPage({active}: EventLogPageProps) {
         <button className="secondary-btn" onClick={() => void loadEvents()}>↻ Làm mới</button>
       </div>
       <div className="event-log-tabs" role="tablist" aria-label="Lọc kết quả xác minh">
-        <FilterTab current={reviewStatus} value="acknowledged" onSelect={setReviewStatus}>Vi phạm đã xác nhận</FilterTab>
-        <FilterTab current={reviewStatus} value="false_alarm" onSelect={setReviewStatus}>Báo sai</FilterTab>
+        <FilterTab current={reviewStatus} value="acknowledged" onSelect={handleSelectStatus}>Vi phạm đã xác nhận</FilterTab>
+        <FilterTab current={reviewStatus} value="false_alarm" onSelect={handleSelectStatus}>Báo sai</FilterTab>
       </div>
       {status && <div className="log-status">{status}</div>}
       <div className="event-log-list">{events.map(event => <EventCard key={event.id} event={event} onOpen={() => setSelectedEventId(event.id)} />)}</div>
       <EventDetailDialog eventId={selectedEventId} onClose={() => setSelectedEventId(null)} />
     </section>
   );
-}
+});
 
 function FilterTab({children, current, value, onSelect}: {
   children: string;
