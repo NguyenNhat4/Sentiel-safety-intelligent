@@ -47,6 +47,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
 - Camera configuration is hidden from the sidebar and opens only when `safety_manager` selects a Live Monitor slot; `system_admin` owns the media library.
+- Camera configuration binds hat/vest draft state directly to the selected zone, reloads persisted switches correctly, and no longer offers unsaveable PPE controls when no zone exists.
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
 - Area managers have a server-scoped compliance/event workspace and may resolve or mark false alarm only for events in their assigned area.
 - Camera configuration now exposes camera-wide machine state immediately after camera selection; PPE controls appear for a selected draft zone before its four points are complete.
@@ -63,6 +64,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- Camera-configuration regression coverage passes with both hat and vest enabled through save/reload; all 75 frontend tests and the production build pass. Full `make check` remains blocked only by the pre-existing `.env.production` expectation in `backend/tests/test_config.py`; ESLint has only the pre-existing `App.tsx` exhaustive-deps warning.
 - Repository verification passes: 25 root tests, 199 backend/Vision tests, 72 frontend tests, Ruff, ESLint, TypeScript and production build.
 - Railway deployment `4b593f2a-18c8-49b0-811a-d2297a2e5ad3` reached `SUCCESS`; PostgreSQL is at `20260823_01`, the app media volume is writable, `/health` is ready in production, and authenticated media/configuration/session smoke passed.
 - Production Streamer and MediaMTX services were removed, the old Streamer volume was scheduled for deletion, and obsolete HLS/RTSP/Streamer variables were removed from `p047-app`.
