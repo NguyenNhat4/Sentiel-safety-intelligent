@@ -78,3 +78,21 @@ it("saves PPE changes without requiring a zone and does not show zone-only switc
   fireEvent.click(save);
   await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({zones: []})));
 });
+
+it("allows disconnecting camera source and saves asset_id as null", async () => {
+  const onSaved = vi.fn();
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+  const disconnectBtn = await screen.findByRole("button", {name: "Ngắt kết nối nguồn media"});
+  expect(disconnectBtn).toBeInTheDocument();
+  fireEvent.click(disconnectBtn);
+
+  expect(screen.queryByRole("button", {name: "Ngắt kết nối nguồn media"})).not.toBeInTheDocument();
+  expect(screen.getByText("Chọn media để xem preview và vẽ vùng.")).toBeInTheDocument();
+
+  const saveBtn = screen.getByRole("button", {name: "Lưu cấu hình"});
+  expect(saveBtn).toBeEnabled();
+  fireEvent.click(saveBtn);
+  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
+    asset_id: null,
+  })));
+});
