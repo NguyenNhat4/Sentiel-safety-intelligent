@@ -15,7 +15,6 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   const [saved, setSaved] = useState<CameraConfiguration>();
   const [draft, setDraft] = useState<CameraConfiguration>();
   const [selectedZoneId, setSelectedZoneId] = useState("");
-  const [rules, setRules] = useState<PpeRequirementUpdate>(EMPTY_RULES);
   const [dragging, setDragging] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,7 +30,6 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
         const initial = configuration;
         setSaved(configuration); setDraft(initial);
         setSelectedZoneId(initial.zones[0]?.zone_id || "");
-        setRules(initial.zones[0]?.ppe_requirements ?? EMPTY_RULES);
         setAssets(inventory.filter(asset => asset.status === "READY"));
       })
       .catch(reason => { if (!controller.signal.aborted) setError(errorText(reason, "Không thể tải cấu hình camera.")); })
@@ -42,11 +40,11 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   if (loading || !draft || !saved) return <section className={`camera-config-page page ${active ? "active" : ""}`} role="status">{error || `Đang tải cấu hình Camera ${cameraNumber(cameraId)}…`}</section>;
 
   const selectedZone = draft.zones.find(zone => zone.zone_id === selectedZoneId);
+  const rules = selectedZone?.ppe_requirements ?? EMPTY_RULES;
   const selectedAsset = assets.find(asset => asset.id === draft.asset_id);
   const conflict = zoneGeometryConflict(draft.zones);
   const incomplete = draft.zones.some(zone => zone.points.length !== 4);
-  const savedRules = saved.zones[0]?.ppe_requirements ?? EMPTY_RULES;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved) || JSON.stringify(rules) !== JSON.stringify(savedRules);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
   function updateDraft(update: Partial<CameraConfiguration>) {
     setDraft(current => current ? {...current, ...update} : current);
@@ -54,13 +52,11 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   }
   function updateSelected(update: Partial<CameraConfigurationZone>) { updateDraft({zones: draft!.zones.map(zone => zone.zone_id === selectedZoneId ? {...zone, ...update} : zone)}); }
   function updateRules(update: Partial<PpeRequirementUpdate>) {
-    const next = {...rules, ...update};
-    setRules(next);
-    if (selectedZone) updateSelected({ppe_requirements: next});
+    if (selectedZone) updateSelected({ppe_requirements: {...rules, ...update}});
   }
   function createZone() {
     if (incomplete) return;
-    const zone = {...createZoneDraft(draft!.zones), ppe_requirements: rules};
+    const zone = {...createZoneDraft(draft!.zones), ppe_requirements: EMPTY_RULES};
     updateDraft({zones: [...draft!.zones, zone]}); setSelectedZoneId(zone.zone_id);
     setMessage("Bấm bốn điểm trên media để hoàn thành vùng.");
   }
@@ -101,7 +97,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
       <div className="machine-state-control"><div><strong>Trạng thái máy</strong><small>{draft.machine_state === "running" ? "Máy đang chạy · kiểm tra PPE" : "Máy đã dừng · bỏ qua PPE"}</small></div><button type="button" role="switch" aria-checked={draft.machine_state === "running"} aria-label="Trạng thái máy" onClick={() => updateDraft({machine_state: draft.machine_state === "running" ? "stopped" : "running"})}>{draft.machine_state === "running" ? "Đang chạy" : "Đã dừng"}</button></div>
       <div className="zone-config-actions"><label>Vùng<select aria-label="Chọn vùng" value={selectedZoneId} onChange={event => setSelectedZoneId(event.target.value)}>{draft.zones.map(zone => <option key={zone.zone_id} value={zone.zone_id}>{zone.display_name}</option>)}</select></label><button type="button" onClick={createZone} disabled={incomplete}>Tạo vùng</button>{selectedZone && <button type="button" className="danger-link" onClick={() => { const next = draft.zones.filter(zone => zone.zone_id !== selectedZoneId); updateDraft({zones: next}); setSelectedZoneId(next[0]?.zone_id || ""); }}>Xóa vùng</button>}</div>
       {selectedZone && <label className="zone-name-field">Tên vùng<input aria-label="Tên vùng" value={selectedZone.display_name} onChange={event => updateSelected({display_name: event.target.value})} /></label>}
-      <div className="ppe-requirement-switches camera-rule-switches"><RuleSwitch label="Yêu cầu mũ bảo hộ" checked={rules.hat_required} onChange={value => updateRules({hat_required: value})} /><RuleSwitch label="Yêu cầu áo phản quang" checked={rules.vest_required} onChange={value => updateRules({vest_required: value})} /></div>
+      {selectedZone ? <div className="ppe-requirement-switches camera-rule-switches"><RuleSwitch label="Yêu cầu mũ bảo hộ" checked={rules.hat_required} onChange={value => updateRules({hat_required: value})} /><RuleSwitch label="Yêu cầu áo phản quang" checked={rules.vest_required} onChange={value => updateRules({vest_required: value})} /></div> : <p>Hãy tạo một vùng để cấu hình yêu cầu PPE.</p>}
       {conflict && <p role="alert">Các vùng đang giao, chạm hoặc chứa nhau: {conflict.join(", ")}.</p>}{error && <p role="alert">{error}</p>}{!error && message && <p role="status">{message}</p>}
       <div className="zone-save-actions"><button type="button" className="secondary-btn" onClick={onBack}>Quay lại</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || !draft.asset_id || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div>
     </div>

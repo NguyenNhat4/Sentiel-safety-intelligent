@@ -44,14 +44,26 @@ it("saves asset, machine, zones and PPE once then returns without starting infer
   const onSaved = vi.fn();
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
   fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+  fireEvent.click(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"}));
   const save = screen.getByRole("button", {name: "Lưu cấu hình"});
   fireEvent.click(save); fireEvent.click(save);
   await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
   expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
     expected_revision: 7, asset_id: "asset-1", machine_state: "stopped",
-    zones: [expect.objectContaining({zone_id: "press", ppe_requirements: expect.objectContaining({hat_required: true, zone_intrusion_enabled: true})})],
+    zones: [expect.objectContaining({zone_id: "press", ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true, zone_intrusion_enabled: true})})],
   }));
   expect(onSaved).toHaveBeenCalledOnce();
+});
+
+it("loads persisted hat and vest requirements as enabled", async () => {
+  loadMock.mockResolvedValue({
+    ...configuration,
+    zones: [{...zone, ppe_requirements: {...zone.ppe_requirements, hat_required: true, vest_required: true}}],
+  });
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  expect(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).toBeChecked();
+  expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).toBeChecked();
 });
 
 it("keeps the controlled draft and reports a revision conflict", async () => {
@@ -63,18 +75,15 @@ it("keeps the controlled draft and reports a revision conflict", async () => {
   expect(vest).toBeChecked();
 });
 
-it("saves PPE changes without requiring a zone and does not show zone-only switches", async () => {
+it("does not offer unsaveable PPE switches without a zone", async () => {
   loadMock.mockResolvedValue(emptyConfiguration);
   saveMock.mockResolvedValue({...emptyConfiguration, revision: 8});
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
 
-  const hat = await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"});
+  expect(await screen.findByText("Hãy tạo một vùng để cấu hình yêu cầu PPE.")).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).not.toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", {name: "Yêu cầu áo phản quang"})).not.toBeInTheDocument();
   expect(screen.queryByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeInTheDocument();
   expect(screen.queryByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).not.toBeInTheDocument();
-  fireEvent.click(hat);
-
-  const save = screen.getByRole("button", {name: "Lưu cấu hình"});
-  expect(save).toBeEnabled();
-  fireEvent.click(save);
-  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({zones: []})));
+  expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
 });
