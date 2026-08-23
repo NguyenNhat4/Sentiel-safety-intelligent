@@ -1,25 +1,37 @@
-import {useCallback, useEffect, useState, type FormEvent} from "react";
+import {memo, useCallback, useEffect, useState, type FormEvent} from "react";
 import {deleteMediaAsset, listMediaAssets, uploadMediaAsset} from "../../api/media-assets";
 import type {MediaAsset} from "../../types";
 import "./media-library.css";
 
-export function MediaLibraryPage() {
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
+interface MediaLibraryPageProps {
+  active?: boolean;
+}
+
+let mediaAssetsCache: MediaAsset[] | null = null;
+
+export const MediaLibraryPage = memo(function MediaLibraryPage({active = true}: MediaLibraryPageProps) {
+  const [assets, setAssets] = useState<MediaAsset[]>(() => mediaAssetsCache ?? []);
   const [displayName, setDisplayName] = useState("");
   const [file, setFile] = useState<File>();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => mediaAssetsCache === null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
     setError("");
-    try { setAssets(await listMediaAssets()); }
+    try {
+      const loaded = await listMediaAssets();
+      mediaAssetsCache = loaded;
+      setAssets(loaded);
+    }
     catch (reason) { setError(errorText(reason, "Không thể tải thư viện media.")); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (active) void load();
+  }, [active, load]);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,7 +58,7 @@ export function MediaLibraryPage() {
     } catch (reason) { setError(errorText(reason, "Không thể xóa media.")); }
   }
 
-  return <section className="page active media-library-page">
+  return <section className={`page media-library-page ${active ? "active" : ""}`}>
     <div className="media-library-heading"><div><p className="eyebrow">SYSTEM ADMIN · MEDIA</p><h2>Thư viện media</h2><p>Quản lý nguồn video và hình ảnh được phép dùng trong mô phỏng.</p></div><strong>{assets.length}<small>media</small></strong></div>
     <form className="media-upload-card" onSubmit={upload}>
       <label>Tên hiển thị<input aria-label="Tên hiển thị" value={displayName} onChange={event => setDisplayName(event.target.value)} required /></label>
@@ -68,7 +80,7 @@ export function MediaLibraryPage() {
       </table>
     </div>
   </section>;
-}
+});
 
 function errorText(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
