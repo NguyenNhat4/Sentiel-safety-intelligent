@@ -14,7 +14,7 @@ P-047/
 │       ├── deploy-railway.yml # CI-gated Railway image redeploy and health verification
 │       └── dependency-audit.yml # Non-blocking nightly dependency audit
 ├── alembic.ini          # Alembic entrypoint for backend migrations
-├── docker-compose.yml   # PostgreSQL, backend, streamer and exact-version MediaMTX gateway
+├── docker-compose.yml   # PostgreSQL and backend with volume-backed media assets
 ├── Dockerfile.ai        # CPU proof image for the standalone Safety Vision worker
 ├── requirements.ai.txt  # Minimal runtime dependencies for the worker image
 ├── backend/             # Modular Monolith FastAPI Backend
@@ -22,14 +22,16 @@ P-047/
 │   │   ├── api/         # API Routers (v1 REST endpoints, WebSocket & AI Safety Agent)
 │   │   │   ├── v1/
 │   │   │   │   ├── agent.py       # AI Safety Agent chat & recommendation endpoint
-│   │   │   │   ├── analysis.py    # Video stream analysis orchestration
+│   │   │   │   ├── analysis.py    # Legacy single-frame inference compatibility
 │   │   │   │   ├── auth.py        # Authentication and system-admin account APIs
+│   │   │   │   ├── camera_configurations.py # Atomic asset, zone and PPE configuration
+│   │   │   │   ├── camera_sessions.py # Explicit Run, Replay and lifecycle queries
 │   │   │   │   ├── events.py      # Safety violation event management & ACK
+│   │   │   │   ├── media_assets.py # Authenticated media inventory, upload and content
 │   │   │   │   ├── monitoring_zones.py # Revisioned per-camera zone collection
 │   │   │   │   ├── operational_metrics.py # Read-only JSONL operational metrics aggregate
 │   │   │   │   ├── ppe_requirements.py # Persisted PPE requirement REST resource
 │   │   │   │   ├── statistics.py  # Compliance & violation metrics
-│   │   │   │   ├── stream_configuration.py # Persisted active mock stream and RBAC
 │   │   │   │   └── websocket.py   # Alert and frame-inference WebSockets
 │   │   │   └── router.py
 │   │   ├── core/        # Typed Settings (Pydantic), CORS & DB Engine
@@ -42,40 +44,39 @@ P-047/
 │   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
-│   │   │   ├── hls_frame_source.py # Validated reconnectable HLS reader and sampling
-│   │   │   ├── rtsp_frame_source.py # Legacy/target RTSP reader and sampling
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
+│   │   │   ├── camera_configuration.py # Fixed camera configuration and session lifecycle
 │   │   │   ├── event.py
+│   │   │   ├── media_asset.py # Backend-owned image/video asset registry
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── remote_vision.py # Worker health/inference wire contract
-│   │   │   ├── stream_configuration.py
 │   │   │   └── user.py
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
+│   │   │   ├── camera_configuration.py
+│   │   │   ├── camera_session.py
 │   │   │   ├── event.py
 │   │   │   ├── health.py # Typed public /health dependency-readiness response
+│   │   │   ├── media_asset.py
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
-│   │   │   ├── hls_access_service.py # Signed 15-minute mapped-camera HLS access tokens
 │   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
 │   │   │   ├── auth_service.py
-│   │   │   ├── analysis_service.py
+│   │   │   ├── camera_configuration_service.py # Atomic asset, zones and rules transaction
+│   │   │   ├── camera_session_runtime.py # Direct finite image/video inference sessions
 │   │   │   ├── event_service.py
 │   │   │   ├── frame_inference_service.py # YOLO, foot point and polygon evaluation
 │   │   │   ├── camera_detection_hub.py # Latest-only per-camera metadata fan-out
-│   │   │   ├── camera_inference_supervisor.py # Mapping-to-worker reconciliation
-│   │   │   ├── camera_inference_worker.py # One RTSP inference loop per camera
-│   │   │   ├── server_camera_inference_runtime.py # Lifespan orchestration
 │   │   │   ├── llm_service.py     # AI Agent reasoning & recommendation service
+│   │   │   ├── media_asset_service.py # Atomic upload, validation and protected deletion
 │   │   │   ├── monitoring_zone_service.py # Atomic validation and revisioned persistence
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
-│   │   │   ├── stream_configuration_service.py # Active mock camera selection
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
 │   │   │   └── statistics_service.py
@@ -99,29 +100,26 @@ P-047/
 │   │       └── 20260819_01_add_event_decision_audit.py # Immutable reviewed-event context and retention deadlines
 │   │       ├── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
 │   │       └── 20260822_01_camera_wide_machine_state.py # Camera mapping machine-state compatibility contract
+│   │       └── 20260823_01_add_media_assets_and_camera_sessions.py # US-29 direct media runtime
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
 │       ├── test_alert_notifications.py
 │       ├── test_camera_detection_hub.py
-│       ├── test_camera_inference_supervisor.py
-│       ├── test_camera_inference_worker.py
 │       ├── test_analysis.py
 │       ├── test_events.py
 │       ├── test_event_audit.py
 │       ├── test_event_audit_migration.py
 │       ├── test_frame_inference_ppe.py
-│       ├── test_hls_access.py # HLS token TTL, role and mapped-stream scope
 │       ├── test_remote_vision.py # Outbound worker adapter contract
 │       ├── test_vision_worker.py # Standalone worker API contract
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
 │       ├── test_ppe_profile_migration.py
 │       ├── test_operational_metrics.py
-│       ├── test_rtsp_frame_source.py
 │       ├── test_violation_tracking.py
 │       ├── test_statistics.py
-│       └── test_stream_configuration.py
+│       └── test_us29_media_runtime.py # Upload, aggregate save and direct-file sessions
 ├── vision/              # Framework- and persistence-independent CV observations
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
@@ -133,24 +131,14 @@ P-047/
 │       ├── test_face_detection.py
 │       ├── test_privacy_pipeline.py
 │       └── test_tracking.py
-├── streamer/            # Standalone mock camera video streamer (port 8001)
-│   ├── README.md
-│   ├── app.py           # Upload API, MJPEG rollback and publisher lifecycle wiring
-│   ├── media_publishers.py # One supervised FFmpeg RTSP publisher per camera
-│   ├── mediamtx.yml     # RTSP/TCP, LL-HLS, auth and observability configuration
-│   ├── mediamtx/        # Minimal Railway deployment context without demo credentials
-│   │   ├── Dockerfile
-│   │   └── README.md
-│   ├── Dockerfile       # FFmpeg + minimal Python runtime
-│   └── tests/
-│       ├── test_app.py
-│       └── test_media_publishers.py
 ├── frontend/            # React 19 + TypeScript + Vite dashboard
 │   ├── src/
 │   │   ├── api/         # REST configuration/events and WebSocket inference
 │   │   │   ├── camera-detection-client.ts # Authenticated camera metadata socket
 │   │   │   ├── auth.ts   # Authentication/account transport
-│   │   │   ├── stream-config.ts # Active stream and streamer-container transport
+│   │   │   ├── camera-configurations.ts # Atomic fixed-camera configuration transport
+│   │   │   ├── media-assets.ts # Inventory, upload and protected content transport
+│   │   │   ├── simulation.ts # Run, Replay and session lifecycle transport
 │   │   │   ├── events.ts  # Reviewed-event list, detail and persistence transport
 │   │   │   ├── events.test.ts
 │   │   │   ├── monitoring-zones.ts # Revisioned multi-zone REST transport
@@ -158,13 +146,13 @@ P-047/
 │   │   │   └── ppe-requirements.ts # Shared PPE requirement transport
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
-│   │   │   ├── camera-config/ # Admin camera dropdown, HLS zone editor and per-zone rules
+│   │   │   ├── camera-config/ # Safety Manager asset preview, zone and per-zone rules
 │   │   │   ├── auth/    # Login and system-admin account management
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
-│   │   │   ├── monitor/ # Active MJPEG stream, multi-zone editor and future inference
-│   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over HLS
+│   │   │   ├── media/ # Sys Admin library and authenticated image/video rendering
+│   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
+│   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── monitor/ # Video, multi-zone draft editor, Canvas and frame sampling
 │   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
@@ -207,20 +195,17 @@ P-047/
 │   │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
 │   │   └── project-problem-statement.md # Safety monitoring problem formulation
-│   ├── ops/                         # Operations, CI/CD, RTSP/CCTV media solution and metrics
+│   ├── ops/                         # Operations, CI/CD, Vision deployment and metrics
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines
 │   │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   │   ├── DEPLOYMENT_FLOW.md           # Visual deployment flow diagrams, service matrix and team runbook
 │   │   ├── local-docker-postgres.md     # Local Docker PostgreSQL configuration
 │   │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
-│   │   ├── RTSP_CCTV_MEDIA_SOLUTION.md # RTSP-first CCTV simulation and browser delivery contract
 │   │   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook
-│   │   └── streamer-concurrency-and-memory.md # Beginner guide to MJPEG fan-out, memory and 100-client load testing
 │   ├── data/                        # Dataset preparation and annotation guides
 │   │   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── guide/                       # Setup guides and reference materials
 │   └── plans/                       # Implementation-ready plans and their reading guide
-│       ├── 2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md # RTSP/HLS migration plan
 │       ├── 2026-08-21-001-feat-remote-vision-service-plan.md # Remote worker implementation plan
 │       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md
 ├── specs/               # Product requirements and PRD-aligned user story backlog
@@ -246,15 +231,14 @@ P-047/
 │       └── US-09.md ... US-26.md
 ├── scripts/             # Explicit-entrypoint automation and model benchmarks
 │   ├── README.md
-│   ├── configure_railway_hls.sh # Safely sync shared HLS variables to Railway services
-│   ├── deploy_all_production.sh # Build, publish, redeploy, wait and health-check app plus streamer
-│   ├── test_deploy_all_production.sh # No-network regression for the combined production release
-│   ├── test_railway_hls_scripts.sh # No-network regression for HLS build/deploy wiring
+│   ├── deploy_all_production.sh # Build, publish, redeploy, wait and health-check the app
+│   ├── test_deploy_all_production.sh # No-network regression for the app release
+│   ├── sync_code_to_google_drive.sh # Sync only backend/app and vision Python source through rclone
+│   ├── test_sync_code_to_google_drive.sh # No-network regression for Google Drive sync arguments
 │   ├── benchmark_privacy.py # YuNet/redaction/JPEG latency benchmark
 │   ├── benchmark_model.py
+│   ├── container_entrypoint.sh # Fix volume ownership then drop to appuser
 │   ├── bootstrap_legacy_sqlite.py # One-time safe adoption of pre-Alembic local SQLite
-│   ├── build_streamer.sh # Build the standalone streamer image
-│   ├── push_streamer.sh # Build and publish the streamer image to Docker Hub
 │   ├── push_app.sh      # Build and publish the main P-047 app image to Docker Hub
 │   ├── production_start.py # Docker preflight, migration and one-worker startup
 │   ├── docker_smoke.py # Repeatable black-box local Docker smoke check
@@ -289,3 +273,4 @@ P-047/
 
 ### Giải thích
 `backend/` là runtime FastAPI hiện hành. `src/` là scaffold LangGraph cũ còn tồn tại trong filesystem nhưng không còn là đích cho production code mới. Ownership, dependency, cách đặt code và lộ trình migration được chốt trong một file duy nhất: `docs/FUTURE_PROJECT_STRUCTURE.md`.
+│   │   │   ├── media_asset_service.py # Atomic upload, validation and protected deletion

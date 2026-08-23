@@ -1,0 +1,261 @@
+import threading
+import time
+from uuid import uuid4
+
+import cv2
+import numpy as np
+
+from backend.app.models.user import UserRole
+from backend.app.schemas.analysis import FrameInferenceRequest
+from backend.app.schemas.ppe_requirement import PpeRequirementResponse
+from backend.app.services.auth_service import AuthService
+from backend.app.services.camera_session_runtime import CameraSessionRuntime
+from backend.app.services.frame_inference_service import FrameInferenceService
+from backend.app.services.media_asset_service import media_asset_settings
+
+
+def _png_bytes() -> bytes:
+    encoded, buffer = cv2.imencode(".png", np.zeros((24, 32, 3), dtype=np.uint8))
+    assert encoded
+    return buffer.tobytes()
+
+
+def _set_role(client, db_session, role: UserRole) -> None:
+    user = AuthService(db_session).get_current_user(client.headers["Authorization"].split(" ", 1)[1])[0]
+    user.role = role.value
+    db_session.commit()
+
+
+def _configuration_payload(asset_id: str, revision: int = 0) -> dict:
+    return {
+        "expected_revision": revision,
+        "asset_id": asset_id,
+        "machine_state": "running",
+        "zones": [
+            {
+                "zone_id": "press",
+                "display_name": "Press",
+                "points": [
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.4, "y": 0.1},
+                    {"x": 0.4, "y": 0.4},
+                    {"x": 0.1, "y": 0.4},
+                ],
+                "enabled": True,
+                "order": 0,
+                "ppe_requirements": {
+                    "profile": "hat_vest_v1",
+                    "hat_required": True,
+                    "vest_required": False,
+                    "restricted_area_detection_enabled": False,
+                    "zone_intrusion_enabled": True,
+                },
+            }
+        ],
+    }
+
+
+def test_media_upload_is_admin_only_and_content_supports_ranges(client, db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(media_asset_settings, "media_asset_dir", str(tmp_path))
+    denied = client.post(
+        "/api/v1/media-assets",
+        data={"display_name": "Camera still"},
+        files={"file": ("still.png", _png_bytes(), "image/png")},
+    )
+    assert denied.status_code == 403
+
+    _set_role(client, db_session, UserRole.SYSTEM_ADMIN)
+    uploaded = client.post(
+        "/api/v1/media-assets",
+        data={"display_name": "Camera still"},
+        files={"file": ("../../still.png", _png_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201
+    body = uploaded.json()
+    assert body["status"] == "READY"
+    assert body["media_type"] == "image"
+    assert "path" not in body
+    assert list(tmp_path.iterdir())[0].name.startswith(body["id"])
+
+    ranged = client.get(f"/api/v1/media-assets/{body['id']}/content", headers={"Range": "bytes=0-7"})
+    assert ranged.status_code == 206
+    assert ranged.headers["content-range"] == f"bytes 0-7/{body['size_bytes']}"
+    assert len(ranged.content) == 8
+
+
+def test_safety_manager_lists_only_ready_assets(client, db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(media_asset_settings, "media_asset_dir", str(tmp_path))
+    _set_role(client, db_session, UserRole.SYSTEM_ADMIN)
+    ready = client.post(
+        "/api/v1/media-assets",
+        data={"display_name": "Ready"},
+        files={"file": ("ready.png", _png_bytes(), "image/png")},
+    ).json()
+    corrupt = client.post(
+        "/api/v1/media-assets",
+        data={"display_name": "Broken"},
+        files={"file": ("broken.png", b"not an image", "image/png")},
+    )
+    assert corrupt.status_code == 422
+
+    _set_role(client, db_session, UserRole.SAFETY_MANAGER)
+    assert [item["id"] for item in client.get("/api/v1/media-assets").json()] == [ready["id"]]
+
+
+def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(media_asset_settings, "media_asset_dir", str(tmp_path))
+    _set_role(client, db_session, UserRole.SYSTEM_ADMIN)
+    asset = client.post(
+        "/api/v1/media-assets",
+        data={"display_name": "Still"},
+        files={"file": ("still.png", _png_bytes(), "image/png")},
+    ).json()
+    _set_role(client, db_session, UserRole.SAFETY_MANAGER)
+
+    initial = client.get("/api/v1/camera-configurations").json()
+    assert [item["camera_id"] for item in initial] == ["cam_1", "cam_2", "cam_3", "cam_4"]
+    saved = client.put("/api/v1/camera-configurations/cam_1", json=_configuration_payload(asset["id"]))
+    assert saved.status_code == 200
+    assert saved.json()["revision"] == 1
+    assert saved.json()["zones"][0]["ppe_requirements"]["hat_required"] is True
+
+    conflict = client.put("/api/v1/camera-configurations/cam_2", json=_configuration_payload(asset["id"]))
+    assert conflict.status_code == 409
+    assert client.get("/api/v1/camera-configurations/cam_2").json()["asset_id"] is None
+    stale = client.put(
+        "/api/v1/camera-configurations/cam_1",
+        json=_configuration_payload(asset["id"], revision=0),
+    )
+    assert stale.status_code == 409
+    assert (
+        client.put("/api/v1/camera-configurations/cam_9", json=_configuration_payload(asset["id"])).status_code == 404
+    )
+
+
+def test_image_runtime_infers_once_and_publishes_running_then_completed(tmp_path):
+    image_path = tmp_path / "still.png"
+    image_path.write_bytes(_png_bytes())
+    published = []
+    inferred = []
+
+    runtime = CameraSessionRuntime(
+        session_factory=None,
+        process_frame=lambda context, frame, frame_id, video_time, bypass: (
+            inferred.append((frame_id, video_time, bypass)) or {"type": "camera_inference_result", "result": "normal"}
+        ),
+        publish=published.append,
+    )
+    runtime.start_in_memory(
+        camera_id="cam_1",
+        session_id="00000000-0000-0000-0000-000000000001",
+        asset_id="00000000-0000-0000-0000-000000000002",
+        media_type="image",
+        path=image_path,
+        config_revision=1,
+    )
+
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline and not any(item["session_status"] == "COMPLETED" for item in published):
+        time.sleep(0.01)
+    runtime.stop_all()
+
+    assert inferred == [(1, 0.0, True)]
+    assert [item["session_status"] for item in published] == ["STARTING", "RUNNING", "COMPLETED"]
+    assert all(item["session_id"] == "00000000-0000-0000-0000-000000000001" for item in published)
+
+
+def test_image_inference_bypasses_ppe_and_intrusion_confirmation():
+    service = FrameInferenceService(
+        ppe_observer=lambda frame, people: [
+            {
+                "hat": {"status": "missing", "confidence": None},
+                "vest": {"status": "present", "confidence": 0.9},
+            }
+            for _ in people
+        ]
+    )
+    service._track_people = lambda session_id, frame: [(8, 4, 12, 18, 0.95, 1)]
+    requirement = PpeRequirementResponse(
+        camera_id="cam_1",
+        zone_id="press",
+        profile="hat_vest_v1",
+        hat_required=True,
+        vest_required=False,
+        zone_intrusion_enabled=True,
+        updated_at=None,
+    )
+    result = service.infer_decoded_frame(
+        FrameInferenceRequest(
+            image_data="",
+            camera_id="cam_1",
+            monitoring_session_id=uuid4(),
+            frame_id=1,
+            machine_state="running",
+            zone_revision=1,
+            zones=[
+                {
+                    "zone_id": "press",
+                    "display_name": "Press",
+                    "points": [
+                        {"x": 0.1, "y": 0.1},
+                        {"x": 0.9, "y": 0.1},
+                        {"x": 0.9, "y": 0.95},
+                        {"x": 0.1, "y": 0.95},
+                    ],
+                    "enabled": True,
+                    "order": 0,
+                }
+            ],
+        ),
+        np.zeros((24, 32, 3), dtype=np.uint8),
+        requirements=requirement,
+        requirements_by_zone={"press": requirement},
+        bypass_confirmation=True,
+    )
+
+    assert result.review_required is True
+    assert {item.rule_key for item in result.people[0].active_violations} == {
+        "missing_ppe:hat",
+        "zone_intrusion:press",
+    }
+
+
+def test_replacement_suppresses_old_session_inference_output(tmp_path):
+    image_path = tmp_path / "still.png"
+    image_path.write_bytes(_png_bytes())
+    first_entered = threading.Event()
+    published = []
+
+    def process(context, frame, frame_id, video_time, bypass):
+        if context.session_id.endswith("1"):
+            first_entered.set()
+            time.sleep(0.1)
+        return {"type": "camera_inference_result", "result": "normal"}
+
+    runtime = CameraSessionRuntime(session_factory=None, process_frame=process, publish=published.append)
+    runtime.start_in_memory(
+        camera_id="cam_1",
+        session_id="00000000-0000-0000-0000-000000000001",
+        asset_id="00000000-0000-0000-0000-000000000003",
+        media_type="image",
+        path=image_path,
+        config_revision=1,
+    )
+    assert first_entered.wait(1)
+    runtime.start_in_memory(
+        camera_id="cam_1",
+        session_id="00000000-0000-0000-0000-000000000002",
+        asset_id="00000000-0000-0000-0000-000000000003",
+        media_type="image",
+        path=image_path,
+        config_revision=1,
+    )
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline and not any(
+        item["session_id"].endswith("2") and item["session_status"] == "COMPLETED" for item in published
+    ):
+        time.sleep(0.01)
+    runtime.stop_all()
+
+    inference_sessions = [item["session_id"] for item in published if item["type"] == "camera_inference_result"]
+    assert inference_sessions == ["00000000-0000-0000-0000-000000000002"]

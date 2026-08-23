@@ -4,7 +4,7 @@
 
 Extract YOLO11m Safety inference from the main FastAPI deployment behind a versioned HTTP provider contract. The first deliverable must run locally with CPU dependencies, deploy as a separate RunPod load-balancing worker image, and let the existing backend select the remote provider without changing browser REST/WebSocket payloads.
 
-Success means one JPEG sent through the shared `FrameInferenceService`—from the server-side RTSP camera loop or the compatibility REST/WebSocket path—is evaluated by the remote worker, the backend receives validated person/hat/vest observations, and existing backend rule/occurrence plus camera-metadata responses remain compatible.
+Success means one frame sent through the shared `FrameInferenceService` from a direct-file camera session is evaluated by the remote worker, the backend receives validated person/hat/vest observations, and existing backend rule/occurrence plus camera-session metadata remain compatible.
 
 ## Capability Boundary
 
@@ -101,7 +101,7 @@ Verification: focused adapter/settings tests pass.
 
 Acceptance:
 - `FrameInferenceService` selects the configured provider without changing injected-test behavior.
-- Existing frame REST/WebSocket output and server-side RTSP camera metadata remain unchanged.
+- Existing observation output and direct-file camera session metadata remain unchanged.
 - Local two-command workflow remains on the local provider by default.
 
 Verification: backend frame/WebSocket tests pass.
@@ -134,7 +134,7 @@ Verification: Docker build/smoke when Docker is available; otherwise record the 
 ## Not Included
 
 - Browser UI changes.
-- Direct RTSP/HLS ingestion inside the remote worker.
+- Direct media ingestion inside the remote worker.
 - Multi-worker horizontal scaling or affinity.
 - CUDA-specific image optimization.
 - Moving privacy redaction, business rules, database or events to RunPod.

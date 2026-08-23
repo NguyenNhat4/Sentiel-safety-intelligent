@@ -1,7 +1,7 @@
 import {useEffect, useState, type ReactNode} from "react";
 import type {AuthenticatedUser} from "../types";
 
-export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "streams" | "camera-config";
+export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "media-library" | "camera-config";
 
 interface AppShellProps {
   page: Page;
@@ -13,20 +13,20 @@ interface AppShellProps {
 
 export function AppShell({page, onNavigate, user, onLogout, children}: AppShellProps) {
   const clock = useClock();
-  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "streams" ? "Camera stream" : page === "camera-config" ? "Cấu hình camera" : "Quản trị hệ thống";
+  const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "media-library" ? "Thư viện media" : page === "camera-config" ? "Cấu hình camera" : "Quản trị hệ thống";
   const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map(part => part[0]).join("").toUpperCase();
 
   return <>
     <aside className="sidebar">
       <a className="brand" href="/"><span className="brand-mark">S</span><span>Sentinel<small>Safety intelligence</small></span></a>
       <nav>
-        {user.role !== "area_manager" && <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>}
-        {user.role !== "area_manager" && <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>}
-        {user.role !== "area_manager" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
+        {user.role === "safety_manager" && <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>}
+        {user.role === "safety_manager" && <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>}
+        {user.role === "safety_manager" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
         {user.role !== "safety_manager" && <button className={`nav-item ${page === "area" ? "active" : ""}`} onClick={() => onNavigate("area")}><span>⌁</span> Dashboard</button>}
         <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
          {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
-         {user.role === "system_admin" && <button className={`nav-item ${page === "camera-config" ? "active" : ""}`} onClick={() => onNavigate("camera-config")}><span>◇</span> Cấu hình camera</button>}
+         {user.role === "system_admin" && <button className={`nav-item ${page === "media-library" ? "active" : ""}`} onClick={() => onNavigate("media-library")}><span>▣</span> Thư viện media</button>}
       </nav>
       <div className="system-card">
         <div><span className="pulse" /> Hệ thống hoạt động</div>

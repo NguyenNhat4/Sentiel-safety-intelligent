@@ -1,10 +1,8 @@
-import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -22,8 +20,8 @@ from backend.app.integrations.snapshot_storage import (
 )
 from backend.app.schemas.health import DependencyReadiness, HealthResponse
 from backend.app.services.auth_service import AuthService
+from backend.app.services.camera_session_runtime import CameraSessionRuntime, camera_session_runtime
 from backend.app.services.frame_inference_service import frame_inference_service
-from backend.app.services.server_camera_inference_runtime import ServerCameraInferenceRuntime
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -47,6 +45,11 @@ async def lifespan(app: FastAPI):
                 AuthService(db).seed_demo_users()
             finally:
                 db.close()
+        db = SessionLocal()
+        try:
+            CameraSessionRuntime.mark_interrupted_stopped(db)
+        finally:
+            db.close()
         logger.info("Database tables verified/created successfully using %s.", database_runtime.backend)
     except Exception as e:
         logger.warning(f"Could not connect to database on startup: {e}")
@@ -57,25 +60,9 @@ async def lifespan(app: FastAPI):
     logger.info("OpenCV YuNet face detector loaded for snapshot privacy.")
     app.state.ready = True
 
-    camera_inference_runtime = None
-    camera_inference_task = None
-    if settings.hls_inference_enabled:
-        if not settings.hls_reader_origin:
-            raise RuntimeError("HLS_READER_ORIGIN is required when HLS inference is enabled")
-        camera_inference_runtime = ServerCameraInferenceRuntime(
-            settings.hls_reader_origin,
-            max_fps=settings.hls_inference_max_fps,
-            poll_seconds=settings.hls_mapping_poll_seconds,
-            media_protocol="hls",
-        )
-        camera_inference_task = asyncio.create_task(camera_inference_runtime.run())
-        logger.info("Server-side HLS camera inference started.")
-
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield
-    if camera_inference_runtime is not None and camera_inference_task is not None:
-        camera_inference_runtime.stop()
-        await camera_inference_task
+    camera_session_runtime.stop_all()
     print("Shutting down backend...")
 
 
@@ -150,17 +137,6 @@ def _dependency_readiness(check, unavailable_reason: str) -> DependencyReadiness
     return DependencyReadiness(ready=True)
 
 
-def check_streamer_connection(origin: str) -> None:
-    response = httpx.get(
-        f"{origin.rstrip('/')}/health",
-        timeout=settings.streamer_health_timeout_seconds,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if payload != {"status": "ok"}:
-        raise RuntimeError("Streamer returned an unexpected health response")
-
-
 @app.get("/health", response_model=HealthResponse, tags=["Health Check"])
 async def health_check() -> HealthResponse:
     if database_runtime.backend != "postgresql" or database_runtime.fallback_active:
@@ -179,15 +155,7 @@ async def health_check() -> HealthResponse:
             "connection_failed",
         )
 
-    if len(settings.hls_token_secret) < 32 or not settings.streamer_internal_origin:
-        streamer = DependencyReadiness(ready=False, reason="not_configured")
-    else:
-        streamer = _dependency_readiness(
-            lambda: check_streamer_connection(settings.streamer_internal_origin),
-            "connection_failed",
-        )
-
-    ready = bool(getattr(app.state, "ready", False)) and postgresql.ready and snapshot_storage.ready and streamer.ready
+    ready = bool(getattr(app.state, "ready", False)) and postgresql.ready and snapshot_storage.ready
     return HealthResponse(
         status="ok" if ready else "degraded",
         ready=ready,
@@ -195,7 +163,7 @@ async def health_check() -> HealthResponse:
         service=settings.app_name,
         database=database_runtime.backend,
         database_fallback_active=database_runtime.fallback_active,
-        dependencies={"postgresql": postgresql, "snapshot_storage": snapshot_storage, "streamer": streamer},
+        dependencies={"postgresql": postgresql, "snapshot_storage": snapshot_storage},
         runtime_files=getattr(app.state, "runtime_files", {}),
     )
 

@@ -25,16 +25,13 @@ PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minut
 
 ## Frontend–Backend Interaction
 
-The baseline uses two transports with separate responsibilities:
+US-29 uses backend-owned media and explicit sessions:
 
-- WebSocket `/api/v1/ws/inference` carries either the legacy one-zone configuration or a saved multi-zone collection, sampled JPEG frames, and additive per-zone inference results.
-- REST `/api/v1/events` persists a legacy reviewed outcome; `/api/v1/event-batches` atomically persists grouped zone reviews.
-
-Connected cameras use a server-owned path when `RTSP_INFERENCE_ENABLED=true`:
-one worker per persisted mapping reads
-`RTSP_READER_ORIGIN/cameras/<stream_camera_id>` at no more than 2 FPS. Browser
-viewers authenticate once on `/api/v1/ws/camera-detections` and receive metadata
-for mapped cameras; they never upload HLS frames back to the backend.
+- `POST /api/v1/media-assets` accepts System Admin image/video uploads into `MEDIA_ASSET_DIR`.
+- `PUT /api/v1/camera-configurations/{camera_id}` atomically saves asset, machine state, zones and PPE for fixed `cam_1` through `cam_4`.
+- `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
+- `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.
+- Streamer, MediaMTX, HLS, RTSP and Connect/Disconnect are not runtime contracts.
 
 Inference frames default to `640x360` through `INFERENCE_FRAME_WIDTH` and
 `INFERENCE_FRAME_HEIGHT`. Keep the source aspect ratio when changing these

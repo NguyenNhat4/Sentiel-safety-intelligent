@@ -119,6 +119,7 @@ class FrameInferenceService:
         *,
         requirements: PpeRequirementResponse | None = None,
         requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
+        bypass_confirmation: bool = False,
     ) -> FrameInferenceResponse:
         """Infer from an existing BGR frame without a JPEG/Base64 round trip."""
         source_height, source_width = frame.shape[:2]
@@ -269,6 +270,7 @@ class FrameInferenceService:
                     person.track_id: (person.foot_point[0] / width, person.foot_point[1] / height) for person in people
                 },
                 ppe_present_items=ppe_present_items,
+                bypass_confirmation=bypass_confirmation,
                 now=now,
             )
             for person in people:
@@ -363,6 +365,12 @@ class FrameInferenceService:
         )
         self._restore_source_coordinates(response, source_width, source_height, width, height)
         return response
+
+    def end_session(self, session_id: str) -> None:
+        self._violation_tracker.end_session(session_id)
+        analyzer_owner = getattr(self._vision_analyzer, "__self__", None)
+        if analyzer_owner is not None and hasattr(analyzer_owner, "end_session"):
+            analyzer_owner.end_session(session_id)
 
     @staticmethod
     def _restore_source_coordinates(

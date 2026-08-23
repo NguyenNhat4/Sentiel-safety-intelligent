@@ -5,13 +5,6 @@ FROM node:22-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
-ARG VITE_STREAMER_URL=
-ARG VITE_MEDIA_PUBLIC_ORIGIN=
-ARG VITE_STREAM_TRANSPORT=hls
-ENV VITE_STREAMER_URL=${VITE_STREAMER_URL}
-ENV VITE_MEDIA_PUBLIC_ORIGIN=${VITE_MEDIA_PUBLIC_ORIGIN}
-ENV VITE_STREAM_TRANSPORT=${VITE_STREAM_TRANSPORT}
-
 COPY frontend/package*.json ./
 RUN npm ci
 
@@ -38,6 +31,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
+
 # Copy the resolved virtual environment as the runtime Python environment.
 COPY --from=python-builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
@@ -49,19 +44,19 @@ RUN useradd -m appuser
 COPY backend ./backend
 COPY vision ./vision
 COPY scripts ./scripts
+COPY --chmod=755 scripts/container_entrypoint.sh /usr/local/bin/p047-entrypoint
 COPY alembic.ini ./
 COPY models/yolo11m_safety.pt ./models/
 COPY models/face_detection_yunet_2023mar.onnx ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create data directory with correct ownership
-RUN mkdir -p /app/data && chown -R appuser:appuser /app
-
-USER appuser
+RUN mkdir -p /app/data/media-assets && chown -R appuser:appuser /app
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD python -c "import json, urllib.request; health=json.load(urllib.request.urlopen('http://localhost:8000/health')); assert health['ready']" || exit 1
 
+ENTRYPOINT ["p047-entrypoint"]
 CMD ["python", "-m", "scripts.production_start"]

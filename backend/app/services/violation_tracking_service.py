@@ -78,6 +78,7 @@ class ViolationTrackingService:
         *,
         track_positions: dict[int, tuple[float, float]] | None = None,
         ppe_present_items: dict[int, set[str]] | None = None,
+        bypass_confirmation: bool = False,
         now: float,
     ) -> dict[int, list[ActiveViolation]]:
         self._expire(now)
@@ -106,7 +107,7 @@ class ViolationTrackingService:
                 activation_frames = self._zone_activation_frames or self._activation_frames
             else:
                 activation_frames = self._activation_frames
-            if activation_frames is not None:
+            if activation_frames is not None and not bypass_confirmation:
                 if occurrence is None:
                     occurrence = _Occurrence(occurrence_id=str(uuid4()), active=False)
                     self._occurrences[key] = occurrence
@@ -128,7 +129,7 @@ class ViolationTrackingService:
                 occurrence.lost_frames = 0
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
                 continue
-            if is_ppe_rule:
+            if is_ppe_rule and not bypass_confirmation:
                 if occurrence is None or not occurrence.active:
                     missing_frames = self._pending_ppe_frames.get(key, 0) + 1
                     self._pending_ppe_frames[key] = missing_frames
