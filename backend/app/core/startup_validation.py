@@ -8,7 +8,7 @@ from pathlib import Path
 from backend.app.core.config import Settings
 
 REQUIRED_MODEL_CHECKSUMS = {
-    "yolo11m_safety.pt": "f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece",
+    "yolo11m_safety.pt": "e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218",
 }
 
 

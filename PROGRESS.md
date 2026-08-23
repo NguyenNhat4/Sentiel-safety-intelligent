@@ -120,7 +120,7 @@ This is the single progress tracker for the repository. Completed work is groupe
 
 ### Vision
 - [x] [Vision] Consolidated canonical person detection, ByteTrack and hat/vest observation into one YOLO11m Safety call per frame; retired YOLO11n from runtime configuration and preload without changing REST/WebSocket semantics.
-- [x] Pinned `wesjos/Yolo-hard-hat-safety-vest/yolo11m_safety.pt` at revision `95ffeeb1e0897d60564c811ace5935bcd43d982b`, SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`, under Git LFS.
+- [x] Pinned `wesjos/Yolo-hard-hat-safety-vest/yolo11m_safety.pt` at revision `95ffeeb1e0897d60564c811ace5935bcd43d982b`; runtime uses the optimizer-stripped EMA FP16 artifact (`40543303` bytes, SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`) under Git LFS.
 - [x] Added full five-source-class startup validation, selected only `hat/person/vest`, promoted Safety class `3` to canonical person, and verified a real-model CPU inference smoke run.
 - [x] [Historical baseline] Recorded the superseded YOLO11n + YOLO11m Safety pipeline at P50 472.20 ms and P95 504.02 ms; the benchmark script now measures the single-model runtime.
 - [x] Moved root `.pt` model files (`ppe_yolov8n.pt`, `yolo11n.pt`) to dedicated `models/` directory, added `models/README.md`, updated `docs/PROJECT_STRUCTURE.md`, and updated backend configuration and service model resolution.
