@@ -33,7 +33,6 @@ export function EventLogPage({active}: EventLogPageProps) {
       <div className="log-toolbar">
         <div>
           <p className="eyebrow">SAFETY RECORDS</p>
-          <h2>Nhật ký vi phạm</h2>
           <p>Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.</p>
         </div>
         <button className="secondary-btn" onClick={() => void loadEvents()}>↻ Làm mới</button>

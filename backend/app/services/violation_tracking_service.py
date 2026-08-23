@@ -58,6 +58,7 @@ class ViolationTrackingService:
         self._pending_ppe_present_since: dict[tuple[str, int, str], float] = {}
         self._confirmed_ppe_items: dict[tuple[str, int], set[str]] = {}
         self._track_positions: dict[tuple[str, int], tuple[float, float]] = {}
+        self._alerted_tracks: set[tuple[str, int]] = set()
         self._last_seen: dict[str, float] = {}
         self._last_frame: dict[str, int] = {}
 
@@ -132,11 +133,12 @@ class ViolationTrackingService:
                     occurrence.consecutive_frames += 1
                     if occurrence.consecutive_frames < activation_frames:
                         continue
-                    if occurrence.cooldown_until > 0:
-                        occurrence = _Occurrence(occurrence_id=str(uuid4()), active=True)
-                        self._occurrences[key] = occurrence
+                    # Re-entry by the same tracked person in this session is
+                    # the same alert lifecycle. Keep its occurrence ID so a
+                    # cleared-and-reopened violation cannot look like a new
+                    # report downstream.
                     occurrence.active = True
-                    is_new = True
+                    is_new = self._claim_alert(session_id, track_id)
                 occurrence.absent_frames = 0
                 occurrence.lost_frames = 0
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
@@ -154,19 +156,23 @@ class ViolationTrackingService:
                         confirmed_items.discard(item)
                     occurrence = _Occurrence(occurrence_id=str(uuid4()))
                     self._occurrences[key] = occurrence
-                    is_new = True
+                    is_new = self._claim_alert(session_id, track_id)
                 else:
                     is_new = False
                 occurrence.absent_frames = 0
                 occurrence.lost_frames = 0
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
                 continue
-            is_new = occurrence is None or (not occurrence.active and now >= occurrence.cooldown_until)
-            if is_new:
+            if occurrence is None:
                 occurrence = _Occurrence(occurrence_id=str(uuid4()))
                 self._occurrences[key] = occurrence
+                is_new = self._claim_alert(session_id, track_id)
             else:
+                # A re-entry keeps the original occurrence identity. The
+                # per-track alert claim decides whether this is reportable;
+                # it must not be reopened as a second alert.
                 occurrence.active = True
+                is_new = False
             occurrence.absent_frames = 0
             occurrence.lost_frames = 0
             output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
@@ -234,6 +240,7 @@ class ViolationTrackingService:
             key: value for key, value in self._confirmed_ppe_items.items() if key[0] != session_id
         }
         self._track_positions = {key: value for key, value in self._track_positions.items() if key[0] != session_id}
+        self._alerted_tracks = {key for key in self._alerted_tracks if key[0] != session_id}
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
@@ -296,6 +303,15 @@ class ViolationTrackingService:
             new_track_key = (session_id, new_track_id)
             if old_track_key in self._confirmed_ppe_items and new_track_key not in self._confirmed_ppe_items:
                 self._confirmed_ppe_items[new_track_key] = self._confirmed_ppe_items.pop(old_track_key)
+            if old_track_key in self._alerted_tracks:
+                self._alerted_tracks.add(new_track_key)
+
+    def _claim_alert(self, session_id: str, track_id: int) -> bool:
+        key = (session_id, track_id)
+        if key in self._alerted_tracks:
+            return False
+        self._alerted_tracks.add(key)
+        return True
 
     def _confirm_present_ppe(
         self,

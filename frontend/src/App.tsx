@@ -47,8 +47,8 @@ export default function App() {
       {page === "monitor" && user.role === "safety_manager" && <MonitorPage role={user.role} onConfigure={cameraId => { setSelectedCameraId(cameraId); setPage("camera-config"); }} />}
       {page === "camera-config" && user.role === "safety_manager" && selectedCameraId && <CameraConfigurationPage cameraId={selectedCameraId} onBack={() => setPage("monitor")} onSaved={() => setPage("monitor")} />}
       {page === "media-library" && user.role === "system_admin" && <MediaLibraryPage />}
-      <EventLogPage active={page === "events"} />
-      <OperationalMetricsPage active={page === "operations"} />
+      {page === "events" && <EventLogPage active />}
+      {page === "operations" && <OperationalMetricsPage active />}
       {page === "area" && user.role !== "safety_manager" && <AreaManagerPage />}
       {page === "admin" && user.role === "system_admin" && <AdminUserPage currentUser={user} onLogout={() => void handleLogout()} />}
     </AppShell>

@@ -57,7 +57,7 @@ PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 
 GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans. In the connected-camera path, PPE rules apply to a person inside the configured zone while the camera-wide machine state is running; restricted-area and intrusion switches are evaluated independently for that zone. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
 
-US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only a newly opened occurrence sets `review_required=true`. Reviewed event requests carry the new occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
+US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only the first violation alert for that person in the session sets `review_required=true`. Later rules or re-violations remain observable without opening another review. Reviewed event requests carry the occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
 ```mermaid
 sequenceDiagram

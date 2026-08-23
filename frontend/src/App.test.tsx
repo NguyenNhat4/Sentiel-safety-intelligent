@@ -162,6 +162,8 @@ describe("Sentinel React application", () => {
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
     expect(await screen.findAllByText("Bấm vào đây để cấu hình")).toHaveLength(4);
+    expect(screen.getByText(/Đã upload video.*bấm vào camera thêm một lần nữa để mở cấu hình/i)).toBeInTheDocument();
+    expect(screen.queryByText("Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.")).not.toBeInTheDocument();
   });
 
   it("opens the exact internal camera configuration without a sidebar item", async () => {

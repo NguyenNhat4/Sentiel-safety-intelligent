@@ -160,6 +160,7 @@ P-047/
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx
 │   │   │   │   ├── EventDetailDialog.test.tsx
+│   │   │   │   ├── event-detail.css
 │   │   │   │   ├── EventLogPage.tsx
 │   │   │   │   └── EventLogPage.test.tsx
 │   │   │   ├── operational-metrics/ # Separate JSONL metrics observability page

@@ -74,11 +74,14 @@ describe("EventDetailDialog", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Đang tải");
     expect(await screen.findByRole("dialog", {name: "Chi tiết sự kiện #42"})).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "1. AI quan sát"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "AI quan sát"})).toBeInTheDocument();
     expect(screen.getByText(/91%/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "2. Rule quyết định"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Rule quyết định"})).toBeInTheDocument();
     expect(screen.getByText(/safety_rule_v1/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "3. Human review"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Human review"})).toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 3")).not.toBeInTheDocument();
     expect(screen.getByText(/Nguyễn Anh Tuấn/)).toBeInTheDocument();
     expect(screen.getByText(/Nguồn: Mẫu xác định/)).toBeInTheDocument();
   });

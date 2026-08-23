@@ -15,6 +15,28 @@ def test_continuous_violation_emits_one_occurrence():
     UUID(first[4][0].occurrence_id)
 
 
+def test_one_person_emits_only_one_alert_for_entire_video_session():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=0.0, ppe_confirmation_frames=1)
+
+    first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    second_rule = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=2.0)[4]
+
+    assert first[0].is_new is True
+    assert second_rule[0].is_new is False
+
+
+def test_same_person_reviolation_after_clear_does_not_request_review_again():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=0.0)
+
+    first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    repeated = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=2.0)[4][0]
+
+    assert repeated.occurrence_id == first.occurrence_id
+    assert repeated.is_new is False
+
+
 def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     service = ViolationTrackingService(activation_frames=4)
 
@@ -38,7 +60,7 @@ def test_interrupted_pending_violation_must_restart_its_consecutive_frame_count(
         assert pending[4] == []
 
 
-def test_violation_rearms_only_after_confirmed_exit_and_cooldown():
+def test_violation_rearms_without_a_second_alert_in_the_same_session():
     service = ViolationTrackingService(exit_confirm_frames=2, cooldown_seconds=2.0)
     first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]
 
@@ -51,8 +73,8 @@ def test_violation_rearms_only_after_confirmed_exit_and_cooldown():
     service.evaluate("session-a", {4: set()}, {4}, now=2.5)
     service.evaluate("session-a", {4: set()}, {4}, now=3.0)
     rearmed = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=5.1)[4][0]
-    assert rearmed.occurrence_id != first.occurrence_id
-    assert rearmed.is_new is True
+    assert rearmed.occurrence_id == first.occurrence_id
+    assert rearmed.is_new is False
 
 
 def test_short_track_loss_does_not_create_a_new_occurrence():

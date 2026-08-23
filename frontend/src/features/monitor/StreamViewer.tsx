@@ -206,7 +206,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 
   return <div className="monitor-stream-shell">
-    <div className="monitor-actions"><div><p className="eyebrow">FOUR CAMERA SIMULATION</p><p>Trạng thái phiên và FPS được đồng bộ từ máy chủ.</p></div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
+    <div className="monitor-actions"><div>{canConfigure && <p className="monitor-config-hint">Đã upload video? Bấm vào camera, sau đó bấm vào camera thêm một lần nữa để mở cấu hình.</p>}</div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
     {error && <p className="stream-config-error" role="alert">{error}</p>}
     <div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => {
       const configuration = configurations[cameraId];

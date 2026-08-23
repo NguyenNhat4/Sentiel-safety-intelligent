@@ -22,6 +22,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-23: [Backend] One violation alert per person per video session
+
+- A person may remain active, clear, and violate again during one `monitoring_session_id`, but the session emits at most one new alert/review for that person.
+- The deduplication key for alert creation is `(monitoring_session_id, track_id)`; occurrence context remains available for rendering and event validation.
+- Ending a session clears this alert history, so the same person in a newly started video can produce a new alert.
+
 ### 2026-08-23: [Backend] Explicit direct-file simulation runtime
 
 - Backend owns system-admin media uploads, assigns READY assets uniquely to fixed `cam_1` through `cam_4`, and reads validated image/video cache files directly with OpenCV for explicit run/replay sessions.

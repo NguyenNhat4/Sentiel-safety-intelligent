@@ -65,6 +65,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Railway deployment `bfe08eab-c477-4e9f-b211-bba93166ccd0` reached `SUCCESS`; PostgreSQL is at `20260823_02`, `/health` is ready, and production completed a 31,389,527-byte direct bucket upload with `POST .../complete` returning 200 in 1.882 seconds.
 - The existing `cbucket` is shared safely by prefixes: `snapshots/` for redacted evidence and `media-assets/` for uploaded media. The one legacy 26,193,014-byte volume asset was copied, size-verified, switched to S3 in PostgreSQL, and removed from canonical volume storage.
 - Inference hardening now applies restricted-area rules camera-wide, closes PPE occurrences when their zone/machine requirement becomes inapplicable, runs independent camera models concurrently, drops stale sampled frames, throttles per-frame session DB writes, records direct-camera latency/drop outcomes, validates fixed-camera occurrence ownership, and restores direct-camera HITL persistence.
+- Violation review alerts are now limited to one per person (`track_id`) for the full `monitoring_session_id`; later rules or re-violations remain observable without opening another review.
 - Railway worktree deployment `c617b5ca-93ca-4ad1-93f2-515024d8e1a0` reached `SUCCESS`; `/health` reports production ready with PostgreSQL and snapshot storage ready. The local Docker publish path was unavailable, so the configured mutable Docker Hub source still needs republishing before a later image-source redeploy.
 
 ## Open Gates
