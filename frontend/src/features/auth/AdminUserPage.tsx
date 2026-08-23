@@ -1,11 +1,10 @@
-import {useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
+import {memo, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
 import {changePassword, createUser, deleteUser, listUsers, updateUserRole} from "../../api/auth";
 import {loadMonitoringZones} from "../../api/monitoring-zones";
-import {disconnectStream, getStreamConfiguration, listStreamerCameras, updateStreamConfiguration} from "../../api/stream-config";
-import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, StreamMapping, UserRole} from "../../types";
+import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, UserRole} from "../../types";
 import "./admin-user.css";
 
-interface AdminUserPageProps { currentUser: AuthenticatedUser; onLogout: () => void; }
+interface AdminUserPageProps { currentUser: AuthenticatedUser; active?: boolean; onLogout: () => void; }
 type AdminTab = "accounts" | "roles" | "security";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -14,32 +13,47 @@ const ROLE_LABELS: Record<UserRole, string> = {
   area_manager: "Quản lý khu vực"
 };
 
-export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
+let adminUsersCache: ManagedUser[] | null = null;
+let adminAreasCache: MonitoringZone[] | null = null;
+
+export const AdminUserPage = memo(function AdminUserPage({currentUser, active = true, onLogout}: AdminUserPageProps) {
   const [tab, setTab] = useState<AdminTab>("accounts");
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [users, setUsers] = useState<ManagedUser[]>(() => adminUsersCache ?? []);
   const [selectedId, setSelectedId] = useState(currentUser.id);
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState<UserRole | "">("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => adminUsersCache === null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [areas, setAreas] = useState<MonitoringZone[]>([]);
+  const [areas, setAreas] = useState<MonitoringZone[]>(() => adminAreasCache ?? []);
   const selected = useMemo(() => users.find(user => user.id === selectedId) ?? users[0], [users, selectedId]);
 
   const load = useCallback(async () => {
-    setLoading(true); setError("");
+    if (!adminUsersCache) setLoading(true);
+    setError("");
     try {
       const result = await listUsers(query, filterRole);
+      adminUsersCache = result;
       setUsers(result);
       setSelectedId(current => result.some(user => user.id === current) ? current : result[0]?.id ?? "");
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setLoading(false); }
   }, [query, filterRole]);
 
-  useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    loadMonitoringZones("uploaded_video").then(collection => setAreas(collection.zones)).catch(reason => setError(errorMessage(reason)));
-  }, []);
+    if (active) void load();
+  }, [active, load]);
+
+  useEffect(() => {
+    if (active) {
+      loadMonitoringZones("uploaded_video")
+        .then(collection => {
+          adminAreasCache = collection.zones;
+          setAreas(collection.zones);
+        })
+        .catch(reason => setError(errorMessage(reason)));
+    }
+  }, [active]);
 
   async function remove(user: ManagedUser) {
     if (!window.confirm(`Xóa tài khoản ${user.email}? Hành động này không thể hoàn tác.`)) return;
@@ -48,7 +62,7 @@ export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
     catch (reason) { setError(errorMessage(reason)); }
   }
 
-  return <section className="page active admin-page">
+  return <section className={`page admin-page ${active ? "active" : ""}`}>
     <div className="admin-heading">
       <div><p className="eyebrow">SYSTEM ADMIN</p><h2>Quản trị hệ thống</h2><p>Quản lý tài khoản, vai trò và thông tin xác thực tập trung.</p></div>
       <div className="admin-summary"><strong>{users.length}</strong><span>tài khoản</span></div>
@@ -63,53 +77,7 @@ export function AdminUserPage({currentUser, onLogout}: AdminUserPageProps) {
     {tab === "roles" && <RoleTab areas={areas} users={users} selected={selected} onSelect={setSelectedId} onUpdated={async user => { setMessage(`Đã cập nhật vai trò cho ${user.email}.`); await load(); }} onError={setError} />}
     {tab === "security" && <SecurityTab users={users} selected={selected} currentUser={currentUser} onSelect={setSelectedId} onChanged={async user => { if (user.id === currentUser.id) { await onLogout(); return; } setMessage(`Đã cấp mật khẩu tạm cho ${user.email}. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.`); }} onError={setError} />}
   </section>;
-}
-
-export function StreamAdminPage() {
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  return <section className="page active admin-page">
-    <div className="admin-heading"><div><p className="eyebrow">SYSTEM ADMIN · CAMERA</p><h2>Camera stream</h2><p>Bật một camera từ streamer container để mọi người cùng quan sát.</p></div></div>
-    {(error || message) && <div className={`admin-feedback ${error ? "error" : "success"}`} role={error ? "alert" : "status"}>{error || message}</div>}
-    <StreamTab onError={setError} onMessage={setMessage} />
-  </section>;
-}
-
-function StreamTab({onError, onMessage}: {onError: (message: string) => void; onMessage: (message: string) => void}) {
-  const [cameras, setCameras] = useState<string[]>([]);
-  const [mappings, setMappings] = useState<StreamMapping[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadStreams = useCallback(async (initial = false) => {
-    if (initial) setLoading(true); else setRefreshing(true);
-    onError("");
-    try {
-      const [available, configuration] = await Promise.all([listStreamerCameras(), getStreamConfiguration()]);
-      setCameras(available); setMappings(configuration.mappings);
-    } catch (reason) { onError(errorMessage(reason)); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [onError]);
-
-  useEffect(() => { void loadStreams(true); }, [loadStreams]);
-
-  async function selectCamera(cameraId: string, streamCameraId: string) {
-    setRefreshing(true); onError("");
-    try {
-      if (mappings.some(mapping => mapping.stream_camera_id === streamCameraId && mapping.camera_id !== cameraId)) throw new Error("Stream này đã được gán cho camera khác.");
-      const next = [...mappings.filter(mapping => mapping.camera_id !== cameraId), {camera_id: cameraId, stream_camera_id: streamCameraId}];
-      const configuration = await updateStreamConfiguration(next);
-      setMappings(configuration.mappings); onMessage(`Đã kết nối ${cameraId}.`);
-    } catch (reason) { onError(errorMessage(reason)); }
-    finally { setRefreshing(false); }
-  }
-
-  return <article className="admin-card stream-admin-card">
-    <div className="admin-card-title"><div><h3>Camera stream</h3><p>Gán stream đã đăng ký vào từng camera. Không upload video tại đây.</p></div><button className="secondary-btn" disabled={loading || refreshing} onClick={() => void loadStreams()}>{refreshing ? "Đang tải…" : "Làm mới"}</button></div>
-     {loading ? <p className="stream-empty">Đang tải danh sách camera…</p> : cameras.length === 0 ? <p className="stream-empty">Chưa có stream trong streamer container.</p> : <div className="stream-camera-grid">{["cam_1", "cam_2", "cam_3", "cam_4"].map(cameraId => { const mapping = mappings.find(item => item.camera_id === cameraId); return <div className={`stream-camera-card ${mapping ? "active" : ""}`} key={cameraId}><div><strong>{cameraId}</strong><small>{mapping ? `Stream: ${mapping.stream_camera_id}` : "Chưa kết nối"}</small></div><select aria-label={`Stream cho ${cameraId}`} value={mapping?.stream_camera_id ?? ""} disabled={refreshing} onChange={event => { if (event.target.value) void selectCamera(cameraId, event.target.value); }}><option value="">Chọn stream</option>{cameras.map(camera => <option key={camera} value={camera} disabled={mappings.some(item => item.stream_camera_id === camera && item.camera_id !== cameraId)}>{camera}</option>)}</select>{mapping && <button className="stream-stop-button" disabled={refreshing} onClick={() => void disconnectStream(cameraId).then(result => { setMappings(result.mappings); onMessage(`Đã ngắt ${cameraId}.`); }).catch(reason => onError(errorMessage(reason)))}>Disconnect</button>}</div>; })}</div>}
-  </article>;
-}
-
+});
 
 function AccountsTab({areas, users, loading, currentUserId, query, filterRole, onQuery, onFilterRole, onCreated, onDelete, onError}: {
   areas: MonitoringZone[];

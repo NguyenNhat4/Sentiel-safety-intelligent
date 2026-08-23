@@ -14,13 +14,17 @@ class Settings(BaseSettings):
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
-    hls_token_secret: str = ""
-    streamer_internal_origin: str = ""
-    streamer_health_timeout_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
-    rtsp_inference_enabled: bool = False
-    rtsp_reader_origin: str = ""
-    rtsp_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
-    rtsp_mapping_poll_seconds: float = Field(default=5.0, ge=1.0, le=60.0)
+    inference_frame_width: int = Field(default=640, ge=320, le=1920)
+    inference_frame_height: int = Field(default=360, ge=180, le=1080)
+    media_asset_dir: str = "data/media-assets"
+    max_media_asset_bytes: int = Field(default=1024 * 1024 * 1024, gt=0, le=10 * 1024 * 1024 * 1024)
+    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
+    media_storage_backend: Literal["filesystem", "s3"] = "filesystem"
+    media_storage_bucket: str = ""
+    media_storage_endpoint_url: str = ""
+    media_storage_region: str = "auto"
+    media_storage_access_key_id: str = ""
+    media_storage_secret_access_key: str = ""
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
@@ -91,7 +95,7 @@ class Settings(BaseSettings):
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
     model_config = SettingsConfigDict(
-        env_file=(".env.production"),
+        env_file=(".env.development"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -111,6 +115,22 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ValueError(f"S3 snapshot storage requires {', '.join(missing)}")
+
+    def validate_media_storage(self) -> None:
+        if self.media_storage_backend != "s3":
+            return
+        missing = [
+            name
+            for name, value in (
+                ("MEDIA_STORAGE_BUCKET", self.media_storage_bucket),
+                ("MEDIA_STORAGE_ENDPOINT_URL", self.media_storage_endpoint_url),
+                ("MEDIA_STORAGE_ACCESS_KEY_ID", self.media_storage_access_key_id),
+                ("MEDIA_STORAGE_SECRET_ACCESS_KEY", self.media_storage_secret_access_key),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"S3 media storage requires {', '.join(missing)}")
 
     @model_validator(mode="after")
     def validate_remote_vision(self):

@@ -91,6 +91,23 @@ def test_repeated_occurrence_create_is_idempotent(client):
     assert repeated.json()["occurrence_ids"] == [occurrence_id]
 
 
+def test_fixed_camera_event_rejects_occurrence_from_unknown_session(client):
+    response = client.post(
+        "/api/v1/events",
+        json={
+            "zone_id": "press",
+            "camera_id": "cam_1",
+            "event_type": "person_safety_violation",
+            "status": "acknowledged",
+            "monitoring_session_id": str(uuid4()),
+            "track_id": 7,
+            "occurrence_ids": [str(uuid4())],
+        },
+    )
+
+    assert response.status_code == 409
+
+
 def test_occurrence_cannot_be_reused_for_a_conflicting_event(client):
     occurrence_id = str(uuid4())
     session_id = str(uuid4())

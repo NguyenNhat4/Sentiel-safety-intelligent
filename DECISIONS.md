@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-22
+Updated: 2026-08-23
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -8,7 +8,7 @@ This file contains only decisions that currently constrain implementation. Super
 
 ### [Cross-cutting] Modular monolith with explicit production owners
 
-- `backend`, `frontend`, and `vision` are the production owners. Streamer owns media transport only.
+- `backend`, `frontend`, and `vision` are the only production owners.
 - Backend uses the approved layered layout: `api`, `core`, `integrations`, `models`, `schemas`, and `services`.
 - Vision emits observations through its public facade; backend owns deterministic safety rules, authorization, event lifecycle, and persistence. Frontend does not decide violations.
 - Cross-owner calls use public facades, adapters, or versioned contracts. New top-level boundaries require an explicit architecture decision.
@@ -22,33 +22,50 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
-### 2026-08-21: [Cross-cutting] RTSP-first private media plane
+### 2026-08-23: [Cross-cutting] Camera disconnect và rule contract
 
-- FFmpeg publishes one H.264 RTSP path per simulated camera to exact-version-pinned MediaMTX. Backend/Vision reads RTSP; browsers use HLS.
-- MediaMTX remains private and separate from the streamer service. FastAPI is the control plane and does not proxy media bytes.
-- Public HLS passes through the streamer gateway. Streamer administration uses separate Basic Auth credentials; browser playback uses short-lived HMAC Bearer tokens available only to `system_admin` and `safety_manager`.
-- Valid-role HLS tokens may authorize all valid camera IDs with `cameras: ["*"]`; streamer still validates signature, expiry, role, authentication, and camera ID.
-- MJPEG remains the explicit rollback transport. WebRTC/WHEP and removal of MJPEG require separate measured decisions.
-- No production capacity claim is allowed without a real 200-viewer x four-camera soak report.
+- Camera configuration cho phép `asset_id=null`; UI có nút “Ngắt kết nối nguồn media” ngoài dropdown và vẫn lưu được trạng thái null.
+- Zone intrusion là violation bất kể `machine_state`; thiếu PPE chỉ được xét khi người nằm trong zone có requirement và máy đang `running`.
+- `docs/architecture/alert-rule-contract.md` là business contract bắt buộc đọc; không tự ý đổi rule nếu chưa có product approval, decision record và regression tests.
 
-### 2026-08-21: [Backend/Frontend] Persist camera mappings and per-camera zone rules
+### 2026-08-23: [Backend] One violation alert per person per video session
 
-- Persist up to four unique `stream_camera_id` to named `camera_id` mappings. Disconnect is idempotent.
-- Live Monitor remains the all-camera operational view. `system_admin` configures one mapped camera at a time on a separate page.
+- A person may remain active, clear, and violate again during one `monitoring_session_id`, but the session emits at most one new alert/review for that person.
+- The deduplication key for alert creation is `(monitoring_session_id, track_id)`; occurrence context remains available for rendering and event validation.
+- Ending a session clears this alert history, so the same person in a newly started video can produce a new alert.
+
+### 2026-08-23: [Backend] Explicit direct-file simulation runtime
+
+- Backend owns system-admin media uploads, assigns READY assets uniquely to fixed `cam_1` through `cam_4`, and reads validated image/video cache files directly with OpenCV for explicit run/replay sessions.
+- Saving camera configuration does not start inference. Sessions never auto-resume after process restart, and the new flow has no streamer, RTSP, HLS, or mapping-supervisor runtime dependency.
+- Reviewed events, existing zones/PPE records, and Alembic history remain authoritative; media assets referenced by a configuration or session cannot be deleted.
+
+### 2026-08-23: [Backend/Frontend] Railway Bucket direct media delivery
+
+- New production media uploads use a backend-authorized presigned POST directly from the browser to the Singapore Railway Bucket; credentials never enter frontend code.
+- Backend verifies object size/type and decodes the first frame before `READY`. PostgreSQL stores each asset's canonical backend/key; legacy volume rows remain readable until the one-time copy migration completes.
+- Playback uses a short-lived presigned GET so video byte ranges bypass the application service. `MEDIA_ASSET_DIR` remains a server-owned OpenCV read-through cache.
+- Run starts fresh inference for every valid configured camera. Replay starts only the selected camera and its new session ID resets playback, tracking and overlays.
+
+### 2026-08-23: [Backend/Frontend] Fixed camera configuration and per-zone rules
+
+- Persist exactly four logical slots `cam_1` through `cam_4`; each READY asset may be assigned to at most one slot.
+- Live Monitor remains the all-camera operational view. Camera configuration has no sidebar entry and opens only when `safety_manager` selects a Live Monitor slot.
 - Zones are revisioned, enabled, disjoint four-point polygons. Rules are persisted by `(camera_id, zone_id)`.
 - `hat_required` and `vest_required` apply to a person whose foot point is inside the zone and only while camera-wide machine state is `running`.
 - `zone_intrusion_enabled` is per zone, defaults to `true` for compatibility, ignores machine state, and opens after four consecutive sampled frames in that zone.
 - `restricted_area_detection_enabled` is a per-zone configuration switch, defaults OFF, treats any canonical person in the camera as an immediate critical occurrence, and ignores polygon and machine state.
-- HLS is display-only. Backend reads mapped RTSP and publishes camera-correlated source-coordinate metadata for overlays.
+- Backend reads the assigned server-owned cached asset directly and publishes session-correlated source-coordinate metadata for overlays.
 
 ## Detection, Tracking, And Privacy
 
 ### 2026-08-21: [Vision/Backend] Optional remote Safety Vision worker
 
-- `FrameInferenceService` selects the in-process facade by default or the versioned `safety_vision_v1` HTTP provider when `VISION_PROVIDER=remote`; browser and server-side RTSP inference contracts remain unchanged.
+- `FrameInferenceService` selects the in-process facade by default or the versioned `safety_vision_v1` HTTP provider when `VISION_PROVIDER=remote`; direct-file sessions use the same rule pipeline.
 - The worker owns YOLO11m Safety and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
 - Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
 - The first deployment uses one worker. Multiple workers require affinity or an explicit decision to relocate tracker state.
+- Independent camera sessions may infer concurrently with one isolated YOLO/ByteTrack instance per session; calls for the same session remain serialized. Terminal sessions release model state while lightweight occurrence context remains available through its TTL for queued human review.
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 
@@ -65,6 +82,7 @@ This file contains only decisions that currently constrain implementation. Super
 - Zone intrusion opens after four consecutive sampled frames. Restricted-area detection remains immediate.
 - Nearby track-ID handoff may transfer active occurrence state during the lost-track grace window. Distant, different-rule, expired, or cross-session tracks remain independent.
 - Submitted `acknowledged` and `false_alarm` outcomes are human-authoritative and cannot be rewritten by later AI observations.
+- Restricted-area switches apply to every canonical person in the camera, regardless of polygon membership. An active PPE occurrence closes when its zone/machine requirement is no longer applicable; an unknown PPE observation inside an applicable rule still does not retract it.
 
 ### 2026-08-16: [Vision/Backend] Fail-closed evidence privacy
 
@@ -114,7 +132,8 @@ This file contains only decisions that currently constrain implementation. Super
 ## Superseded Summary
 
 - SQLite default, dual-database support, and PostgreSQL-with-SQLite-fallback are superseded by PostgreSQL-only.
-- Browser-local upload, one active camera, browser-driven production inference, and standalone MJPEG-only playback are superseded by persisted multi-camera RTSP inference with authenticated HLS.
+- Browser-local upload, one active camera and browser-driven production inference are superseded by backend-owned media assets and explicit fixed-camera sessions.
+- Streamer, MediaMTX, HLS/RTSP simulation, stream mappings, Connect/Disconnect, and automatic mapping reconciliation are superseded by backend-owned direct-file media sessions.
 - HSV/SH17 and YOLO11n runtime paths, helmet/glasses/gloves contracts, and three-PPE rules are superseded by the single YOLO11m `hat_vest_v1` contract.
 - Build-free JavaScript and Vanilla frontend baselines are superseded by React 19, TypeScript, and Vite.
 - Capability-owned backend submodules and separate prose contract trees are superseded by the approved layered backend and executable contract definitions.

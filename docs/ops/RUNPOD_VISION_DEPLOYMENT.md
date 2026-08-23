@@ -7,7 +7,7 @@ Lát cắt này tách phần YOLO11m Safety và ByteTrack ra thành một FastAP
 Luồng production hiện tại:
 
 ```text
-Streamer xuất RTSP qua MediaMTX
+Backend đọc image/video từ media volume
   -> Railway backend lấy frame ở nhịp giới hạn và gọi FrameInferenceService
     -> RemoteVisionAdapter mã hóa JPEG
     -> POST /v1/infer tới vision worker
@@ -15,10 +15,10 @@ Streamer xuất RTSP qua MediaMTX
       <- bbox person/hat/vest + track_id
     <- contract safety_vision_v1
   -> Railway áp rule, deduplicate và publish metadata camera
-  -> Browser phát HLS và nhận overlay qua WebSocket hiện hữu
+  -> Browser phát asset được xác thực và nhận overlay qua WebSocket hiện hữu
 ```
 
-REST/WebSocket gửi JPEG từ browser vẫn được giữ để tương thích và dùng cùng `FrameInferenceService`. Vision worker không đọc RTSP/HLS trực tiếp; backend tiếp tục sở hữu camera mapping, sampling, rule, review và persistence. Lần tách này chỉ thay nơi thực thi model nên contract browser và metadata camera không đổi.
+Vision worker không đọc media trực tiếp; backend tiếp tục sở hữu asset, camera configuration, sampling, session, rule, review và persistence. Lần tách này chỉ thay nơi thực thi model.
 
 ## Contract của worker
 
@@ -113,12 +113,12 @@ RunPod Load Balancer nhận custom FastAPI image và forward trực tiếp HTTP,
 4. Đặt `VISION_REMOTE_URL` trên Railway thành URL Load Balancer endpoint và `VISION_REMOTE_API_KEY` thành RunPod API key. Không đặt `VISION_WORKER_API_KEY` trong container nếu RunPod đã kiểm soát `Authorization` ở gateway.
 5. Kiểm tra `/ping`, sau đó gửi một JPEG nhỏ qua `/v1/infer` trước khi bật `VISION_PROVIDER=remote` trên backend.
 
-RunPod Serverless hiện vẫn yêu cầu chọn GPU cho endpoint worker. Image CPU này chạy được để kiểm tra contract nhưng không tận dụng GPU và không phải cấu hình kinh tế/latency cuối cùng. Bước sau mới thay base image/PyTorch bằng CUDA, benchmark vùng gần Railway/streamer, cấu hình worker affinity và đặt active worker theo SLA.
+RunPod Serverless hiện vẫn yêu cầu chọn GPU cho endpoint worker. Image CPU này chạy được để kiểm tra contract nhưng không tận dụng GPU và không phải cấu hình kinh tế/latency cuối cùng. Bước sau mới thay base image/PyTorch bằng CUDA, benchmark vùng gần Railway, cấu hình worker affinity và đặt active worker theo SLA.
 
 ## Điều kiện xác nhận deploy thành công
 
 - `/ping` trả `healthy`, `safety_vision_v1` và đúng model version.
 - Backend khởi động thành công ở `VISION_PROVIDER=remote`; nếu worker không sẵn sàng thì backend fail-closed thay vì âm thầm dùng local model.
-- Một frame từ REST/WebSocket hoặc vòng RTSP server-side giữ nguyên response/metadata hiện tại và có bbox/track ID hợp lệ.
+- Một frame từ direct-file camera session giữ nguyên observation contract và có bbox/track ID hợp lệ.
 - Worker không có credential PostgreSQL, S3, Telegram hoặc OpenAI.
 - Log không chứa JPEG, bearer token hoặc response body chi tiết từ provider.

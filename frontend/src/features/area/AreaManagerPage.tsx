@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from "react";
+import {memo, useCallback, useEffect, useState} from "react";
 import {loadAreaEvents, updateAreaEvent} from "../../api/events";
 import {assetUrl} from "../../api/config";
 import {loadStatisticsSummary} from "../../api/statistics";
@@ -6,18 +6,27 @@ import type {SafetyEvent, StatisticsSummary} from "../../types";
 import {EventDetailDialog} from "../events/EventDetailDialog";
 import "./area-manager.css";
 
-export function AreaManagerPage() {
-  const [summary, setSummary] = useState<StatisticsSummary>();
-  const [events, setEvents] = useState<SafetyEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<SafetyEvent>();
+interface AreaManagerPageProps {
+  active?: boolean;
+}
+
+let areaCache: { summary: StatisticsSummary; events: SafetyEvent[] } | null = null;
+
+export const AreaManagerPage = memo(function AreaManagerPage({active = true}: AreaManagerPageProps) {
+  const [summary, setSummary] = useState<StatisticsSummary | undefined>(() => areaCache?.summary);
+  const [events, setEvents] = useState<SafetyEvent[]>(() => areaCache?.events ?? []);
+  const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | undefined>(() => areaCache?.events[0]);
   const [updatingEventId, setUpdatingEventId] = useState<number>();
-  const [status, setStatus] = useState("Đang tải dữ liệu khu vực...");
+  const [status, setStatus] = useState(() => areaCache ? "" : "Đang tải dữ liệu khu vực...");
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setStatus("Đang tải dữ liệu khu vực...");
+    if (!areaCache) {
+      setStatus("Đang tải dữ liệu khu vực...");
+    }
     try {
       const [nextSummary, nextEvents] = await Promise.all([loadStatisticsSummary(), loadAreaEvents()]);
+      areaCache = { summary: nextSummary, events: nextEvents };
       setSummary(nextSummary);
       setEvents(nextEvents);
       setSelectedEvent(current => nextEvents.find(event => event.id === current?.id) ?? nextEvents[0]);
@@ -27,7 +36,9 @@ export function AreaManagerPage() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (active) void load();
+  }, [active, load]);
 
   async function setEventOutcome(event: SafetyEvent, outcome: "resolved" | "false_alarm") {
     setUpdatingEventId(event.id);
@@ -43,7 +54,7 @@ export function AreaManagerPage() {
     }
   }
 
-  return <section className="page active area-page">
+  return <section className={`page area-page ${active ? "active" : ""}`}>
     <div className="area-heading">
       <div><p className="eyebrow">AREA MANAGEMENT</p><h2>Dashboard khu vực</h2><p>Theo dõi mức tuân thủ và log an toàn của khu vực phụ trách.</p></div>
       <button className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
@@ -63,7 +74,7 @@ export function AreaManagerPage() {
     </>}
     <EventDetailDialog eventId={selectedEventId} onClose={() => setSelectedEventId(null)} />
   </section>;
-}
+});
 
 function EventDetail({event, saving, onOutcome}: {event: SafetyEvent; saving: boolean; onOutcome: (event: SafetyEvent, outcome: "resolved" | "false_alarm") => void}) {
   const canUpdate = event.status === "acknowledged" || event.status === "unacknowledged";

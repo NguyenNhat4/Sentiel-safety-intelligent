@@ -23,11 +23,13 @@ def test_validate_runtime_files_accepts_approved_models(tmp_path, monkeypatch):
             face_detector_model_path=str(yunet),
             operational_metrics_log_path="data/operational-metrics.jsonl",
             snapshot_dir="runtime/snapshots",
+            media_asset_dir="runtime/media-assets",
         )
     )
 
-    assert result == {"data_writable": True, "models_verified": True}
+    assert result == {"data_writable": True, "media_assets_writable": True, "models_verified": True}
     assert (tmp_path / "runtime" / "snapshots").is_dir()
+    assert (tmp_path / "runtime" / "media-assets").is_dir()
 
 
 def test_validate_runtime_files_rejects_missing_model(tmp_path, monkeypatch):
@@ -97,4 +99,4 @@ def test_remote_vision_does_not_require_local_ppe_checkpoint(tmp_path, monkeypat
         )
     )
 
-    assert result == {"data_writable": True, "models_verified": True}
+    assert result == {"data_writable": True, "media_assets_writable": True, "models_verified": True}

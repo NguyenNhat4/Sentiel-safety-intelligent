@@ -15,7 +15,7 @@ describe("multi-zone editor domain", () => {
   it("creates another stopped draft without a zone-count constant", () => {
     const zones = Array.from({length: 20}, (_, index) => zone(`zone_${index + 1}`, index / 25, index / 25 + 0.02, index));
     expect(createZoneDraft(zones)).toMatchObject({
-      zone_id: "zone_21", display_name: "Vùng 21", points: [], machine_state: "stopped", order: 20,
+      zone_id: "zone_21", display_name: "Vùng 21", points: [], order: 20,
     });
   });
 

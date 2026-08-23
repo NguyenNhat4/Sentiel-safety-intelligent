@@ -1,92 +1,45 @@
-# Quy Trình Triển Khai Hệ Thống (Deployment Flow & Team Runbook)
+# Deployment Flow
 
-Tài liệu này chi tiết hóa luồng triển khai hệ thống **P-047** lên hạ tầng **Railway**, phục vụ việc phối hợp giữa các thành viên trong team khi thực hiện deploy thủ công qua script `scripts/deploy_all_production.sh`.
+## Production Topology
 
----
+```mermaid
+flowchart LR
+    Browser -->|HTTPS| App[p047-app]
+    MediaVolume[(Railway Persistent Volume)] --> App
+    App --> Postgres[(PostgreSQL)]
+    App -. optional .-> Vision[Safety Vision Worker]
+    App -. reviewed snapshots .-> S3[(S3-compatible Storage)]
+```
 
-## 1. Luồng Chạy Script Deployment (`scripts/deploy_all_production.sh`)
+Production no longer deploys Streamer or MediaMTX. Mount the application volume at
+`/app/data/media-assets` and set `MEDIA_ASSET_DIR` to the same path.
 
-Sơ đồ bên dưới mô tả thứ tự thực hiện các bước khi chạy script deploy từ máy cá nhân:
+## Release
 
 ```mermaid
 flowchart TD
-    Start(["🚀 Bắt đầu: ./scripts/deploy_all_production.sh"]) --> CheckTools{"1. Kiểm tra CLI Tools<br/>(docker, railway, jq, curl)"}
-
-    CheckTools -- Thiếu tool --> FailTool["❌ Thông báo lỗi & Dừng execution"]
-    CheckTools -- Đủ tool --> ReleaseChecks["2. Chạy Release Checks (Local Gates)"]
-
-    subgraph ReleaseChecksGroup ["Chi tiết Release Checks"]
-        direction TB
-        PyTest["Backend HLS Test<br/>pytest backend/tests/test_hls_access.py"]
-        StreamerTest["Streamer Test<br/>make streamer-test"]
-        FrontLint["Frontend Lint & Vitest<br/>npm run lint && npm test HlsVideo"]
-        FrontBuild["Frontend Production Build<br/>npm run build"]
-        PyTest --> StreamerTest --> FrontLint --> FrontBuild
-    end
-
-    ReleaseChecks --> ReleaseChecksGroup
-    ReleaseChecksGroup -- Test/Build Lỗi --> FailCheck["❌ Dừng Deploy (Code chưa sẵn sàng)"]
-    ReleaseChecksGroup -- Passed All --> FetchPrevID["3. Lấy Deployment ID hiện tại trên Railway<br/>(railway deployment list --json)"]
-
-    FetchPrevID --> BuildPushApp["4. Build & Push App Image<br/>Docker build & push nguyennhat4/p047:latest"]
-    BuildPushApp --> BuildPushStreamer["5. Build & Push Streamer Image<br/>Docker build & push nguyennhat4/streamer:dev1"]
-
-    BuildPushStreamer --> RailwayRedeploy["6. Kích hoạt Railway Redeploy<br/>railway redeploy --from-source"]
-
-    subgraph RailwayPoll ["7. Polling trạng thái Railway (Mỗi 10s)"]
-        direction TB
-        PollStatus{"Trạng thái Deployment?"}
-        PollStatus -- SUCCESS --> AppOk["App & Streamer Ready"]
-        PollStatus -- FAILED / TIMEOUT --> AppFail["❌ Railway Deploy Failed"]
-        PollStatus -- IN_PROGRESS --> Wait["Sleep 10s & Poll lại"]
-        Wait --> PollStatus
-    end
-
-    RailwayRedeploy --> RailwayPoll
-    AppFail --> FailDeploy["❌ Triển khai thất bại"]
-    AppOk --> HealthCheck["8. Kiểm tra Health Endpoints (curl)"]
-
-    subgraph HealthCheckGroup ["Kiểm tra Healthcheck HTTPS"]
-        curlApp["curl https://p047-production.up.railway.app/health"]
-        curlStreamer["curl https://streamer-production-3002.up.railway.app/health"]
-    end
-
-    HealthCheck --> HealthCheckGroup
-    HealthCheckGroup -- Both 200 OK --> Success(["✅ Deploy thành công hoàn tất!"])
-    HealthCheckGroup -- HTTP Error / Timeout --> FailHealth["❌ Endpoint Unreachable"]
+    Check[make check] --> Build[Build p047-app image]
+    Build --> Push[Push immutable app image]
+    Push --> Redeploy[Redeploy p047-app]
+    Redeploy --> Poll[Poll Railway deployment]
+    Poll -->|SUCCESS| Health[Verify public /health]
+    Poll -->|FAILED or CRASHED| Logs[Inspect build and deploy logs]
 ```
 
----
+`scripts/deploy_all_production.sh` runs focused US-29/frontend gates, publishes
+the application image, redeploys `p047-app`, waits for terminal `SUCCESS`, then
+checks the public health endpoint. A queued deployment is not release success.
 
-## 2. Phân Định Dịch Vụ Trên Railway (Service Matrix)
+## Required Runtime Configuration
 
-| Dịch vụ | Service Name trên Railway | Dockerfile | Nhiệm vụ chính | Healthcheck Endpoint |
-|---|---|---|---|---|
-| **App Main** | `p047-app` | `/Dockerfile` | FastAPI Backend, React Frontend, YOLO Vision Inferences, PostgreSQL Auth/Events | `https://p047-production.up.railway.app/health` |
-| **Streamer** | `streamer` | `/streamer/Dockerfile` | HLS / RTSP Gateway proxy, MediaMTX streaming plane | `https://streamer-production-3002.up.railway.app/health` |
+| Variable/resource | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection |
+| Railway volume at `/app/data/media-assets` | Durable uploaded media |
+| `MEDIA_ASSET_DIR=/app/data/media-assets` | Backend asset directory |
+| `MAX_MEDIA_ASSET_BYTES` | Per-upload size ceiling |
+| `MEDIA_INFERENCE_MAX_FPS` | Bounded direct-file sampling rate |
+| `SNAPSHOT_STORAGE_*` | Production redacted evidence storage |
 
----
-
-## 3. Yêu Cầu Chuẩn Bị Cho Team (Onboarding Checklist)
-
-Để một thành viên mới trong team có thể chạy được script deployment, Admin cần cung cấp và thành viên cần chuẩn bị các thông tin sau:
-
-1. **Công cụ hệ thống (CLI)**: Cài đặt `docker`, `railway`, `jq`, `curl`, `make`, `npm`.
-2. **Quyền tài khoản**:
-   - Invite vào **Railway Workspace/Project** (`3aeb66d7-0d02-4a6d-a9e8-57cac403b049`).
-   - Phân quyền Push vào Docker Hub repositories (`nguyennhat4/p047` và `nguyennhat4/streamer`).
-3. **Đăng nhập CLI ở máy cá nhân**:
-   ```bash
-   docker login
-   railway login
-   ```
-4. **Tạo file `.env.production` ở gốc dự án**:
-   ```env
-   VITE_STREAMER_URL=https://streamer-production-3002.up.railway.app
-   VITE_MEDIA_PUBLIC_ORIGIN=https://p047-production.up.railway.app
-   VITE_STREAM_TRANSPORT=hls
-   ```
-5. **Cấu hình môi trường local**:
-   ```bash
-   make setup
-   ```
+Rollback uses a known-good app image/deployment. Database migrations are not
+rewritten or removed during rollback; uploaded media remains on the volume.

@@ -1,4 +1,4 @@
-import type {ModelDetection, PersonDetection, ReviewStatus} from "../../types";
+import type {ModelDetection, MonitoringZone, PersonDetection, ReviewStatus} from "../../types";
 import {SnapshotOverlay} from "./SnapshotOverlay";
 
 interface ReviewModalProps {
@@ -7,11 +7,13 @@ interface ReviewModalProps {
   snapshot?: string;
   people?: PersonDetection[];
   detections?: ModelDetection[];
+  zones?: MonitoringZone[];
   timer: string;
   reviewSaving: boolean;
   alertTitle: string;
   alertSummary: string;
   onReview: (status: ReviewStatus) => void;
+  closeable?: boolean;
 }
 
 export function ReviewModal({
@@ -20,11 +22,13 @@ export function ReviewModal({
   snapshot,
   people,
   detections,
+  zones,
   timer,
   reviewSaving,
   alertTitle,
   alertSummary,
   onReview,
+  closeable = true,
 }: ReviewModalProps) {
   if (!isOpen) return null;
   const affectedZones = [...new Set(
@@ -34,7 +38,7 @@ export function ReviewModal({
   )];
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div className="modal-backdrop" onClick={closeable ? onClose : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-card" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
@@ -48,9 +52,7 @@ export function ReviewModal({
             <strong>{timer}</strong>
             <small>Chờ xác nhận</small>
           </div>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Đóng pop-up">
-            ×
-          </button>
+          {closeable && <button className="modal-close-btn" onClick={onClose} aria-label="Đóng pop-up">×</button>}
         </div>
 
         <div className="modal-body">
@@ -63,7 +65,7 @@ export function ReviewModal({
           )}
           {snapshot ? (
             <div className="modal-snapshot-container">
-              <SnapshotOverlay snapshot={snapshot} people={people} detections={detections} />
+              <SnapshotOverlay snapshot={snapshot} people={people} detections={detections} zones={zones?.filter(zone => affectedZones.includes(zone.zone_id))} />
             </div>
           ) : (
             <div className="modal-snapshot-placeholder">Không có hình ảnh xem trước</div>

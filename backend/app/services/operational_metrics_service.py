@@ -98,7 +98,7 @@ class OperationalMetricsService:
                         counts[key] += 1
                         if isinstance(event.get("duration_ms"), (int, float)):
                             groups[key].append(float(event["duration_ms"]))
-                    if event_type in {"inference_completed", "inference_failed"}:
+                    if event_type in {"inference_completed", "inference_dropped", "inference_failed"}:
                         inference_outcomes[str(event.get("outcome", event_type))] += 1
                     if event_type == "inference_completed":
                         route, duration_ms = event.get("route"), event.get("duration_ms")
