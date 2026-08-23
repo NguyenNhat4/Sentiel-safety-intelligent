@@ -15,7 +15,7 @@ def test_continuous_violation_emits_one_occurrence():
     UUID(first[4][0].occurrence_id)
 
 
-def test_one_person_suppresses_alert_within_cooldown():
+def test_same_rule_is_suppressed_within_cooldown_but_different_rule_alerts():
     service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=20.0, ppe_confirmation_frames=1)
 
     first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4]
@@ -26,11 +26,24 @@ def test_one_person_suppresses_alert_within_cooldown():
     assert same_category_rule[0].is_new is False
 
     ppe_first = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=6.0)[4]
-    service.evaluate("session-a", {4: set()}, {4}, now=7.0)
-    ppe_second = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=10.0)[4]
+    service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: {"hat"}}, now=7.0)
+    ppe_second = service.evaluate(
+        "session-a", {4: {"missing_ppe:vest"}}, {4}, ppe_present_items={4: {"hat"}}, now=10.0
+    )[4]
 
     assert ppe_first[0].is_new is True
-    assert ppe_second[0].is_new is False
+    assert ppe_second[0].is_new is True
+
+
+def test_same_ppe_rule_is_suppressed_within_cooldown():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=20.0, ppe_confirmation_frames=1)
+
+    first = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=0.0)[4][0]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    repeated = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=5.0)[4][0]
+
+    assert first.is_new is True
+    assert repeated.is_new is False
 
 
 def test_reviolation_after_cooldown_emits_new_alert():

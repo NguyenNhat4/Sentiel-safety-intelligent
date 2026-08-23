@@ -31,6 +31,7 @@ class ViolationTrackingService:
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
         cooldown_seconds: float = 20.0,
+        reentry_cooldown_seconds: float = 2.0,
         ppe_confirmation_frames: int = 6,
         ppe_revoke_confirmation_seconds: float = 2.0,
         session_ttl_seconds: float = 300.0,
@@ -49,6 +50,7 @@ class ViolationTrackingService:
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
         self._cooldown_seconds = cooldown_seconds
+        self._reentry_cooldown_seconds = reentry_cooldown_seconds
         self._ppe_confirmation_frames = ppe_confirmation_frames
         self._ppe_revoke_confirmation_seconds = ppe_revoke_confirmation_seconds
         self._session_ttl_seconds = session_ttl_seconds
@@ -254,7 +256,7 @@ class ViolationTrackingService:
         occurrence.active = False
         occurrence.absent_frames = 0
         occurrence.lost_frames = 0
-        occurrence.cooldown_until = now + 2.0
+        occurrence.cooldown_until = now + self._reentry_cooldown_seconds
 
     def _handoff_nearby_tracks(
         self,
@@ -303,28 +305,18 @@ class ViolationTrackingService:
             new_track_key = (session_id, new_track_id)
             if old_track_key in self._confirmed_ppe_items and new_track_key not in self._confirmed_ppe_items:
                 self._confirmed_ppe_items[new_track_key] = self._confirmed_ppe_items.pop(old_track_key)
-            old_category = self._debounce_category(rule_key)
-            old_alert_key = (session_id, old_key[1], old_category)
-            new_alert_key = (session_id, new_track_id, old_category)
+            old_alert_key = (session_id, old_key[1], rule_key)
+            new_alert_key = (session_id, new_track_id, rule_key)
             if old_alert_key in self._last_alert_time:
                 self._last_alert_time[new_alert_key] = self._last_alert_time.pop(old_alert_key)
 
     def _claim_alert(self, session_id: str, track_id: int, rule_key: str, now: float) -> bool:
-        category = self._debounce_category(rule_key)
-        key = (session_id, track_id, category)
+        key = (session_id, track_id, rule_key)
         last_time = self._last_alert_time.get(key)
         if last_time is None or now - last_time >= self._cooldown_seconds or last_time == now:
             self._last_alert_time[key] = now
             return True
         return False
-
-    @staticmethod
-    def _debounce_category(rule_key: str) -> str:
-        if rule_key.startswith("missing_ppe:"):
-            return "ppe"
-        if ":" in rule_key:
-            return rule_key.split(":", 1)[1]
-        return rule_key
 
     def _confirm_present_ppe(
         self,
