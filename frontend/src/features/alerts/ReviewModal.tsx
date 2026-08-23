@@ -12,6 +12,7 @@ interface ReviewModalProps {
   alertTitle: string;
   alertSummary: string;
   onReview: (status: ReviewStatus) => void;
+  closeable?: boolean;
 }
 
 export function ReviewModal({
@@ -25,6 +26,7 @@ export function ReviewModal({
   alertTitle,
   alertSummary,
   onReview,
+  closeable = true,
 }: ReviewModalProps) {
   if (!isOpen) return null;
   const affectedZones = [...new Set(
@@ -34,7 +36,7 @@ export function ReviewModal({
   )];
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div className="modal-backdrop" onClick={closeable ? onClose : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-card" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
@@ -48,9 +50,7 @@ export function ReviewModal({
             <strong>{timer}</strong>
             <small>Chờ xác nhận</small>
           </div>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Đóng pop-up">
-            ×
-          </button>
+          {closeable && <button className="modal-close-btn" onClick={onClose} aria-label="Đóng pop-up">×</button>}
         </div>
 
         <div className="modal-body">

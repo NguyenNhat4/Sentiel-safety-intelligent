@@ -1,18 +1,21 @@
 import threading
 import time
+from pathlib import Path
 from uuid import uuid4
 
 import cv2
 import numpy as np
 
 import backend.app.api.v1.camera_sessions as camera_sessions_api
+import backend.app.services.camera_session_runtime as camera_session_runtime_module
 import backend.app.services.media_asset_service as media_asset_service_module
 from backend.app.integrations.media_storage import PresignedUpload, StoredObjectMetadata
 from backend.app.models.user import UserRole
-from backend.app.schemas.analysis import FrameInferenceRequest
+from backend.app.schemas.analysis import FrameInferenceRequest, FrameInferenceResponse
+from backend.app.schemas.camera_configuration import CameraConfigurationResponse
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.auth_service import AuthService
-from backend.app.services.camera_session_runtime import CameraSessionRuntime
+from backend.app.services.camera_session_runtime import CameraSessionRuntime, SessionContext
 from backend.app.services.frame_inference_service import FrameInferenceService
 from backend.app.services.media_asset_service import media_asset_settings
 
@@ -222,11 +225,17 @@ def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session,
     )
 
 
-def test_image_runtime_infers_once_and_publishes_running_then_completed(tmp_path):
+def test_image_runtime_infers_once_and_releases_vision_state(tmp_path, monkeypatch):
     image_path = tmp_path / "still.png"
     image_path.write_bytes(_png_bytes())
     published = []
     inferred = []
+    released = []
+    monkeypatch.setattr(
+        camera_session_runtime_module.frame_inference_service,
+        "release_vision_session",
+        released.append,
+    )
 
     runtime = CameraSessionRuntime(
         session_factory=None,
@@ -250,6 +259,7 @@ def test_image_runtime_infers_once_and_publishes_running_then_completed(tmp_path
     runtime.stop_all()
 
     assert inferred == [(1, 0.0, True)]
+    assert released == ["00000000-0000-0000-0000-000000000001"]
     assert [item["session_status"] for item in published] == ["STARTING", "RUNNING", "COMPLETED"]
     assert all(item["session_id"] == "00000000-0000-0000-0000-000000000001" for item in published)
 
@@ -310,6 +320,48 @@ def test_image_inference_bypasses_ppe_and_intrusion_confirmation():
     }
 
 
+def test_camera_runtime_encodes_snapshot_only_when_review_is_required(monkeypatch):
+    response = FrameInferenceResponse(
+        result="violate",
+        review_required=True,
+        has_active_violation=True,
+        people=[],
+        rule={},
+    )
+    monkeypatch.setattr(
+        camera_session_runtime_module.frame_inference_service,
+        "infer_decoded_frame",
+        lambda *args, **kwargs: response,
+    )
+    configuration = CameraConfigurationResponse(
+        camera_id="cam_1",
+        revision=1,
+        asset_id=uuid4(),
+        machine_state="running",
+        zones=[],
+        updated_at=None,
+    )
+    context = SessionContext(
+        camera_id="cam_1",
+        session_id=str(uuid4()),
+        asset_id=str(configuration.asset_id),
+        media_type="image",
+        path=Path("."),
+        config_revision=1,
+        configuration=configuration,
+    )
+
+    payload = CameraSessionRuntime(session_factory=None)._infer_frame(
+        context,
+        np.zeros((24, 32, 3), dtype=np.uint8),
+        1,
+        0.0,
+        True,
+    )
+
+    assert payload["snapshot_data"].startswith("data:image/jpeg;base64,")
+
+
 def test_replacement_suppresses_old_session_inference_output(tmp_path):
     image_path = tmp_path / "still.png"
     image_path.write_bytes(_png_bytes())
@@ -349,3 +401,29 @@ def test_replacement_suppresses_old_session_inference_output(tmp_path):
 
     inference_sessions = [item["session_id"] for item in published if item["type"] == "camera_inference_result"]
     assert inference_sessions == ["00000000-0000-0000-0000-000000000002"]
+
+
+def test_different_cameras_process_inference_concurrently(tmp_path):
+    image_path = tmp_path / "still.png"
+    image_path.write_bytes(_png_bytes())
+    both_running = threading.Barrier(2)
+    completed = threading.Event()
+
+    def process(context, frame, frame_id, video_time, bypass):
+        both_running.wait(timeout=1)
+        completed.set()
+        return {"type": "camera_inference_result", "result": "normal"}
+
+    runtime = CameraSessionRuntime(session_factory=None, process_frame=process, publish=lambda payload: None)
+    for index, camera_id in enumerate(("cam_1", "cam_2"), start=1):
+        runtime.start_in_memory(
+            camera_id=camera_id,
+            session_id=f"00000000-0000-0000-0000-00000000000{index}",
+            asset_id="00000000-0000-0000-0000-000000000003",
+            media_type="image",
+            path=image_path,
+            config_revision=1,
+        )
+
+    assert completed.wait(2)
+    runtime.stop_all()

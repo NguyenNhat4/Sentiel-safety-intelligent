@@ -1011,11 +1011,13 @@ export function buildEventPayload(
   )];
   const violationKeys = [...new Set(violations.map(item => item.rule_key))];
   const zoneId = violations.find(item => item.zone_id)?.zone_id ?? pending.rule.zone_id;
-  const critical = violationKeys.some(key => key.startsWith("zone_intrusion") || key === "restricted_area_person");
+  const critical = violationKeys.some(
+    key => key.startsWith("zone_intrusion") || key.startsWith("restricted_area_person"),
+  );
   const triggeredRuleKeys = violationKeys.length ? violationKeys : newRuleKeys(pending);
   return {
     zone_id: zoneId,
-    camera_id: "uploaded_video",
+    camera_id: pending.rule.camera_id,
     event_type: "person_safety_violation",
     severity: critical ? "critical" : "high",
     status,

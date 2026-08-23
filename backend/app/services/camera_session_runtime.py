@@ -1,3 +1,4 @@
+import base64
 import math
 import threading
 import time
@@ -72,9 +73,9 @@ class CameraSessionRuntime:
         self._max_fps = max_fps or settings.media_inference_max_fps
         self._workers: dict[str, _Worker] = {}
         self._current_sessions: dict[str, str] = {}
+        self._status_persisted_at: dict[str, float] = {}
         self._lock = threading.RLock()
         self._start_lock = threading.Lock()
-        self._model_lock = threading.Lock()
 
     def start(self, db: Session, camera_id: str) -> CameraSessionResponse:
         configuration = CameraConfigurationService(db).get(camera_id)
@@ -180,7 +181,7 @@ class CameraSessionRuntime:
         if old is not None:
             old.stop.set()
             old.thread.join(timeout=2.0)
-            frame_inference_service.end_session(old.context.session_id)
+            frame_inference_service.release_vision_session(old.context.session_id)
         self._publish_lifecycle(context, "STARTING", 0.0)
         thread.start()
 
@@ -197,6 +198,14 @@ class CameraSessionRuntime:
             self._run_video(context, stop)
         except Exception:
             self._fail(context, "INFERENCE_FAILED")
+        finally:
+            # Keep lightweight occurrence context through its TTL so a queued
+            # human review can still validate after video EOF.
+            frame_inference_service.release_vision_session(context.session_id)
+            with self._lock:
+                worker = self._workers.get(context.camera_id)
+                if worker is not None and worker.context.session_id == context.session_id:
+                    self._workers.pop(context.camera_id, None)
 
     def _run_video(self, context: SessionContext, stop: threading.Event) -> None:
         capture = cv2.VideoCapture(str(context.path))
@@ -230,6 +239,13 @@ class CameraSessionRuntime:
                     continue
                 while next_sample <= video_time + 1e-9:
                     next_sample += 1.0 / self._max_fps
+                if time.monotonic() - (started + video_time) > 1.0 / self._max_fps:
+                    record_operational_event(
+                        "inference_dropped",
+                        route="/camera-inference",
+                        outcome="stale_frame",
+                    )
+                    continue
                 if stop.wait(max(0.0, started + video_time - time.monotonic())):
                     return
                 frame_id += 1
@@ -247,8 +263,9 @@ class CameraSessionRuntime:
         completions: deque[float],
         started: float,
     ) -> None:
-        with self._model_lock:
-            result = self._process_frame(context, frame, frame_id, video_time, bypass_confirmation)
+        inference_started = time.perf_counter()
+        result = self._process_frame(context, frame, frame_id, video_time, bypass_confirmation)
+        duration_ms = round((time.perf_counter() - inference_started) * 1000, 3)
         completed = time.monotonic()
         completions.append(completed)
         while completions and completed - completions[0] > 5.0:
@@ -276,6 +293,7 @@ class CameraSessionRuntime:
             "inference_completed",
             route="/camera-inference",
             outcome=result.get("result", "completed"),
+            duration_ms=duration_ms,
         )
 
     def _infer_frame(
@@ -338,7 +356,13 @@ class CameraSessionRuntime:
             bypass_confirmation=bypass_confirmation,
         )
         payload = response.model_dump(mode="json")
-        payload.pop("snapshot_data", None)
+        if response.review_required:
+            encoded, buffer = cv2.imencode(".jpg", frame)
+            if not encoded:
+                raise RuntimeError("Could not encode review snapshot")
+            payload["snapshot_data"] = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('ascii')}"
+        else:
+            payload.pop("snapshot_data", None)
         return {"type": "camera_inference_result", **payload}
 
     def _complete(self, context: SessionContext, *, video_time: float) -> None:
@@ -368,6 +392,10 @@ class CameraSessionRuntime:
         with self._lock:
             if self._current_sessions.get(context.camera_id) != context.session_id or self._session_factory is None:
                 return
+            monotonic_now = time.monotonic()
+            last_persisted = self._status_persisted_at.get(context.session_id)
+            if status == "RUNNING" and last_persisted is not None and monotonic_now - last_persisted < 5.0:
+                return
             with self._session_factory() as db:
                 session = db.get(CameraSession, context.session_id)
                 if session is None:
@@ -382,6 +410,10 @@ class CameraSessionRuntime:
                     session.completed_at = now
                 session.error_code = error_code
                 db.commit()
+                if status == "RUNNING":
+                    self._status_persisted_at[context.session_id] = monotonic_now
+                else:
+                    self._status_persisted_at.pop(context.session_id, None)
 
     def _stop_if_active(self, context: SessionContext) -> None:
         if self._session_factory is None:

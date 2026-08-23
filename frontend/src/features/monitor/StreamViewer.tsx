@@ -2,11 +2,14 @@ import {useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {listCameraConfigurations} from "../../api/camera-configurations";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
+import {saveReviewedEvent} from "../../api/events";
 import {listMediaAssets} from "../../api/media-assets";
 import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
-import type {CameraConfiguration, CameraInferenceResult, CameraSession, MediaAsset, UserRole} from "../../types";
+import type {CameraConfiguration, CameraInferenceResult, CameraSession, InferenceResult, MediaAsset, ReviewStatus, UserRole} from "../../types";
+import {ReviewModal} from "../alerts/ReviewModal";
 import {AuthenticatedMedia} from "../media/AuthenticatedMedia";
 import {DetectionOverlay} from "./DetectionOverlay";
+import {buildEventPayload} from "./use-monitor";
 import "./stream.css";
 
 export const CAMERA_IDS = ["cam_1", "cam_2", "cam_3", "cam_4"] as const;
@@ -22,9 +25,15 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   const [running, setRunning] = useState(false);
   const [replaying, setReplaying] = useState("");
   const [error, setError] = useState("");
+  const [pendingReview, setPendingReview] = useState<CameraInferenceResult | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const runningRef = useRef(false);
   const replayingRef = useRef(false);
   const sessionsRef = useRef(sessions);
+  const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
+  const reviewQueueRef = useRef<CameraInferenceResult[]>([]);
+  const seenReviewOccurrencesRef = useRef(new Set<string>());
   sessionsRef.current = sessions;
 
   useEffect(() => {
@@ -52,6 +61,20 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
     if (!accessToken) return;
     let disposed = false;
     let retryTimer: number | undefined;
+    const enqueueReview = (result: CameraInferenceResult) => {
+      const occurrenceIds = result.people.flatMap(person => person.active_violations
+        ?.filter(violation => violation.is_new)
+        .map(violation => violation.occurrence_id) ?? []);
+      if (!occurrenceIds.length || occurrenceIds.every(id => seenReviewOccurrencesRef.current.has(id))) return;
+      occurrenceIds.forEach(id => seenReviewOccurrencesRef.current.add(id));
+      if (pendingReviewRef.current) {
+        reviewQueueRef.current.push(result);
+        return;
+      }
+      pendingReviewRef.current = result;
+      setPendingReview(result);
+      setReviewStartedAt(Date.now());
+    };
     const client = new CameraDetectionClient({
       accessToken,
       cameraIds: [...CAMERA_IDS],
@@ -65,6 +88,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
         } else {
           setDetections(values => ({...values, [result.camera_id]: result}));
         }
+        if (result.review_required) enqueueReview(result);
         setSessions(values => ({...values, [result.camera_id]: updated}));
       },
       onSessionStatus: status => {
@@ -125,6 +149,57 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
     finally { replayingRef.current = false; setReplaying(""); }
   }
 
+  function showReview(result: CameraInferenceResult | null) {
+    pendingReviewRef.current = result;
+    setPendingReview(result);
+    setReviewStartedAt(result ? Date.now() : null);
+  }
+
+  async function review(status: ReviewStatus) {
+    const pending = pendingReviewRef.current;
+    if (!pending) return;
+    const configuration = configurations[pending.camera_id];
+    setReviewSaving(true);
+    setError("");
+    try {
+      const payloads = pending.people.flatMap(person => {
+        const newViolations = person.active_violations?.filter(violation => violation.is_new) ?? [];
+        if (!newViolations.length) return [];
+        const zoneId = newViolations.find(violation => violation.zone_id)?.zone_id ?? pending.rule.zone_id;
+        const zone = configuration?.zones.find(item => item.zone_id === zoneId);
+        const inference = {
+          ...pending,
+          type: "inference_result",
+          people: [{...person, active_violations: newViolations}],
+        } satisfies InferenceResult;
+        return [buildEventPayload(
+          status,
+          inference,
+          zone?.points ?? [],
+          configuration?.machine_state === "running",
+          zone?.display_name ?? zoneId,
+        )];
+      });
+      if (!payloads.length) throw new Error("Không có occurrence mới để lưu.");
+      await Promise.all(payloads.map(saveReviewedEvent));
+      showReview(reviewQueueRef.current.shift() ?? null);
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setReviewSaving(false);
+    }
+  }
+
+  const reviewTimer = useReviewTimer(reviewStartedAt);
+  const violationKeys = pendingReview?.people.flatMap(person => person.active_violations
+    ?.filter(violation => violation.is_new)
+    .map(violation => violation.rule_key) ?? []) ?? [];
+  const reviewTitle = violationKeys.some(key => key.startsWith("restricted_area_person"))
+    ? "Phát hiện người trong phạm vi hạn chế"
+    : violationKeys.some(key => key.startsWith("zone_intrusion"))
+      ? "Phát hiện xâm nhập vùng nguy hiểm"
+      : "Phát hiện thiếu PPE";
+
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 
   return <div className="monitor-stream-shell">
@@ -146,9 +221,35 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
         </> : <div className="stream-empty-state"><strong>{canConfigure ? "Bấm vào đây để cấu hình" : "Camera chưa được cấu hình"}</strong><span>Camera {index + 1}</span></div>}
       </article>;
     })}</div>
+    <ReviewModal
+      isOpen={pendingReview !== null}
+      onClose={() => undefined}
+      snapshot={pendingReview?.snapshot_data}
+      people={pendingReview?.people}
+      detections={pendingReview?.detections}
+      timer={reviewTimer}
+      reviewSaving={reviewSaving}
+      alertTitle={reviewTitle}
+      alertSummary={pendingReview ? `${pendingReview.camera_id} · ${pendingReview.video_time.toFixed(1)}s` : ""}
+      onReview={status => void review(status)}
+      closeable={false}
+    />
   </div>;
 }
 
 function indexBy<T, K extends keyof T>(items: T[], key: K): Record<string, T> { return Object.fromEntries(items.map(item => [String(item[key]), item])); }
 function without<T>(values: Record<string, T>, key: string): Record<string, T> { const next = {...values}; delete next[key]; return next; }
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : "Không thể đồng bộ Live Monitor."; }
+
+function useReviewTimer(startedAt: number | null): string {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!startedAt) return;
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [startedAt]);
+  if (!startedAt) return "00:00";
+  const seconds = Math.floor((now - startedAt) / 1000);
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}

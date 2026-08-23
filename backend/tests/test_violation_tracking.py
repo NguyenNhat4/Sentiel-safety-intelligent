@@ -218,6 +218,29 @@ def test_unknown_ppe_does_not_retract_an_active_warning():
     assert unknown_result.occurrence_id == opened.occurrence_id
 
 
+def test_ppe_warning_retracts_when_requirement_is_no_longer_applicable():
+    service = ViolationTrackingService(ppe_confirmation_frames=1)
+    rule = "missing_ppe:hat"
+    opened = service.evaluate(
+        "session-a",
+        {4: {rule}},
+        {4},
+        applicable_ppe_rules={(4, rule)},
+        now=0.0,
+    )[4][0]
+
+    retracted = service.evaluate(
+        "session-a",
+        {4: set()},
+        {4},
+        applicable_ppe_rules=set(),
+        now=0.5,
+    )[4]
+
+    assert opened.is_new is True
+    assert retracted == []
+
+
 def test_unknown_or_missing_resets_the_two_second_present_retraction_window():
     service = ViolationTrackingService(ppe_confirmation_frames=6)
 

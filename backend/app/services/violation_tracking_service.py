@@ -78,6 +78,7 @@ class ViolationTrackingService:
         *,
         track_positions: dict[int, tuple[float, float]] | None = None,
         ppe_present_items: dict[int, set[str]] | None = None,
+        applicable_ppe_rules: set[tuple[int, str]] | None = None,
         bypass_confirmation: bool = False,
         now: float,
     ) -> dict[int, list[ActiveViolation]]:
@@ -94,6 +95,17 @@ class ViolationTrackingService:
             ppe_present_items or {},
             now=now,
         )
+        if applicable_ppe_rules is not None:
+            for key, occurrence in self._occurrences.items():
+                existing_session, track_id, rule_key = key
+                if (
+                    existing_session == session_id
+                    and occurrence.active
+                    and self._requires_ppe_confirmation(rule_key)
+                    and (track_id, rule_key) not in applicable_ppe_rules
+                ):
+                    self._pending_ppe_present_since.pop(key, None)
+                    self._clear(occurrence, now)
 
         for key in observed_keys:
             _, track_id, rule_key = key
@@ -180,6 +192,7 @@ class ViolationTrackingService:
                 and (track_id, rule_key) not in suppressed_ppe_rules
                 and occurrence.active
                 and self._requires_ppe_confirmation(rule_key)
+                and (applicable_ppe_rules is None or (track_id, rule_key) in applicable_ppe_rules)
                 and not any(item.occurrence_id == occurrence.occurrence_id for item in output.get(track_id, []))
             ):
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, False))
@@ -224,10 +237,10 @@ class ViolationTrackingService:
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
-    def occurrence_context(self, occurrence_id: str) -> tuple[str, str] | None:
-        for (session_id, _track_id, rule_key), occurrence in self._occurrences.items():
+    def occurrence_context(self, occurrence_id: str) -> tuple[str, int, str] | None:
+        for (session_id, track_id, rule_key), occurrence in self._occurrences.items():
             if occurrence.occurrence_id == occurrence_id:
-                return session_id, rule_key
+                return session_id, track_id, rule_key
         return None
 
     def _clear(self, occurrence: _Occurrence, now: float) -> None:

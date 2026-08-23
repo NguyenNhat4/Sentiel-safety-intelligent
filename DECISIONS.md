@@ -53,6 +53,7 @@ This file contains only decisions that currently constrain implementation. Super
 - The worker owns YOLO11m Safety and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
 - Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
 - The first deployment uses one worker. Multiple workers require affinity or an explicit decision to relocate tracker state.
+- Independent camera sessions may infer concurrently with one isolated YOLO/ByteTrack instance per session; calls for the same session remain serialized. Terminal sessions release model state while lightweight occurrence context remains available through its TTL for queued human review.
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 
@@ -69,6 +70,7 @@ This file contains only decisions that currently constrain implementation. Super
 - Zone intrusion opens after four consecutive sampled frames. Restricted-area detection remains immediate.
 - Nearby track-ID handoff may transfer active occurrence state during the lost-track grace window. Distant, different-rule, expired, or cross-session tracks remain independent.
 - Submitted `acknowledged` and `false_alarm` outcomes are human-authoritative and cannot be rewritten by later AI observations.
+- Restricted-area switches apply to every canonical person in the camera, regardless of polygon membership. An active PPE occurrence closes when its zone/machine requirement is no longer applicable; an unknown PPE observation inside an applicable rule still does not retract it.
 
 ### 2026-08-16: [Vision/Backend] Fail-closed evidence privacy
 

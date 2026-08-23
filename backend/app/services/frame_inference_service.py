@@ -1,5 +1,6 @@
 import base64
 import binascii
+import threading
 import time
 from collections.abc import Callable
 from uuid import uuid4
@@ -81,6 +82,7 @@ class FrameInferenceService:
         self._requirement_loader = requirement_loader or self._load_requirements
         self._missing_ppe_threshold = missing_ppe_threshold
         self._rule_engine = SafetyRuleEngine(missing_ppe_threshold)
+        self._tracker_lock = threading.RLock()
         self._violation_tracker = ViolationTrackingService(
             activation_frames=settings.violation_frame,
             ppe_confirmation_frames=settings.ppe_alert_confirm_frames,
@@ -92,9 +94,25 @@ class FrameInferenceService:
         self._model_preloader()
 
     def occurrences_belong_to_zone(self, session_id: str, zone_id: str, occurrence_ids: list[str]) -> bool:
-        expected = (session_id, f"zone_intrusion:{zone_id}")
+        expected_rule = f"zone_intrusion:{zone_id}"
         return all(
-            self._violation_tracker.occurrence_context(occurrence_id) == expected for occurrence_id in occurrence_ids
+            (context := self._violation_tracker.occurrence_context(occurrence_id)) is not None
+            and context[0] == session_id
+            and context[2] == expected_rule
+            for occurrence_id in occurrence_ids
+        )
+
+    def occurrences_belong_to_track(
+        self,
+        session_id: str,
+        track_id: int,
+        occurrence_ids: list[str],
+    ) -> bool:
+        return all(
+            (context := self._violation_tracker.occurrence_context(occurrence_id)) is not None
+            and context[0] == session_id
+            and context[1] == track_id
+            for occurrence_id in occurrence_ids
         )
 
     def infer(
@@ -126,12 +144,13 @@ class FrameInferenceService:
         if frame.shape[1] > self._inference_size[0] or frame.shape[0] > self._inference_size[1]:
             frame = cv2.resize(frame, self._inference_size, interpolation=cv2.INTER_AREA)
         now = time.monotonic()
-        if (
-            request.monitoring_session_id is not None
-            and request.frame_id is not None
-            and not self._violation_tracker.accept_frame(str(request.monitoring_session_id), request.frame_id, now=now)
-        ):
-            raise StaleFrameError("frame_id must increase within a monitoring session")
+        if request.monitoring_session_id is not None and request.frame_id is not None:
+            with self._tracker_lock:
+                accepted = self._violation_tracker.accept_frame(
+                    str(request.monitoring_session_id), request.frame_id, now=now
+                )
+            if not accepted:
+                raise StaleFrameError("frame_id must increase within a monitoring session")
         height, width = frame.shape[:2]
         multi_zone_mode = request.zones is not None
         zones = self._normalized_zones(request)
@@ -235,6 +254,7 @@ class FrameInferenceService:
                 person.missing_required_ppe = sorted(missing)
 
         observed_rules: dict[int, set[str]] = {}
+        applicable_ppe_rules: set[tuple[int, str]] = set()
         for person in people:
             rules = {f"missing_ppe:{item}" for item in person.missing_required_ppe}
             membership_by_id = {item.zone_id: item.inside for item in person.zone_memberships}
@@ -245,15 +265,24 @@ class FrameInferenceService:
                     if membership_by_id.get(zone.zone_id) and requirements.zone_intrusion_enabled:
                         rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             else:
+                if request.machine_state == "running":
+                    for zone in active_zones:
+                        if not membership_by_id.get(zone.zone_id):
+                            continue
+                        zone_requirement = requirements_by_zone.get(zone.zone_id)
+                        if zone_requirement is None:
+                            continue
+                        if zone_requirement.hat_required:
+                            applicable_ppe_rules.add((person.track_id, "missing_ppe:hat"))
+                        if zone_requirement.vest_required:
+                            applicable_ppe_rules.add((person.track_id, "missing_ppe:vest"))
                 for zone in active_zones:
-                    if not membership_by_id.get(zone.zone_id):
-                        continue
                     zone_requirement = requirements_by_zone.get(zone.zone_id)
                     if zone_requirement is None:
                         continue
                     if zone_requirement.restricted_area_detection_enabled:
                         rules.add(f"restricted_area_person:{zone.zone_id}")
-                    if zone_requirement.zone_intrusion_enabled:
+                    if membership_by_id.get(zone.zone_id) and zone_requirement.zone_intrusion_enabled:
                         rules.add(f"zone_intrusion:{zone.zone_id}")
             observed_rules[person.track_id] = rules
 
@@ -262,17 +291,20 @@ class FrameInferenceService:
                 person.track_id: {item for item in ("hat", "vest") if getattr(person.ppe, item).status == "present"}
                 for person in people
             }
-            active = self._violation_tracker.evaluate(
-                str(request.monitoring_session_id),
-                observed_rules,
-                {person.track_id for person in people},
-                track_positions={
-                    person.track_id: (person.foot_point[0] / width, person.foot_point[1] / height) for person in people
-                },
-                ppe_present_items=ppe_present_items,
-                bypass_confirmation=bypass_confirmation,
-                now=now,
-            )
+            with self._tracker_lock:
+                active = self._violation_tracker.evaluate(
+                    str(request.monitoring_session_id),
+                    observed_rules,
+                    {person.track_id for person in people},
+                    track_positions={
+                        person.track_id: (person.foot_point[0] / width, person.foot_point[1] / height)
+                        for person in people
+                    },
+                    ppe_present_items=ppe_present_items,
+                    applicable_ppe_rules=applicable_ppe_rules if requirements_by_zone is not None else None,
+                    bypass_confirmation=bypass_confirmation,
+                    now=now,
+                )
             for person in people:
                 person.active_violations = [
                     ActiveViolationSchema(
@@ -367,7 +399,11 @@ class FrameInferenceService:
         return response
 
     def end_session(self, session_id: str) -> None:
-        self._violation_tracker.end_session(session_id)
+        with self._tracker_lock:
+            self._violation_tracker.end_session(session_id)
+        self.release_vision_session(session_id)
+
+    def release_vision_session(self, session_id: str) -> None:
         analyzer_owner = getattr(self._vision_analyzer, "__self__", None)
         if analyzer_owner is not None and hasattr(analyzer_owner, "end_session"):
             analyzer_owner.end_session(session_id)

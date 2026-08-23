@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict
@@ -63,6 +64,8 @@ class PpeVisionFacade:
         self._model_factory = model_factory
         self._model = None
         self._sessions: dict[str, tuple[Any, float]] = {}
+        self._sessions_lock = threading.RLock()
+        self._session_locks: dict[str, threading.Lock] = {}
 
     def analyze(
         self,
@@ -80,19 +83,22 @@ class PpeVisionFacade:
             )[0]
             return self._safety_result(result, require_track_ids=False)
 
-        self._expire_sessions(now)
-        session = self._sessions.get(monitoring_session_id)
-        model = self._create_model() if session is None else session[0]
-        self._validate_model_classes(model.names)
-        self._sessions[monitoring_session_id] = (model, now)
-        result = model.track(
-            frame,
-            persist=True,
-            tracker="bytetrack.yaml",
-            classes=[0, 3, 4],
-            conf=self._confidence_threshold,
-            verbose=False,
-        )[0]
+        with self._sessions_lock:
+            self._expire_sessions(now)
+            session = self._sessions.get(monitoring_session_id)
+            model = self._create_model() if session is None else session[0]
+            self._validate_model_classes(model.names)
+            self._sessions[monitoring_session_id] = (model, now)
+            session_lock = self._session_locks.setdefault(monitoring_session_id, threading.Lock())
+        with session_lock:
+            result = model.track(
+                frame,
+                persist=True,
+                tracker="bytetrack.yaml",
+                classes=[0, 3, 4],
+                conf=self._confidence_threshold,
+                verbose=False,
+            )[0]
         return self._safety_result(result, require_track_ids=True)
 
     def observe(
@@ -121,7 +127,9 @@ class PpeVisionFacade:
         self._load_model()
 
     def end_session(self, monitoring_session_id: str) -> None:
-        self._sessions.pop(monitoring_session_id, None)
+        with self._sessions_lock:
+            self._sessions.pop(monitoring_session_id, None)
+            self._session_locks.pop(monitoring_session_id, None)
 
     def _safety_result(self, result: Any, *, require_track_ids: bool) -> SafetyVisionResult:
         self._validate_model_classes(result.names)
@@ -251,6 +259,7 @@ class PpeVisionFacade:
         ]
         for session_id in expired:
             self._sessions.pop(session_id, None)
+            self._session_locks.pop(session_id, None)
 
     @staticmethod
     def _box_track_id(box: Any) -> int | None:

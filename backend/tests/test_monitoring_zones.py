@@ -250,7 +250,7 @@ def test_multi_zone_rules_apply_only_inside_their_configured_zone(monkeypatch):
     )
 
     assert result.people[0].missing_required_ppe == []
-    assert result.people[0].active_violations == []
+    assert [item.rule_key for item in result.people[0].active_violations] == ["restricted_area_person:right"]
     assert result.people[1].missing_required_ppe == ["hat"]
     assert {item.rule_key for item in result.people[1].active_violations} == {
         "missing_ppe:hat",
@@ -271,6 +271,48 @@ def test_multi_zone_rules_apply_only_inside_their_configured_zone(monkeypatch):
             "violation": True,
         },
     ]
+
+
+def test_restricted_area_rule_applies_to_person_outside_all_polygons(monkeypatch):
+    service = FrameInferenceService(
+        ppe_observer=lambda frame, people: [
+            {
+                "hat": {"status": "unknown", "confidence": None},
+                "vest": {"status": "unknown", "confidence": None},
+            }
+            for _ in people
+        ],
+        requirement_loader=_no_ppe_requirements,
+    )
+    service._violation_tracker = ViolationTrackingService(zone_activation_frames=4)
+    monkeypatch.setattr(service, "_track_people", lambda session_id, frame: [(80, 10, 20, 40, 0.95, 1)])
+    requirement = PpeRequirementResponse(
+        camera_id="cam_1",
+        zone_id="left",
+        profile="hat_vest_v1",
+        hat_required=False,
+        vest_required=False,
+        restricted_area_detection_enabled=True,
+        zone_intrusion_enabled=False,
+        updated_at=None,
+    )
+
+    result = service.infer(
+        FrameInferenceRequest(
+            image_data=_jpeg_data_url(),
+            camera_id="cam_1",
+            monitoring_session_id=uuid4(),
+            frame_id=1,
+            machine_state="stopped",
+            zones=[_rect("left", 0.05, 0.1, 0.3, 0.8)],
+            zone_revision=1,
+        ),
+        requirements_by_zone={"left": requirement},
+    )
+
+    assert result.people[0].inside_zone is False
+    assert result.review_required is True
+    assert [item.rule_key for item in result.people[0].active_violations] == ["restricted_area_person:left"]
 
 
 def test_multi_zone_request_rejects_legacy_and_new_configuration_together(client):

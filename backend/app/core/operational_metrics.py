@@ -15,6 +15,7 @@ _EVENT_TYPES = {
     "websocket_connection_opened",
     "websocket_connection_closed",
     "inference_completed",
+    "inference_dropped",
     "inference_failed",
     "privacy_redaction_completed",
 }

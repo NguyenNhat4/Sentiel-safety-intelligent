@@ -8,7 +8,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Cross-cutting
 
-- The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets on the application volume.
+- The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.
 - The implemented safety flow covers four fixed camera slots, per-camera zones/rules, direct video/image inference, Human-in-the-Loop review, immutable decision context, privacy-redacted evidence, event history, and area-scoped follow-up.
@@ -18,7 +18,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Backend
 
-- US-29 backend runtime owns volume-backed media assets, atomic fixed-camera configuration aggregates, and explicit direct OpenCV image/video sessions with persisted lifecycle evidence.
+- US-29 backend runtime owns bucket-backed media assets, atomic fixed-camera configuration aggregates, and explicit direct OpenCV image/video sessions with persisted lifecycle evidence.
 - Four fixed camera configurations support unique READY asset assignment and atomic asset/zone/PPE saves.
 - Each configured camera can have revisioned, disjoint four-point zones and persisted rules keyed by `(camera_id, zone_id)`.
 - Authenticated `/api/v1/ws/camera-detections` publishes session-correlated detection metadata for fixed cameras.
@@ -35,6 +35,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - PPE review opens after six consecutive missing frames for the same session track/item. An unreviewed warning retracts only after two continuous seconds of explicit presence.
 - Zone intrusion opens after four consecutive sampled frames in the same active zone. Restricted-area detection remains immediate.
 - Snapshot persistence runs YuNet face redaction first, falls back per person, then annotates and persists. Failure remains closed.
+- Fixed-camera sessions now use isolated YOLO/ByteTrack instances concurrently, serialize only same-session access, and release model state on completion/error while retaining occurrence context for queued review.
 
 ### Frontend
 
@@ -43,10 +44,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
 - Area managers have a server-scoped compliance/event workspace and may resolve or mark false alarm only for events in their assigned area.
 - Camera configuration now exposes camera-wide machine state immediately after camera selection; PPE controls appear for a selected draft zone before its four points are complete.
+- Live Monitor queues direct-camera review candidates with their inference snapshot and persists one idempotent reviewed event per affected tracked person before advancing the queue.
 
 ### Media And Delivery
 
-- Sys Admin uploads validated image/video assets atomically to `MEDIA_ASSET_DIR`; Railway production uses the application persistent volume.
+- Sys Admin uploads image/video assets directly to the Singapore Railway Bucket through presigned POST. Backend verifies metadata and the first decoded frame before `READY`; `MEDIA_ASSET_DIR` is the OpenCV read-through cache.
+- Presigned GET playback preserves byte-range streaming without proxying full videos through `p047-app`. Run starts every valid configured camera; Replay creates one fresh camera session and resets playback to the beginning.
 - Explicit Run starts every valid camera independently; Replay creates a fresh session for one completed video. Sessions never auto-resume after restart.
 - Images infer exactly once without frame debounce. Videos stop at EOF and report inference throughput over a rolling five-second window.
 - `scripts/deploy_all_production.sh` gates, publishes, redeploys, waits for Railway success, and checks the application health endpoint.
@@ -54,11 +57,15 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
-- US-29 repository verification passes: 25 root tests, 191 backend/Vision tests, 71 frontend tests, Ruff, ESLint, TypeScript and production build.
+- Repository verification passes: 25 root tests, 199 backend/Vision tests, 72 frontend tests, Ruff, ESLint, TypeScript and production build.
 - Railway deployment `4b593f2a-18c8-49b0-811a-d2297a2e5ad3` reached `SUCCESS`; PostgreSQL is at `20260823_01`, the app media volume is writable, `/health` is ready in production, and authenticated media/configuration/session smoke passed.
 - Production Streamer and MediaMTX services were removed, the old Streamer volume was scheduled for deletion, and obsolete HLS/RTSP/Streamer variables were removed from `p047-app`.
 - Server-camera inference now bypasses the internal JPEG/Base64 encode-decode round trip, downsizes oversized frames to the configured inference size, and restores detections to source-frame coordinates. The focused inference/media suite passes `24 passed`; a 1080p synthetic micro-benchmark measured the removed round trip at `39.36 ms/frame` versus `0.99 ms/frame` for the retained resize on this workstation.
 - The standalone `p047-vision:dev` CPU image builds successfully and its live `/ping` smoke returns `safety_vision_v1`; frontend dependency audit reports zero known vulnerabilities after the compatible `nanoid` patch update.
+- Railway deployment `bfe08eab-c477-4e9f-b211-bba93166ccd0` reached `SUCCESS`; PostgreSQL is at `20260823_02`, `/health` is ready, and production completed a 31,389,527-byte direct bucket upload with `POST .../complete` returning 200 in 1.882 seconds.
+- The existing `cbucket` is shared safely by prefixes: `snapshots/` for redacted evidence and `media-assets/` for uploaded media. The one legacy 26,193,014-byte volume asset was copied, size-verified, switched to S3 in PostgreSQL, and removed from canonical volume storage.
+- Inference hardening now applies restricted-area rules camera-wide, closes PPE occurrences when their zone/machine requirement becomes inapplicable, runs independent camera models concurrently, drops stale sampled frames, throttles per-frame session DB writes, records direct-camera latency/drop outcomes, validates fixed-camera occurrence ownership, and restores direct-camera HITL persistence.
+- Railway worktree deployment `c617b5ca-93ca-4ad1-93f2-515024d8e1a0` reached `SUCCESS`; `/health` reports production ready with PostgreSQL and snapshot storage ready. The local Docker publish path was unavailable, so the configured mutable Docker Hub source still needs republishing before a later image-source redeploy.
 
 ## Open Gates
 
@@ -69,7 +76,6 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Complete the PostgreSQL-only runtime migration and validate the full Alembic chain against PostgreSQL.
 - Add the retention cleanup scheduler for persisted US-16 metadata/snapshot deadlines.
 - Complete US-13 protocol, representative ground truth, calibration/final split, accuracy thresholds, association/tracking evidence, and target-device latency.
-- Configure S3 snapshot storage so production application health can become fully ready.
 - Configure and exercise the GitHub production environment, first protected release PR, and immutable rollback procedure.
 - Deploy one remote Vision worker, verify backend-to-worker health/inference, and benchmark the Railway/RunPod hop before GPU optimization.
 

@@ -180,8 +180,8 @@ export interface CameraInferenceResult extends Omit<InferenceResult, "type" | "v
   video_time: number;
   session_status: CameraSessionStatus;
   inference_fps: number;
-  source_timestamp_ms: number;
-  captured_at: number;
+  source_timestamp_ms?: number;
+  captured_at?: number;
   frame_width: number;
   frame_height: number;
 }
