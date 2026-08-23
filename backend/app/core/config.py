@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     hls_reader_origin: str = ""
     hls_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
     hls_mapping_poll_seconds: float = Field(default=5.0, ge=1.0, le=60.0)
+    inference_frame_width: int = Field(default=640, ge=320, le=1920)
+    inference_frame_height: int = Field(default=360, ge=180, le=1080)
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"

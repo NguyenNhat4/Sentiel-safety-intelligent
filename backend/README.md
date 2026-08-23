@@ -36,6 +36,10 @@ one worker per persisted mapping reads
 viewers authenticate once on `/api/v1/ws/camera-detections` and receive metadata
 for mapped cameras; they never upload HLS frames back to the backend.
 
+Inference frames default to `640x360` through `INFERENCE_FRAME_WIDTH` and
+`INFERENCE_FRAME_HEIGHT`. Keep the source aspect ratio when changing these
+values, and benchmark detection recall and latency before using another size.
+
 Reviewed-event and statistics endpoints require a logged-in user. Safety officers and system administrators can record reviews; an area manager receives only events and statistics for their assigned `managed_area_id`. A Telegram alert is queued for that matching manager only when a review is saved as `acknowledged`, never when the AI merely opens a candidate.
 
 US-27 persists the operator's zone collection through `GET/PUT /api/v1/cameras/{camera_id}/monitoring-zones`. Saves use `expected_revision`, reject stale writes, and atomically reject intersecting, touching or containing active polygons. Multi-zone configure must echo that saved revision. Connected-camera inference loads safety requirements for each saved `(camera_id, zone_id)` pair.

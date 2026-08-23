@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-08-22
+Updated: 2026-08-23
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
@@ -61,6 +61,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- Server-camera inference now bypasses the internal JPEG/Base64 encode-decode round trip, downsizes oversized frames to the configured inference size, and restores detections to source-frame coordinates. The focused inference/media suite passes `24 passed`; a 1080p synthetic micro-benchmark measured the removed round trip at `39.36 ms/frame` versus `0.99 ms/frame` for the retained resize on this workstation.
 - `VISION_PROVIDER=local make check` passes after rebasing the remote Vision worker onto `develop2`: Ruff/ESLint/type-check/build pass, frontend `72 passed`, core/streamer `46 passed`, and backend/Vision `210 passed`.
 - The standalone `p047-vision:dev` CPU image builds successfully and its live `/ping` smoke returns `safety_vision_v1`; frontend dependency audit reports zero known vulnerabilities after the compatible `nanoid` patch update.
 - Production `p047-app` deployment `ffa10050-7657-4bab-8014-a411d044b09a` and streamer deployment `851de566-1c31-492d-8d68-04f234c0b914` reached `SUCCESS`.
@@ -70,6 +71,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Open Gates
 
+- Measure end-to-end camera freshness and model latency on Railway; current focused evidence isolates CPU preprocessing overhead but does not prove live HLS/RTSP latency or four-camera throughput.
 - FastAPI lifespan integration and WebSocket integration hang locally during model preload; live RTSP-to-alert evidence remains incomplete.
 - Run browser UAT for camera configuration, two-zone save/reload, mixed rule states, overlays, grouped review, Event Detail, and Area Manager follow-up.
 - Run a real 200-viewer x four-camera 30-minute soak with CPU, RSS, egress, errors, and first-frame latency before making a capacity claim.

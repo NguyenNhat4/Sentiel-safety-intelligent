@@ -1,10 +1,8 @@
 import asyncio
-import base64
 import logging
 import threading
 from uuid import NAMESPACE_URL, uuid5
 
-import cv2
 import numpy as np
 
 from backend.app.core.database import SessionLocal
@@ -24,7 +22,9 @@ logger = logging.getLogger(__name__)
 class ServerCameraInferenceRuntime:
     """Reconcile mappings and run one HLS inference worker per connected camera."""
 
-    def __init__(self, media_origin: str, *, max_fps: float = 2.0, poll_seconds: float = 5.0, media_protocol: str = "hls") -> None:
+    def __init__(
+        self, media_origin: str, *, max_fps: float = 2.0, poll_seconds: float = 5.0, media_protocol: str = "hls"
+    ) -> None:
         self._media_origin = media_origin
         self._media_protocol = media_protocol
         self._max_fps = max_fps
@@ -76,10 +76,6 @@ class ServerCameraInferenceRuntime:
         captured_at: float,
         frame: np.ndarray,
     ) -> dict:
-        ok, encoded = cv2.imencode(".jpg", frame)
-        if not ok:
-            raise ValueError("RTSP frame could not be encoded as JPEG")
-        image_data = f"data:image/jpeg;base64,{base64.b64encode(encoded).decode()}"
         session_id = uuid5(NAMESPACE_URL, f"p047:hls:{camera_id}:{stream_camera_id}")
         with SessionLocal() as db:
             machine_state = next(
@@ -97,7 +93,7 @@ class ServerCameraInferenceRuntime:
             }
             requirements = requirement_service.get(camera_id, "zone_01")
         request = FrameInferenceRequest(
-            image_data=image_data,
+            image_data="",
             camera_id=camera_id,
             zones=zones.zones,
             zone_revision=zones.revision,
@@ -106,8 +102,9 @@ class ServerCameraInferenceRuntime:
             machine_state=machine_state,
         )
         with self._model_lock:
-            result = frame_inference_service.infer(
+            result = frame_inference_service.infer_decoded_frame(
                 request,
+                frame,
                 requirements=requirements,
                 requirements_by_zone=requirements_by_zone,
             )

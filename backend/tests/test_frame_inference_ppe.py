@@ -122,6 +122,89 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     assert [item.class_name for item in result.detections] == ["person", "hat"]
 
 
+def test_decoded_camera_frame_skips_jpeg_round_trip(monkeypatch):
+    received_shapes = []
+
+    def analyze(frame, monitoring_session_id, now):
+        received_shapes.append(frame.shape)
+        return {"canonical_people": [], "people": [], "detections": []}
+
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
+    )
+    service = FrameInferenceService(
+        vision_analyzer=analyze,
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    monkeypatch.setattr(
+        service,
+        "_decode_frame",
+        lambda _: (_ for _ in ()).throw(AssertionError("decoded camera frames must not be decoded again")),
+    )
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    camera_request = FrameInferenceRequest(image_data="", machine_state="stopped")
+
+    result = service.infer_decoded_frame(camera_request, frame)
+
+    assert result.result == "normal"
+    assert received_shapes == [(360, 640, 3)]
+
+
+def test_inference_resize_preserves_original_frame_coordinates(monkeypatch):
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(100, 50, 200, 250, 0.9, 1)],
+            "people": [
+                {
+                    "hat": {"status": "present", "confidence": 0.9},
+                    "vest": {"status": "present", "confidence": 0.9},
+                }
+            ],
+            "detections": [
+                {
+                    "class_id": 3,
+                    "class_name": "person",
+                    "bbox": [100, 50, 300, 300],
+                    "confidence": 0.9,
+                    "person_index": 0,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
+    )
+    service = FrameInferenceService(
+        vision_analyzer=analyze,
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+
+    result = service.infer_decoded_frame(
+        FrameInferenceRequest(image_data="", machine_state="stopped"),
+        np.zeros((720, 1280, 3), dtype=np.uint8),
+    )
+
+    assert result.people[0].bbox == [200, 100, 600, 600]
+    assert result.people[0].foot_point == [400, 600]
+    assert result.detections[0].bbox == [200, 100, 600, 600]
+
+
 def test_preload_models_warms_the_unified_safety_model(monkeypatch):
     service = FrameInferenceService(model_path="unused.pt")
     loaded = []

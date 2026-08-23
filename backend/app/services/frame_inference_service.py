@@ -53,6 +53,7 @@ class FrameInferenceService:
         from backend.app.core.config import get_settings
 
         settings = get_settings()
+        self._inference_size = (settings.inference_frame_width, settings.inference_frame_height)
         self._model_path = model_path or settings.ppe_model_path
         self._fallback_model = None
         if vision_analyzer is not None:
@@ -104,6 +105,25 @@ class FrameInferenceService:
         requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
     ) -> FrameInferenceResponse:
         frame = self._decode_frame(request.image_data)
+        return self.infer_decoded_frame(
+            request,
+            frame,
+            requirements=requirements,
+            requirements_by_zone=requirements_by_zone,
+        )
+
+    def infer_decoded_frame(
+        self,
+        request: FrameInferenceRequest,
+        frame: np.ndarray,
+        *,
+        requirements: PpeRequirementResponse | None = None,
+        requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
+    ) -> FrameInferenceResponse:
+        """Infer from an existing BGR frame without a JPEG/Base64 round trip."""
+        source_height, source_width = frame.shape[:2]
+        if frame.shape[1] > self._inference_size[0] or frame.shape[0] > self._inference_size[1]:
+            frame = cv2.resize(frame, self._inference_size, interpolation=cv2.INTER_AREA)
         now = time.monotonic()
         if (
             request.monitoring_session_id is not None
@@ -303,7 +323,7 @@ class FrameInferenceService:
         primary_machine_state = request.machine_state
         primary_zone_id = primary_zone.zone_id if primary_zone else request.zone_id
 
-        return FrameInferenceResponse(
+        response = FrameInferenceResponse(
             result="violate" if has_active_violation else "normal",
             review_required=review_required,
             has_active_violation=has_active_violation,
@@ -341,6 +361,38 @@ class FrameInferenceService:
                 ),
             },
         )
+        self._restore_source_coordinates(response, source_width, source_height, width, height)
+        return response
+
+    @staticmethod
+    def _restore_source_coordinates(
+        response: FrameInferenceResponse,
+        source_width: int,
+        source_height: int,
+        inference_width: int,
+        inference_height: int,
+    ) -> None:
+        if source_width == inference_width and source_height == inference_height:
+            return
+        scale_x = source_width / inference_width
+        scale_y = source_height / inference_height
+
+        def scale_box(box: list[int]) -> list[int]:
+            return [
+                round(box[0] * scale_x),
+                round(box[1] * scale_y),
+                round(box[2] * scale_x),
+                round(box[3] * scale_y),
+            ]
+
+        for person in response.people:
+            person.bbox = scale_box(person.bbox)
+            person.foot_point = [
+                round(person.foot_point[0] * scale_x),
+                round(person.foot_point[1] * scale_y),
+            ]
+        for detection in response.detections:
+            detection.bbox = scale_box(detection.bbox)
 
     @staticmethod
     def _normalized_zones(request: FrameInferenceRequest) -> list[MonitoringZone]:
