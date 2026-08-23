@@ -13,8 +13,10 @@ This specification details the violation tracking, pop-up debounce logic, and mu
    - Prevents duplicate review pop-ups for the same tracked person when they temporarily exit and re-enter a restricted zone or momentarily fix PPE within the 20-second debounce window.
    - When 20 seconds elapse after an initial alert, any subsequent violation by the same person re-triggers a new pop-up review (`is_new = True`).
 
-2. **Multi-Violation Aggregation**:
-   - If a person triggers multiple violation types simultaneously (e.g. Zone Intrusion + Missing PPE Hat/Vest + Restricted Area), the violations are combined into a single pop-up review notification.
+2. **Multi-Violation & Multi-Zone Aggregation**:
+   - Debounce alert timing is tracked per `(session_id, track_id, rule_key)`.
+   - If a person triggers a new zone (e.g., `zone_A` -> `zone_B`), the new zone event produces `is_new = True` and triggers a pop-up review even within 20s.
+   - If multiple violations occur concurrently in a single frame, they are combined into a single pop-up review notification.
    - The pop-up title dynamically summarizes all active violations (e.g., *"Phát hiện người trong phạm vi hạn chế & Phát hiện xâm nhập vùng nguy hiểm & Phát hiện thiếu PPE"*).
 
 ---

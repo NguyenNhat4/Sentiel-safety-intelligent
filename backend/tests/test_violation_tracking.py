@@ -20,16 +20,23 @@ def test_one_person_suppresses_alert_within_cooldown():
 
     first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4]
     service.evaluate("session-a", {4: set()}, {4}, now=1.0)
-    second_rule = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=5.0)[4]
+    same_category_rule = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=5.0)[4]
 
     assert first[0].is_new is True
-    assert second_rule[0].is_new is False
+    assert same_category_rule[0].is_new is False
+
+    ppe_first = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=6.0)[4]
+    service.evaluate("session-a", {4: set()}, {4}, now=7.0)
+    ppe_second = service.evaluate("session-a", {4: {"missing_ppe:vest"}}, {4}, now=10.0)[4]
+
+    assert ppe_first[0].is_new is True
+    assert ppe_second[0].is_new is False
 
 
 def test_reviolation_after_cooldown_emits_new_alert():
     service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=20.0)
 
-    first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]
+    service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)
     service.evaluate("session-a", {4: set()}, {4}, now=1.0)
     repeated_within_cooldown = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=5.0)[4][0]
     service.evaluate("session-a", {4: set()}, {4}, now=10.0)
@@ -37,6 +44,18 @@ def test_reviolation_after_cooldown_emits_new_alert():
 
     assert repeated_within_cooldown.is_new is False
     assert repeated_after_cooldown.is_new is True
+
+
+def test_zone_transition_triggers_new_alert_within_cooldown():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=20.0)
+
+    zone_a_first = service.evaluate("session-a", {4: {"zone_intrusion:zone_A"}}, {4}, now=0.0)[4][0]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    zone_b_first = service.evaluate("session-a", {4: {"zone_intrusion:zone_B"}}, {4}, now=5.0)[4][0]
+
+    assert zone_a_first.is_new is True
+    assert zone_b_first.is_new is True
+    assert zone_a_first.occurrence_id != zone_b_first.occurrence_id
 
 
 def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
