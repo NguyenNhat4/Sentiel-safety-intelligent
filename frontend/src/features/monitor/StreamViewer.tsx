@@ -14,7 +14,7 @@ import "./stream.css";
 
 export const CAMERA_IDS = ["cam_1", "cam_2", "cam_3", "cam_4"] as const;
 
-export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: (cameraId: string) => void}) {
+export function StreamViewer({active = true, role, onConfigure}: {active?: boolean; role: UserRole; onConfigure: (cameraId: string) => void}) {
   const canConfigure = role === "safety_manager";
   const [configurations, setConfigurations] = useState<Record<string, CameraConfiguration>>({});
   const [assets, setAssets] = useState<Record<string, MediaAsset>>({});
@@ -32,30 +32,37 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   const runningRef = useRef(false);
   const replayingRef = useRef(false);
   const sessionsRef = useRef(sessions);
+  const configurationsRef = useRef(configurations);
   const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
   const reviewQueueRef = useRef<CameraInferenceResult[]>([]);
   const seenReviewOccurrencesRef = useRef(new Set<string>());
   sessionsRef.current = sessions;
+  configurationsRef.current = configurations;
 
   useEffect(() => {
+    if (!active) return;
     const controller = new AbortController();
+    setLoading(true);
     void Promise.all([listCameraConfigurations(controller.signal), listMediaAssets(), listCameraSessions(controller.signal)])
       .then(([configurationList, inventory, sessionList]) => {
-        setConfigurations(indexBy(configurationList, "camera_id"));
+        const indexedConfigurations = indexBy(configurationList, "camera_id");
+        configurationsRef.current = indexedConfigurations;
+        setConfigurations(indexedConfigurations);
         setAssets(indexBy(inventory, "id"));
         applySessions(sessionList);
       })
       .catch(reason => { if (!controller.signal.aborted) setError(errorText(reason)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, []);
+  }, [active]);
 
   useEffect(() => {
+    if (!active) return;
     const timer = window.setInterval(() => {
       void listCameraSessions().then(applySessions).catch(reason => setError(errorText(reason)));
     }, 2000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [active]);
 
   useEffect(() => {
     const accessToken = getAccessToken();
@@ -109,7 +116,8 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   }, []);
 
   function applySessions(next: CameraSession[]) {
-    const indexed = indexLatestBy(next, "camera_id");
+    const compatible = next.filter(session => configurationsRef.current[session.camera_id]?.asset_id === session.asset_id);
+    const indexed = indexLatestBy(compatible, "camera_id");
     setDetections(current => {
       const retained = {...current};
       for (const cameraId of CAMERA_IDS) {
@@ -123,6 +131,11 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
       const nextEnded = {...current};
       for (const cameraId of CAMERA_IDS) if (sessionsRef.current[cameraId]?.id !== indexed[cameraId]?.id) delete nextEnded[cameraId];
       return nextEnded;
+    });
+    setPlaybackRequested(current => {
+      const retained = {...current};
+      for (const cameraId of CAMERA_IDS) if (!indexed[cameraId]) delete retained[cameraId];
+      return retained;
     });
     sessionsRef.current = indexed;
     setSessions(indexed);
@@ -211,7 +224,8 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
     <div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => {
       const configuration = configurations[cameraId];
       const asset = configuration?.asset_id ? assets[configuration.asset_id] : undefined;
-      const session = sessions[cameraId];
+      const storedSession = sessions[cameraId];
+      const session = storedSession?.asset_id === configuration?.asset_id ? storedSession : undefined;
       const detection = session && detections[cameraId]?.session_id === session.id ? detections[cameraId] : undefined;
       const replayVisible = asset?.media_type === "video" && (ended[cameraId] || session?.status === "COMPLETED");
       return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình Camera ${index + 1}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>

@@ -226,6 +226,7 @@ class PpeVisionFacade:
                 classes=[0, 3, 4],
                 conf=self._model_confidence_threshold,
                 imgsz=self._inference_image_size,
+                rect=False,
                 verbose=False,
             )[0]
             # Stateless: geometric validation only, no temporal smoothing
@@ -250,6 +251,7 @@ class PpeVisionFacade:
                 classes=[0, 3, 4],
                 conf=self._model_confidence_threshold,
                 imgsz=self._inference_image_size,
+                rect=False,
                 verbose=False,
             )[0]
             vision_result = self._safety_result(result, require_track_ids=True, smoother=smoother)
@@ -383,6 +385,7 @@ class PpeVisionFacade:
             classes=[0, 3, 4],
             conf=self._confidence_threshold,
             imgsz=self._inference_image_size,
+            rect=False,
             verbose=False,
         )[0]
         names = result.names

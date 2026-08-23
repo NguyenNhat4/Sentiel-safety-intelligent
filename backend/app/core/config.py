@@ -14,11 +14,9 @@ class Settings(BaseSettings):
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
-    inference_frame_width: int = Field(default=640, ge=320, le=1920)
-    inference_frame_height: int = Field(default=360, ge=180, le=1080)
     media_asset_dir: str = "data/media-assets"
     max_media_asset_bytes: int = Field(default=1024 * 1024 * 1024, gt=0, le=10 * 1024 * 1024 * 1024)
-    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
+    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=20.0)
     media_storage_backend: Literal["filesystem", "s3"] = "filesystem"
     media_storage_bucket: str = ""
     media_storage_endpoint_url: str = ""

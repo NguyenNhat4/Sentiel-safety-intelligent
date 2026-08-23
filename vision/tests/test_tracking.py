@@ -83,6 +83,7 @@ def test_unified_safety_inference_tracks_people_and_ppe_in_one_call():
     assert models[0].calls[0]["classes"] == [0, 3, 4]
     assert models[0].calls[0]["conf"] == 0.2
     assert models[0].calls[0]["imgsz"] == 960
+    assert models[0].calls[0]["rect"] is False
     assert len(models[0].calls) == 2
 
 

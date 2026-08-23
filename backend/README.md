@@ -39,9 +39,11 @@ US-29 uses backend-owned media and explicit sessions:
 - A newly opened direct-camera occurrence carries one transient review JPEG; Live Monitor queues human review and persists only the operator outcome through the existing event API. Terminal model state is released without invalidating queued occurrence context.
 - Streamer, MediaMTX, HLS, RTSP and Connect/Disconnect are not runtime contracts.
 
-Inference frames default to `640x360` through `INFERENCE_FRAME_WIDTH` and
-`INFERENCE_FRAME_HEIGHT`. Keep the source aspect ratio when changing these
-values, and benchmark detection recall and latency before using another size.
+Inference keeps the decoded source frame at its original resolution until the
+YOLO boundary. Ultralytics performs the only resize/letterbox step using
+`YOLO_INFERENCE_IMAGE_SIZE` (`960`, producing a `960x960` model tensor by
+default). Benchmark detection recall, latency, and memory when changing that
+model input size.
 Camera sessions use isolated YOLO/ByteTrack instances and may run concurrently. Calls within one session remain serialized; sampled video frames that exceed one sampling interval of source lag are dropped before model execution instead of building a stale queue. Running FPS persistence is throttled to five seconds while WebSocket results remain per-frame.
 
 Reviewed-event and statistics endpoints require a logged-in user. Safety officers and system administrators can record reviews; an area manager receives only events and statistics for their assigned `managed_area_id`. A Telegram alert is queued for that matching manager only when a review is saved as `acknowledged`, never when the AI merely opens a candidate.

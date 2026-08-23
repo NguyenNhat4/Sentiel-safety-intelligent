@@ -26,9 +26,10 @@ def test_ppe_facade_exposes_only_canonical_person_hat_and_vest():
         def __init__(self):
             self.calls = 0
 
-        def predict(self, frame, classes, conf, imgsz, verbose):
+        def predict(self, frame, classes, conf, imgsz, rect, verbose):
             assert conf == 0.2
             assert imgsz == 960
+            assert rect is False
             self.calls += 1
             assert classes == [0, 3, 4]
             result = type("Result", (), {})()
@@ -87,7 +88,7 @@ def test_stateless_safety_analysis_uses_model_person_as_canonical_in_one_call():
     assert result["canonical_people"] == [(10, 10, 30, 80, 0.92, 1)]
     assert result["people"][0]["vest"] == {"status": "present", "confidence": 0.84}
     assert [item["class_name"] for item in result["detections"]] == ["person", "vest"]
-    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.2, "imgsz": 960, "verbose": False}]
+    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.2, "imgsz": 960, "rect": False, "verbose": False}]
 
 
 def test_person_confidence_is_configurable_independently_from_ppe_confidence():
@@ -127,7 +128,7 @@ def test_person_confidence_is_configurable_independently_from_ppe_confidence():
     assert result["canonical_people"] == [(10, 10, 30, 80, 0.30, 1)]
     assert [item["class_name"] for item in result["detections"]] == ["person"]
     assert result["people"][0]["vest"] == {"status": "unknown", "confidence": None}
-    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.25, "imgsz": 960, "verbose": False}]
+    assert model.calls == [{"classes": [0, 3, 4], "conf": 0.25, "imgsz": 960, "rect": False, "verbose": False}]
 
 
 def test_ppe_facade_rejects_invalid_confidence_thresholds():
@@ -150,8 +151,9 @@ def test_ppe_facade_drops_unassociated_hat_when_no_person_is_detected():
     class FakeModel:
         names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
 
-        def predict(self, frame, classes, conf, imgsz, verbose):
+        def predict(self, frame, classes, conf, imgsz, rect, verbose):
             assert imgsz == 960
+            assert rect is False
             result = type("Result", (), {})()
             result.names = self.names
             result.boxes = [FakeBox()]
@@ -175,8 +177,9 @@ def test_ppe_model_person_supports_association_without_replacing_canonical_perso
     class FakeModel:
         names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
 
-        def predict(self, frame, classes, conf, imgsz, verbose):
+        def predict(self, frame, classes, conf, imgsz, rect, verbose):
             assert imgsz == 960
+            assert rect is False
             result = type("Result", (), {})()
             result.names = self.names
             result.boxes = [

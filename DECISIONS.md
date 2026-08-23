@@ -75,6 +75,13 @@ This file contains only decisions that currently constrain implementation. Super
 - The public PPE profile is `hat_vest_v1`. Missing PPE is qualified absence derived by backend rules and requires US-13 calibration before non-demo use.
 - ByteTrack IDs are monitoring-session-local technical associations, never identity or cross-camera recognition.
 
+### 2026-08-24: [Vision/Backend] Preserve source frames until the YOLO boundary
+
+- Backend direct-camera inference passes each decoded frame at its original resolution to the configured Vision provider; it does not pre-resize to `640x360`.
+- Ultralytics owns the only resize/letterbox step, with `YOLO_INFERENCE_IMAGE_SIZE=960` producing the current `960x960` model tensor.
+- Detection boxes, foot points, and zone geometry remain in source-frame coordinates without a backend scale-down/restore round trip.
+- This favors source detail and PPE recall; four-camera latency and memory must be measured with representative media before production capacity claims.
+
 ### 2026-08-16: [Cross-cutting] Occurrence confirmation and reconciliation
 
 - Event occurrences are keyed by monitoring session, track, and rule; database persistence is idempotent by occurrence ID.

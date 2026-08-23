@@ -54,7 +54,6 @@ class FrameInferenceService:
         from backend.app.core.config import get_settings
 
         settings = get_settings()
-        self._inference_size = (settings.inference_frame_width, settings.inference_frame_height)
         self._model_path = model_path or settings.ppe_model_path
         self._person_detection_confidence = settings.person_detection_confidence
         self._ppe_detection_confidence = settings.ppe_detection_confidence
@@ -150,10 +149,7 @@ class FrameInferenceService:
         requirements_by_zone: dict[str, PpeRequirementResponse] | None = None,
         bypass_confirmation: bool = False,
     ) -> FrameInferenceResponse:
-        """Infer from an existing BGR frame without a JPEG/Base64 round trip."""
-        source_height, source_width = frame.shape[:2]
-        if frame.shape[1] > self._inference_size[0] or frame.shape[0] > self._inference_size[1]:
-            frame = cv2.resize(frame, self._inference_size, interpolation=cv2.INTER_AREA)
+        """Infer from the original BGR frame without a JPEG/Base64 or pre-resize round trip."""
         now = time.monotonic()
         if request.monitoring_session_id is not None and request.frame_id is not None:
             with self._tracker_lock:
@@ -419,7 +415,6 @@ class FrameInferenceService:
                 ),
             },
         )
-        self._restore_source_coordinates(response, source_width, source_height, width, height)
         return response
 
     def end_session(self, session_id: str) -> None:
@@ -431,36 +426,6 @@ class FrameInferenceService:
         analyzer_owner = getattr(self._vision_analyzer, "__self__", None)
         if analyzer_owner is not None and hasattr(analyzer_owner, "end_session"):
             analyzer_owner.end_session(session_id)
-
-    @staticmethod
-    def _restore_source_coordinates(
-        response: FrameInferenceResponse,
-        source_width: int,
-        source_height: int,
-        inference_width: int,
-        inference_height: int,
-    ) -> None:
-        if source_width == inference_width and source_height == inference_height:
-            return
-        scale_x = source_width / inference_width
-        scale_y = source_height / inference_height
-
-        def scale_box(box: list[int]) -> list[int]:
-            return [
-                round(box[0] * scale_x),
-                round(box[1] * scale_y),
-                round(box[2] * scale_x),
-                round(box[3] * scale_y),
-            ]
-
-        for person in response.people:
-            person.bbox = scale_box(person.bbox)
-            person.foot_point = [
-                round(person.foot_point[0] * scale_x),
-                round(person.foot_point[1] * scale_y),
-            ]
-        for detection in response.detections:
-            detection.bbox = scale_box(detection.bbox)
 
     @staticmethod
     def _normalized_zones(request: FrameInferenceRequest) -> list[MonitoringZone]:
@@ -542,6 +507,7 @@ class FrameInferenceService:
             classes=[3],
             conf=self._person_detection_confidence,
             imgsz=self._inference_image_size,
+            rect=False,
             verbose=False,
         )
         people = []

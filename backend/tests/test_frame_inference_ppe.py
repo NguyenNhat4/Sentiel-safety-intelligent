@@ -108,7 +108,7 @@ def test_person_detection_confidence_is_forwarded_to_main_and_fallback_detectors
 
     assert service._detect_people(np.zeros((10, 10, 3), dtype=np.uint8)) == []
     assert adapter_calls == [("models/yolo11m_safety.pt", 0.42, 0.23, 960, 10)]
-    assert model.calls == [{"classes": [3], "conf": 0.42, "imgsz": 960, "verbose": False}]
+    assert model.calls == [{"classes": [3], "conf": 0.42, "imgsz": 960, "rect": False, "verbose": False}]
 
 
 def test_remote_provider_routes_inference_through_http_adapter(monkeypatch):
@@ -192,17 +192,13 @@ def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     assert [item.class_name for item in result.detections] == ["person", "hat"]
 
 
-def test_decoded_camera_frame_skips_jpeg_round_trip(monkeypatch):
+def test_decoded_camera_frame_preserves_source_quality_and_skips_jpeg_round_trip(monkeypatch):
     received_shapes = []
 
     def analyze(frame, monitoring_session_id, now):
         received_shapes.append(frame.shape)
         return {"canonical_people": [], "people": [], "detections": []}
 
-    monkeypatch.setattr(
-        "backend.app.core.config.get_settings",
-        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
-    )
     service = FrameInferenceService(
         vision_analyzer=analyze,
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
@@ -225,10 +221,10 @@ def test_decoded_camera_frame_skips_jpeg_round_trip(monkeypatch):
     result = service.infer_decoded_frame(camera_request, frame)
 
     assert result.result == "normal"
-    assert received_shapes == [(360, 640, 3)]
+    assert received_shapes == [(720, 1280, 3)]
 
 
-def test_inference_resize_preserves_original_frame_coordinates(monkeypatch):
+def test_original_frame_coordinates_do_not_require_backend_restoration():
     def analyze(frame, monitoring_session_id, now):
         return {
             "canonical_people": [(100, 50, 200, 250, 0.9, 1)],
@@ -249,10 +245,6 @@ def test_inference_resize_preserves_original_frame_coordinates(monkeypatch):
             ],
         }
 
-    monkeypatch.setattr(
-        "backend.app.core.config.get_settings",
-        lambda: Settings(inference_frame_width=640, inference_frame_height=360),
-    )
     service = FrameInferenceService(
         vision_analyzer=analyze,
         requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
@@ -270,9 +262,9 @@ def test_inference_resize_preserves_original_frame_coordinates(monkeypatch):
         np.zeros((720, 1280, 3), dtype=np.uint8),
     )
 
-    assert result.people[0].bbox == [200, 100, 600, 600]
-    assert result.people[0].foot_point == [400, 600]
-    assert result.detections[0].bbox == [200, 100, 600, 600]
+    assert result.people[0].bbox == [100, 50, 300, 300]
+    assert result.people[0].foot_point == [200, 300]
+    assert result.detections[0].bbox == [100, 50, 300, 300]
 
 
 def test_preload_models_warms_the_unified_safety_model(monkeypatch):
