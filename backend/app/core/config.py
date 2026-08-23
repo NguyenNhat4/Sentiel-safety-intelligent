@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     ppe_alert_confirm_frames: int = Field(default=6, ge=1, le=60)
     ppe_revoke_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
+    violation_cooldown_seconds: float = Field(default=20.0, ge=0.0, le=300.0)
 
     model_config = SettingsConfigDict(
         env_file=(".env.development"),
