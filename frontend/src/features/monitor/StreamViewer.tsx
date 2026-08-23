@@ -21,6 +21,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   const [sessions, setSessions] = useState<Record<string, CameraSession>>({});
   const [detections, setDetections] = useState<Record<string, CameraInferenceResult>>({});
   const [ended, setEnded] = useState<Record<string, boolean>>({});
+  const [playbackRequested, setPlaybackRequested] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [replaying, setReplaying] = useState("");
@@ -108,7 +109,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   }, []);
 
   function applySessions(next: CameraSession[]) {
-    const indexed = indexBy(next, "camera_id");
+    const indexed = indexLatestBy(next, "camera_id");
     setDetections(current => {
       const retained = {...current};
       for (const cameraId of CAMERA_IDS) {
@@ -130,6 +131,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   async function run() {
     if (runningRef.current) return;
     runningRef.current = true; setRunning(true); setError("");
+    setPlaybackRequested(Object.fromEntries(CAMERA_IDS.map(cameraId => [cameraId, true])));
     try {
       const result = await runSimulation();
       const started = new Set(result.sessions.map(item => item.camera_id));
@@ -144,6 +146,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
   async function replay(cameraId: string) {
     if (replayingRef.current) return;
     replayingRef.current = true; setReplaying(cameraId); setError("");
+    setPlaybackRequested(current => ({...current, [cameraId]: true}));
     try { applySessions([...Object.values(sessionsRef.current).filter(item => item.camera_id !== cameraId), await replayCamera(cameraId)]); }
     catch (reason) { setError(errorText(reason)); }
     finally { replayingRef.current = false; setReplaying(""); }
@@ -213,7 +216,7 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
       const replayVisible = asset?.media_type === "video" && (ended[cameraId] || session?.status === "COMPLETED");
       return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình Camera ${index + 1}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>
         <h3>Camera {index + 1}</h3>
-        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} label={`Media Camera ${index + 1}`} playing={session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onEnded={() => setEnded(current => ({...current, [cameraId]: true}))} /><DetectionOverlay result={detection} />
+        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
           {session && <div className={`stream-badge ${session.status.toLowerCase()}`}>{session.status}</div>}
           {session?.inference_fps != null && <div className="inference-fps">FPS infer <strong>{session.inference_fps.toFixed(1)}</strong></div>}
           {session?.status === "ERROR" && <div className="session-error">{session.error_code || "Phiên mô phỏng gặp lỗi."}</div>}
@@ -238,6 +241,14 @@ export function StreamViewer({role, onConfigure}: {role: UserRole; onConfigure: 
 }
 
 function indexBy<T, K extends keyof T>(items: T[], key: K): Record<string, T> { return Object.fromEntries(items.map(item => [String(item[key]), item])); }
+function indexLatestBy<T, K extends keyof T>(items: T[], key: K): Record<string, T> {
+  const indexed: Record<string, T> = {};
+  for (const item of items) {
+    const value = String(item[key]);
+    if (!(value in indexed)) indexed[value] = item;
+  }
+  return indexed;
+}
 function without<T>(values: Record<string, T>, key: string): Record<string, T> { const next = {...values}; delete next[key]; return next; }
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : "Không thể đồng bộ Live Monitor."; }
 

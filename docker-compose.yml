@@ -3,6 +3,8 @@
 services:
   db:
     image: postgres:17-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: p047_compose_test
       POSTGRES_USER: p047_test

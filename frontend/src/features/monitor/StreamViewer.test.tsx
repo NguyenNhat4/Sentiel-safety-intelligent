@@ -15,7 +15,7 @@ vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
 vi.mock("../../api/events", () => ({saveReviewedEvent: vi.fn()}));
 vi.mock("../../api/simulation", () => ({listCameraSessions: vi.fn(), replayCamera: vi.fn(), runSimulation: vi.fn()}));
 vi.mock("../../api/camera-detection-client", () => ({CameraDetectionClient: vi.fn(function(options: {onResult: typeof resultHandler}) { resultHandler = options.onResult; return {connect: vi.fn().mockResolvedValue(undefined), close: vi.fn()}; })}));
-vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, onEnded}: {label: string; playbackKey: string; onEnded: () => void}) => <button aria-label={label} data-playback-key={playbackKey} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>}));
+vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, onEnded}: {label: string; playbackKey: string; playing?: boolean; onEnded: () => void}) => <button aria-label={label} data-playback-key={playbackKey} data-playing={String(Boolean(playing))} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>}));
 
 const session = {id: "session-current", camera_id: "cam_1", asset_id: "asset-1", media_type: "video" as const, status: "RUNNING" as const, config_revision: 1, inference_fps: 1.5, started_at: "2026-08-23T00:00:00Z", running_at: "2026-08-23T00:00:01Z", completed_at: null, error_code: null};
 const result = (sessionId: string, fps: number): CameraInferenceResult => ({type: "camera_inference_result", camera_id: "cam_1", session_id: sessionId, asset_id: "asset-1", media_type: "video", video_time: 1, session_status: "RUNNING", inference_fps: fps, source_timestamp_ms: 1, captured_at: 1, frame_width: 100, frame_height: 100, frame_id: 1, result: "normal", review_required: false, people: [], rule: {} as CameraInferenceResult["rule"]});
@@ -51,9 +51,11 @@ it("runs once, ignores stale sessions, displays rolling FPS, and replays one com
   resultHandler(result("session-run", 2.75));
   expect(await screen.findByText("2.8")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", {name: "Media Camera 1"}));
+  vi.mocked(replayCamera).mockResolvedValue({...session, id: "session-replay", status: "COMPLETED"});
   fireEvent.click(screen.getByRole("button", {name: "Replay Camera 1"}));
   await waitFor(() => expect(replayCamera).toHaveBeenCalledWith("cam_1"));
   expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playback-key", "session-replay");
+  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playing", "true");
 });
 
 it("does not expose run or configuration actions to system admins", async () => {

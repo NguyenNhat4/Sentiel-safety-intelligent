@@ -89,6 +89,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Next Steps
 
+0. [Frontend] Đã sửa Live Monitor giữ playback request sau khi Replay/Run trả về session COMPLETED sớm; focused test, lint, type-check và production build đã pass. Chưa deploy Railway vì worktree còn thay đổi ngoài scope cần được tách trước.
 1. Prove an uploaded asset reaches model, rule, HITL log, and persisted event end to end on Railway.
 2. Run the two-zone browser UAT and record results.
 3. Finish PostgreSQL-only cleanup and verify `make setup`, `make run`, and migrations on a fresh environment.
