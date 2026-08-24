@@ -260,6 +260,8 @@ class FrameInferenceService:
                 applicable = [
                     requirement for zone_id, requirement in requirements_by_zone.items() if zone_id in inside_zone_ids
                 ]
+                if not applicable and requirements is not None:
+                    applicable = [requirements]
                 missing: set[str] = set()
                 if request.machine_state == "running":
                     for requirement in applicable:
@@ -285,15 +287,17 @@ class FrameInferenceService:
                         rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             else:
                 if request.machine_state == "running":
-                    for zone in active_zones:
-                        if not membership_by_id.get(zone.zone_id):
-                            continue
-                        zone_requirement = requirements_by_zone.get(zone.zone_id)
-                        if zone_requirement is None:
-                            continue
-                        if zone_requirement.hat_required:
+                    inside_zone_ids = {item.zone_id for item in person.zone_memberships if item.inside}
+                    req_dict = requirements_by_zone or {}
+                    applicable_reqs = [
+                        req_dict[zid] for zid in inside_zone_ids if zid in req_dict
+                    ]
+                    if not applicable_reqs and requirements is not None:
+                        applicable_reqs = [requirements]
+                    for req in applicable_reqs:
+                        if req.hat_required:
                             applicable_ppe_rules.add((person.track_id, "missing_ppe:hat"))
-                        if zone_requirement.vest_required:
+                        if req.vest_required:
                             applicable_ppe_rules.add((person.track_id, "missing_ppe:vest"))
                 for zone in active_zones:
                     zone_requirement = requirements_by_zone.get(zone.zone_id)

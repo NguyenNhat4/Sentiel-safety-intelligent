@@ -644,3 +644,65 @@ def test_requirements_by_zone_evaluates_ppe_when_machine_running():
     assert result.result == "violate"
     assert result.people[0].missing_required_ppe == ["hat"]
     assert result.people[0].active_violations[0].rule_key == "missing_ppe:hat"
+
+
+def test_requirements_by_zone_evaluates_ppe_for_person_outside_zones_when_machine_running():
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(1, 1, 10, 10, 0.95, 1)],  # Foot point (6, 11) is far outside zone (10..90)
+            "people": [
+                {
+                    "hat": {"status": "missing", "confidence": None},
+                    "vest": {"status": "present", "confidence": 0.9},
+                }
+            ],
+            "detections": [],
+        }
+
+    service = FrameInferenceService(vision_analyzer=analyze)
+    req = request(with_zone=False, machine_state="running")
+    req.zones = [
+        MonitoringZone(
+            zone_id="zone_01",
+            display_name="Zone 01",
+            points=[
+                {"x": 0.5, "y": 0.5},
+                {"x": 0.9, "y": 0.5},
+                {"x": 0.9, "y": 0.9},
+                {"x": 0.5, "y": 0.9},
+            ],
+            enabled=True,
+            order=0,
+        )
+    ]
+    req.monitoring_session_id = None
+    default_req = PpeRequirementResponse(
+        camera_id="cam_1",
+        zone_id="cam_default",
+        profile="hat_vest_v1",
+        hat_required=True,
+        vest_required=False,
+        updated_at=None,
+    )
+    requirements_by_zone = {
+        "zone_01": PpeRequirementResponse(
+            camera_id="cam_1",
+            zone_id="zone_01",
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        )
+    }
+
+    result = service.infer_decoded_frame(
+        req,
+        np.zeros((120, 160, 3), dtype=np.uint8),
+        requirements=default_req,
+        requirements_by_zone=requirements_by_zone,
+    )
+
+    assert result.people[0].inside_zone is False
+    assert result.result == "violate"
+    assert result.people[0].missing_required_ppe == ["hat"]
+    assert result.people[0].active_violations[0].rule_key == "missing_ppe:hat"
