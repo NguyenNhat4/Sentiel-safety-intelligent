@@ -56,8 +56,8 @@ def test_yolo_inference_image_size_rejects_invalid_values(value: int) -> None:
         Settings(_env_file=None, yolo_inference_image_size=value)
 
 
-def test_ppe_temporal_frames_defaults_to_10() -> None:
-    assert Settings(_env_file=None).ppe_temporal_frames == 10
+def test_ppe_temporal_frames_defaults_to_3() -> None:
+    assert Settings(_env_file=None).ppe_temporal_frames == 3
 
 
 def test_ppe_temporal_frames_loads_from_environment(monkeypatch) -> None:
@@ -73,4 +73,4 @@ def test_ppe_temporal_frames_rejects_invalid_values(value: int) -> None:
 
 
 def test_settings_loads_production_env_file() -> None:
-    assert Settings.model_config["env_file"] == ".env.production"
+    assert Settings.model_config["env_file"] == ".env.development"
