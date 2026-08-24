@@ -83,7 +83,6 @@ class Settings(BaseSettings):
     person_detection_confidence: float = Field(default=0.6, gt=0.0, le=1.0)
     ppe_detection_confidence: float = Field(default=0.2, gt=0.0, le=1.0)
     yolo_inference_image_size: int = Field(default=960, ge=32, le=4096, multiple_of=32)
-    ppe_temporal_frames: int = Field(default=10, ge=1, le=60)
     vision_provider: Literal["local", "remote"] = "local"
     vision_remote_url: str = ""
     vision_remote_api_key: SecretStr = SecretStr("")
@@ -92,7 +91,8 @@ class Settings(BaseSettings):
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
     violation_frame: int = Field(default=5, ge=1, le=60)
-    ppe_alert_confirm_frames: int = Field(default=6, ge=1, le=60)
+    ppe_temporal_frames: int = Field(default=3, ge=1, le=60)
+    ppe_alert_confirm_frames: int = Field(default=1, ge=1, le=60)
     ppe_revoke_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
     zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
 
