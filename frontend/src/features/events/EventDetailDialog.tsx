@@ -3,6 +3,7 @@ import {assetUrl} from "../../api/config";
 import {loadEventDetail} from "../../api/events";
 import type {EventDetail, StoredDecisionContext} from "../../types";
 import {SnapshotOverlay} from "../alerts/SnapshotOverlay";
+import {violationRuleItemLabel} from "../alerts/violation-copy";
 import "./event-detail.css";
 
 interface EventDetailDialogProps {
@@ -134,7 +135,7 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
         <span>{context.scene.machine_state === "running" ? "Máy đang chạy" : "Máy đã dừng"}</span>
         <span>{context.scene.zone_name}</span>
       </div>
-      <ul>{context.rule.triggered_rule_keys.map(rule => <li key={rule}>{rule}</li>)}</ul>
+      <ul>{context.rule.triggered_rule_keys.map(rule => <li key={rule}>{violationRuleItemLabel(rule)}</li>)}</ul>
     </section>
     <section>
       <h3 className="audit-step-title"><span aria-hidden="true">3</span> Human review</h3>

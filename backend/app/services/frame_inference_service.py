@@ -256,22 +256,15 @@ class FrameInferenceService:
                 person.missing_required_ppe = missing
         else:
             for person, rule_person in zip(people, rule_people, strict=True):
-                inside_zone_ids = {item.zone_id for item in person.zone_memberships if item.inside}
-                applicable = [
-                    requirement for zone_id, requirement in requirements_by_zone.items() if zone_id in inside_zone_ids
-                ]
-                if not applicable and requirements is not None:
-                    applicable = [requirements]
                 missing: set[str] = set()
-                if request.machine_state == "running":
-                    for requirement in applicable:
-                        evaluated = self._rule_engine.evaluate(
-                            people=[rule_person],
-                            requirements=requirement,
-                            machine_state=request.machine_state,
-                            zone_active=False,
-                        )
-                        missing.update(evaluated.missing_required_ppe[0])
+                if request.machine_state == "running" and requirements is not None:
+                    evaluated = self._rule_engine.evaluate(
+                        people=[rule_person],
+                        requirements=requirements,
+                        machine_state=request.machine_state,
+                        zone_active=False,
+                    )
+                    missing.update(evaluated.missing_required_ppe[0])
                 person.missing_required_ppe = sorted(missing)
 
         observed_rules: dict[int, set[str]] = {}
@@ -286,19 +279,11 @@ class FrameInferenceService:
                     if membership_by_id.get(zone.zone_id) and requirements.zone_intrusion_enabled:
                         rules.add(f"zone_intrusion:{zone.zone_id}" if multi_zone_mode else "zone_intrusion")
             else:
-                if request.machine_state == "running":
-                    inside_zone_ids = {item.zone_id for item in person.zone_memberships if item.inside}
-                    req_dict = requirements_by_zone or {}
-                    applicable_reqs = [
-                        req_dict[zid] for zid in inside_zone_ids if zid in req_dict
-                    ]
-                    if not applicable_reqs and requirements is not None:
-                        applicable_reqs = [requirements]
-                    for req in applicable_reqs:
-                        if req.hat_required:
-                            applicable_ppe_rules.add((person.track_id, "missing_ppe:hat"))
-                        if req.vest_required:
-                            applicable_ppe_rules.add((person.track_id, "missing_ppe:vest"))
+                if request.machine_state == "running" and requirements is not None:
+                    if requirements.hat_required:
+                        applicable_ppe_rules.add((person.track_id, "missing_ppe:hat"))
+                    if requirements.vest_required:
+                        applicable_ppe_rules.add((person.track_id, "missing_ppe:vest"))
                 for zone in active_zones:
                     zone_requirement = requirements_by_zone.get(zone.zone_id)
                     if zone_requirement is None:

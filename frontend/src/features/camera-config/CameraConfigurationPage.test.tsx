@@ -15,7 +15,8 @@ const zone = {
   zone_id: "press", display_name: "Máy dập", points: [{x: .1, y: .1}, {x: .4, y: .1}, {x: .4, y: .5}, {x: .1, y: .5}], enabled: true, order: 0,
   ppe_requirements: {profile: "hat_vest_v1" as const, hat_required: false, vest_required: false, restricted_area_detection_enabled: false, zone_intrusion_enabled: true},
 };
-const configuration = {camera_id: "cam_3", revision: 7, asset_id: "asset-1", machine_state: "stopped" as const, zones: [zone], updated_at: null};
+const cameraPpe = {profile: "hat_vest_v1" as const, hat_required: false, vest_required: false};
+const configuration = {camera_id: "cam_3", revision: 7, asset_id: "asset-1", machine_state: "stopped" as const, ppe_requirements: cameraPpe, zones: [zone], updated_at: null};
 const emptyConfiguration = {...configuration, zones: []};
 
 beforeEach(() => {
@@ -50,6 +51,7 @@ it("saves asset, machine, zones and PPE once then returns without starting infer
   await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
   expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
     expected_revision: 7, asset_id: "asset-1", machine_state: "stopped",
+    ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true}),
     zones: [expect.objectContaining({zone_id: "press", ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true, zone_intrusion_enabled: true})})],
   }));
   expect(onSaved).toHaveBeenCalledOnce();
@@ -58,6 +60,7 @@ it("saves asset, machine, zones and PPE once then returns without starting infer
 it("loads persisted hat and vest requirements as enabled", async () => {
   loadMock.mockResolvedValue({
     ...configuration,
+    ppe_requirements: {...cameraPpe, hat_required: true, vest_required: true},
     zones: [{...zone, ppe_requirements: {...zone.ppe_requirements, hat_required: true, vest_required: true}}],
   });
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
@@ -80,7 +83,7 @@ it("lets users set PPE switches before creating a zone and carries them into the
   saveMock.mockResolvedValue({...emptyConfiguration, revision: 8});
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
 
-  expect(await screen.findByText("Hãy tạo một vùng để cấu hình yêu cầu PPE.")).toBeInTheDocument();
+  expect(await screen.findByText("PPE áp dụng toàn bộ khung hình; không cần tạo vùng.")).toBeInTheDocument();
   const hat = screen.getByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"});
   const vest = screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"});
   expect(hat).not.toBeChecked();
@@ -93,6 +96,24 @@ it("lets users set PPE switches before creating a zone and carries them into the
   expect(screen.queryByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeInTheDocument();
   expect(screen.queryByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).not.toBeInTheDocument();
   expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+});
+
+it("saves camera-wide PPE without requiring a zone", async () => {
+  const onSaved = vi.fn();
+  loadMock.mockResolvedValue(emptyConfiguration);
+  saveMock.mockResolvedValue({...emptyConfiguration, revision: 8, ppe_requirements: {...cameraPpe, hat_required: true}});
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+
+  fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+  const save = screen.getByRole("button", {name: "Lưu cấu hình"});
+  expect(save).toBeEnabled();
+  fireEvent.click(save);
+
+  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
+    ppe_requirements: expect.objectContaining({hat_required: true, vest_required: false}),
+    zones: [],
+  })));
+  expect(onSaved).toHaveBeenCalledOnce();
 });
 
 it("allows disconnecting camera source and saves asset_id as null", async () => {

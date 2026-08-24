@@ -22,7 +22,7 @@ const result = (sessionId: string, fps: number): CameraInferenceResult => ({type
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(listCameraConfigurations).mockResolvedValue([{camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", zones: [], updated_at: null}]);
+  vi.mocked(listCameraConfigurations).mockResolvedValue([{camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null}]);
   vi.mocked(listMediaAssets).mockResolvedValue([{id: "asset-1", display_name: "Demo", media_type: "video", status: "READY", content_type: "video/mp4", size_bytes: 10, uploaded_at: "2026-08-23T00:00:00Z", assigned_camera_id: "cam_1", can_delete: false}]);
   vi.mocked(listCameraSessions).mockResolvedValue([session]);
   vi.mocked(runSimulation).mockResolvedValue({sessions: [{...session, id: "session-run", status: "STARTING"}], errors: {}});
@@ -111,4 +111,83 @@ it("opens direct-camera HITL review and persists the reviewed occurrence", async
     occurrence_ids: ["00000000-0000-0000-0000-000000000002"],
     status: "acknowledged",
   });
+});
+
+it("persists a shared occurrence once and closes the HITL review", async () => {
+  render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
+  await screen.findByText("RUNNING");
+  const sharedViolation = {
+    occurrence_id: "00000000-0000-0000-0000-000000000003",
+    rule_key: "zone_intrusion:press",
+    zone_id: "press",
+    is_new: true,
+  };
+  const person = (trackId: number) => ({
+    track_id: trackId,
+    bbox: [10, 10, 30, 80] as [number, number, number, number],
+    confidence: 0.95,
+    foot_point: [20, 80] as [number, number],
+    inside_zone: true,
+    ppe: {hat: {status: "present" as const, confidence: 0.9}, vest: {status: "present" as const, confidence: 0.9}},
+    missing_required_ppe: [],
+    active_violations: [sharedViolation],
+  });
+  resultHandler({
+    ...result("session-current", 1.5),
+    result: "violate",
+    review_required: true,
+    has_active_violation: true,
+    monitoring_session_id: "00000000-0000-0000-0000-000000000001",
+    snapshot_data: "data:image/jpeg;base64,AA==",
+    people: [person(7), person(8)],
+    rule: {
+      person_inside_zone: true,
+      machine_state: "running",
+      ppe_profile: "hat_vest_v1",
+      camera_id: "cam_1",
+      zone_id: "press",
+      ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false},
+      ppe_alert: false,
+    },
+  });
+
+  const violate = await screen.findByRole("button", {name: /Vi phạm thực tế/});
+  fireEvent.click(violate);
+  fireEvent.click(violate);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(saveReviewedEvent).toHaveBeenCalledOnce();
+});
+
+it("names the missing PPE item in the HITL popup", async () => {
+  render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
+  await screen.findByText("RUNNING");
+  resultHandler({
+    ...result("session-current", 1.5),
+    result: "violate",
+    review_required: true,
+    has_active_violation: true,
+    monitoring_session_id: "00000000-0000-0000-0000-000000000001",
+    people: [{
+      track_id: 9,
+      bbox: [10, 10, 30, 80],
+      confidence: 0.95,
+      foot_point: [20, 80],
+      inside_zone: false,
+      ppe: {hat: {status: "missing", confidence: null}, vest: {status: "present", confidence: 0.9}},
+      missing_required_ppe: ["hat"],
+      active_violations: [{occurrence_id: "00000000-0000-0000-0000-000000000004", rule_key: "missing_ppe:hat", zone_id: "camera_wide", is_new: true}],
+    }],
+    rule: {
+      person_inside_zone: false,
+      machine_state: "running",
+      ppe_profile: "hat_vest_v1",
+      camera_id: "cam_1",
+      zone_id: "camera_wide",
+      ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: false},
+      ppe_alert: true,
+    },
+  });
+
+  expect(await screen.findByRole("heading", {name: "Phát hiện thiếu mũ bảo hộ"})).toBeInTheDocument();
+  expect(screen.queryByText("Phát hiện thiếu PPE")).not.toBeInTheDocument();
 });

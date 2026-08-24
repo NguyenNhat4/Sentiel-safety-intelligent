@@ -78,6 +78,8 @@ describe("EventDetailDialog", () => {
     expect(screen.getByText(/91%/)).toBeInTheDocument();
     expect(screen.getByRole("heading", {name: "Rule quyết định"})).toBeInTheDocument();
     expect(screen.getByText(/safety_rule_v1/)).toBeInTheDocument();
+    expect(screen.getByText("Thiếu mũ bảo hộ")).toBeInTheDocument();
+    expect(screen.queryByText("missing_ppe:hat")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", {name: "Human review"})).toBeInTheDocument();
     expect(screen.queryByText("BƯỚC 1")).not.toBeInTheDocument();
     expect(screen.queryByText("BƯỚC 2")).not.toBeInTheDocument();

@@ -52,6 +52,11 @@ class CameraConfigurationService:
             revision=configuration.revision if configuration else (collection.revision if collection else 0),
             asset_id=configuration.asset_id if configuration else None,
             machine_state=configuration.machine_state if configuration else "stopped",
+            ppe_requirements=PpeRequirementUpdate(
+                profile="hat_vest_v1",
+                hat_required=configuration.hat_required if configuration else False,
+                vest_required=configuration.vest_required if configuration else False,
+            ),
             zones=[self._zone_response(record, requirements.get(record.zone_id)) for record in zones],
             updated_at=configuration.updated_at if configuration else (collection.updated_at if collection else None),
         )
@@ -81,6 +86,8 @@ class CameraConfigurationService:
                 self.db.add(configuration)
             configuration.asset_id = str(payload.asset_id) if payload.asset_id is not None else None
             configuration.machine_state = payload.machine_state
+            configuration.hat_required = payload.ppe_requirements.hat_required
+            configuration.vest_required = payload.ppe_requirements.vest_required
             configuration.revision = current_revision + 1
             configuration.updated_at = datetime.now(UTC)
 

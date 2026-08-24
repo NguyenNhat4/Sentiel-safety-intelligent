@@ -50,7 +50,7 @@ Các bất biến an toàn:
 
 1. LLM chỉ diễn giải hoặc đề xuất rule có schema; deterministic code quyết định severity/routing.
 2. Zone entry của một vùng enabled luôn critical, dù machine state là `running` hay `stopped`. Machine state vẫn là audit/operational context, không phải điều kiện chặn zone alert. Lỗi kênh ngoài không làm mất cảnh báo trong ứng dụng.
-3. PPE chỉ được đánh giá khi máy đang `running`; khi máy `stopped`, các switch requirement và observation PPE không được tạo PPE alert.
+3. PPE là requirement cấp camera, áp dụng cho mọi người trong toàn khung hình mà không cần zone, và chỉ được đánh giá khi máy đang `running`; khi máy `stopped`, observation PPE không tạo PPE alert.
 4. Dedup theo session + track + rule key có `zone_id` + occurrence; retry dùng idempotency key. Zone collection không có giới hạn số lượng nghiệp vụ cố định và phải bị từ chối nếu hai polygon giao, chạm hoặc chứa nhau.
 5. Privacy thất bại thì không persist snapshot và không được gắn `privacy_blurred=true`.
 6. Audit giữ rule version, `zone_id`, machine state của zone, shift, confidence, actor và transition; không giữ raw stream. Một review nhiều vùng vẫn lưu event riêng theo từng zone.

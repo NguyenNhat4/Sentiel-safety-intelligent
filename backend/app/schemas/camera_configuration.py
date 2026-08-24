@@ -31,6 +31,9 @@ class CameraConfigurationUpdate(BaseModel):
     expected_revision: int = Field(ge=0)
     asset_id: UUID | None = None
     machine_state: Literal["running", "stopped"]
+    ppe_requirements: PpeRequirementUpdate = Field(
+        default_factory=lambda: PpeRequirementUpdate(profile="hat_vest_v1", hat_required=False, vest_required=False)
+    )
     zones: list[CameraConfigurationZone] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
@@ -64,5 +67,8 @@ class CameraConfigurationResponse(BaseModel):
     revision: int
     asset_id: UUID | None
     machine_state: Literal["running", "stopped"]
+    ppe_requirements: PpeRequirementUpdate = Field(
+        default_factory=lambda: PpeRequirementUpdate(profile="hat_vest_v1", hat_required=False, vest_required=False)
+    )
     zones: list[CameraConfigurationZone]
     updated_at: datetime | None

@@ -7,6 +7,7 @@ import {listMediaAssets} from "../../api/media-assets";
 import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
 import type {CameraConfiguration, CameraInferenceResult, CameraSession, InferenceResult, MediaAsset, ReviewStatus, UserRole} from "../../types";
 import {ReviewModal} from "../alerts/ReviewModal";
+import {violationRuleLabel} from "../alerts/violation-copy";
 import {AuthenticatedMedia} from "../media/AuthenticatedMedia";
 import {DetectionOverlay} from "./DetectionOverlay";
 import {buildEventPayload} from "./use-monitor";
@@ -31,6 +32,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const runningRef = useRef(false);
   const replayingRef = useRef(false);
+  const reviewSavingRef = useRef(false);
   const sessionsRef = useRef(sessions);
   const configurationsRef = useRef(configurations);
   const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
@@ -173,20 +175,26 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
 
   async function review(status: ReviewStatus) {
     const pending = pendingReviewRef.current;
-    if (!pending) return;
+    if (!pending || reviewSavingRef.current) return;
     const configuration = configurations[pending.camera_id];
-    setReviewSaving(true);
+    reviewSavingRef.current = true; setReviewSaving(true);
     setError("");
     try {
+      const claimedOccurrences = new Set<string>();
       const payloads = pending.people.flatMap(person => {
         const newViolations = person.active_violations?.filter(violation => violation.is_new) ?? [];
-        if (!newViolations.length) return [];
-        const zoneId = newViolations.find(violation => violation.zone_id)?.zone_id ?? pending.rule.zone_id;
+        const unclaimedViolations = newViolations.filter(violation => {
+          if (claimedOccurrences.has(violation.occurrence_id)) return false;
+          claimedOccurrences.add(violation.occurrence_id);
+          return true;
+        });
+        if (!unclaimedViolations.length) return [];
+        const zoneId = unclaimedViolations.find(violation => violation.zone_id)?.zone_id ?? pending.rule.zone_id;
         const zone = configuration?.zones.find(item => item.zone_id === zoneId);
         const inference = {
           ...pending,
           type: "inference_result",
-          people: [{...person, active_violations: newViolations}],
+          people: [{...person, active_violations: unclaimedViolations}],
         } satisfies InferenceResult;
         return [buildEventPayload(
           status,
@@ -197,12 +205,12 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
         )];
       });
       if (!payloads.length) throw new Error("Không có occurrence mới để lưu.");
-      await Promise.all(payloads.map(saveReviewedEvent));
+      for (const payload of payloads) await saveReviewedEvent(payload);
       showReview(reviewQueueRef.current.shift() ?? null);
     } catch (reason) {
       setError(errorText(reason));
     } finally {
-      setReviewSaving(false);
+      reviewSavingRef.current = false; setReviewSaving(false);
     }
   }
 
@@ -210,11 +218,8 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const violationKeys = pendingReview?.people.flatMap(person => person.active_violations
     ?.filter(violation => violation.is_new)
     .map(violation => violation.rule_key) ?? []) ?? [];
-  const reviewTitle = violationKeys.some(key => key.startsWith("restricted_area_person"))
-    ? "Phát hiện người trong phạm vi hạn chế"
-    : violationKeys.some(key => key.startsWith("zone_intrusion"))
-      ? "Phát hiện xâm nhập vùng nguy hiểm"
-      : "Phát hiện thiếu PPE";
+  const violationLabel = violationRuleLabel(violationKeys);
+  const reviewTitle = `Phát hiện ${violationLabel.charAt(0).toLocaleLowerCase("vi-VN")}${violationLabel.slice(1)}`;
 
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 

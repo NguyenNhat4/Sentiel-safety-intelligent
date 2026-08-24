@@ -317,17 +317,12 @@ class CameraSessionRuntime:
             )
             for zone in configuration.zones
         }
-        default_requirement = next(
-            iter(requirements_by_zone.values()),
-            PpeRequirementResponse(
-                camera_id=context.camera_id,
-                zone_id="zone_01",
-                profile="hat_vest_v1",
-                hat_required=False,
-                vest_required=False,
-                is_configured=False,
-                updated_at=None,
-            ),
+        default_requirement = PpeRequirementResponse(
+            camera_id=context.camera_id,
+            zone_id="camera_wide",
+            is_configured=True,
+            updated_at=None,
+            **configuration.ppe_requirements.model_dump(),
         )
         request = FrameInferenceRequest(
             image_data="",

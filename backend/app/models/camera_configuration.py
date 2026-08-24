@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, text
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import relationship
 
 from backend.app.core.database import Base
@@ -19,6 +19,8 @@ class CameraConfiguration(Base):
     camera_id = Column(String(16), primary_key=True)
     asset_id = Column(String(36), ForeignKey("media_assets.id", ondelete="RESTRICT"), unique=True, nullable=True)
     machine_state = Column(String(20), nullable=False, default="stopped")
+    hat_required = Column(Boolean, nullable=False, default=False)
+    vest_required = Column(Boolean, nullable=False, default=False)
     revision = Column(Integer, nullable=False, default=0)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now)
     asset = relationship("MediaAsset", back_populates="assigned_configuration")

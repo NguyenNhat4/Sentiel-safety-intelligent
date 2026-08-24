@@ -33,7 +33,7 @@ export function ReviewModal({
   if (!isOpen) return null;
   const affectedZones = [...new Set(
     people?.flatMap(person => person.active_violations
-      ?.filter(violation => violation.is_new && violation.zone_id)
+      ?.filter(violation => violation.is_new && violation.zone_id && violation.zone_id !== "camera_wide")
       .map(violation => violation.zone_id as string) ?? []) ?? [],
   )];
 

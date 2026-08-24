@@ -104,6 +104,7 @@ P-047/
 │   │       └── 20260823_01_add_media_assets_and_camera_sessions.py # US-29 direct media runtime
 │   │       └── 20260823_02_add_media_storage_backend.py # Per-asset filesystem/S3 storage marker
 │   │       └── 20260824_01_repair_sqlite_camera_session_index.py # Repair SQLite active-session partial index
+│   │       └── 20260824_02_camera_wide_ppe_requirements.py # Persist/backfill camera-wide hat/vest requirements
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -157,7 +158,7 @@ P-047/
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
 │   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── alerts/  # Rule result, detection list summary, ReviewModal, and SnapshotOverlay
+│   │   │   ├── alerts/  # Rule result, shared violation copy, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx

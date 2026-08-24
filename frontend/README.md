@@ -39,14 +39,14 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 1. System Admin uploads a named image/video directly to the configured Railway Bucket
    through a presigned request; only backend-validated `READY` assets are selectable.
-2. Safety Manager selects a Live Monitor slot, previews its asset, edits normalized zones and PPE, then saves one atomic draft.
+2. Safety Manager selects a Live Monitor slot, previews its asset, edits camera-wide PPE and optional normalized zones, then saves one atomic draft.
 3. Save returns to Live Monitor and does not start inference.
 4. **Chạy mô phỏng** starts fresh server-owned sessions for valid cameras; Replay starts one completed video again.
 5. `/api/v1/ws/camera-detections` carries lifecycle, session ID, source time, rolling inference FPS and detections.
 6. The UI ignores stale session output and draws canonical person/hat/vest observations in source coordinates.
 7. Run creates fresh sessions for every valid configured camera. Replay creates one
    fresh session for only the selected camera and remounts playback at the beginning.
-8. Newly opened occurrences are queued for mandatory HITL review with their own transient snapshot; each affected tracked person is persisted idempotently as acknowledged or false alarm before the next queued review opens.
+8. Newly opened occurrences are queued for mandatory HITL review with their own transient snapshot; duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.
 
 ## Source Boundaries
 
