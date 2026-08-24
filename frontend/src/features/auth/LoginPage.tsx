@@ -73,13 +73,13 @@ export function LoginPage({onAuthenticated}: LoginPageProps) {
 
 function DemoAccounts({onFill}: {onFill: (account: typeof DEMO_ACCOUNTS[number]) => void}) {
   return <section className="demo-accounts" aria-labelledby="demo-accounts-title">
-    <div className="demo-heading"><div><p className="eyebrow">DEMO LOCAL</p><h3 id="demo-accounts-title">Tài khoản dùng thử</h3></div><span>Mật khẩu chung: <strong>Sentinel123!</strong></span></div>
+    <div className="demo-heading"><div><p className="eyebrow">DEMO LOCAL</p><h3 id="demo-accounts-title">Tài khoản dùng thử</h3></div></div>
     <div className="demo-list">
       {DEMO_ACCOUNTS.map(account => <div className="demo-account" key={account.email}>
         <div className="demo-account-info"><strong>{account.email}</strong><span>{account.role}</span></div>
         <div className="demo-account-actions"><button type="button" aria-label={`Dùng tài khoản ${account.email}`} onClick={() => onFill(account)}>Dùng tài khoản</button></div>
       </div>)}
     </div>
-    <p className="demo-footnote">Các tài khoản này chỉ dành cho demo môi trường local.</p>
+    <p className="demo-footnote">Các tài khoản này chỉ dành cho demo môi trường.</p>
   </section>;
 }

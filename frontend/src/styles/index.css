@@ -10,6 +10,9 @@
 
 .chart-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.chart-heading h3{margin-bottom:4px}.chart-heading p{font-size:10px;max-width:520px}.latency-frame-chart{overflow:hidden}.latency-frame-chart svg{width:100%;height:220px;margin-top:12px;background:linear-gradient(180deg,#e8f4ec,#fff);border-radius:7px}.latency-frame-chart line{stroke:#c9d8d0;stroke-width:1}.latency-frame-chart polyline{fill:none;stroke:var(--green);stroke-width:2.5;vector-effect:non-scaling-stroke}.chart-axis{display:flex;justify-content:space-between;color:var(--muted);font:10px "DM Mono",monospace;margin-top:5px}
 
+/* Operational tables are rendered as page sections, not cards. */
+.operations-table-card{background:transparent;border:0;border-radius:0;padding:0;margin-bottom:16px}
+
 
 .detections-section{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .review-zone-list{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 10px;border:1px solid #f3cac6;border-radius:7px;background:var(--red-soft);font-size:9px}.review-zone-list strong{margin-right:4px;color:var(--red)}.review-zone-list span{padding:3px 7px;border-radius:99px;background:#fff;border:1px solid #e8b8b3;font:700 8px "DM Mono"}

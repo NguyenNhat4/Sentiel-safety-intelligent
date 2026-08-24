@@ -53,7 +53,7 @@ describe("Sentinel authentication", () => {
     await waitFor(() => expect(screen.getByRole("button", {name: /Đăng nhập/})).toBeInTheDocument());
     expect(screen.getByText("Tài khoản dùng thử")).toBeInTheDocument();
     expect(screen.getByText("admin@sentinel.local")).toBeInTheDocument();
-    expect(screen.getByText("Mật khẩu chung:")).toBeInTheDocument();
+    expect(screen.queryByText("Mật khẩu chung:")).not.toBeInTheDocument();
   });
 
   it("fills the login form from a demo account shortcut", async () => {
@@ -125,6 +125,7 @@ describe("Sentinel authentication", () => {
     fireEvent.click(screen.getByRole("button", {name: /Đăng nhập/}));
 
     await screen.findByRole("button", {name: /Thư viện media/});
+    expect(screen.getByRole("button", {name: /Quan sát hệ thống/})).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Live monitor/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Quản trị hệ thống/}));
@@ -158,6 +159,7 @@ describe("Sentinel React application", () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
+    expect(screen.queryByRole("button", {name: /Quan sát hệ thống/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
