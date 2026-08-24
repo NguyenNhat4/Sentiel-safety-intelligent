@@ -68,7 +68,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
-- [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
+- [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. The page actions are grouped into media, zone/safety-rule, and save/navigation sections with responsive mobile layout. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
 
 - Added `scripts/clean_local_data.py` and `make clean-local-data` for explicit local-only PostgreSQL cleanup. The script preserves schema/migration history, clears configured media/snapshot/log directories, rejects Railway/production targets, and its three guard tests pass.
 
