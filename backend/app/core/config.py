@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     media_asset_dir: str = "data/media-assets"
     max_media_asset_bytes: int = Field(default=1024 * 1024 * 1024, gt=0, le=10 * 1024 * 1024 * 1024)
-    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=20.0)
+    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=40.0)
     media_storage_backend: Literal["filesystem", "s3"] = "filesystem"
     media_storage_bucket: str = ""
     media_storage_endpoint_url: str = ""
@@ -90,11 +90,11 @@ class Settings(BaseSettings):
     face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
-    violation_frame: int = Field(default=5, ge=1, le=60)
+    violation_frame: int = Field(default=7, ge=1, le=60)
     ppe_temporal_frames: int = Field(default=3, ge=1, le=60)
-    ppe_alert_confirm_frames: int = Field(default=1, ge=1, le=60)
+    ppe_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
     ppe_revoke_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
-    zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
+    zone_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
 
     model_config = SettingsConfigDict(
         env_file=(".env.development"),

@@ -12,9 +12,10 @@ import backend.app.services.media_asset_service as media_asset_service_module
 from backend.app.integrations.media_storage import PresignedUpload, StoredObjectMetadata
 from backend.app.models.user import UserRole
 from backend.app.schemas.analysis import FrameInferenceRequest, FrameInferenceResponse
-from backend.app.schemas.camera_configuration import CameraConfigurationResponse
+from backend.app.schemas.camera_configuration import CameraConfigurationResponse, CameraConfigurationUpdate
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.auth_service import AuthService
+from backend.app.services.camera_configuration_service import CameraConfigurationService
 from backend.app.services.camera_session_runtime import CameraSessionRuntime, SessionContext
 from backend.app.services.frame_inference_service import FrameInferenceService
 from backend.app.services.media_asset_service import media_asset_settings
@@ -37,6 +38,11 @@ def _configuration_payload(asset_id: str, revision: int = 0) -> dict:
         "expected_revision": revision,
         "asset_id": asset_id,
         "machine_state": "running",
+        "ppe_requirements": {
+            "profile": "hat_vest_v1",
+            "hat_required": True,
+            "vest_required": False,
+        },
         "zones": [
             {
                 "zone_id": "press",
@@ -210,6 +216,7 @@ def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session,
     saved = client.put("/api/v1/camera-configurations/cam_1", json=_configuration_payload(asset["id"]))
     assert saved.status_code == 200
     assert saved.json()["revision"] == 1
+    assert saved.json()["ppe_requirements"]["hat_required"] is True
     assert saved.json()["zones"][0]["ppe_requirements"]["hat_required"] is True
 
     conflict = client.put("/api/v1/camera-configurations/cam_2", json=_configuration_payload(asset["id"]))
@@ -223,6 +230,51 @@ def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session,
     assert (
         client.put("/api/v1/camera-configurations/cam_9", json=_configuration_payload(asset["id"])).status_code == 404
     )
+
+
+def test_camera_configuration_saves_camera_wide_ppe_without_zones(client):
+    saved = client.put(
+        "/api/v1/camera-configurations/cam_1",
+        json={
+            "expected_revision": 0,
+            "asset_id": None,
+            "machine_state": "running",
+            "ppe_requirements": {
+                "profile": "hat_vest_v1",
+                "hat_required": True,
+                "vest_required": True,
+            },
+            "zones": [],
+        },
+    )
+
+    assert saved.status_code == 200
+    assert saved.json()["zones"] == []
+    assert saved.json()["ppe_requirements"]["hat_required"] is True
+    assert saved.json()["ppe_requirements"]["vest_required"] is True
+
+
+def test_camera_configuration_service_persists_camera_wide_ppe_without_zones(db_session):
+    saved = CameraConfigurationService(db_session).save(
+        "cam_2",
+        CameraConfigurationUpdate.model_validate(
+            {
+                "expected_revision": 0,
+                "asset_id": None,
+                "machine_state": "running",
+                "ppe_requirements": {
+                    "profile": "hat_vest_v1",
+                    "hat_required": True,
+                    "vest_required": True,
+                },
+                "zones": [],
+            }
+        ),
+    )
+
+    assert saved.zones == []
+    assert saved.ppe_requirements.hat_required is True
+    assert saved.ppe_requirements.vest_required is True
 
 
 def test_image_runtime_infers_once_and_releases_vision_state(tmp_path, monkeypatch):

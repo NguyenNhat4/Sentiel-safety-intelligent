@@ -1,5 +1,18 @@
 # Benchmark scripts
 
+## Dọn dữ liệu local
+
+`clean_local_data.py` xóa rows trong PostgreSQL local, giữ nguyên schema và
+migration history, đồng thời dọn media uploads, snapshots và operational logs.
+Script từ chối database Railway/production và bắt buộc cờ xác nhận:
+
+```bash
+make clean-local-data
+```
+
+Kiểm tra `DATABASE_URL` trong `.env.development` trước khi chạy. Lệnh này
+không thể khôi phục dữ liệu đã xóa.
+
 ## Đồng bộ code lên Google Drive
 
 `sync_code_to_google_drive.sh` dùng `rclone` để đồng bộ duy nhất các file

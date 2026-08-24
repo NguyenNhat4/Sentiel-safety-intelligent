@@ -29,6 +29,7 @@ export interface CameraConfiguration {
   revision: number;
   asset_id: string | null;
   machine_state: MachineState;
+  ppe_requirements: PpeRequirementUpdate;
   zones: CameraConfigurationZone[];
   updated_at: string | null;
 }
@@ -37,6 +38,7 @@ export interface CameraConfigurationUpdate {
   expected_revision: number;
   asset_id: string | null;
   machine_state: MachineState;
+  ppe_requirements: PpeRequirementUpdate;
   zones: CameraConfigurationZone[];
 }
 

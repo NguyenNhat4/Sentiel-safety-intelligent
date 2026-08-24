@@ -7,16 +7,16 @@
 Không được tự ý thay đổi các quy tắc dưới đây chỉ để làm xanh một test; mọi
 thay đổi cần xác nhận sản phẩm, decision record và regression tests.
 
-Bản chốt theo `DECISIONS.md` (2026-08-21):
+Bản chốt theo `DECISIONS.md` (2026-08-24):
 - **Zone Intrusion (`zone_intrusion_enabled=true`)**: Xâm nhập vùng nguy hiểm luôn báo vi phạm (`violate`), bất kể trạng thái máy `running` hay `stopped`.
-- **PPE Requirements (`hat_required`, `vest_required`)**: Thiếu PPE chỉ báo vi phạm khi người nằm trong zone có yêu cầu PPE và trạng thái máy đang hoạt động (`machine_state=running`). Trạng thái `stopped` chỉ là ngữ cảnh vận hành và không gate cảnh báo PPE.
+- **PPE Requirements (`hat_required`, `vest_required`)**: PPE là cấu hình cấp camera, áp dụng cho mọi người trong toàn khung hình và không cần zone. Thiếu PPE chỉ báo vi phạm khi `machine_state=running`; `stopped` gate cảnh báo PPE.
 
 ## Rule sau khi triển khai
 
 Một frame là `violate` khi có ít nhất một điều kiện sau:
 
 - Có ít nhất một người nằm trong zone có `zone_intrusion_enabled=true` (bất kể máy `running` hay `stopped`).
-- Có ít nhất một người nằm trong zone khi máy `running` mà thiếu PPE bắt buộc (`hat_required` hoặc `vest_required`).
+- Có ít nhất một người trong khung hình khi máy `running` mà thiếu PPE bắt buộc (`hat_required` hoặc `vest_required`).
 - Có ít nhất một người thuộc vùng nguy hiểm bị kích hoạt `restricted_area_detection_enabled=true`.
 
 Không có người thì frame luôn `normal`; không đánh giá thiếu PPE khi không có person detection.
@@ -33,7 +33,9 @@ Không có người thì frame luôn `normal`; không đánh giá thiếu PPE kh
 | Có | Có (`intrusion=true`) | Có | OFF | `violate` (bởi zone intrusion) |
 | Có | Có (`intrusion=true`) | Có | ON | `violate` |
 
-Với nhiều người, chỉ cần một người vi phạm là toàn frame `violate` và UI mở một review popup. Backend vẫn giữ `track_id`, `occurrence_id` và `zone_id` riêng để dedup, audit, thống kê và persist event theo zone.
+Với nhiều người, chỉ cần một người vi phạm là toàn frame `violate` và UI mở một review popup. Backend vẫn giữ `track_id` và `occurrence_id` riêng để dedup/audit; `zone_id` chỉ gắn cho rule thuộc zone.
+
+HITL debounce: UI chỉ mở popup khi cùng một violation đã được xác nhận trong **7 frame liên tiếp**. Một frame bình thường hoặc chưa xác định sẽ reset chuỗi đang chờ. Xác nhận chất lượng PPE ở vision là một gate riêng và không được dùng để bỏ qua debounce 7 frame.
 
 ## Luồng runtime
 
@@ -43,28 +45,28 @@ flowchart LR
     B --> C[People + PPE observations + foot points]
     C --> D[Backend SafetyRuleEngine]
     D --> E{Any person in enabled zone?}
-    D --> F{Any required PPE missing?}
+    D --> F{Any camera-wide PPE missing while running?}
     E --> G[Aggregate frame decision]
     F --> G
     G -->|No| H[NORMAL\nno review snapshot]
     G -->|Yes| I[VIOLATE\nreview_required]
     I --> J[One UI review popup]
-    I --> K[Per-track occurrences\nper-zone event persistence]
+    I --> K[Per-track occurrences\nidempotent event persistence]
 ```
 
 ## Boundary không thay đổi
 
 - Vision chỉ phát hiện/track/đo foot point và trả observation; không quyết định alert.
 - Backend service là nơi quyết định `result`, `review_required` và occurrence.
-- REST/WebSocket payload hiện hành giữ nguyên; không tạo schema frame-event mới.
-- Review được gộp ở UI theo frame, nhưng persistence vẫn tạo event riêng theo zone.
+- Camera configuration thêm `ppe_requirements` cấp camera; field PPE trong zone được giữ tương thích trong giai đoạn chuyển đổi.
+- Review được gộp ở UI theo frame; persistence tạo tối đa một request cho mỗi occurrence và một event theo track/session.
 - Privacy snapshot vẫn fail-closed và chỉ persist sau khi operator xác nhận.
 
 ## Team checklist
 
-- [ ] Unit rule test cho machine `running` và `stopped` có cùng kết quả khi người ở zone.
-- [ ] REST/WebSocket test cho stopped-zone trả `violate` và `review_required=true`.
+- [ ] Unit rule test cho PPE ngoài zone khi `running` và không cảnh báo PPE khi `stopped`.
+- [ ] Camera configuration test lưu/reload PPE với `zones=[]`.
 - [ ] Test không có người trả `normal` dù PPE requirement bật.
 - [ ] Test nhiều người chỉ cần một người vi phạm thì aggregate frame là `violate`.
-- [ ] Kiểm tra occurrence/dedup và event theo zone không bị thay đổi.
+- [ ] Kiểm tra occurrence trùng trong popup chỉ tạo một request và popup đóng sau khi lưu thành công.
 - [ ] Cập nhật `DECISIONS.md`, `PROGRESS.md`, `ARCHITECTURE.md` và `backend/README.md` sau khi implementation hoàn tất.

@@ -37,6 +37,7 @@ US-29 uses backend-owned media and explicit sessions:
 - `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
 - `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.
 - A newly opened direct-camera occurrence carries one transient review JPEG; Live Monitor queues human review and persists only the operator outcome through the existing event API. Terminal model state is released without invalidating queued occurrence context.
+- HITL debounce is seven consecutive accepted violating frames for every violation type. A normal or unknown observation resets the pending sequence; vision-side PPE confirmation remains a separate observation gate.
 - Streamer, MediaMTX, HLS, RTSP and Connect/Disconnect are not runtime contracts.
 
 Inference keeps the decoded source frame at its original resolution until the
@@ -57,7 +58,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans. In the connected-camera path, PPE rules apply to a person inside the configured zone while the camera-wide machine state is running; restricted-area and intrusion switches are evaluated independently for that zone. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`. Backend derives `missing` only when a canonical person meets the confidence/association guard and has no associated required PPE detection.
+GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans for compatibility. The fixed-camera aggregate persists `ppe_requirements` at camera level, including when `zones=[]`; hat/vest apply to every qualified person in the frame only while the camera-wide machine state is running. Restricted-area and intrusion switches remain per-zone. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only the first violation alert for that person in the session sets `review_required=true`. Later rules or re-violations remain observable without opening another review. Reviewed event requests carry the occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 

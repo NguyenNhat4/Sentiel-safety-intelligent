@@ -49,6 +49,18 @@ def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     assert opened[4][0].is_new is True
 
 
+def test_default_hitl_debounce_requires_seven_consecutive_frames():
+    service = ViolationTrackingService(activation_frames=7)
+
+    for frame in range(1, 7):
+        pending = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=float(frame))
+        assert pending[4] == []
+
+    opened = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=7.0)
+
+    assert opened[4][0].is_new is True
+
+
 def test_rule_prefix_can_use_a_shorter_activation_threshold():
     service = ViolationTrackingService(
         activation_frames=4,
@@ -124,6 +136,7 @@ def test_nearby_track_id_handoff_keeps_occurrence_while_person_exits():
 
     assert handed_off.occurrence_id == first.occurrence_id
     assert handed_off.is_new is False
+    assert service.occurrence_context(first.occurrence_id) == ("session-a", 4, "zone_intrusion")
 
 
 def test_distant_new_track_still_opens_an_independent_occurrence():

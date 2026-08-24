@@ -1,4 +1,4 @@
-import {memo, useEffect, useState, type ReactNode} from "react";
+import {memo, type ReactNode} from "react";
 import type {AuthenticatedUser} from "../types";
 
 export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "media-library" | "camera-config";
@@ -22,9 +22,8 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
       <nav>
         {user.role === "safety_manager" && <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>}
         {user.role === "safety_manager" && <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>}
-        {user.role === "safety_manager" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
+        {user.role === "system_admin" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
         {user.role !== "safety_manager" && <button className={`nav-item ${page === "area" ? "active" : ""}`} onClick={() => onNavigate("area")}><span>⌁</span> Dashboard</button>}
-        <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
          {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
          {user.role === "system_admin" && <button className={`nav-item ${page === "media-library" ? "active" : ""}`} onClick={() => onNavigate("media-library")}><span>▣</span> Thư viện media</button>}
       </nav>
@@ -43,10 +42,6 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
     <main>
       <header>
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
-        <div className="header-actions">
-          <ClockDisplay />
-          <button className="icon-btn">⌕</button><button className="icon-btn notification">♢<i /></button>
-        </div>
       </header>
       {children}
     </main>
@@ -54,20 +49,3 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
 });
 
 function cameraNumber(cameraId?: string): string { return cameraId?.replace("cam_", "") || ""; }
-
-function ClockDisplay() {
-  const [clock, setClock] = useState("--:--:--");
-  useEffect(() => {
-    const update = () => setClock(new Date().toLocaleTimeString("vi-VN", {hour12: false}));
-    update();
-    const interval = window.setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="clock">
-      <span>{clock}</span>
-      <small>Safety shirt baseline</small>
-    </div>
-  );
-}

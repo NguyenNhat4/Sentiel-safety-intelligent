@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -25,7 +25,7 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-23: [Cross-cutting] Camera disconnect và rule contract
 
 - Camera configuration cho phép `asset_id=null`; UI có nút “Ngắt kết nối nguồn media” ngoài dropdown và vẫn lưu được trạng thái null.
-- Zone intrusion là violation bất kể `machine_state`; thiếu PPE chỉ được xét khi người nằm trong zone có requirement và máy đang `running`.
+- Zone intrusion là violation bất kể `machine_state`; thiếu PPE chỉ được xét khi máy đang `running` và không phụ thuộc zone.
 - `docs/architecture/alert-rule-contract.md` là business contract bắt buộc đọc; không tự ý đổi rule nếu chưa có product approval, decision record và regression tests.
 
 ### 2026-08-23: [Backend] One violation alert per person per video session
@@ -47,12 +47,24 @@ This file contains only decisions that currently constrain implementation. Super
 - Playback uses a short-lived presigned GET so video byte ranges bypass the application service. `MEDIA_ASSET_DIR` remains a server-owned OpenCV read-through cache.
 - Run starts fresh inference for every valid configured camera. Replay starts only the selected camera and its new session ID resets playback, tracking and overlays.
 
+### 2026-08-24: [Backend/Frontend] Camera-wide PPE and deterministic HITL persistence
+
+- `hat_required` and `vest_required` are persisted on the fixed camera configuration, remain saveable with `zones=[]`, and apply to every qualified person in the frame only while camera-wide machine state is `running`.
+- Zone records continue to own `zone_intrusion_enabled` and `restricted_area_detection_enabled`; their embedded PPE fields remain additive compatibility data during migration.
+- A grouped HITL popup may contain multiple people, but the browser claims each occurrence ID once, serializes event writes, blocks duplicate submit, and advances the queue only after every valid write succeeds.
+
+### 2026-08-24: [Cross-cutting] Seven-frame HITL debounce
+
+- A violation must be observed in 7 consecutive accepted frames before its first occurrence can set `review_required=true` and open the HITL popup.
+- This applies consistently to zone intrusion, restricted-area-compatible generic violations, and missing-PPE alerts; a normal/unknown frame resets the pending consecutive-frame count.
+- Vision-side PPE temporal confirmation remains a separate observation-quality gate; it does not bypass the 7-frame HITL debounce.
+
 ### 2026-08-23: [Backend/Frontend] Fixed camera configuration and per-zone rules
 
 - Persist exactly four logical slots `cam_1` through `cam_4`; each READY asset may be assigned to at most one slot.
 - Live Monitor remains the all-camera operational view. Camera configuration has no sidebar entry and opens only when `safety_manager` selects a Live Monitor slot.
 - Zones are revisioned, enabled, disjoint four-point polygons. Rules are persisted by `(camera_id, zone_id)`.
-- `hat_required` and `vest_required` apply to a person whose foot point is inside the zone and only while camera-wide machine state is `running`.
+- `hat_required` and `vest_required` are camera-wide per the newer 2026-08-24 decision.
 - `zone_intrusion_enabled` is per zone, defaults to `true` for compatibility, ignores machine state, and opens after four consecutive sampled frames in that zone.
 - `restricted_area_detection_enabled` is a per-zone configuration switch, defaults OFF, treats any canonical person in the camera as an immediate critical occurrence, and ignores polygon and machine state.
 - Backend reads the assigned server-owned cached asset directly and publishes session-correlated source-coordinate metadata for overlays.
@@ -85,12 +97,13 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-16: [Cross-cutting] Occurrence confirmation and reconciliation
 
 - Event occurrences are keyed by monitoring session, track, and rule; database persistence is idempotent by occurrence ID.
+- Occurrence ownership used to validate a queued HITL review is the immutable session/track/rule context from the alert frame. A later nearby ByteTrack handoff may move live tracking state but must not invalidate that earlier review payload.
 - Local vision confirms initial PPE absence and holds established presence using `PPE_TEMPORAL_FRAMES` (default 10); a locally confirmed absence opens without a second backend debounce. The remote provider, whose v1 contract has no absence-confirmation field, retains six-frame backend confirmation.
 - An unreviewed PPE warning retracts only after two continuous seconds of explicit presence; missing or unknown resets that timer.
 - Zone intrusion opens after four consecutive sampled frames. Restricted-area detection remains immediate.
 - Nearby track-ID handoff may transfer active occurrence state during the lost-track grace window. Distant, different-rule, expired, or cross-session tracks remain independent.
 - Submitted `acknowledged` and `false_alarm` outcomes are human-authoritative and cannot be rewritten by later AI observations.
-- Restricted-area switches apply to every canonical person in the camera, regardless of polygon membership. An active PPE occurrence closes when its zone/machine requirement is no longer applicable; an unknown PPE observation inside an applicable rule still does not retract it.
+- Restricted-area switches apply to every canonical person in the camera, regardless of polygon membership. An active PPE occurrence closes when the camera-wide machine requirement becomes inapplicable; an unknown PPE observation still does not retract it.
 
 ### 2026-08-16: [Vision/Backend] Fail-closed evidence privacy
 

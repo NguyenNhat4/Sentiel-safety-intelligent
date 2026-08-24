@@ -1,4 +1,4 @@
-.PHONY: setup py-setup env-setup db-upgrade run vision-worker-run vision-worker-image e2e-demo test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
+.PHONY: setup py-setup env-setup db-upgrade clean-local-data run vision-worker-run vision-worker-image e2e-demo test lint format check clean frontend-install frontend-dev frontend-lint frontend-type-check frontend-test frontend-build docker-build docker-up docker-down docker-smoke backup restore
 
 ifeq ($(OS),Windows_NT)
 VENV_BIN = .venv/Scripts
@@ -17,6 +17,9 @@ env-setup:
 db-upgrade:
 	PYTHONPATH=. $(VENV_BIN)/python scripts/bootstrap_legacy_sqlite.py
 	PYTHONPATH=. $(VENV_BIN)/alembic upgrade head
+
+clean-local-data:
+	PYTHONPATH=. $(VENV_BIN)/python scripts/clean_local_data.py --yes
 
 run: db-upgrade frontend-build
 	set -a; . ./.env.development; set +a; $(VENV_BIN)/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000

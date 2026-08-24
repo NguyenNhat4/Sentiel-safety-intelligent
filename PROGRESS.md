@@ -6,10 +6,10 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
-### 2026-08-23 Conflict resolution
+### 2026-08-24 PPE and HITL correction
 
 - [Cross-cutting] Đã hợp nhất conflict camera configuration: `asset_id` nullable, disconnect ngoài dropdown, preview empty state và lưu được trạng thái null.
-- [Vision] Đã hợp nhất rule zone/PPE: zone intrusion không phụ thuộc machine state; PPE chỉ áp dụng cho người inside zone khi máy running; bỏ fallback requirement của zone khác.
+- [Vision] PPE là camera-wide, áp dụng toàn khung hình khi máy running và không phụ thuộc zone; zone intrusion vẫn không phụ thuộc machine state.
 - [Cross-cutting] Đã thêm cảnh báo contract bắt buộc đọc trong `docs/architecture/alert-rule-contract.md`.
 
 ### Cross-cutting
@@ -25,7 +25,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Backend
 
 - US-29 backend runtime owns bucket-backed media assets, atomic fixed-camera configuration aggregates, and explicit direct OpenCV image/video sessions with persisted lifecycle evidence.
-- Four fixed camera configurations support unique READY asset assignment and atomic asset/zone/PPE saves.
+- Four fixed camera configurations support unique READY asset assignment and atomic camera-wide PPE saves even with no zones.
 - Each configured camera can have revisioned, disjoint four-point zones and persisted rules keyed by `(camera_id, zone_id)`.
 - Authenticated `/api/v1/ws/camera-detections` publishes session-correlated detection metadata for fixed cameras.
 - Event persistence is idempotent by occurrence. One tracked person/session log accumulates active hat, vest, restricted-area, and zone rules; submitted human outcomes remain authoritative.
@@ -47,14 +47,15 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Frontend
 
+- Sidebar no longer renders the unused disabled `Log JSON` placeholder tab.
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
 - Live Monitor reloads camera configuration, media inventory, and compatible sessions whenever the page becomes active; disconnected cameras and sessions belonging to a previously assigned asset are removed from the rendered slot.
 - Camera configuration is hidden from the sidebar and opens only when `safety_manager` selects a Live Monitor slot; `system_admin` owns the media library.
-- Camera configuration binds hat/vest draft state directly to the selected zone, reloads persisted switches correctly, and no longer offers unsaveable PPE controls when no zone exists.
+- Camera configuration binds hat/vest draft state to the camera, reloads persisted switches correctly, and saves them with `zones=[]`.
 - HITL logs retain their own inference frame/context and are opened explicitly by the Safety Officer. Pending counts exclude reviewed logs.
 - Area managers have a server-scoped compliance/event workspace and may resolve or mark false alarm only for events in their assigned area.
-- Camera configuration now exposes camera-wide machine state immediately after camera selection; PPE controls appear for a selected draft zone before its four points are complete.
-- Live Monitor queues direct-camera review candidates with their inference snapshot and persists one idempotent reviewed event per affected tracked person before advancing the queue.
+- Camera configuration exposes camera-wide machine state and PPE controls independently from zone creation.
+- Live Monitor deduplicates occurrence IDs across people, serializes reviewed-event writes, blocks double-submit, and advances the HITL queue only after successful persistence.
 
 ### Media And Delivery
 
@@ -66,6 +67,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.
 
 ## Latest Verification
+
+- Camera-wide PPE, HITL duplicate-request handling, immutable occurrence ownership across track handoff, and explicit missing-hat/missing-vest wording in the HITL popup and audit views are fixed locally. PostgreSQL migration `20260824_02` adds/backfills camera-level hat/vest requirements; Railway deployment and browser UAT are intentionally pending.
+
+- [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. The page actions are grouped into media, zone/safety-rule, and save/navigation sections with responsive mobile layout. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
+
+- Added `scripts/clean_local_data.py` and `make clean-local-data` for explicit local-only PostgreSQL cleanup. The script preserves schema/migration history, clears configured media/snapshot/log directories, rejects Railway/production targets, and its three guard tests pass.
 
 - `.env.development` now includes every active field from `.env.development.example`; runtime loading confirms local Vision, media paths, retention defaults, and a `4.0` per-camera inference FPS cap.
 - Removed the backend `640x360` pre-resize and its coordinate-restoration pass so YOLO receives the original decoded frame; tests were updated for the new contract but not run per user request.
@@ -106,7 +113,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Next Steps
 
-0. [Frontend] Đã sửa Live Monitor giữ playback request sau khi Replay/Run trả về session COMPLETED sớm; focused test, lint, type-check và production build đã pass. Chưa deploy Railway vì worktree còn thay đổi ngoài scope cần được tách trước.
+0. [Frontend] Resolve the pre-existing `frontend/src/App.tsx:26` ESLint warning, redeploy the PPE-switch fix to Railway, and run browser UAT for camera configuration.
 1. Prove an uploaded asset reaches model, rule, HITL log, and persisted event end to end on Railway.
 2. Run the two-zone browser UAT and record results.
 3. Finish PostgreSQL-only cleanup and verify `make setup`, `make run`, and migrations on a fresh environment.

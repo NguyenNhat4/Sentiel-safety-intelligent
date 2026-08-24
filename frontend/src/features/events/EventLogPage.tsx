@@ -3,6 +3,7 @@ import {assetUrl} from "../../api/config";
 import {loadReviewedEvents} from "../../api/events";
 import type {ReviewStatus, SafetyEvent} from "../../types";
 import {EventDetailDialog} from "./EventDetailDialog";
+import {violationRuleLabel} from "../alerts/violation-copy";
 
 interface EventLogPageProps {active: boolean}
 
@@ -93,7 +94,7 @@ function EventCard({event, onOpen}: {event: SafetyEvent; onOpen: () => void}) {
       {snapshot ? <img src={snapshot} alt={`Snapshot sự kiện ${event.id}`} /> : <div className="log-status">Không có snapshot</div>}
       <div className="event-card-body">
         <div className="event-card-head">
-          <div><small>EVENT #{event.id}</small><h3>{eventTypeLabel(event.event_type)}</h3><time>{formatTimestamp(event.timestamp)}</time></div>
+          <div><small>EVENT #{event.id}</small><h3>{eventTypeLabel(event)}</h3><time>{formatTimestamp(event.timestamp)}</time></div>
           <span className={`event-badge ${event.status === "false_alarm" ? "false-alarm" : ""}`}>{event.status === "false_alarm" ? "BÁO SAI" : "ĐÃ XÁC NHẬN"}</span>
         </div>
         <div className="event-meta">
@@ -111,8 +112,12 @@ function emptyState(status: ReviewStatus): string {
   return status === "false_alarm" ? "Chưa có cảnh báo nào được đánh dấu báo sai." : "Chưa có vi phạm nào được xác nhận.";
 }
 
-function eventTypeLabel(type: string): string {
-  return type === "missing_ppe_and_intrusion" ? "Thiếu PPE trong vùng cấm" : "Có người vào vùng cấm";
+function eventTypeLabel(event: SafetyEvent): string {
+  const ruleKeys = event.decision_context?.rule.triggered_rule_keys ?? [];
+  if (ruleKeys.length) return violationRuleLabel(ruleKeys);
+  if (event.event_type === "missing_ppe_and_intrusion") return "Thiếu PPE trong vùng cấm";
+  if (event.event_type === "zone_intrusion") return "Có người vào vùng cấm";
+  return "Vi phạm an toàn";
 }
 
 function formatTimestamp(timestamp: string): string {
