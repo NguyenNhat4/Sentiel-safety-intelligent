@@ -91,6 +91,7 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-16: [Cross-cutting] Occurrence confirmation and reconciliation
 
 - Event occurrences are keyed by monitoring session, track, and rule; database persistence is idempotent by occurrence ID.
+- Occurrence ownership used to validate a queued HITL review is the immutable session/track/rule context from the alert frame. A later nearby ByteTrack handoff may move live tracking state but must not invalidate that earlier review payload.
 - Local vision confirms initial PPE absence and holds established presence using `PPE_TEMPORAL_FRAMES` (default 10); a locally confirmed absence opens without a second backend debounce. The remote provider, whose v1 contract has no absence-confirmation field, retains six-frame backend confirmation.
 - An unreviewed PPE warning retracts only after two continuous seconds of explicit presence; missing or unknown resets that timer.
 - Zone intrusion opens after four consecutive sampled frames. Restricted-area detection remains immediate.

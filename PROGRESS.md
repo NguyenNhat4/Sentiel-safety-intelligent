@@ -68,7 +68,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
-- Camera-wide PPE, HITL duplicate-request handling, and explicit missing-hat/missing-vest wording in the HITL popup and audit views are fixed locally. PostgreSQL migration `20260824_02` adds/backfills camera-level hat/vest requirements; Railway deployment and browser UAT are intentionally pending.
+- Camera-wide PPE, HITL duplicate-request handling, immutable occurrence ownership across track handoff, and explicit missing-hat/missing-vest wording in the HITL popup and audit views are fixed locally. PostgreSQL migration `20260824_02` adds/backfills camera-level hat/vest requirements; Railway deployment and browser UAT are intentionally pending.
 
 - [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. The page actions are grouped into media, zone/safety-rule, and save/navigation sections with responsive mobile layout. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
 

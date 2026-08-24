@@ -59,6 +59,7 @@ class ViolationTrackingService:
         self._session_ttl_seconds = session_ttl_seconds
         self._track_handoff_max_distance = track_handoff_max_distance
         self._occurrences: dict[tuple[str, int, str], _Occurrence] = {}
+        self._occurrence_origins: dict[str, tuple[str, int, str]] = {}
         self._pending_ppe_frames: dict[tuple[str, int, str], int] = {}
         self._pending_ppe_present_since: dict[tuple[str, int, str], float] = {}
         self._confirmed_ppe_items: dict[tuple[str, int], set[str]] = {}
@@ -231,6 +232,8 @@ class ViolationTrackingService:
             if occurrence.absent_frames >= self._exit_confirm_frames:
                 self._clear(occurrence, now)
 
+        for key, occurrence in self._occurrences.items():
+            self._occurrence_origins.setdefault(occurrence.occurrence_id, key)
         for violations in output.values():
             violations.sort(key=lambda item: item.rule_key)
         for track_id, position in positions.items():
@@ -239,6 +242,11 @@ class ViolationTrackingService:
 
     def end_session(self, session_id: str) -> None:
         self._occurrences = {key: value for key, value in self._occurrences.items() if key[0] != session_id}
+        self._occurrence_origins = {
+            occurrence_id: context
+            for occurrence_id, context in self._occurrence_origins.items()
+            if context[0] != session_id
+        }
         self._pending_ppe_frames = {
             key: value for key, value in self._pending_ppe_frames.items() if key[0] != session_id
         }
@@ -254,10 +262,7 @@ class ViolationTrackingService:
         self._last_frame.pop(session_id, None)
 
     def occurrence_context(self, occurrence_id: str) -> tuple[str, int, str] | None:
-        for (session_id, track_id, rule_key), occurrence in self._occurrences.items():
-            if occurrence.occurrence_id == occurrence_id:
-                return session_id, track_id, rule_key
-        return None
+        return self._occurrence_origins.get(occurrence_id)
 
     def _clear(self, occurrence: _Occurrence, now: float) -> None:
         occurrence.active = False

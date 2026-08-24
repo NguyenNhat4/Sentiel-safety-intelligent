@@ -124,6 +124,7 @@ def test_nearby_track_id_handoff_keeps_occurrence_while_person_exits():
 
     assert handed_off.occurrence_id == first.occurrence_id
     assert handed_off.is_new is False
+    assert service.occurrence_context(first.occurrence_id) == ("session-a", 4, "zone_intrusion")
 
 
 def test_distant_new_track_still_opens_an_independent_occurrence():
