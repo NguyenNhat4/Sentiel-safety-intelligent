@@ -5,8 +5,66 @@ export type UserRole = "system_admin" | "safety_manager" | "area_manager";
 export type AssignableUserRole = UserRole;
 
 export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
-export interface StreamMapping { camera_id: string; stream_camera_id: string; }
-export interface StreamConfiguration { mappings: StreamMapping[]; active_camera_id?: string | null; updated_at: string | null; }
+export type MediaType = "video" | "image";
+export type MediaAssetStatus = "UPLOADING" | "READY" | "ERROR";
+export type CameraSessionStatus = "STARTING" | "RUNNING" | "COMPLETED" | "ERROR" | "STOPPED";
+
+export interface MediaAsset {
+  id: string;
+  display_name: string;
+  media_type: MediaType;
+  status: MediaAssetStatus;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  assigned_camera_id: string | null;
+  can_delete?: boolean;
+  error_message?: string | null;
+}
+
+export interface CameraConfigurationZone extends MonitoringZone { ppe_requirements: PpeRequirementUpdate; }
+
+export interface CameraConfiguration {
+  camera_id: string;
+  revision: number;
+  asset_id: string | null;
+  machine_state: MachineState;
+  zones: CameraConfigurationZone[];
+  updated_at: string | null;
+}
+
+export interface CameraConfigurationUpdate {
+  expected_revision: number;
+  asset_id: string | null;
+  machine_state: MachineState;
+  zones: CameraConfigurationZone[];
+}
+
+export interface CameraSession {
+  id: string;
+  camera_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  status: CameraSessionStatus;
+  config_revision: number;
+  inference_fps: number;
+  started_at: string;
+  running_at: string | null;
+  completed_at: string | null;
+  error_code: string | null;
+}
+
+export interface CameraSessionStatusEvent {
+  type: "camera_session_status";
+  camera_id: string;
+  session_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  video_time: number;
+  session_status: CameraSessionStatus;
+  inference_fps: number;
+  error_code?: string | null;
+}
 export interface LoginRequest { email: string; password: string; }
 export interface LoginResponse { access_token: string; token_type: "bearer"; user: AuthenticatedUser; }
 export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
@@ -26,7 +84,8 @@ export interface MonitoringZone {
   zone_id: string;
   display_name: string;
   points: ZonePoint[];
-  machine_state: MachineState;
+  /** @deprecated Camera mapping is the source of truth. */
+  machine_state?: MachineState;
   enabled: boolean;
   order: number;
 }
@@ -115,9 +174,14 @@ export interface InferenceResult {
 export interface CameraInferenceResult extends Omit<InferenceResult, "type" | "video_time"> {
   type: "camera_inference_result";
   camera_id: string;
-  stream_camera_id: string;
-  source_timestamp_ms: number;
-  captured_at: number;
+  session_id: string;
+  asset_id: string;
+  media_type: MediaType;
+  video_time: number;
+  session_status: CameraSessionStatus;
+  inference_fps: number;
+  source_timestamp_ms?: number;
+  captured_at?: number;
   frame_width: number;
   frame_height: number;
 }

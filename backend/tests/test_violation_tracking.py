@@ -15,6 +15,28 @@ def test_continuous_violation_emits_one_occurrence():
     UUID(first[4][0].occurrence_id)
 
 
+def test_one_person_emits_only_one_alert_for_entire_video_session():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=0.0, ppe_confirmation_frames=1)
+
+    first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    second_rule = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=2.0)[4]
+
+    assert first[0].is_new is True
+    assert second_rule[0].is_new is False
+
+
+def test_same_person_reviolation_after_clear_does_not_request_review_again():
+    service = ViolationTrackingService(exit_confirm_frames=1, cooldown_seconds=0.0)
+
+    first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]
+    service.evaluate("session-a", {4: set()}, {4}, now=1.0)
+    repeated = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=2.0)[4][0]
+
+    assert repeated.occurrence_id == first.occurrence_id
+    assert repeated.is_new is False
+
+
 def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     service = ViolationTrackingService(activation_frames=4)
 
@@ -25,6 +47,22 @@ def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     opened = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=4.0)
 
     assert opened[4][0].is_new is True
+
+
+def test_rule_prefix_can_use_a_shorter_activation_threshold():
+    service = ViolationTrackingService(
+        activation_frames=4,
+        activation_frames_by_rule_prefix={"missing_ppe:": 1},
+    )
+
+    ppe = service.evaluate("session-a", {4: {"missing_ppe:hat"}}, {4}, now=1.0)
+    assert ppe[4][0].is_new is True
+
+    for frame in range(2, 5):
+        zone = service.evaluate("session-a", {9: {"zone_intrusion"}}, {9}, now=float(frame))
+        assert zone[9] == []
+    zone = service.evaluate("session-a", {9: {"zone_intrusion"}}, {9}, now=5.0)
+    assert zone[9][0].is_new is True
 
 
 def test_interrupted_pending_violation_must_restart_its_consecutive_frame_count():
@@ -38,7 +76,7 @@ def test_interrupted_pending_violation_must_restart_its_consecutive_frame_count(
         assert pending[4] == []
 
 
-def test_violation_rearms_only_after_confirmed_exit_and_cooldown():
+def test_violation_rearms_without_a_second_alert_in_the_same_session():
     service = ViolationTrackingService(exit_confirm_frames=2, cooldown_seconds=2.0)
     first = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=0.0)[4][0]
 
@@ -51,8 +89,8 @@ def test_violation_rearms_only_after_confirmed_exit_and_cooldown():
     service.evaluate("session-a", {4: set()}, {4}, now=2.5)
     service.evaluate("session-a", {4: set()}, {4}, now=3.0)
     rearmed = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=5.1)[4][0]
-    assert rearmed.occurrence_id != first.occurrence_id
-    assert rearmed.is_new is True
+    assert rearmed.occurrence_id == first.occurrence_id
+    assert rearmed.is_new is False
 
 
 def test_short_track_loss_does_not_create_a_new_occurrence():
@@ -216,6 +254,29 @@ def test_unknown_ppe_does_not_retract_an_active_warning():
     unknown_result = service.evaluate("session-a", {4: set()}, {4}, ppe_present_items={4: set()}, now=5.1)[4][0]
 
     assert unknown_result.occurrence_id == opened.occurrence_id
+
+
+def test_ppe_warning_retracts_when_requirement_is_no_longer_applicable():
+    service = ViolationTrackingService(ppe_confirmation_frames=1)
+    rule = "missing_ppe:hat"
+    opened = service.evaluate(
+        "session-a",
+        {4: {rule}},
+        {4},
+        applicable_ppe_rules={(4, rule)},
+        now=0.0,
+    )[4][0]
+
+    retracted = service.evaluate(
+        "session-a",
+        {4: set()},
+        {4},
+        applicable_ppe_rules=set(),
+        now=0.5,
+    )[4]
+
+    assert opened.is_new is True
+    assert retracted == []
 
 
 def test_unknown_or_missing_resets_the_two_second_present_retraction_window():

@@ -1,45 +1,10 @@
 # Local container run uses the developer environment, with an isolated
 # PostgreSQL URL so application checks never target a developer's configured DB.
 services:
-  mediamtx:
-    image: bluenviron/mediamtx:1.20.1
-    volumes:
-      - ./streamer/mediamtx.yml:/mediamtx.yml:ro
-    ports:
-      - "8888:8888"
-    expose:
-      - "8554"
-      - "9997"
-      - "9998"
-    restart: unless-stopped
-
-  streamer:
-    build:
-      context: .
-      dockerfile: streamer/Dockerfile
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./data/streamer:/app/data/streamer
-    environment:
-      MEDIA_RTSP_ENABLED: "true"
-      MEDIA_RTSP_ORIGIN: rtsp://p047_local_publisher:p047_local_only_change_me@mediamtx:8554
-      MEDIA_PUBLIC_ORIGIN: ${MEDIA_PUBLIC_ORIGIN:-http://localhost:8888}
-      HLS_UPSTREAM_ORIGIN: http://mediamtx:8888
-      HLS_TOKEN_SECRET: ${HLS_TOKEN_SECRET:-p047_local_hls_signing_secret_change_me}
-      STREAMER_ADMIN_USERNAME: ${STREAMER_ADMIN_USERNAME:-p047_local_admin}
-      STREAMER_ADMIN_PASSWORD: ${STREAMER_ADMIN_PASSWORD:-p047_local_admin_only_change_me}
-    depends_on:
-      - mediamtx
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
   db:
     image: postgres:17-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: p047_compose_test
       POSTGRES_USER: p047_test
@@ -54,24 +19,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        VITE_STREAMER_URL: ${VITE_STREAMER_URL:-}
-        VITE_MEDIA_PUBLIC_ORIGIN: ${VITE_MEDIA_PUBLIC_ORIGIN:-http://localhost:8001}
-        VITE_STREAM_TRANSPORT: ${VITE_STREAM_TRANSPORT:-hls}
     env_file:
       - .env.development
+    volumes:
+      - ./data/media-assets:/app/data/media-assets
     environment:
       DATABASE_URL: postgresql+psycopg2://p047_test:p047-test-only@db:5432/p047_compose_test
       RUN_DB_MIGRATIONS_ON_START: "true"
-      STREAMER_INTERNAL_ORIGIN: http://streamer:8001
-      RTSP_INFERENCE_ENABLED: "true"
-      RTSP_READER_ORIGIN: rtsp://mediamtx:8554
+      MEDIA_ASSET_DIR: /app/data/media-assets
     ports:
       - "8000:8000"
     depends_on:
       db:
-        condition: service_healthy
-      streamer:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

@@ -13,7 +13,7 @@
 
 Hệ thống gán một `track_id` ổn định cho mỗi người trong một phiên video và nhận biết vòng đời của từng vi phạm theo người và rule. Một vi phạm liên tục chỉ mở một occurrence và chỉ có thể tạo một event đã review; các frame tiếp theo vẫn hiển thị trạng thái vi phạm nhưng không yêu cầu review hoặc lưu event lặp.
 
-Thành công nghĩa là cán bộ an toàn không bị video dừng liên tục vì cùng một người vẫn ở trong cùng trạng thái vi phạm. Khi người đó thực sự hết vi phạm rồi tái phạm sau thời gian re-arm, hệ thống tạo occurrence mới và cho phép một review/event mới.
+Thành công nghĩa là cán bộ an toàn không bị video dừng liên tục vì cùng một người vẫn ở trong cùng trạng thái vi phạm. Trong một `monitoring_session_id`, một người chỉ mở một review/alert; nếu hết vi phạm rồi tái phạm, hệ thống vẫn hiển thị trạng thái nhưng không mở cảnh báo lần hai. Session mới được phép tạo cảnh báo mới.
 
 ## Bối cảnh runtime hiện tại
 

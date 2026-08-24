@@ -23,11 +23,13 @@ def test_validate_runtime_files_accepts_approved_models(tmp_path, monkeypatch):
             face_detector_model_path=str(yunet),
             operational_metrics_log_path="data/operational-metrics.jsonl",
             snapshot_dir="runtime/snapshots",
+            media_asset_dir="runtime/media-assets",
         )
     )
 
-    assert result == {"data_writable": True, "models_verified": True}
+    assert result == {"data_writable": True, "media_assets_writable": True, "models_verified": True}
     assert (tmp_path / "runtime" / "snapshots").is_dir()
+    assert (tmp_path / "runtime" / "media-assets").is_dir()
 
 
 def test_validate_runtime_files_rejects_missing_model(tmp_path, monkeypatch):
@@ -78,3 +80,23 @@ def test_validate_runtime_files_rejects_wrong_yunet_checksum(tmp_path, monkeypat
                 operational_metrics_log_path="data/operational-metrics.jsonl",
             )
         )
+
+
+def test_remote_vision_does_not_require_local_ppe_checkpoint(tmp_path, monkeypatch):
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+    yunet = model_dir / "face_detection_yunet_2023mar.onnx"
+    yunet.write_bytes(b"yunet")
+    monkeypatch.setitem(REQUIRED_MODEL_CHECKSUMS, yunet.name, hashlib.sha256(b"yunet").hexdigest())
+    monkeypatch.chdir(tmp_path)
+
+    result = validate_runtime_files(
+        Settings(
+            vision_provider="remote",
+            vision_remote_url="https://vision.example",
+            face_detector_model_path=str(yunet),
+            operational_metrics_log_path="data/operational-metrics.jsonl",
+        )
+    )
+
+    assert result == {"data_writable": True, "media_assets_writable": True, "models_verified": True}

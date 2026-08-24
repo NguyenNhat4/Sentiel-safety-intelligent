@@ -37,7 +37,9 @@ flowchart LR
     backendApi --> backendService[Backend service]
     backendService --> modelCore[Model, schema, core]
     backendService --> integration[Integration adapter]
-    integration --> visionFacade[Vision facade or provider]
+    integration --> localVision[Local vision facade]
+    integration --> remoteWorker[Remote safety vision HTTP worker]
+    remoteWorker --> workerVision[Worker vision facade]
 ```
 
 Executable contracts hiện hành (FastAPI/Pydantic, frontend wire types, SQLAlchemy/Alembic và
@@ -57,9 +59,7 @@ Các bất biến an toàn:
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
 machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
-event history, PPE production model và RBAC. PostgreSQL là database duy nhất cho mọi môi trường;
-SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất
-chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
+event history, PPE production model và RBAC. Safety Vision có thể chạy trong backend hoặc qua worker HTTP `safety_vision_v1`; phiên video/ảnh trực tiếp đi qua `FrameInferenceService`, còn rule, occurrence, HITL và persistence vẫn thuộc backend. PostgreSQL là database duy nhất cho mọi môi trường; SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
@@ -68,73 +68,56 @@ Thứ tự tiến hóa theo backlog:
 3. **Nâng cao:** escalation → analytics theo zone/shift → reporting.
 4. **Vận hành:** cloud, observability, backup/restore, security/performance và UAT.
 
-## Kiến trúc media RTSP-first đã chốt
+## Kiến trúc media trực tiếp
 
 ```mermaid
 flowchart LR
     react[React] -->|REST| backend[Backend control plane]
-    backend -->|Read and write mapping| postgres[(PostgreSQL)]
-    backend -->|Upload and lifecycle control| streamer[Streamer]
-
-    source[MP4 camera source] --> ffmpeg[FFmpeg publisher]
-    ffmpeg -->|RTSP and H.264| mediamtx[MediaMTX]
-    mediamtx -->|RTSP| vision[Backend and vision]
-    mediamtx -->|HLS| browser[Browser scale path]
-    mediamtx -.->|Optional WHEP| lowLatency[Low-latency browser]
+    backend -->|Asset, configuration, session| postgres[(PostgreSQL)]
+    admin[Sys Admin] -->|Authorize upload| backend
+    react -->|Presigned upload and playback| bucket[(Railway Bucket)]
+    bucket -->|Validate and cache| backend
+    volume[(Inference cache volume)] --> backend
+    backend -->|Decoded sampled frame| vision[Local or remote Vision]
+    vision -->|Observations| backend
+    backend -->|Session status and detections| react
 ```
 
-RTSP là contract nguồn camera; HLS chỉ là delivery contract cho browser và không
-được dùng thay bằng chứng inference. MediaMTX sở hữu protocol gateway/fan-out;
-FastAPI giữ upload, registry, lifecycle control, RBAC và mapping nhưng không proxy
-media bytes. Một FFmpeg publisher phục vụ một camera path. MJPEG hiện tại được
-giữ làm compatibility/rollback transport đến khi browser, inference và capacity
-gates hoàn tất.
-
-HLS ưu tiên cho tải lớn vì đi qua HTTP proxy/CDN dễ hơn; WebRTC là slice riêng
-nếu latency requirement thấp hơn khả năng HLS. Production giữ RTSP/publisher
-trong private network, public playback qua TLS, pin MediaMTX exact version và đo
-egress thực tế trước khi tuyên bố đạt 200 người × 4 camera.
+Backend là owner duy nhất của asset registry, file content, camera configuration và
+inference-session lifecycle. Browser chỉ gửi `asset_id` và camera command, không gửi
+filesystem path hoặc URL nguồn tùy ý. Railway Bucket là canonical storage cho upload
+mới; browser chỉ nhận presigned URL ngắn hạn sau khi backend kiểm tra quyền. Backend
+xác minh object và frame đầu, sau đó dùng volume tại `MEDIA_ASSET_DIR` làm read-through
+cache cho OpenCV. PostgreSQL giữ storage backend/key, metadata, assignment và lifecycle evidence.
 
 ### Luồng runtime của một camera
 
 ```mermaid
 flowchart LR
-    video["Volume: camera MP4"] --> scan[Streamer scans source]
-    scan --> supervisor[One supervised FFmpeg process]
-    supervisor -->|RTSP over TCP| mediaPath[MediaMTX camera path]
-    mediaPath -->|Path online| ready[Gateway ready]
-    ready -->|Rollback| mjpeg[Browser via MJPEG]
-    ready -->|Authenticated HLS| hls[Browser via HTTPS ingress]
-    ready -->|Bounded 2 FPS RTSP| inference[Backend and vision inference]
-    supervisor -->|Unexpected exit| backoff[Bounded backoff]
-    backoff --> supervisor
+    config[Saved asset, zones and PPE] --> run[Run or Replay command]
+    run --> reset[Fresh session and reset tracking/occurrences]
+    reset --> source[Open validated volume file]
+    source -->|Video sampled and paced| inference[FrameInferenceService]
+    source -->|Image exactly once| inference
+    inference --> first[First real result sets RUNNING]
+    first --> ws[WebSocket detections and rolling FPS]
+    ws --> eof[Video EOF sets COMPLETED and enables Replay]
 ```
 
-Camera identity đi xuyên suốt bằng `stream_camera_id`; `media_path` luôn được
-server derive thành `cameras/<validated-id>`, không nhận URL tùy ý từ browser.
-Mapping `camera_id ↔ stream_camera_id` vẫn thuộc backend/PostgreSQL và độc lập
-với publisher lifecycle.
+Camera identity là một trong `cam_1` đến `cam_4`. Mỗi Run/Replay tạo UUID session
+mới; output phiên cũ bị bỏ qua. Save cấu hình không khởi động hoặc dừng inference.
+Sau restart, cấu hình được giữ nhưng phiên đang chạy chuyển `STOPPED` và không tự resume.
 
 ### Topology Railway hiện tại
 
 ```mermaid
 flowchart LR
-    browser[Internet browser] -->|HTTPS and MJPEG rollback| streamer["Streamer: public HTTPS"]
-    volume[(Persistent video volume)] --> streamer
-
-    subgraph privateNetwork[Railway private network]
-        mediamtx["MediaMTX 1.20.1: private RTSP and HLS"]
-        vision[Backend and vision RTSP reader]
-    end
-
-    streamer -->|Authenticated RTSP and H.264| mediamtx
-    mediamtx -->|Private RTSP read| vision
-
-    browser -->|REST control plane| backend["p047-app backend: mapping and RBAC"]
+    browser[Internet browser] -->|HTTPS REST and WebSocket| backend["p047-app"]
+    bucket[(Railway Bucket Singapore)] --> backend
+    volume[(OpenCV media cache)] --> backend
     backend --> postgres[(PostgreSQL)]
+    backend --> vision[Optional Safety Vision worker]
 ```
 
-Deployment ngày 2026-08-21 đã chứng minh bốn publisher RTSP/H.264 online và
-authenticated HLS gateway trả playlist thật. Source hiện có server-side RTSP
-reader cùng metadata WebSocket, nhưng chưa có live RTSP-to-model/rule/event UAT
-hoặc tải 200 × 4. MediaMTX vẫn private; browser chỉ đi qua HLS gateway có token.
+Streamer, MediaMTX, FFmpeg publisher, HLS, RTSP và MJPEG simulation không còn là
+runtime hoặc deployment dependency.

@@ -8,7 +8,6 @@ export function createZoneDraft(zones: MonitoringZone[]): MonitoringZone {
     zone_id: `zone_${number}`,
     display_name: `Vùng ${number}`,
     points: [],
-    machine_state: "stopped",
     enabled: true,
     order: zones.reduce((highest, zone) => Math.max(highest, zone.order), -1) + 1,
   };
