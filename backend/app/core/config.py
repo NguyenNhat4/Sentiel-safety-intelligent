@@ -90,11 +90,11 @@ class Settings(BaseSettings):
     face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
-    violation_frame: int = Field(default=5, ge=1, le=60)
+    violation_frame: int = Field(default=7, ge=1, le=60)
     ppe_temporal_frames: int = Field(default=3, ge=1, le=60)
-    ppe_alert_confirm_frames: int = Field(default=1, ge=1, le=60)
+    ppe_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
     ppe_revoke_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
-    zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
+    zone_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
 
     model_config = SettingsConfigDict(
         env_file=(".env.development"),

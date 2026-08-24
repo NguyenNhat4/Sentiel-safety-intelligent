@@ -49,6 +49,18 @@ def test_violation_requires_four_consecutive_frames_before_opening_an_alert():
     assert opened[4][0].is_new is True
 
 
+def test_default_hitl_debounce_requires_seven_consecutive_frames():
+    service = ViolationTrackingService(activation_frames=7)
+
+    for frame in range(1, 7):
+        pending = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=float(frame))
+        assert pending[4] == []
+
+    opened = service.evaluate("session-a", {4: {"zone_intrusion"}}, {4}, now=7.0)
+
+    assert opened[4][0].is_new is True
+
+
 def test_rule_prefix_can_use_a_shorter_activation_threshold():
     service = ViolationTrackingService(
         activation_frames=4,

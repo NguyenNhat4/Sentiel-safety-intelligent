@@ -35,6 +35,8 @@ Không có người thì frame luôn `normal`; không đánh giá thiếu PPE kh
 
 Với nhiều người, chỉ cần một người vi phạm là toàn frame `violate` và UI mở một review popup. Backend vẫn giữ `track_id` và `occurrence_id` riêng để dedup/audit; `zone_id` chỉ gắn cho rule thuộc zone.
 
+HITL debounce: UI chỉ mở popup khi cùng một violation đã được xác nhận trong **7 frame liên tiếp**. Một frame bình thường hoặc chưa xác định sẽ reset chuỗi đang chờ. Xác nhận chất lượng PPE ở vision là một gate riêng và không được dùng để bỏ qua debounce 7 frame.
+
 ## Luồng runtime
 
 ```mermaid

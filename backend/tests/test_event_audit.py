@@ -89,7 +89,7 @@ def test_reviewed_event_persists_server_owned_decision_context_and_summary(clien
     assert created["acknowledged_by"] == actor_name
     assert created["decision_context"]["schema_version"] == "decision_context_v1"
     assert created["decision_context"]["rule"]["rule_version"] == "safety_rule_v1"
-    assert created["decision_context"]["rule"]["violation_frame_count"] == 4
+    assert created["decision_context"]["rule"]["violation_frame_count"] == 7
     assert created["decision_context"]["scene"]["camera_id"] == "uploaded_video"
     assert created["decision_context"]["scene"]["zone_id"] == "zone_01"
     assert created["decision_context"]["system_decision"]["severity"] == "high"

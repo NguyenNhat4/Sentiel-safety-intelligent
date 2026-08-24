@@ -187,7 +187,7 @@ class ViolationTrackingService:
             occurrence.lost_frames = 0
             output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
 
-        # Six missing frames must be consecutive. Present or unknown breaks a
+        # Seven missing frames must be consecutive. Present or unknown breaks a
         # pending sequence, while only explicit present revokes an active log.
         self._pending_ppe_frames = {
             key: frame_count

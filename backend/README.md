@@ -37,6 +37,7 @@ US-29 uses backend-owned media and explicit sessions:
 - `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
 - `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.
 - A newly opened direct-camera occurrence carries one transient review JPEG; Live Monitor queues human review and persists only the operator outcome through the existing event API. Terminal model state is released without invalidating queued occurrence context.
+- HITL debounce is seven consecutive accepted violating frames for every violation type. A normal or unknown observation resets the pending sequence; vision-side PPE confirmation remains a separate observation gate.
 - Streamer, MediaMTX, HLS, RTSP and Connect/Disconnect are not runtime contracts.
 
 Inference keeps the decoded source frame at its original resolution until the

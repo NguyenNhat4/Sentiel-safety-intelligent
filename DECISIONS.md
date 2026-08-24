@@ -53,6 +53,12 @@ This file contains only decisions that currently constrain implementation. Super
 - Zone records continue to own `zone_intrusion_enabled` and `restricted_area_detection_enabled`; their embedded PPE fields remain additive compatibility data during migration.
 - A grouped HITL popup may contain multiple people, but the browser claims each occurrence ID once, serializes event writes, blocks duplicate submit, and advances the queue only after every valid write succeeds.
 
+### 2026-08-24: [Cross-cutting] Seven-frame HITL debounce
+
+- A violation must be observed in 7 consecutive accepted frames before its first occurrence can set `review_required=true` and open the HITL popup.
+- This applies consistently to zone intrusion, restricted-area-compatible generic violations, and missing-PPE alerts; a normal/unknown frame resets the pending consecutive-frame count.
+- Vision-side PPE temporal confirmation remains a separate observation-quality gate; it does not bypass the 7-frame HITL debounce.
+
 ### 2026-08-23: [Backend/Frontend] Fixed camera configuration and per-zone rules
 
 - Persist exactly four logical slots `cam_1` through `cam_4`; each READY asset may be assigned to at most one slot.

@@ -94,7 +94,7 @@ class FrameInferenceService:
         self._tracker_lock = threading.RLock()
         self._violation_tracker = ViolationTrackingService(
             activation_frames=settings.violation_frame,
-            activation_frames_by_rule_prefix=({"missing_ppe:": 1} if settings.vision_provider == "local" else None),
+            activation_frames_by_rule_prefix=None,
             ppe_confirmation_frames=settings.ppe_alert_confirm_frames,
             ppe_revoke_confirmation_seconds=settings.ppe_revoke_confirm_seconds,
             zone_activation_frames=settings.zone_alert_confirm_frames,
