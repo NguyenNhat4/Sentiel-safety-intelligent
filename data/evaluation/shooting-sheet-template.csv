@@ -1,3 +1,0 @@
-video_id,scenario_id,recording_take,actor_ids,hat,vest,machine_timeline,zone_action,expected_review_outcome,consent_record_id,notes
-VID_S01_001,S01,1,actor_001,present,present,0-20000:stopped,outside,normal,CONSENT_001,Normal negative video
-VID_S06_001,S06,1,actor_001,present,present,0-5000:stopped;5000-20000:running,enter-zone-after-5000ms,violate,CONSENT_001,Zone violation while machine runs

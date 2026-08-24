@@ -24,7 +24,6 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
         {user.role === "safety_manager" && <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>}
         {user.role === "safety_manager" && <button className={`nav-item ${page === "operations" ? "active" : ""}`} onClick={() => onNavigate("operations")}><span>⌁</span> Quan sát hệ thống</button>}
         {user.role !== "safety_manager" && <button className={`nav-item ${page === "area" ? "active" : ""}`} onClick={() => onNavigate("area")}><span>⌁</span> Dashboard</button>}
-        <button className="nav-item muted-nav" disabled><span>{"{ }"}</span> Log JSON</button>
          {user.role === "system_admin" && <button className={`nav-item ${page === "admin" ? "active" : ""}`} onClick={() => onNavigate("admin")}><span>⚙</span> Quản trị hệ thống</button>}
          {user.role === "system_admin" && <button className={`nav-item ${page === "media-library" ? "active" : ""}`} onClick={() => onNavigate("media-library")}><span>▣</span> Thư viện media</button>}
       </nav>

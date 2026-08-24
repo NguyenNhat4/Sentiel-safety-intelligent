@@ -59,7 +59,7 @@ export const MediaLibraryPage = memo(function MediaLibraryPage({active = true}: 
   }
 
   return <section className={`page media-library-page ${active ? "active" : ""}`}>
-    <div className="media-library-heading"><div><p className="eyebrow">SYSTEM ADMIN · MEDIA</p><h2>Thư viện media</h2><p>Quản lý nguồn video và hình ảnh được phép dùng trong mô phỏng.</p></div><strong>{assets.length}<small>media</small></strong></div>
+    <div className="media-library-heading"><strong>{assets.length}<small>media</small></strong><p>Quản lý nguồn video và hình ảnh được phép dùng trong mô phỏng.</p></div>
     <form className="media-upload-card" onSubmit={upload}>
       <label>Tên hiển thị<input aria-label="Tên hiển thị" value={displayName} onChange={event => setDisplayName(event.target.value)} required /></label>
       <label>Video hoặc hình ảnh<input aria-label="Video hoặc hình ảnh" name="media_file" type="file" accept="video/*,image/*" onChange={event => setFile(event.target.files?.[0])} required /></label>

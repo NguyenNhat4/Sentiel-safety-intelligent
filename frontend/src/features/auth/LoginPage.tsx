@@ -22,22 +22,11 @@ export function LoginPage({onAuthenticated}: LoginPageProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedValue, setCopiedValue] = useState("");
 
   function fillDemoAccount(account: typeof DEMO_ACCOUNTS[number]): void {
     setEmail(account.email);
     setPassword(account.password);
     setError("");
-  }
-
-  async function copyValue(value: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedValue(value);
-      window.setTimeout(() => setCopiedValue(current => current === value ? "" : current), 1600);
-    } catch {
-      setError("Không thể sao chép. Hãy chọn và copy thủ công.");
-    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -75,20 +64,20 @@ export function LoginPage({onAuthenticated}: LoginPageProps) {
             <div className="login-message" aria-live="polite">{error && <p className="login-error" role="alert">{error}</p>}</div>
             <button className="login-submit" disabled={isSubmitting} type="submit">{isSubmitting ? "Đang xác thực..." : "Đăng nhập"}</button>
           </form>
-          <DemoAccounts copiedValue={copiedValue} onCopy={copyValue} onFill={fillDemoAccount} />
+          <DemoAccounts onFill={fillDemoAccount} />
         </div>
       </section>
     </main>
   );
 }
 
-function DemoAccounts({copiedValue, onCopy, onFill}: {copiedValue: string; onCopy: (value: string) => Promise<void>; onFill: (account: typeof DEMO_ACCOUNTS[number]) => void}) {
+function DemoAccounts({onFill}: {onFill: (account: typeof DEMO_ACCOUNTS[number]) => void}) {
   return <section className="demo-accounts" aria-labelledby="demo-accounts-title">
-    <div className="demo-heading"><div><p className="eyebrow">DEMO LOCAL</p><h3 id="demo-accounts-title">Tài khoản dùng thử</h3></div><span>Mật khẩu chung: <strong>Sentinel123!</strong> <button type="button" aria-label="Sao chép mật khẩu dùng thử" onClick={() => void onCopy("Sentinel123!")}>{copiedValue === "Sentinel123!" ? "Đã copy" : "Copy mật khẩu"}</button></span></div>
+    <div className="demo-heading"><div><p className="eyebrow">DEMO LOCAL</p><h3 id="demo-accounts-title">Tài khoản dùng thử</h3></div><span>Mật khẩu chung: <strong>Sentinel123!</strong></span></div>
     <div className="demo-list">
       {DEMO_ACCOUNTS.map(account => <div className="demo-account" key={account.email}>
         <div className="demo-account-info"><strong>{account.email}</strong><span>{account.role}</span></div>
-        <div className="demo-account-actions"><button type="button" aria-label={`Sao chép email ${account.email}`} onClick={() => void onCopy(account.email)}>{copiedValue === account.email ? "Đã copy" : "Copy email"}</button><button type="button" aria-label={`Dùng tài khoản ${account.email}`} onClick={() => onFill(account)}>Dùng tài khoản</button></div>
+        <div className="demo-account-actions"><button type="button" aria-label={`Dùng tài khoản ${account.email}`} onClick={() => onFill(account)}>Dùng tài khoản</button></div>
       </div>)}
     </div>
     <p className="demo-footnote">Các tài khoản này chỉ dành cho demo môi trường local.</p>

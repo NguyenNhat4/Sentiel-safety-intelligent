@@ -64,7 +64,7 @@ export const AdminUserPage = memo(function AdminUserPage({currentUser, active = 
 
   return <section className={`page admin-page ${active ? "active" : ""}`}>
     <div className="admin-heading">
-      <div><p className="eyebrow">SYSTEM ADMIN</p><h2>Quản trị hệ thống</h2><p>Quản lý tài khoản, vai trò và thông tin xác thực tập trung.</p></div>
+      <p>Quản lý tài khoản, vai trò và thông tin xác thực tập trung.</p>
       <div className="admin-summary"><strong>{users.length}</strong><span>tài khoản</span></div>
     </div>
     <div className="admin-tabs" role="tablist">

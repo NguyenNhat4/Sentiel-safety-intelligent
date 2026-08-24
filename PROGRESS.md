@@ -47,6 +47,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Frontend
 
+- Sidebar no longer renders the unused disabled `Log JSON` placeholder tab.
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
 - Live Monitor reloads camera configuration, media inventory, and compatible sessions whenever the page becomes active; disconnected cameras and sessions belonging to a previously assigned asset are removed from the rendered slot.
 - Camera configuration is hidden from the sidebar and opens only when `safety_manager` selects a Live Monitor slot; `system_admin` owns the media library.
@@ -66,6 +67,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.
 
 ## Latest Verification
+
+- Added `scripts/clean_local_data.py` and `make clean-local-data` for explicit local-only PostgreSQL cleanup. The script preserves schema/migration history, clears configured media/snapshot/log directories, rejects Railway/production targets, and its three guard tests pass.
 
 - `.env.development` now includes every active field from `.env.development.example`; runtime loading confirms local Vision, media paths, retention defaults, and a `4.0` per-camera inference FPS cap.
 - Removed the backend `640x360` pre-resize and its coordinate-restoration pass so YOLO receives the original decoded frame; tests were updated for the new contract but not run per user request.
