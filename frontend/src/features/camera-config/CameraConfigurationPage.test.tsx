@@ -75,14 +75,21 @@ it("keeps the controlled draft and reports a revision conflict", async () => {
   expect(vest).toBeChecked();
 });
 
-it("does not offer unsaveable PPE switches without a zone", async () => {
+it("lets users set PPE switches before creating a zone and carries them into the new zone", async () => {
   loadMock.mockResolvedValue(emptyConfiguration);
   saveMock.mockResolvedValue({...emptyConfiguration, revision: 8});
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
 
   expect(await screen.findByText("Hãy tạo một vùng để cấu hình yêu cầu PPE.")).toBeInTheDocument();
-  expect(screen.queryByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).not.toBeInTheDocument();
-  expect(screen.queryByRole("checkbox", {name: "Yêu cầu áo phản quang"})).not.toBeInTheDocument();
+  const hat = screen.getByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"});
+  const vest = screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"});
+  expect(hat).not.toBeChecked();
+  expect(vest).not.toBeChecked();
+  fireEvent.click(hat);
+  fireEvent.click(vest);
+  fireEvent.click(screen.getByRole("button", {name: "Tạo vùng"}));
+  expect(hat).toBeChecked();
+  expect(vest).toBeChecked();
   expect(screen.queryByRole("checkbox", {name: "Detect vùng cấm"})).not.toBeInTheDocument();
   expect(screen.queryByRole("checkbox", {name: "Cảnh báo xâm nhập zone"})).not.toBeInTheDocument();
   expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();

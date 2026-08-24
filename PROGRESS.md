@@ -68,6 +68,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
+
 - Added `scripts/clean_local_data.py` and `make clean-local-data` for explicit local-only PostgreSQL cleanup. The script preserves schema/migration history, clears configured media/snapshot/log directories, rejects Railway/production targets, and its three guard tests pass.
 
 - `.env.development` now includes every active field from `.env.development.example`; runtime loading confirms local Vision, media paths, retention defaults, and a `4.0` per-camera inference FPS cap.
@@ -109,7 +111,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Next Steps
 
-0. [Frontend] Đã sửa Live Monitor giữ playback request sau khi Replay/Run trả về session COMPLETED sớm; focused test, lint, type-check và production build đã pass. Chưa deploy Railway vì worktree còn thay đổi ngoài scope cần được tách trước.
+0. [Frontend] Resolve the pre-existing `frontend/src/App.tsx:26` ESLint warning, redeploy the PPE-switch fix to Railway, and run browser UAT for camera configuration.
 1. Prove an uploaded asset reaches model, rule, HITL log, and persisted event end to end on Railway.
 2. Run the two-zone browser UAT and record results.
 3. Finish PostgreSQL-only cleanup and verify `make setup`, `make run`, and migrations on a fresh environment.
