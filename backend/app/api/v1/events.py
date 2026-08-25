@@ -91,8 +91,24 @@ async def create_event(
     db: Session = Depends(get_db),
 ):
     """Record a new safety violation event."""
+    from backend.app.services.frame_inference_service import frame_inference_service
+
     service = EventService(db)
     try:
+        occurrence_ids = [str(value) for value in event_in.occurrence_ids]
+        if (
+            event_in.camera_id in {"cam_1", "cam_2", "cam_3", "cam_4"}
+            and occurrence_ids
+            and not service.has_persisted_occurrences(occurrence_ids)
+            and (
+                event_in.monitoring_session_id is None
+                or event_in.track_id is None
+                or not frame_inference_service.occurrences_belong_to_track(
+                    str(event_in.monitoring_session_id), event_in.track_id, occurrence_ids
+                )
+            )
+        ):
+            raise HTTPException(status_code=409, detail="Occurrence does not belong to the requested session and track")
         event = service.create_event(event_in, actor=actor)
         if event_in.status == "acknowledged" and getattr(event, "_was_created", False):
             alert_notification_service.queue_confirmed_events(db, [event])

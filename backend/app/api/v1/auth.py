@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.app.api.dependencies import require_authenticated_user, require_roles, require_system_admin, require_token
-from backend.app.core.config import get_settings
+from backend.app.api.dependencies import require_authenticated_user, require_system_admin, require_token
 from backend.app.core.database import get_db
 from backend.app.models.user import User, UserRole
 from backend.app.schemas.auth import (
     AuthUser,
-    HlsTokenResponse,
     LoginRequest,
     LoginResponse,
     ManagedUser,
@@ -26,7 +24,6 @@ from backend.app.services.auth_service import (
     InvalidSessionError,
     UserManagementError,
 )
-from backend.app.services.hls_access_service import issue_hls_access_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -55,7 +52,6 @@ def as_managed_user(user) -> ManagedUser:
 
 
 require_admin = require_system_admin
-require_hls_viewer = require_roles(UserRole.SYSTEM_ADMIN, UserRole.SAFETY_MANAGER)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -83,24 +79,6 @@ def get_me(token: str = Depends(require_token), db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail=str(exc), headers={"WWW-Authenticate": "Bearer"}) from exc
     except AuthenticationUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-@router.post("/hls-token", response_model=HlsTokenResponse)
-def create_hls_token(
-    actor: User = Depends(require_hls_viewer),
-    db: Session = Depends(get_db),
-):
-    secret = get_settings().hls_token_secret
-    try:
-        token, expires_in = issue_hls_access_token(
-            secret=secret,
-            user_id=actor.id,
-            role=actor.role,
-            cameras=["*"],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=503, detail="HLS access is not configured") from exc
-    return HlsTokenResponse(access_token=token, expires_in=expires_in)
 
 
 @router.post("/logout", status_code=204)

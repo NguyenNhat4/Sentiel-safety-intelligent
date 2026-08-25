@@ -44,8 +44,7 @@ printf '#!/usr/bin/env bash\nexit 0\n' >"$TEST_BIN/.venv/bin/pytest"
 chmod +x "$TEST_BIN/.venv/bin/pytest"
 mkdir -p "$TEST_BIN/scripts" "$TEST_BIN/backend/tests" "$TEST_BIN/frontend"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$TEST_BIN/scripts/push_app.sh"
-printf '#!/usr/bin/env bash\nexit 0\n' >"$TEST_BIN/scripts/push_streamer.sh"
-chmod +x "$TEST_BIN/scripts/push_app.sh" "$TEST_BIN/scripts/push_streamer.sh"
+chmod +x "$TEST_BIN/scripts/push_app.sh"
 printf '0' >"$TEST_BIN/railway-state"
 
 output="$({
@@ -53,7 +52,6 @@ output="$({
   POLL_INTERVAL_SECONDS=0 \
   DEPLOY_TIMEOUT_SECONDS=2 \
   APP_HEALTH_URL=https://app.example.test/health \
-  STREAMER_HEALTH_URL=https://streamer.example.test/health \
   ROOT_DIR_OVERRIDE="$TEST_BIN" \
   RAILWAY_TEST_STATE="$TEST_BIN/railway-state" \
     bash "$ROOT_DIR/scripts/deploy_all_production.sh"

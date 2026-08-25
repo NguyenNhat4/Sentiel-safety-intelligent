@@ -1,14 +1,15 @@
 import {useState} from "react";
-import type {ModelDetection, PersonDetection} from "../../types";
+import type {ModelDetection, MonitoringZone, PersonDetection} from "../../types";
 import {getDetectionColor, isDisplayedPpeDetection} from "../monitor/canvas";
 
 interface SnapshotOverlayProps {
   snapshot: string;
   people?: PersonDetection[];
   detections?: ModelDetection[];
+  zones?: MonitoringZone[];
 }
 
-export function SnapshotOverlay({snapshot, people = [], detections = []}: SnapshotOverlayProps) {
+export function SnapshotOverlay({snapshot, people = [], detections = [], zones = []}: SnapshotOverlayProps) {
   const [imageSize, setImageSize] = useState<{width: number; height: number} | null>(null);
 
   return (
@@ -29,6 +30,9 @@ export function SnapshotOverlay({snapshot, people = [], detections = []}: Snapsh
           preserveAspectRatio="xMidYMid meet"
           viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
         >
+          {zones.filter(zone => zone.enabled && zone.points.length === 4).map(zone => (
+            <SnapshotZone key={zone.zone_id} zone={zone} imageSize={imageSize} />
+          ))}
           {people.map((person, index) => (
             <SnapshotBox
               key={`person-${index}`}
@@ -49,6 +53,23 @@ export function SnapshotOverlay({snapshot, people = [], detections = []}: Snapsh
         </svg>
       )}
     </div>
+  );
+}
+
+function SnapshotZone({zone, imageSize}: {zone: MonitoringZone; imageSize: {width: number; height: number}}) {
+  return (
+    <g data-testid="snapshot-zone">
+      <polygon
+        aria-label={`Vùng ${zone.display_name}`}
+        fill="#f4cc2f33"
+        points={zone.points.map(point => `${point.x * imageSize.width},${point.y * imageSize.height}`).join(" ")}
+        stroke="#f4cc2f"
+        strokeWidth={Math.max(2, imageSize.width * 0.004)}
+      />
+      <text fill="#f4cc2f" fontSize={Math.max(12, imageSize.width * 0.018)} fontWeight="700" x={zone.points[0].x * imageSize.width} y={Math.max(16, zone.points[0].y * imageSize.height - 6)}>
+        {zone.display_name}
+      </text>
+    </g>
   );
 }
 

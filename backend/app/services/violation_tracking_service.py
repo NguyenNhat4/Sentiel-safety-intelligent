@@ -27,6 +27,7 @@ class ViolationTrackingService:
         self,
         *,
         activation_frames: int | None = None,
+        activation_frames_by_rule_prefix: dict[str, int] | None = None,
         zone_activation_frames: int | None = None,
         lost_grace_frames: int = 3,
         exit_confirm_frames: int = 2,
@@ -38,6 +39,9 @@ class ViolationTrackingService:
     ) -> None:
         if activation_frames is not None and activation_frames < 1:
             raise ValueError("activation_frames must be at least 1")
+        activation_overrides = activation_frames_by_rule_prefix or {}
+        if any(not prefix or frames < 1 for prefix, frames in activation_overrides.items()):
+            raise ValueError("rule activation prefixes must be non-empty and frame counts must be at least 1")
         if zone_activation_frames is not None and zone_activation_frames < 1:
             raise ValueError("zone_activation_frames must be at least 1")
         if ppe_confirmation_frames < 1:
@@ -45,6 +49,7 @@ class ViolationTrackingService:
         if ppe_revoke_confirmation_seconds < 0:
             raise ValueError("ppe_revoke_confirmation_seconds must not be negative")
         self._activation_frames = activation_frames
+        self._activation_frames_by_rule_prefix = dict(activation_overrides)
         self._zone_activation_frames = zone_activation_frames
         self._lost_grace_frames = lost_grace_frames
         self._exit_confirm_frames = exit_confirm_frames
@@ -54,10 +59,12 @@ class ViolationTrackingService:
         self._session_ttl_seconds = session_ttl_seconds
         self._track_handoff_max_distance = track_handoff_max_distance
         self._occurrences: dict[tuple[str, int, str], _Occurrence] = {}
+        self._occurrence_origins: dict[str, tuple[str, int, str]] = {}
         self._pending_ppe_frames: dict[tuple[str, int, str], int] = {}
         self._pending_ppe_present_since: dict[tuple[str, int, str], float] = {}
         self._confirmed_ppe_items: dict[tuple[str, int], set[str]] = {}
         self._track_positions: dict[tuple[str, int], tuple[float, float]] = {}
+        self._alerted_tracks: set[tuple[str, int]] = set()
         self._last_seen: dict[str, float] = {}
         self._last_frame: dict[str, int] = {}
 
@@ -78,6 +85,8 @@ class ViolationTrackingService:
         *,
         track_positions: dict[int, tuple[float, float]] | None = None,
         ppe_present_items: dict[int, set[str]] | None = None,
+        applicable_ppe_rules: set[tuple[int, str]] | None = None,
+        bypass_confirmation: bool = False,
         now: float,
     ) -> dict[int, list[ActiveViolation]]:
         self._expire(now)
@@ -93,6 +102,17 @@ class ViolationTrackingService:
             ppe_present_items or {},
             now=now,
         )
+        if applicable_ppe_rules is not None:
+            for key, occurrence in self._occurrences.items():
+                existing_session, track_id, rule_key = key
+                if (
+                    existing_session == session_id
+                    and occurrence.active
+                    and self._requires_ppe_confirmation(rule_key)
+                    and (track_id, rule_key) not in applicable_ppe_rules
+                ):
+                    self._pending_ppe_present_since.pop(key, None)
+                    self._clear(occurrence, now)
 
         for key in observed_keys:
             _, track_id, rule_key = key
@@ -106,7 +126,7 @@ class ViolationTrackingService:
                 activation_frames = self._zone_activation_frames or self._activation_frames
             else:
                 activation_frames = self._activation_frames
-            if activation_frames is not None:
+            if activation_frames is not None and not bypass_confirmation:
                 if occurrence is None:
                     occurrence = _Occurrence(occurrence_id=str(uuid4()), active=False)
                     self._occurrences[key] = occurrence
@@ -119,20 +139,25 @@ class ViolationTrackingService:
                     occurrence.consecutive_frames += 1
                     if occurrence.consecutive_frames < activation_frames:
                         continue
-                    if occurrence.cooldown_until > 0:
-                        occurrence = _Occurrence(occurrence_id=str(uuid4()), active=True)
-                        self._occurrences[key] = occurrence
+                    # Re-entry by the same tracked person in this session is
+                    # the same alert lifecycle. Keep its occurrence ID so a
+                    # cleared-and-reopened violation cannot look like a new
+                    # report downstream.
                     occurrence.active = True
-                    is_new = True
+                    is_new = self._claim_alert(session_id, track_id)
                 occurrence.absent_frames = 0
                 occurrence.lost_frames = 0
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
                 continue
-            if is_ppe_rule:
+            if is_ppe_rule and not bypass_confirmation:
                 if occurrence is None or not occurrence.active:
                     missing_frames = self._pending_ppe_frames.get(key, 0) + 1
                     self._pending_ppe_frames[key] = missing_frames
-                    if missing_frames < self._ppe_confirmation_frames:
+                    confirmation_frames = self._activation_frames_for(
+                        rule_key,
+                        default=self._ppe_confirmation_frames,
+                    )
+                    if missing_frames < confirmation_frames:
                         continue
                     self._pending_ppe_frames.pop(key, None)
                     item = rule_key.split(":", 1)[1]
@@ -141,24 +166,28 @@ class ViolationTrackingService:
                         confirmed_items.discard(item)
                     occurrence = _Occurrence(occurrence_id=str(uuid4()))
                     self._occurrences[key] = occurrence
-                    is_new = True
+                    is_new = self._claim_alert(session_id, track_id)
                 else:
                     is_new = False
                 occurrence.absent_frames = 0
                 occurrence.lost_frames = 0
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
                 continue
-            is_new = occurrence is None or (not occurrence.active and now >= occurrence.cooldown_until)
-            if is_new:
+            if occurrence is None:
                 occurrence = _Occurrence(occurrence_id=str(uuid4()))
                 self._occurrences[key] = occurrence
+                is_new = self._claim_alert(session_id, track_id)
             else:
+                # A re-entry keeps the original occurrence identity. The
+                # per-track alert claim decides whether this is reportable;
+                # it must not be reopened as a second alert.
                 occurrence.active = True
+                is_new = False
             occurrence.absent_frames = 0
             occurrence.lost_frames = 0
             output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, is_new))
 
-        # Six missing frames must be consecutive. Present or unknown breaks a
+        # Seven missing frames must be consecutive. Present or unknown breaks a
         # pending sequence, while only explicit present revokes an active log.
         self._pending_ppe_frames = {
             key: frame_count
@@ -179,6 +208,7 @@ class ViolationTrackingService:
                 and (track_id, rule_key) not in suppressed_ppe_rules
                 and occurrence.active
                 and self._requires_ppe_confirmation(rule_key)
+                and (applicable_ppe_rules is None or (track_id, rule_key) in applicable_ppe_rules)
                 and not any(item.occurrence_id == occurrence.occurrence_id for item in output.get(track_id, []))
             ):
                 output.setdefault(track_id, []).append(ActiveViolation(occurrence.occurrence_id, rule_key, False))
@@ -202,6 +232,8 @@ class ViolationTrackingService:
             if occurrence.absent_frames >= self._exit_confirm_frames:
                 self._clear(occurrence, now)
 
+        for key, occurrence in self._occurrences.items():
+            self._occurrence_origins.setdefault(occurrence.occurrence_id, key)
         for violations in output.values():
             violations.sort(key=lambda item: item.rule_key)
         for track_id, position in positions.items():
@@ -210,6 +242,11 @@ class ViolationTrackingService:
 
     def end_session(self, session_id: str) -> None:
         self._occurrences = {key: value for key, value in self._occurrences.items() if key[0] != session_id}
+        self._occurrence_origins = {
+            occurrence_id: context
+            for occurrence_id, context in self._occurrence_origins.items()
+            if context[0] != session_id
+        }
         self._pending_ppe_frames = {
             key: value for key, value in self._pending_ppe_frames.items() if key[0] != session_id
         }
@@ -220,20 +257,26 @@ class ViolationTrackingService:
             key: value for key, value in self._confirmed_ppe_items.items() if key[0] != session_id
         }
         self._track_positions = {key: value for key, value in self._track_positions.items() if key[0] != session_id}
+        self._alerted_tracks = {key for key in self._alerted_tracks if key[0] != session_id}
         self._last_seen.pop(session_id, None)
         self._last_frame.pop(session_id, None)
 
-    def occurrence_context(self, occurrence_id: str) -> tuple[str, str] | None:
-        for (session_id, _track_id, rule_key), occurrence in self._occurrences.items():
-            if occurrence.occurrence_id == occurrence_id:
-                return session_id, rule_key
-        return None
+    def occurrence_context(self, occurrence_id: str) -> tuple[str, int, str] | None:
+        return self._occurrence_origins.get(occurrence_id)
 
     def _clear(self, occurrence: _Occurrence, now: float) -> None:
         occurrence.active = False
         occurrence.absent_frames = 0
         occurrence.lost_frames = 0
         occurrence.cooldown_until = now + self._cooldown_seconds
+
+    def _activation_frames_for(self, rule_key: str) -> int:
+        matches = [
+            (len(prefix), frames)
+            for prefix, frames in self._activation_frames_by_rule_prefix.items()
+            if rule_key.startswith(prefix)
+        ]
+        return max(matches)[1] if matches else self._activation_frames
 
     def _handoff_nearby_tracks(
         self,
@@ -282,6 +325,15 @@ class ViolationTrackingService:
             new_track_key = (session_id, new_track_id)
             if old_track_key in self._confirmed_ppe_items and new_track_key not in self._confirmed_ppe_items:
                 self._confirmed_ppe_items[new_track_key] = self._confirmed_ppe_items.pop(old_track_key)
+            if old_track_key in self._alerted_tracks:
+                self._alerted_tracks.add(new_track_key)
+
+    def _claim_alert(self, session_id: str, track_id: int) -> bool:
+        key = (session_id, track_id)
+        if key in self._alerted_tracks:
+            return False
+        self._alerted_tracks.add(key)
+        return True
 
     def _confirm_present_ppe(
         self,
@@ -316,6 +368,14 @@ class ViolationTrackingService:
     @staticmethod
     def _requires_ppe_confirmation(rule_key: str) -> bool:
         return rule_key.startswith("missing_ppe:")
+
+    def _activation_frames_for(self, rule_key: str, *, default: int) -> int:
+        matches = [
+            (len(prefix), frames)
+            for prefix, frames in self._activation_frames_by_rule_prefix.items()
+            if rule_key.startswith(prefix)
+        ]
+        return max(matches)[1] if matches else default
 
     def _expire(self, now: float) -> None:
         expired = [

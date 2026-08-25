@@ -7,10 +7,10 @@ import numpy as np
 import pytest
 
 from backend.app.api.v1.analysis import frame_inference_service
-from backend.app.models.stream_configuration import StreamConfiguration
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.camera_detection_hub import camera_detection_hub
+from backend.app.services.ppe_requirement_service import PpeRequirementService
 from backend.app.services.violation_tracking_service import ViolationTrackingService
 
 
@@ -25,6 +25,7 @@ def jpeg_bytes(width=160, height=120):
 def use_stubbed_vision_observations(monkeypatch):
     """Keep analysis rule tests independent from the installed vision model."""
     monkeypatch.setattr(frame_inference_service, "_violation_tracker", ViolationTrackingService(activation_frames=1))
+    monkeypatch.setattr(frame_inference_service, "_model_preloader", lambda: None)
     monkeypatch.setattr(frame_inference_service, "_vision_analyzer", None)
     monkeypatch.setattr(
         frame_inference_service,
@@ -72,14 +73,7 @@ def send_inference_websocket_frame(websocket, frame_id=1, video_time=1.5, frame=
     return websocket.receive_json()
 
 
-def test_camera_detection_websocket_authenticates_and_routes_mapped_camera(client, db_session):
-    db_session.add(
-        StreamConfiguration(
-            id=1,
-            mappings=[{"camera_id": "cam_1", "stream_camera_id": "line_1"}],
-        )
-    )
-    db_session.commit()
+def test_camera_detection_websocket_authenticates_and_routes_fixed_camera(client):
     token = client.headers["Authorization"].split(" ", 1)[1]
 
     with client.websocket_connect("/api/v1/ws/camera-detections") as websocket:
@@ -89,11 +83,11 @@ def test_camera_detection_websocket_authenticates_and_routes_mapped_camera(clien
         assert websocket.receive_json()["frame_id"] == 3
 
 
-def test_camera_detection_websocket_rejects_unmapped_camera(client):
+def test_camera_detection_websocket_rejects_invalid_camera(client):
     token = client.headers["Authorization"].split(" ", 1)[1]
     with client.websocket_connect("/api/v1/ws/camera-detections") as websocket:
         websocket.send_json({"type": "authenticate", "access_token": token, "camera_ids": ["cam_9"]})
-        assert websocket.receive_json()["code"] == "camera_not_mapped"
+        assert websocket.receive_json()["code"] == "invalid_camera"
 
 
 def test_health_check(client):
@@ -102,7 +96,7 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] in {"ok", "degraded"}
     assert isinstance(data["ready"], bool)
-    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage", "streamer"}
+    assert set(data["dependencies"]) == {"postgresql", "snapshot_storage"}
 
 
 def test_frontend_is_served(client):
@@ -115,33 +109,6 @@ def test_frontend_is_served(client):
     script = client.get(asset_path.group(1))
     assert script.status_code == 200
     assert "Sentinel" in script.text
-
-
-def test_start_analysis(client):
-    payload = {
-        "source_type": "demo",
-        "source_path": "data/demo/test.mp4",
-        "zone_ids": ["zone_01"],
-        "enable_privacy_blur": True,
-        "conf_threshold": 0.5,
-    }
-    response = client.post("/api/v1/analysis/start", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert "session_id" in data
-    assert data["status"] == "running"
-
-
-def test_stop_analysis(client):
-    start_resp = client.post(
-        "/api/v1/analysis/start",
-        json={"source_type": "demo", "source_path": "data/demo/test.mp4", "zone_ids": ["zone_01"]},
-    )
-    session_id = start_resp.json()["session_id"]
-
-    stop_resp = client.post(f"/api/v1/analysis/stop/{session_id}")
-    assert stop_resp.status_code == 200
-    assert stop_resp.json()["status"] == "stopped"
 
 
 def test_frame_inference_returns_normal_without_people(client, monkeypatch):
@@ -268,9 +235,9 @@ def test_zone_entry_requests_review_when_machine_is_stopped(monkeypatch):
 
     assert result.people[0].foot_point == [60, 100]
     assert result.people[0].inside_zone is True
-    assert result.review_required is False
-    assert result.result == "normal"
-    assert result.snapshot_data is None
+    assert result.review_required is True
+    assert result.result == "violate"
+    assert result.snapshot_data is not None
 
 
 def test_inference_websocket_returns_empty_people(client, monkeypatch):
@@ -384,3 +351,108 @@ def test_inference_websocket_rejects_stale_frame_id(client, monkeypatch):
 
     assert stale["type"] == "error"
     assert stale["code"] == "stale_frame"
+
+
+def test_inference_websocket_opens_ppe_review_on_fourth_raw_miss(client, monkeypatch):
+    observations = iter(
+        [
+            ("present", 0.91, False),
+            ("present", 0.91, False),
+            ("present", 0.91, False),
+            ("present", None, False),
+            ("present", None, False),
+            ("present", None, False),
+            ("unknown", None, True),
+        ]
+    )
+
+    def analyze(frame, monitoring_session_id, now):
+        status, confidence, absence_confirmed = next(observations)
+        return {
+            "canonical_people": [(40, 60, 40, 50, 0.95, 7)],
+            "people": [
+                {
+                    "hat": {"status": status, "confidence": confidence},
+                    "vest": {"status": "present", "confidence": 0.88},
+                }
+            ],
+            "detections": [],
+            "absence_confirmed": [{"hat": absence_confirmed, "vest": False}],
+        }
+
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", analyze)
+    monkeypatch.setattr(
+        PpeRequirementService,
+        "get",
+        lambda self, camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    upper_zone = [
+        {"x": 0.1, "y": 0.05},
+        {"x": 0.9, "y": 0.05},
+        {"x": 0.9, "y": 0.5},
+        {"x": 0.1, "y": 0.5},
+    ]
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, upper_zone)
+        results = [send_inference_websocket_frame(websocket, frame_id=frame_id) for frame_id in range(1, 8)]
+
+    assert [result["result"] for result in results] == ["normal"] * 6 + ["violate"]
+    assert [result["review_required"] for result in results] == [False] * 6 + [True]
+    assert results[-1]["people"][0]["active_violations"][0]["rule_key"] == "missing_ppe:hat"
+
+
+def test_inference_websocket_waits_for_three_initial_ppe_misses(client, monkeypatch):
+    confirmations = iter([False, False, True])
+
+    def analyze(frame, monitoring_session_id, now):
+        return {
+            "canonical_people": [(40, 60, 40, 50, 0.95, 7)],
+            "people": [
+                {
+                    "hat": {"status": "unknown", "confidence": None},
+                    "vest": {"status": "present", "confidence": 0.88},
+                }
+            ],
+            "detections": [],
+            "absence_confirmed": [{"hat": next(confirmations), "vest": False}],
+        }
+
+    monkeypatch.setattr(frame_inference_service, "_vision_analyzer", analyze)
+    monkeypatch.setattr(
+        PpeRequirementService,
+        "get",
+        lambda self, camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=True,
+            vest_required=False,
+            updated_at=None,
+        ),
+    )
+    upper_zone = [
+        {"x": 0.1, "y": 0.05},
+        {"x": 0.9, "y": 0.05},
+        {"x": 0.9, "y": 0.5},
+        {"x": 0.1, "y": 0.5},
+    ]
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, upper_zone)
+        results = [send_inference_websocket_frame(websocket, frame_id=frame_id) for frame_id in range(1, 4)]
+
+    assert [result["people"][0]["ppe"]["hat"]["status"] for result in results] == [
+        "unknown",
+        "unknown",
+        "missing",
+    ]
+    assert [result["result"] for result in results] == ["normal", "normal", "violate"]
+    assert [result["review_required"] for result in results] == [False, False, True]

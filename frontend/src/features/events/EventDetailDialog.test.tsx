@@ -32,7 +32,7 @@ const detail: EventDetail = {
       video_timestamp_seconds: 6,
       machine_state: "running",
       zone_revision: 3,
-      zone_points: [],
+      zone_points: [{x: 0.2, y: 0.2}, {x: 0.8, y: 0.2}, {x: 0.8, y: 0.8}, {x: 0.2, y: 0.8}],
       people: [{
         track_id: 7,
         bbox: [40, 10, 80, 100],
@@ -60,7 +60,7 @@ const detail: EventDetail = {
     },
   },
   summary: {
-    text: "Một người được phát hiện tại Máy dập A và được xác nhận là vi phạm thực tế.",
+    text: "Tại Vùng 1, hệ thống phát hiện 1 người và đánh dấu là vi phạm do xâm nhập vùng. Nguyễn Anh Tuấn xác nhận đây là vi phạm thực tế.",
     source: "deterministic",
     context_schema_version: "decision_context_v1",
   },
@@ -74,13 +74,20 @@ describe("EventDetailDialog", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("Đang tải");
     expect(await screen.findByRole("dialog", {name: "Chi tiết sự kiện #42"})).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "1. AI quan sát"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "AI quan sát"})).toBeInTheDocument();
     expect(screen.getByText(/91%/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "2. Rule quyết định"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Rule quyết định"})).toBeInTheDocument();
     expect(screen.getByText(/safety_rule_v1/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", {name: "3. Human review"})).toBeInTheDocument();
-    expect(screen.getByText(/Nguyễn Anh Tuấn/)).toBeInTheDocument();
+    expect(screen.getByText("Thiếu mũ bảo hộ")).toBeInTheDocument();
+    expect(screen.queryByText("missing_ppe:hat")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Human review"})).toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("BƯỚC 3")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Nguyễn Anh Tuấn/)).toHaveLength(2);
     expect(screen.getByText(/Nguồn: Mẫu xác định/)).toBeInTheDocument();
+    expect(screen.getByText("xâm nhập vùng")).toHaveProperty("tagName", "STRONG");
+    expect(screen.getAllByText("Nguyễn Anh Tuấn").every(element => element.tagName === "STRONG")).toBe(true);
   });
 
   it("shows a limited-audit explanation for legacy events", async () => {

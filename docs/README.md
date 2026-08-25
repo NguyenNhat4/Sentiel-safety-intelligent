@@ -4,7 +4,7 @@ Thư mục này chứa kiến trúc, hướng dẫn vận hành, chuẩn bị d�
 
 Structure subdirectories:
 - `docs/architecture/`: Problem statement, architecture diagrams, và alert rule contracts.
-- `docs/ops/`: Operations, CI/CD, RTSP/CCTV media gateway, operational metrics, streamer concurrency, local Postgres, và AI team workflow.
+- `docs/ops/`: Operations, CI/CD, direct-file media deployment, operational metrics, local Postgres, Vision worker và AI team workflow.
 - `docs/data/`: Hướng dẫn chuẩn bị dữ liệu và dataset evaluation.
 - `docs/plans/`: Kế hoạch thực thi chi tiết (implementation plans).
 - `docs/guide/`: Hướng dẫn cài đặt và tài nguyên tham khảo.
@@ -16,4 +16,3 @@ Quy tắc tài liệu:
 - Root `context-map.md` là chỉ mục duy nhất của repository.
 - Khi tạo, xóa hoặc di chuyển tài liệu, cập nhật chỉ mục root `context-map.md` và `docs/PROJECT_STRUCTURE.md`.
 - Quy tắc workflow bắt buộc dành cho agent có thể chứa liên kết để nạp đúng ngữ cảnh.
-

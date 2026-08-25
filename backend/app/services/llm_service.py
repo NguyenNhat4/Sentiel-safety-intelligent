@@ -132,9 +132,18 @@ class SafetyAgentService:
         machine_state = "đang chạy" if scene.get("machine_state") == "running" else "đã dừng"
         people_count = len(scene.get("people") or [])
         outcome = "vi phạm thực tế" if review.get("outcome") == "actual_violation" else "báo sai"
-        reasons = ", ".join(decision.get("reason_codes") or [])
+        reason_labels = []
+        for reason in decision.get("reason_codes") or []:
+            if reason.startswith("zone_intrusion:"):
+                reason_labels.append("xâm nhập vùng")
+            elif reason.startswith("missing_required_ppe:"):
+                item = reason.rsplit(":", 1)[-1]
+                reason_labels.append({"hat": "không đội mũ", "vest": "không mặc áo phản quang"}.get(item, "thiếu PPE"))
+            else:
+                reason_labels.append(reason)
+        reasons = " và ".join(reason_labels) or "không rõ nguyên nhân"
         return (
-            f"Tại {zone_name}, hệ thống ghi nhận {people_count} người khi máy {machine_state} "
-            f"và đưa ra kết quả {decision.get('result', 'không xác định')} ({reasons}). "
-            f"{review.get('actor_name', 'Cán bộ an toàn')} xác nhận là {outcome}."
+            f"Tại {zone_name}, hệ thống phát hiện {people_count} người khi máy {machine_state} "
+            f"và đánh dấu là vi phạm do {reasons}. "
+            f"{review.get('actor_name', 'Cán bộ an toàn')} xác nhận đây là {outcome}."
         )

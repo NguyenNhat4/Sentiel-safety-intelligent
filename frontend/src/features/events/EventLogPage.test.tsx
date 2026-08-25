@@ -19,6 +19,18 @@ const acknowledged: SafetyEvent = {
   status: "acknowledged",
 };
 const falseAlarm: SafetyEvent = {...acknowledged, id: 2, status: "false_alarm"};
+const missingHat: SafetyEvent = {
+  ...acknowledged,
+  id: 3,
+  event_type: "person_safety_violation",
+  decision_context: {
+    schema_version: "decision_context_v1",
+    rule: {rule_version: "safety_rule_v1", violation_frame_count: 6, triggered_rule_keys: ["missing_ppe:hat"], ppe_profile: "hat_vest_v1", ppe_requirements: {profile: "hat_vest_v1", hat_required: true, vest_required: false}},
+    scene: {camera_id: "cam_1", zone_id: "camera_wide", zone_name: "Camera 1", frame_id: 1, video_timestamp_seconds: 1, machine_state: "running", zone_points: [], people: [], detections: []},
+    system_decision: {result: "violate", reason_codes: ["missing_required_ppe:hat"], severity: "high"},
+    human_review: {outcome: "actual_violation", actor_name: "Safety Officer", reviewed_at: "2026-08-15T03:05:40Z"},
+  },
+};
 
 describe("EventLogPage audit filters", () => {
   beforeEach(() => {
@@ -40,5 +52,13 @@ describe("EventLogPage audit filters", () => {
 
     await waitFor(() => expect(loadReviewedEvents).toHaveBeenLastCalledWith("false_alarm"));
     expect(await screen.findByText("BÁO SAI")).toBeInTheDocument();
+  });
+
+  it("names the missing equipment in the audit log card", async () => {
+    vi.mocked(loadReviewedEvents).mockResolvedValue([missingHat]);
+    render(<EventLogPage active />);
+
+    expect(await screen.findByRole("heading", {name: "Thiếu mũ bảo hộ"})).toBeInTheDocument();
+    expect(screen.queryByText("Thiếu PPE")).not.toBeInTheDocument();
   });
 });

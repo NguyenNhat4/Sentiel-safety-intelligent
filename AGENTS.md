@@ -26,7 +26,7 @@ When implementing code, agents must interpret `docs/FUTURE_PROJECT_STRUCTURE.md`
 6. Boundary/provider folders must include their required `README.md`, tests must live in the documented test layer, and the actual filesystem change must be reflected in `docs/PROJECT_STRUCTURE.md`.
 7. If no single owner/layer can be identified, or the task requires a new top-level directory, do not invent a boundary. Report the ambiguity and request a decision from the user.
 8. Existing code outside the target layout is not permission for a broad refactor. Preserve current contracts and migrate incrementally unless the user explicitly scopes a larger migration.
-9. Updated code: after completing code changes, deploy to Railway environment (no local runtime execution). 
+9. Updated code: after completing code changes, deploy to Railway environment (no local runtime execution).
 ---
 
 ## Session Workflow

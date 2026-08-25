@@ -2,6 +2,9 @@ import {useEffect, useRef, useState} from "react";
 import {assetUrl} from "../../api/config";
 import {loadEventDetail} from "../../api/events";
 import type {EventDetail, StoredDecisionContext} from "../../types";
+import {SnapshotOverlay} from "../alerts/SnapshotOverlay";
+import {violationRuleItemLabel} from "../alerts/violation-copy";
+import "./event-detail.css";
 
 interface EventDetailDialogProps {
   eventId: number | null;
@@ -71,9 +74,26 @@ function EventDetailContent({detail}: {detail: EventDetail}) {
         <h3 id="event-summary-heading">Tóm tắt sự việc</h3>
         <span>Nguồn: {detail.summary.source === "llm" ? "AI có kiểm soát" : "Mẫu xác định"}</span>
       </div>
-      <p>{detail.summary.text}</p>
+      <p>{renderHighlightedSummary(detail.summary.text, context?.human_review.actor_name)}</p>
     </section>
-    {snapshot && <img className="event-detail-snapshot" src={snapshot} alt={`Snapshot đã làm mờ của sự kiện ${detail.id}`} />}
+    {snapshot && context?.scene.zone_points.length === 4 ? (
+      <div className="event-detail-snapshot event-detail-snapshot-overlay">
+        <SnapshotOverlay
+          snapshot={snapshot}
+          people={context.scene.people}
+          detections={context.scene.detections}
+          zones={[{
+            zone_id: context.scene.zone_id,
+            display_name: context.scene.zone_name,
+            points: context.scene.zone_points,
+            enabled: true,
+            order: 0,
+          }]}
+        />
+      </div>
+    ) : snapshot ? (
+      <img className="event-detail-snapshot" src={snapshot} alt={`Snapshot đã làm mờ của sự kiện ${detail.id}`} />
+    ) : null}
     {context ? <AuditChain context={context} /> : <section className="event-limited-audit">
       <h3>Audit hạn chế</h3>
       <p>Sự kiện này được tạo bởi phiên bản hệ thống cũ nên không có decision context đầy đủ. Hệ thống không tự suy diễn dữ liệu lịch sử còn thiếu.</p>
@@ -81,13 +101,24 @@ function EventDetailContent({detail}: {detail: EventDetail}) {
   </>;
 }
 
+function renderHighlightedSummary(summary: string, reviewerName?: string) {
+  const terms = ["xâm nhập vùng", reviewerName].filter((term): term is string => Boolean(term));
+  if (!terms.length) return summary;
+  const escapedTerms = terms.map(term => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(${escapedTerms.join("|")})`, "gi");
+  return summary.split(pattern).map((part, index) =>
+    terms.some(term => part.localeCompare(term, undefined, {sensitivity: "accent"}) === 0)
+      ? <strong key={`${part}-${index}`}>{part}</strong>
+      : <span key={`${part}-${index}`}>{part}</span>,
+  );
+}
+
 function AuditChain({context}: {context: StoredDecisionContext}) {
   const people = context.scene.people;
   const maxConfidence = people.length ? Math.max(...people.map(person => person.confidence)) : null;
   return <div className="event-audit-chain">
     <section>
-      <small>BƯỚC 1</small>
-      <h3>1. AI quan sát</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">1</span> AI quan sát</h3>
       <p>{people.length} người được ghi nhận{maxConfidence === null ? "" : ` · Confidence cao nhất ${formatPercent(maxConfidence)}`}.</p>
       <div className="audit-facts">
         <span>Frame #{context.scene.frame_id}</span>
@@ -96,8 +127,7 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
       </div>
     </section>
     <section>
-      <small>BƯỚC 2</small>
-      <h3>2. Rule quyết định</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">2</span> Rule quyết định</h3>
       <p>{context.system_decision.result === "violate" ? "Hệ thống yêu cầu review" : "Hệ thống đánh giá bình thường"} · Mức độ {context.system_decision.severity}.</p>
       <div className="audit-facts">
         <span>{context.rule.rule_version}</span>
@@ -105,11 +135,10 @@ function AuditChain({context}: {context: StoredDecisionContext}) {
         <span>{context.scene.machine_state === "running" ? "Máy đang chạy" : "Máy đã dừng"}</span>
         <span>{context.scene.zone_name}</span>
       </div>
-      <ul>{context.rule.triggered_rule_keys.map(rule => <li key={rule}>{rule}</li>)}</ul>
+      <ul>{context.rule.triggered_rule_keys.map(rule => <li key={rule}>{violationRuleItemLabel(rule)}</li>)}</ul>
     </section>
     <section>
-      <small>BƯỚC 3</small>
-      <h3>3. Human review</h3>
+      <h3 className="audit-step-title"><span aria-hidden="true">3</span> Human review</h3>
       <p><strong>{context.human_review.actor_name}</strong> xác nhận: {context.human_review.outcome === "actual_violation" ? "Vi phạm thực tế" : "Báo sai"}.</p>
       <time>{new Date(context.human_review.reviewed_at).toLocaleString("vi-VN", {hour12: false})}</time>
     </section>

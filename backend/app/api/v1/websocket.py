@@ -17,6 +17,7 @@ from backend.app.schemas.analysis import (
     InferenceWebSocketFrameMeta,
 )
 from backend.app.services.auth_service import AuthError, AuthService
+from backend.app.services.camera_configuration_service import CAMERA_IDS
 from backend.app.services.camera_detection_hub import camera_detection_hub
 from backend.app.services.frame_inference_service import (
     InvalidFrameError,
@@ -29,7 +30,6 @@ from backend.app.services.monitoring_zone_service import (
     validate_zone_geometry,
 )
 from backend.app.services.ppe_requirement_service import PpeRequirementService
-from backend.app.services.stream_configuration_service import StreamConfigurationService
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ active_inference_sessions: set[str] = set()
 
 @router.websocket("/ws/camera-detections")
 async def websocket_camera_detections_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
-    """Stream server-side RTSP inference metadata for mapped cameras."""
+    """Stream server-owned inference metadata for fixed camera slots."""
     await websocket.accept()
     subscription = None
     try:
@@ -91,10 +91,11 @@ async def websocket_camera_detections_endpoint(websocket: WebSocket, db: Session
         }:
             await send_inference_error(websocket, "forbidden", "This role cannot view camera detections")
             return
-        mapped_ids = {mapping.camera_id for mapping in StreamConfigurationService(db).get().mappings}
         requested = set(camera_ids)
-        if not requested <= mapped_ids:
-            await send_inference_error(websocket, "camera_not_mapped", "Every requested camera must be mapped")
+        if not requested <= set(CAMERA_IDS):
+            await send_inference_error(
+                websocket, "invalid_camera", "Every requested camera must be cam_1 through cam_4"
+            )
             return
         subscription = camera_detection_hub.subscribe(requested)
         await websocket.send_json({"type": "subscribed", "camera_ids": sorted(requested)})

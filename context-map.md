@@ -30,7 +30,7 @@ Camera nhà máy thật, PLC, tự động dừng máy và xử lý đồng th�
 Baseline hiện có:
 
 - React 19 + TypeScript + Vite cho monitor, FastAPI cho REST/WebSocket và frontend build.
-- Upload video local; tạo, lưu nhiều vùng bốn điểm không chồng nhau; zone intrusion đang bật luôn cảnh báo, còn machine state chỉ gate PPE.
+- Sys Admin upload video/ảnh vào thư viện media; Safety Manager gán asset duy nhất cho bốn camera logic, cấu hình vùng/PPE và chủ động chạy phiên inference.
 - YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
 - PostgreSQL là database duy nhất cho local, test và deployment; không dùng SQLite hoặc database fallback. Session authentication hỗ trợ ba role.
@@ -77,8 +77,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Multi-zone | [US-27](specs/done/US-27-MULTI-ZONE-SPEC.md) |
 | Dataset/evaluation US-13 | [dataset guide](docs/data/US-13-task2-datapreparation.md), [evaluation workspace](data/evaluation/README.md) |
 | Operational JSONL metrics | [Operational Metrics](docs/ops/operational-metrics.md) |
-| Hiểu/tải thử streamer nhiều client và bộ nhớ MJPEG | [Streamer concurrency and memory](docs/ops/streamer-concurrency-and-memory.md) |
-| Hiểu hoặc vận hành luồng CCTV RTSP, MediaMTX, Railway và HLS/WebRTC | [RTSP CCTV media solution](docs/ops/RTSP_CCTV_MEDIA_SOLUTION.md), [streamer README](streamer/README.md), [implementation plan](docs/plans/2026-08-21-001-feat-rtsp-cctv-media-gateway-plan.md) |
+| Hiểu workflow thư viện media và bốn camera demo | [US-29](specs/US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md) |
 | Cài Python với uv | [uv Setup Guide](docs/guide/setup/uv-setup.md) |
 | Quy trình phối hợp AI | [AI Team Workflow](docs/ops/AI_TEAM_WORKFLOW.md) |
 

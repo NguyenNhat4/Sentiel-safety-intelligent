@@ -10,7 +10,6 @@ Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành 
 
 `telegram_notifications.py` chỉ chuyển nội dung cảnh báo đã được backend quyết định sang Telegram Bot API. Routing theo khu vực và người nhận vẫn thuộc backend service; lỗi nhà cung cấp không được làm gián đoạn inference.
 
-`rtsp_frame_source.py` là adapter media đầu vào cho backend/vision. Nó chỉ derive
-path `cameras/<stream_camera_id>` từ RTSP origin cấu hình phía server, giới hạn
-tần suất lấy frame và reconnect sau lỗi đọc; browser không được cung cấp URL
-RTSP tùy ý.
+`media_storage.py` cấp presigned POST/GET cho Railway Bucket, xác minh metadata object
+và download vào cache server-owned khi OpenCV bắt đầu inference. Asset cũ trên volume
+vẫn đọc được trong quá trình migration; browser không nhận credential bucket.

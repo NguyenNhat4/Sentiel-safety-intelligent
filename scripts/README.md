@@ -1,64 +1,120 @@
 # Benchmark scripts
 
+## Dọn dữ liệu local
+
+`clean_local_data.py` xóa rows trong PostgreSQL local, giữ nguyên schema và
+migration history, đồng thời dọn media uploads, snapshots và operational logs.
+Script từ chối database Railway/production và bắt buộc cờ xác nhận:
+
+```bash
+make clean-local-data
+```
+
+Kiểm tra `DATABASE_URL` trong `.env.development` trước khi chạy. Lệnh này
+không thể khôi phục dữ liệu đã xóa.
+
+## Đồng bộ code lên Google Drive
+
+`sync_code_to_google_drive.sh` dùng `rclone` để đồng bộ duy nhất các file
+Python (`*.py`) trong `backend/app/` và `vision/`. Script không upload
+`__pycache__`, `*.pyc`, `*.pyo`, test cache, model, media, tài liệu hoặc file
+không phải Python. `rclone sync` cũng xóa trên thư mục Drive đích những file
+Python đã bị xóa ở local, vì vậy hãy dùng một thư mục Drive riêng cho backup này.
+
+### 1. Cài và kết nối Google Drive
+
+Trên Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install rclone
+rclone config
+```
+
+Trong `rclone config`:
+
+1. Chọn `n` để tạo remote mới.
+2. Đặt tên `gdrive`.
+3. Chọn storage `drive` (Google Drive).
+4. Có thể để trống `client_id` và `client_secret` cho tài khoản cá nhân.
+5. Chọn quyền `drive` hoặc quyền phù hợp với tài khoản backup.
+6. Chọn `auto config` và đăng nhập tài khoản Google trong trình duyệt.
+7. Không chọn Shared Drive, trừ khi thư mục đích thuộc Shared Drive.
+
+Kiểm tra kết nối mà không upload:
+
+```bash
+rclone lsd gdrive:
+./scripts/sync_code_to_google_drive.sh --dry-run
+```
+
+### 2. Chạy đồng bộ
+
+Mặc định code được đưa vào `gdrive:P-047-code/`:
+
+```bash
+./scripts/sync_code_to_google_drive.sh
+```
+
+Đổi tên remote hoặc thư mục đích bằng biến môi trường. Tên remote không chứa
+dấu `:`:
+
+```bash
+GOOGLE_DRIVE_REMOTE=company-drive \
+GOOGLE_DRIVE_DESTINATION=backups/P-047-code \
+./scripts/sync_code_to_google_drive.sh
+```
+
+### 3. Tự động chạy mỗi 5 phút bằng cron
+
+Lấy đường dẫn tuyệt đối của repository bằng `pwd`, sau đó mở cron:
+
+```bash
+crontab -e
+```
+
+Thêm một dòng, thay `/absolute/path/to/P-047` bằng đường dẫn thật:
+
+```cron
+*/5 * * * * /absolute/path/to/P-047/scripts/sync_code_to_google_drive.sh >> "$HOME/p047-drive-sync.log" 2>&1
+```
+
+Cron chạy với môi trường tối giản. Nếu `rclone` không nằm trong `PATH` của cron,
+dùng đường dẫn trả về bởi `command -v rclone` trong `PATH` của crontab hoặc cài
+`rclone` vào `/usr/bin`. File cấu hình mặc định nằm tại
+`~/.config/rclone/rclone.conf`; không commit file này vì nó chứa token truy cập.
+
+Chạy regression không dùng mạng sau khi sửa script:
+
+```bash
+./scripts/test_sync_code_to_google_drive.sh
+```
+
 `deploy_all_production.sh` runs the focused release gates, rebuilds and pushes
-both production images, redeploys `p047-app` and `streamer`, waits for new
-Railway deployments to reach `SUCCESS`, and checks both health endpoints:
+the application image, redeploys `p047-app`, waits for the new Railway deployment
+to reach `SUCCESS`, and checks the application health endpoint:
 
 ```bash
 ./scripts/deploy_all_production.sh
 ```
 
-The defaults target this project's production services and images. Override
-`RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT`, service names, image names/tags,
-health URLs, or `DEPLOY_TIMEOUT_SECONDS` through environment variables when
-needed. The script never prints or passes application secrets as build args.
+The defaults target this project's production app service and image. Override
+`RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT`, app service, image name/tag, health
+URL, or `DEPLOY_TIMEOUT_SECONDS` through environment variables when needed.
+Production must mount a persistent volume at `MEDIA_ASSET_DIR`.
 
-`configure_railway_hls.sh` synchronizes the shared HLS signing secret and
-Railway service-reference variables to `p047-app` and `streamer`. For a complete
-image-based release, `--publish-app` also builds the frontend with concrete
-production URLs, pushes the app image and redeploys from the latest image:
-
-```bash
-./scripts/configure_railway_hls.sh --publish-app
-```
-
-Both scripts read the gitignored root `.env.production`; process environment
-values take precedence. Local `VITE_STREAMER_URL` and
-`VITE_MEDIA_PUBLIC_ORIGIN` must be concrete public URLs, not Railway `${{...}}`
-references. Secrets are never Docker build arguments. Without `--publish-app`,
-runtime variables are updated but an existing prebuilt frontend is unchanged.
-
-Run the no-network mock regression after editing either deployment script:
+`migrate_media_assets_to_s3.py` copies legacy canonical files from that volume into
+the configured media bucket, verifies object size, then updates one database row at
+a time. Preview first, then apply after the S3 variables and migration are deployed:
 
 ```bash
-./scripts/test_railway_hls_scripts.sh
+python -m scripts.migrate_media_assets_to_s3
+python -m scripts.migrate_media_assets_to_s3 --apply --delete-local
 ```
 
-`build_streamer.sh` builds the standalone mock camera streamer image from the
-repository root. It defaults to `nguyennaht4/streamer:dev`; pass another image
-tag as the first argument when needed:
-
-```bash
-./scripts/build_streamer.sh
-./scripts/build_streamer.sh DOCKERHUB_USERNAME/streamer:dev
-```
-
-`push_streamer.sh` builds and publishes the streamer image to Docker Hub. Run
-`docker login` first, or use an existing Docker credential helper. It accepts
-the Docker Hub image name and tag separately:
-
-```bash
-docker login
-./scripts/push_streamer.sh
-./scripts/push_streamer.sh DOCKERHUB_USERNAME/p047-streamer v1.0.0
-```
-
-The default image is `nguyennaht4/streamer:dev`. Set `DOCKERHUB_IMAGE` to
-change the default image name without passing an argument:
-
-```bash
-DOCKERHUB_IMAGE=DOCKERHUB_USERNAME/p047-streamer ./scripts/push_streamer.sh
-```
+`container_entrypoint.sh` runs as container root only long enough to ensure the
+Railway-mounted media directory belongs to `appuser`, then uses `gosu` so the
+application and all media writes run without root privileges.
 
 `push_app.sh` reads the three `VITE_*` build values from `.env.production`,
 builds and publishes the main P-047 image, then asks Railway service `p047-app`

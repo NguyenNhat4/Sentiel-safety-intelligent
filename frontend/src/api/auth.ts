@@ -16,32 +16,6 @@ export function getAccessToken(): string | null {
   return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
-export interface HlsAccessToken {
-  access_token: string;
-  token_type: "bearer";
-  expires_in: number;
-}
-
-export function getHlsAccessToken(): Promise<HlsAccessToken> {
-  return requestHlsAccessToken();
-}
-
-async function requestHlsAccessToken(): Promise<HlsAccessToken> {
-  const token = getAccessToken();
-  if (!token) throw new Error("Phiên đăng nhập đã hết hạn.");
-  const response = await fetch(apiUrl("/auth/hls-token"), {
-    method: "POST",
-    headers: {Authorization: `Bearer ${token}`},
-  });
-  if (response.status === 401) {
-    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    window.location.reload();
-    throw new Error("Phiên đăng nhập đã hết hạn.");
-  }
-  if (!response.ok) throw new Error(await readErrorMessage(response, "Không thể cấp quyền xem HLS"));
-  return response.json() as Promise<HlsAccessToken>;
-}
-
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   const response = await fetch(apiUrl("/auth/login"), {
     method: "POST",

@@ -89,7 +89,7 @@ def test_reviewed_event_persists_server_owned_decision_context_and_summary(clien
     assert created["acknowledged_by"] == actor_name
     assert created["decision_context"]["schema_version"] == "decision_context_v1"
     assert created["decision_context"]["rule"]["rule_version"] == "safety_rule_v1"
-    assert created["decision_context"]["rule"]["violation_frame_count"] == 4
+    assert created["decision_context"]["rule"]["violation_frame_count"] == 7
     assert created["decision_context"]["scene"]["camera_id"] == "uploaded_video"
     assert created["decision_context"]["scene"]["zone_id"] == "zone_01"
     assert created["decision_context"]["system_decision"]["severity"] == "high"
@@ -105,6 +105,11 @@ def test_reviewed_event_persists_server_owned_decision_context_and_summary(clien
     assert detail["summary"]["source"] == "deterministic"
     assert "Máy dập A" in detail["summary"]["text"]
     assert "Nguyễn Anh Tuấn" in detail["summary"]["text"]
+    assert detail["summary"]["text"] == (
+        "Tại Máy dập A, hệ thống phát hiện một người khi máy đang chạy "
+        "và đánh dấu là vi phạm do xâm nhập vùng và không đội mũ. "
+        "Nguyễn Anh Tuấn xác nhận đây là vi phạm thực tế."
+    )
     assert detail["summary"]["context_schema_version"] == "decision_context_v1"
 
 

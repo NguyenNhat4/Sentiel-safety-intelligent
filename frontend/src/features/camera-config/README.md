@@ -1,6 +1,5 @@
 # Camera Configuration
 
-System-admin workspace for selecting one persisted camera mapping, previewing
-its HLS source, editing revisioned four-point monitoring zones, and opening the
-rule panel owned by each `(camera_id, zone_id)`. Live Monitor remains a separate
-read-only multi-camera view.
+Safety Manager internal page for the exact Live Monitor slot selected, previewing
+its READY image/video asset and editing revisioned zones plus rules owned by each
+`(camera_id, zone_id)`. It has no sidebar entry; save or back returns to Live Monitor.

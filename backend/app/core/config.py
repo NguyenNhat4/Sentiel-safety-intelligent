@@ -14,13 +14,15 @@ class Settings(BaseSettings):
     app_debug: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     api_v1_prefix: str = "/api/v1"
-    hls_token_secret: str = ""
-    streamer_internal_origin: str = ""
-    streamer_health_timeout_seconds: float = Field(default=3.0, ge=0.5, le=10.0)
-    rtsp_inference_enabled: bool = False
-    rtsp_reader_origin: str = ""
-    rtsp_inference_max_fps: float = Field(default=2.0, gt=0.0, le=10.0)
-    rtsp_mapping_poll_seconds: float = Field(default=5.0, ge=1.0, le=60.0)
+    media_asset_dir: str = "data/media-assets"
+    max_media_asset_bytes: int = Field(default=1024 * 1024 * 1024, gt=0, le=10 * 1024 * 1024 * 1024)
+    media_inference_max_fps: float = Field(default=2.0, gt=0.0, le=40.0)
+    media_storage_backend: Literal["filesystem", "s3"] = "filesystem"
+    media_storage_bucket: str = ""
+    media_storage_endpoint_url: str = ""
+    media_storage_region: str = "auto"
+    media_storage_access_key_id: str = ""
+    media_storage_secret_access_key: str = ""
 
     # Lightweight operational metrics persisted as rotated JSONL files.
     operational_metrics_log_path: str = "data/operational-metrics.jsonl"
@@ -78,6 +80,9 @@ class Settings(BaseSettings):
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
     ppe_model_path: str = "models/yolo11m_safety.pt"
+    person_detection_confidence: float = Field(default=0.6, gt=0.0, le=1.0)
+    ppe_detection_confidence: float = Field(default=0.2, gt=0.0, le=1.0)
+    yolo_inference_image_size: int = Field(default=960, ge=32, le=4096, multiple_of=32)
     vision_provider: Literal["local", "remote"] = "local"
     vision_remote_url: str = ""
     vision_remote_api_key: SecretStr = SecretStr("")
@@ -85,13 +90,14 @@ class Settings(BaseSettings):
     face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
-    violation_frame: int = Field(default=5, ge=1, le=60)
-    ppe_alert_confirm_frames: int = Field(default=6, ge=1, le=60)
+    violation_frame: int = Field(default=7, ge=1, le=60)
+    ppe_temporal_frames: int = Field(default=3, ge=1, le=60)
+    ppe_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
     ppe_revoke_confirm_seconds: float = Field(default=2.0, ge=0.0, le=30.0)
-    zone_alert_confirm_frames: int = Field(default=4, ge=1, le=60)
+    zone_alert_confirm_frames: int = Field(default=7, ge=1, le=60)
 
     model_config = SettingsConfigDict(
-        env_file=(".env.production"),
+        env_file=(".env.development"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -111,6 +117,22 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ValueError(f"S3 snapshot storage requires {', '.join(missing)}")
+
+    def validate_media_storage(self) -> None:
+        if self.media_storage_backend != "s3":
+            return
+        missing = [
+            name
+            for name, value in (
+                ("MEDIA_STORAGE_BUCKET", self.media_storage_bucket),
+                ("MEDIA_STORAGE_ENDPOINT_URL", self.media_storage_endpoint_url),
+                ("MEDIA_STORAGE_ACCESS_KEY_ID", self.media_storage_access_key_id),
+                ("MEDIA_STORAGE_SECRET_ACCESS_KEY", self.media_storage_secret_access_key),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"S3 media storage requires {', '.join(missing)}")
 
     @model_validator(mode="after")
     def validate_remote_vision(self):

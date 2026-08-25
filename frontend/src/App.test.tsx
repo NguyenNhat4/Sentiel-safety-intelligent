@@ -35,7 +35,8 @@ function mockAuthenticatedSession(): void {
       zones: [],
       updated_at: null
     });
-    if (url.includes("/stream-config")) return jsonResponse({active_camera_id: null, updated_at: null});
+    if (url.includes("/camera-configurations/cam_")) return jsonResponse({camera_id: url.match(/cam_[1-4]/)?.[0], revision: 0, asset_id: null, machine_state: "stopped", zones: [], updated_at: null});
+    if (url.includes("/camera-configurations") || url.includes("/media-assets") || url.includes("/camera-sessions")) return jsonResponse([]);
     return jsonResponse([]);
   }));
 }
@@ -52,7 +53,7 @@ describe("Sentinel authentication", () => {
     await waitFor(() => expect(screen.getByRole("button", {name: /Đăng nhập/})).toBeInTheDocument());
     expect(screen.getByText("Tài khoản dùng thử")).toBeInTheDocument();
     expect(screen.getByText("admin@sentinel.local")).toBeInTheDocument();
-    expect(screen.getByText("Mật khẩu chung:")).toBeInTheDocument();
+    expect(screen.queryByText("Mật khẩu chung:")).not.toBeInTheDocument();
   });
 
   it("fills the login form from a demo account shortcut", async () => {
@@ -115,9 +116,6 @@ describe("Sentinel authentication", () => {
       if (url.includes("/monitoring-zones")) {
         return jsonResponse({camera_id: "uploaded_video", revision: 0, zones: [], updated_at: null});
       }
-      if (url.includes("/stream-config")) {
-        return jsonResponse({mappings: [], updated_at: null});
-      }
       return jsonResponse([]);
     }));
     render(<App />);
@@ -126,15 +124,15 @@ describe("Sentinel authentication", () => {
     fireEvent.change(screen.getByLabelText(/Mật khẩu/), {target: {value: "Sentinel123!"}});
     fireEvent.click(screen.getByRole("button", {name: /Đăng nhập/}));
 
-    await screen.findByRole("heading", {name: "Live Monitor"});
+    await screen.findByRole("button", {name: /Thư viện media/});
+    expect(screen.getByRole("button", {name: /Quan sát hệ thống/})).toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Live monitor/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Quản trị hệ thống/}));
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
-    expect(screen.getByRole("button", {name: /Cấu hình camera/})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: /Cấu hình camera/}));
-    expect(await screen.findByRole("heading", {name: "Cấu hình camera", level: 1})).toBeInTheDocument();
-    expect(screen.getByText("Chưa có camera nào được kết nối trong Live Monitor.")).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Thư viện media/})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
   });
 
@@ -161,20 +159,26 @@ describe("Sentinel React application", () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
+    expect(screen.queryByRole("button", {name: /Quan sát hệ thống/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
-    expect(await screen.findAllByText("Chưa có stream được gán.")).toHaveLength(4);
+    expect(await screen.findAllByText("Bấm vào đây để cấu hình")).toHaveLength(4);
+    expect(screen.getByText(/Đã upload video.*bấm vào camera thêm một lần nữa để mở cấu hình/i)).toBeInTheDocument();
+    expect(screen.queryByText("Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.")).not.toBeInTheDocument();
   });
 
-  it("keeps the four-camera live monitor read-only", async () => {
+  it("opens the exact internal camera configuration without a sidebar item", async () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
     expect(await screen.findByRole("heading", {name: "Camera 1"})).toBeInTheDocument();
     expect(screen.getByRole("heading", {name: "Camera 4"})).toBeInTheDocument();
-    expect(screen.queryByRole("button", {name: /Tạo vùng/})).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", {name: "Chuyển trạng thái máy"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Cấu hình Camera 2"}));
+    expect(await screen.findByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+    expect(screen.queryAllByText("Cấu hình Camera 2")).toHaveLength(1);
+    expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   });
 
   it("does not render the removed local video upload controls", async () => {
