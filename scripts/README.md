@@ -147,7 +147,7 @@ image digest. The command queues a deployment; verify its final status and
 `/health` before treating the release as successful.
 
 `benchmark_model.py` measures inference-only latency and throughput for a YOLO checkpoint.
-It defaults to the repository test video and the unified YOLO11m Safety runtime model:
+It defaults to the repository test video and the unified YOLO11n Safety KD runtime model:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py
@@ -160,7 +160,7 @@ PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
   --pipeline --warmup 5 --iterations 30 --frames 30
 ```
 
-The pipeline result is latency and FPS for the single YOLO11m Safety call on one frame. It excludes
+The pipeline result is latency and FPS for the single YOLO11n Safety KD call on one frame. It excludes
 video decoding and WebSocket/network time, but includes Ultralytics preprocessing, inference and
 postprocessing.
 
@@ -168,11 +168,11 @@ To benchmark the PPE model and save machine-readable output:
 
 ```bash
 PYTHONPATH=. .venv/bin/python scripts/benchmark_model.py \
-  --model models/yolo11m_safety.pt \
+  --model models/yolo11n_safety_kd_best.pt \
   --output data/model-benchmark.json
 ```
 
-Pipeline mode matches runtime filtering: YOLO11m Safety uses source classes `[0, 3, 4]`
+Pipeline mode matches runtime filtering: YOLO11n Safety KD uses source classes `[0, 3, 4]`
 (`hat`, `person`, `vest`) exactly once per frame. Class `3` supplies canonical people
 for tracking and zone rules. Single-model mode deliberately measures all checkpoint
 classes unless a future CLI option states otherwise.

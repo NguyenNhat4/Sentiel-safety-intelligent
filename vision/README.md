@@ -2,7 +2,7 @@
 
 `vision` sở hữu các observation Computer Vision thuần: person/PPE detection, association, tracking, geometry và redaction. Module không đọc HTTP, database hoặc requirement của người dùng.
 
-Runtime sử dụng `vision.api.PpeVisionFacade` với checkpoint duy nhất `yolo11m_safety.pt`. Facade xác thực mapping nguồn `{hat, nohat, novest, person, vest}`, chỉ yêu cầu source ID `0`, `3`, `4` một lần mỗi frame và chỉ phát hành `person`, `hat`, `vest`. Class `person` ID `3` là nguồn canonical cho bounding box, foot point, zone và ByteTrack; `hat`/`vest` được associate trực tiếp vào những person này từ cùng kết quả inference. Backend `rules` là nơi duy nhất biến observation thành qualified absence và cảnh báo.
+Runtime sử dụng `vision.api.PpeVisionFacade` với checkpoint duy nhất `yolo11n_safety_kd_best.pt`. Facade xác thực mapping nguồn `{hat, nohat, novest, person, vest}`, chỉ yêu cầu source ID `0`, `3`, `4` một lần mỗi frame và chỉ phát hành `person`, `hat`, `vest`. Class `person` ID `3` là nguồn canonical cho bounding box, foot point, zone và ByteTrack; `hat`/`vest` được associate trực tiếp vào những person này từ cùng kết quả inference. Backend `rules` là nơi duy nhất biến observation thành qualified absence và cảnh báo.
 
 Privacy không phụ thuộc model PPE. `PrivacyRedactionFacade` chạy OpenCV YuNet đúng một lần trên snapshot, mở rộng và làm mờ mọi face box, rồi làm mờ 40% phía trên riêng từng person canonical không có face tương ứng. Nếu YuNet lỗi, mọi person dùng fallback; nếu không có person box hợp lệ thì facade fail-closed và backend không lưu snapshot. Pipeline chỉ annotate person/`hat`/`vest` trên frame **đã** redact, không quyết định safety rule và không mutate ảnh đầu vào.
 

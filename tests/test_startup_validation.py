@@ -9,7 +9,7 @@ from backend.app.core.startup_validation import REQUIRED_MODEL_CHECKSUMS, valida
 def test_validate_runtime_files_accepts_approved_models(tmp_path, monkeypatch):
     model_dir = tmp_path / "models"
     model_dir.mkdir()
-    safety = model_dir / "yolo11m_safety.pt"
+    safety = model_dir / "yolo11n_safety_kd_best.pt"
     yunet = model_dir / "face_detection_yunet_2023mar.onnx"
     safety.write_bytes(b"safety")
     yunet.write_bytes(b"yunet")
@@ -37,7 +37,7 @@ def test_validate_runtime_files_rejects_missing_model(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="Required model is missing"):
         validate_runtime_files(
             Settings(
-                ppe_model_path="models/yolo11m_safety.pt",
+                ppe_model_path="models/yolo11n_safety_kd_best.pt",
                 face_detector_model_path="models/face_detection_yunet_2023mar.onnx",
                 operational_metrics_log_path="data/operational-metrics.jsonl",
             )
@@ -47,7 +47,7 @@ def test_validate_runtime_files_rejects_missing_model(tmp_path, monkeypatch):
 def test_validate_runtime_files_rejects_missing_yunet_model(tmp_path, monkeypatch):
     model_dir = tmp_path / "models"
     model_dir.mkdir()
-    safety = model_dir / "yolo11m_safety.pt"
+    safety = model_dir / "yolo11n_safety_kd_best.pt"
     safety.write_bytes(b"safety")
     monkeypatch.setitem(REQUIRED_MODEL_CHECKSUMS, safety.name, hashlib.sha256(b"safety").hexdigest())
     monkeypatch.chdir(tmp_path)
@@ -65,7 +65,7 @@ def test_validate_runtime_files_rejects_missing_yunet_model(tmp_path, monkeypatc
 def test_validate_runtime_files_rejects_wrong_yunet_checksum(tmp_path, monkeypatch):
     model_dir = tmp_path / "models"
     model_dir.mkdir()
-    safety = model_dir / "yolo11m_safety.pt"
+    safety = model_dir / "yolo11n_safety_kd_best.pt"
     yunet = model_dir / "face_detection_yunet_2023mar.onnx"
     safety.write_bytes(b"safety")
     yunet.write_bytes(b"corrupt-yunet")

@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     # Video & Model paths
     demo_video_dir: str = "data/demo"
     model_dir: str = "models"
-    ppe_model_path: str = "models/yolo11m_safety.pt"
+    ppe_model_path: str = "models/yolo11n_safety_kd_best.pt"
     person_detection_confidence: float = Field(default=0.6, gt=0.0, le=1.0)
     ppe_detection_confidence: float = Field(default=0.2, gt=0.0, le=1.0)
     yolo_inference_image_size: int = Field(default=960, ge=32, le=4096, multiple_of=32)

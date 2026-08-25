@@ -2,7 +2,7 @@
 
 Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành interface backend dùng được. Chúng không quyết định rule an toàn, severity hay event state.
 
-`ppe_vision.py` cache public `vision.api.PpeVisionFacade` dùng checkpoint YOLO11m Safety duy nhất cho person canonical, ByteTrack và observation `hat`/`vest` trong một model call mỗi frame. Adapter không quyết định alert hoặc event state.
+`ppe_vision.py` cache public `vision.api.PpeVisionFacade` dùng checkpoint YOLO11n Safety KD duy nhất cho person canonical, ByteTrack và observation `hat`/`vest` trong một model call mỗi frame. Adapter không quyết định alert hoặc event state.
 
 `remote_vision.py` giữ nguyên interface facade đó nhưng chuyển một JPEG sang vision worker qua contract `safety_vision_v1`. Adapter xác thực health/response, đối chiếu `request_id`, không fallback ngầm sang local và không đưa response lỗi của provider vào exception public. `VISION_PROVIDER=local` vẫn là mặc định; remote chỉ được bật sau khi `/ping` của worker thành công.
 

@@ -1,5 +1,9 @@
 # Model Inference Benchmark Report
 
+> Kết quả bên dưới là bằng chứng lịch sử của checkpoint YOLO11m cũ. Runtime
+> `yolo11n_safety_kd_best.pt` được chọn ngày 2026-08-25 và chưa có benchmark
+> tương đương; không dùng số liệu này để đánh giá checkpoint KD.
+
 ## Scope
 
 Baseline lịch sử: đo smoke latency khi một frame đi qua tuần tự hai model theo flow US-28 trước cutover single-model:

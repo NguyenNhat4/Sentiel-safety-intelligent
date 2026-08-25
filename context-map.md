@@ -31,7 +31,7 @@ Baseline hiện có:
 
 - React 19 + TypeScript + Vite cho monitor, FastAPI cho REST/WebSocket và frontend build.
 - Sys Admin upload video/ảnh vào thư viện media; Safety Manager gán asset duy nhất cho bốn camera logic, cấu hình vùng/PPE và chủ động chạy phiên inference.
-- YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
+- YOLO11n Safety KD chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
 - PostgreSQL là database duy nhất cho local, test và deployment; không dùng SQLite hoặc database fallback. Session authentication hỗ trợ ba role.
 

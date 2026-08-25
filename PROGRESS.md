@@ -1,10 +1,15 @@
 # Project Progress
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
 ## Current State
+
+### 2026-08-25 YOLO11n Safety KD experiment
+
+- [Vision] Runtime configuration, startup checksum validation and container packaging now target the user-supplied `yolo11n_safety_kd_best.pt`; the public `[0,3,4]` person/hat/vest contract is unchanged.
+- [Vision] The former YOLO11m checkpoint remains available only for controlled rollback/benchmark. Training-code revision, dataset provenance and held-out US-13 accuracy/latency evidence for the KD checkpoint remain open gates.
 
 ### 2026-08-24 PPE and HITL correction
 
@@ -35,9 +40,9 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Vision
 
-- `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
+- `models/yolo11n_safety_kd_best.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
 - Decoded camera frames retain their source resolution until Ultralytics performs the sole resize/letterbox operation at the configured `960x960` YOLO input boundary.
-- The runtime checkpoint is the optimizer-stripped EMA FP16 artifact (`40543303` bytes, SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`) under Git LFS.
+- The runtime checkpoint is the user-supplied knowledge-distilled artifact (`5480154` bytes, SHA-256 `940467d80536e1a26313bd700e33d3e7a17816659ca7346708e0dc8e03aa06c6`) under Git LFS.
 - Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
 - Missing PPE is derived by deterministic backend rules, not emitted by the model.
 - Local inference uses anatomical PPE association and ten-frame temporal confirmation without a second backend debounce. Remote v1 inference retains six-frame backend confirmation because its contract has no local absence-confirmation metadata. An unreviewed warning retracts only after two continuous seconds of explicit presence.
@@ -68,6 +73,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- YOLO11n Safety KD cutover: the actual checkpoint hash matches the pinned SHA-256; 10 settings/startup tests and 39 Vision API/tracking tests pass. The backend PPE file has 16 passing tests and 3 pre-existing debounce expectation failures (4/immediate versus the active 7-frame contract). Ruff, format, frontend type-check, 82 frontend tests and production build pass; ESLint retains the known `App.tsx:26` warning. Full root pytest and the Railway release gate both stall in the known Starlette `TestClient` path, so the release stopped before Docker build/push and no production deployment was made.
+
 - Camera-wide PPE, HITL duplicate-request handling, immutable occurrence ownership across track handoff, and explicit missing-hat/missing-vest wording in the HITL popup and audit views are fixed locally. PostgreSQL migration `20260824_02` adds/backfills camera-level hat/vest requirements; Railway deployment and browser UAT are intentionally pending.
 
 - [Frontend] Camera configuration now always renders the two PPE requirement switches; users can toggle them before creating a zone, and the draft values carry into the new zone. The page actions are grouped into media, zone/safety-rule, and save/navigation sections with responsive mobile layout. Focused camera-configuration tests (6), frontend type-check, and production build pass. Railway release script reached backend 10/10 but stopped at the pre-existing `App.tsx:26` ESLint warning under `--max-warnings=0`; no production deployment was made.
@@ -92,6 +99,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Railway worktree deployment `c617b5ca-93ca-4ad1-93f2-515024d8e1a0` reached `SUCCESS`; `/health` reports production ready with PostgreSQL and snapshot storage ready. The local Docker publish path was unavailable, so the configured mutable Docker Hub source still needs republishing before a later image-source redeploy.
 
 ## Open Gates
+
+- Record the YOLO11n Safety KD training-code revision and dataset provenance/license, then run held-out US-13 accuracy and target-device latency evaluation before pilot use.
 
 - Measure end-to-end direct-file inference freshness and model latency on Railway; focused evidence does not yet prove four-camera throughput.
 - Complete browser UAT from upload through real-model HITL review and persisted event.

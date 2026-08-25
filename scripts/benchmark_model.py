@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 DEFAULT_SOURCE = "data/test.mp4"
-DEFAULT_MODEL = "models/yolo11m_safety.pt"
+DEFAULT_MODEL = "models/yolo11n_safety_kd_best.pt"
 
 
 def percentile(values: list[float], fraction: float) -> float:

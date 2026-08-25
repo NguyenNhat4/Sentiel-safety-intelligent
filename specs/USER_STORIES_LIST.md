@@ -281,6 +281,10 @@
 
 ### US-28 — Thay SH17 bằng `wesjos/Yolo-hard-hat-safety-vest`
 
+> Cập nhật runtime (2026-08-25): nhánh thử nghiệm dùng
+> `models/yolo11n_safety_kd_best.pt` thay checkpoint YOLO11m, giữ nguyên class
+> contract `[0,3,4]` và semantics person/hat/vest.
+
 > Cập nhật sau implementation (2026-08-13): quyết định Product Owner mới hơn đã chọn `yolo11m_safety.pt` làm detector runtime duy nhất. Class `person` ID `3` thay YOLO11 cho person canonical/ByteTrack/zone và cùng call `[0,3,4]` trả `hat`/`vest`; các boundary hai-model bên dưới được giữ như lịch sử phạm vi ban đầu của US-28.
 
 > Với vai trò cán bộ an toàn, tôi muốn hệ thống dùng model `wesjos/Yolo-hard-hat-safety-vest` với đúng ba lớp `person`, `hat` và `vest`, để phát hiện mũ và áo phản quang theo một model PPE phù hợp với phạm vi prototype.
