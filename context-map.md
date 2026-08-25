@@ -55,6 +55,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 | Khi cần | Đọc tài liệu/nguồn |
 |---|---|
+| Hướng dẫn Onboarding cho Engineer mới | [Onboarding Guide](docs/guide/ONBOARDING.md) |
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
 | Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/ops/CI_CD.md) |
 | Xem luồng deployment và sơ đồ vận hành cho team | [Quy trình deployment](docs/ops/DEPLOYMENT_FLOW.md) |

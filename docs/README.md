@@ -7,7 +7,7 @@ Structure subdirectories:
 - `docs/ops/`: Operations, CI/CD, direct-file media deployment, operational metrics, local Postgres, Vision worker và AI team workflow.
 - `docs/data/`: Hướng dẫn chuẩn bị dữ liệu và dataset evaluation.
 - `docs/plans/`: Kế hoạch thực thi chi tiết (implementation plans).
-- `docs/guide/`: Hướng dẫn cài đặt và tài nguyên tham khảo.
+- `docs/guide/`: Hướng dẫn cài đặt, tài nguyên tham khảo và Hướng dẫn Onboarding (`docs/guide/ONBOARDING.md`).
 
 Quy tắc tài liệu:
 

@@ -209,7 +209,8 @@ P-047/
 │   │   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook
 │   ├── data/                        # Dataset preparation and annotation guides
 │   │   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
-│   ├── guide/                       # Setup guides and reference materials
+│   ├── guide/                       # Setup guides, reference materials and developer onboarding
+│   │   └── ONBOARDING.md            # New developer onboarding and system flow quickstart guide
 │   └── plans/                       # Implementation-ready plans and their reading guide
 │       ├── 2026-08-21-001-feat-remote-vision-service-plan.md # Remote worker implementation plan
 │       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md
