@@ -142,4 +142,47 @@ Không đụng tới Video Streaming giúp team **tiết kiệm 40% khối lư�
 - **Chiều:** Rehearsal Demo: Trình diễn hệ thống chạy mô phỏng 4 camera với tốc độ cực nhanh, mượt mà và ổn định chuẩn công nghiệp.
 
 ---
+
+## 5. Danh Sách Task Backlog Sản Xuất (Coarse-Grained Epic/Tasks)
+
+Các task dưới đây được thiết kế ở mức tổng quát vừa phải (Coarse-Grained) để đưa vào Jira/Linear/GitHub Issues, phù hợp cho Engineer làm việc cùng sự hỗ trợ của AI Agent (Cursor / Jules):
+
+### **TASK 1: Export & Tối Ưu Tốc Độ AI Model Vision Worker (TensorRT / ONNXRuntime)**
+- **Mô tả:** Chuyển đổi mô hình `yolo11m_safety.pt` và YuNet Face Redaction sang định dạng ONNX/TensorRT FP16 execution provider. Tích hợp ONNXRuntime-GPU vào `vision_worker.py` để đạt mốc phản hồi AI dưới **30ms/frame**.
+- **Acceptance Criteria:**
+  - Script convert `.pt` -> `.onnx` thành công, lưu tại `models/`.
+  - Endpoint `/v1/infer` của `vision_worker` hỗ trợ CUDA/TensorRT execution provider.
+  - Latency trung bình 1 frame (kích thước 960x960) <= 30ms trên GPU.
+  - Toàn bộ unit tests trong `vision/tests/` giữ nguyên kết quả đính kèm bbox hợp lệ.
+
+### **TASK 2: Thiết Lập Async Task Queue & Offload I/O Tác Vụ Nặng Qua Redis**
+- **Mô tả:** Cấu hình Redis Async Worker (dùng Celery hoặc ARQ) để đưa các tác vụ tốn I/O (Ghi snapshot S3, Lưu log event DB, Gửi Telegram alert) ra khỏi luồng xử lý frame chính của FastAPI.
+- **Acceptance Criteria:**
+  - Service Redis được cấu hình chuẩn trong `docker-compose.yml` và `.env.development`.
+  - Khởi tạo Async Task Processor module tại `backend/app/core/tasks.py`.
+  - Luồng xử lý WebSocket frame không bị nghẽn (non-blocking) khi có sự kiện vi phạm xảy ra.
+  - Tất cả thông báo Telegram và Snapshot S3 upload được thực thi thành công dưới background task.
+
+### **TASK 3: Chuyển Đổi Tracking State & Temporal Smoothing Sang Redis Store**
+- **Mô tả:** Tách `_sessions` ByteTrack và `PpeTemporalSmoother` khỏi bộ nhớ RAM in-process của Python server, lưu trữ trạng thái có cấu trúc trên Redis Key-Value Store với thời gian sống (TTL) linh hoạt theo session.
+- **Acceptance Criteria:**
+  - Thiết lập Redis Repository adapter cho Tracking State và Temporal History.
+  - Hệ thống duy trì đúng Track ID và Anti-flicker state kể từ khi restart lại worker process.
+  - Bật đồng thời 2 Vision Worker instances cùng đọc/ghi chung Redis state mà không bị phân mảnh hoặc mất Track ID.
+
+### **TASK 4: Tối Ưu Hóa Giao Thức Truyền Tải Payload Giữa Backend & Vision Worker**
+- **Mô tả:** Thay thế giao thức HTTP REST Multipart/JPEG thô bằng Compressed Binary Payload hoặc gRPC/Protobuf nhẹ giữa `backend` và `vision_worker` để giảm thiểu overhead CPU mã hóa/giải mã và băng thông mạng.
+- **Acceptance Criteria:**
+  - Giảm thiểu kích thước Payload truyền tải mỗi frame xuống dưới 50KB.
+  - Giảm bớt CPU utilization trên Backend instance trong quá trình đẩy frame liên tục.
+  - Giữ nguyên tính tương thích hợp đồng dữ liệu output (`canonical_people`, `people`, `detections`).
+
+### **TASK 5: Performance Stress Testing, Docker Hardening & Staging Release**
+- **Mô tả:** Đóng gói toàn bộ hệ thống vào Docker Compose Production profile (PostgreSQL, Redis, Backend, Vision GPU Worker), chạy kiểm thử tải 4-8 camera mô phỏng đồng thời và triển khai lên Staging server.
+- **Acceptance Criteria:**
+  - File `docker-compose.yml` có cấu hình resource limits, healthchecks và GPU allocation (`nvidia-container-toolkit`).
+  - Hệ thống chạy mượt mà 4 camera mô phỏng liên tục trong 1 giờ mà không bị tràn bộ nhớ (Memory Leak), crash process hoặc rò rỉ kết nối WebSocket.
+  - Báo cáo Benchmark latency (p95, p99) và toàn bộ test suites (`make check`) pass 100%.
+
+---
 *Tài liệu này là kế hoạch chuẩn hóa kiến trúc chính thức cho dự án P-047 (Excluding Streaming).*
