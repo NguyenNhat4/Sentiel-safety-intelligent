@@ -32,6 +32,25 @@ def response_payload(request_id: str) -> dict:
     }
 
 
+def empty_tracking_state() -> dict:
+    return {
+        "schema_version": "bytetrack_ppe_state_v1",
+        "tracker": {"frame_id": 0, "last_track_id": 0, "tracked": [], "lost": []},
+        "smoother": {"temporal_frames": 3, "tracks": []},
+    }
+
+
+def response_payload_v2(request_id: str, session_id: str, frame_id: int, revision: int) -> dict:
+    return {
+        **response_payload(request_id),
+        "contract_version": "safety_vision_v2",
+        "monitoring_session_id": session_id,
+        "frame_id": frame_id,
+        "base_state_revision": revision,
+        "tracking_state": empty_tracking_state(),
+    }
+
+
 def test_remote_adapter_sends_jpeg_and_adapts_versioned_response():
     seen_request_id = None
 
@@ -165,6 +184,90 @@ def test_remote_adapter_preload_checks_health_contract():
         base_url="https://vision.example",
         api_key="secret-token",
         timeout_seconds=2.0,
+        client=client,
+    )
+
+    adapter.preload()
+
+
+def test_remote_adapter_v2_transfers_and_correlates_tracking_state():
+    session_id = "3cddfe85-9428-44d7-afbf-0cd9e5fc0640"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v2/infer"
+        body = request.read()
+        assert b'name="frame_id"\r\n\r\n7' in body
+        assert b'name="state_revision"\r\n\r\n3' in body
+        assert b'"schema_version":"bytetrack_ppe_state_v1"' in body
+        marker = b'name="request_id"\r\n\r\n'
+        request_id = body.split(marker, 1)[1].split(b"\r\n", 1)[0].decode()
+        return httpx.Response(200, json=response_payload_v2(request_id, session_id, 7, 3))
+
+    client = httpx.Client(base_url="https://vision.example", transport=httpx.MockTransport(handler))
+    adapter = RemoteVisionAdapter(
+        base_url="https://vision.example",
+        api_key="secret-token",
+        timeout_seconds=2.0,
+        client=client,
+    )
+
+    result, state = adapter.analyze_with_state(
+        np.zeros((80, 120, 3), dtype=np.uint8),
+        monitoring_session_id=session_id,
+        frame_id=7,
+        state_revision=3,
+        tracking_state=empty_tracking_state(),
+    )
+
+    assert result["canonical_people"] == [(10, 20, 30, 40, 0.95, 7)]
+    assert state == empty_tracking_state()
+
+
+def test_remote_adapter_v2_rejects_mismatched_frame_correlation():
+    session_id = "3cddfe85-9428-44d7-afbf-0cd9e5fc0640"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = request.read()
+        marker = b'name="request_id"\r\n\r\n'
+        request_id = body.split(marker, 1)[1].split(b"\r\n", 1)[0].decode()
+        return httpx.Response(200, json=response_payload_v2(request_id, session_id, 8, 3))
+
+    client = httpx.Client(base_url="https://vision.example", transport=httpx.MockTransport(handler))
+    adapter = RemoteVisionAdapter(
+        base_url="https://vision.example",
+        api_key="secret-token",
+        timeout_seconds=2.0,
+        client=client,
+    )
+
+    with pytest.raises(RemoteVisionError, match="mismatched frame correlation"):
+        adapter.analyze_with_state(
+            np.zeros((20, 20, 3), dtype=np.uint8),
+            monitoring_session_id=session_id,
+            frame_id=7,
+            state_revision=3,
+            tracking_state=empty_tracking_state(),
+        )
+
+
+def test_remote_adapter_v2_preload_checks_v2_health_contract():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v2/ping"
+        return httpx.Response(
+            200,
+            json={
+                "status": "healthy",
+                "contract_version": "safety_vision_v2",
+                "model_version": "test-model",
+            },
+        )
+
+    client = httpx.Client(base_url="https://vision.example", transport=httpx.MockTransport(handler))
+    adapter = RemoteVisionAdapter(
+        base_url="https://vision.example",
+        api_key="secret-token",
+        timeout_seconds=2.0,
+        contract_version="safety_vision_v2",
         client=client,
     )
 
