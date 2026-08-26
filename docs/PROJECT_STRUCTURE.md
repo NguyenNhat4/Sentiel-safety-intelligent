@@ -53,8 +53,8 @@ P-047/
 │   │   │   ├── media_asset.py # Backend-owned image/video asset registry
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
-│   │   │   ├── remote_vision.py # Worker health/inference wire contract
-│   │   │   └── user.py
+│   │   │   ├── user.py
+│   │   │   └── vision_tracking_state.py # PostgreSQL v2 continuation-state row
 │   │   ├── schemas/     # Pydantic validation schemas
 │   │   │   ├── analysis.py
 │   │   │   ├── auth.py
@@ -66,6 +66,7 @@ P-047/
 │   │   │   ├── monitoring_zone.py
 │   │   │   ├── ppe_requirement.py
 │   │   │   ├── operational_metrics.py
+│   │   │   ├── remote_vision.py # Strict v1/v2 worker wire contracts and portable state DTO
 │   │   │   └── statistics.py
 │   │   ├── services/    # Core Services & AI Reasoning
 │   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
@@ -81,6 +82,7 @@ P-047/
 │   │   │   ├── ppe_requirement_service.py # PPE persistence and alert rule
 │   │   │   ├── operational_metrics_service.py # Bounded JSONL aggregation
 │   │   │   ├── violation_tracking_service.py # Session occurrence lifecycle
+│   │   │   ├── vision_tracking_state_service.py # TTL, validation and revision/frame CAS
 │   │   │   └── statistics_service.py
 │   │   ├── vision_worker.py # Standalone FastAPI Safety Vision worker entrypoint
 │   │   └── main.py      # FastAPI App entrypoint
@@ -103,9 +105,10 @@ P-047/
 │   │       ├── 20260821_01_add_zone_intrusion_rule.py # Per-zone intrusion enable switch
 │   │       └── 20260822_01_camera_wide_machine_state.py # Camera mapping machine-state compatibility contract
 │   │       └── 20260823_01_add_media_assets_and_camera_sessions.py # US-29 direct media runtime
-│   │       └── 20260823_02_add_media_storage_backend.py # Per-asset filesystem/S3 storage marker
-│   │       └── 20260824_01_repair_sqlite_camera_session_index.py # Repair SQLite active-session partial index
-│   │       └── 20260824_02_camera_wide_ppe_requirements.py # Persist/backfill camera-wide hat/vest requirements
+│   │       ├── 20260823_02_add_media_storage_backend.py # Bucket/volume storage metadata
+│   │       ├── 20260824_01_repair_sqlite_camera_session_index.py # Legacy replay-safe index repair
+│   │       ├── 20260824_02_camera_wide_ppe_requirements.py # Camera-wide hat/vest requirements
+│   │       └── 20260825_01_add_vision_tracking_states.py # v2 JSONB continuation state and TTL index
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
@@ -117,6 +120,8 @@ P-047/
 │       ├── test_event_audit_migration.py
 │       ├── test_frame_inference_ppe.py
 │       ├── test_remote_vision.py # Outbound worker adapter contract
+│       ├── test_vision_tracking_state.py # TTL, validation and CAS persistence behavior
+│       ├── test_vision_tracking_state_migration.py # Reversible JSONB migration contract
 │       ├── test_vision_worker.py # Standalone worker API contract
 │       ├── test_monitoring_zones.py
 │       ├── test_ppe_requirements.py
@@ -131,6 +136,7 @@ P-047/
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
 │   ├── face_detection.py # Thread-safe OpenCV YuNet provider
 │   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
+│   ├── tracking_state.py # Versioned JSON-safe ByteTrack continuation codec
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
 │       ├── test_api.py
@@ -222,6 +228,7 @@ P-047/
 │   ├── README.md
 │   ├── PRD.md
 │   ├── USER_STORIES_LIST.md
+│   ├── ISSUE-43-DISTRIBUTED-TRACKING-STATE-SPEC.md # Approved PostgreSQL-backed worker-neutral tracking state
 │   ├── US-29-DEMO-MULTI-CAMERA-STREAM-SPEC.md # Demo Day multi-camera stream configuration
 │   ├── US-01.md ... US-06.md  # Detailed specs for completed user stories
 │   ├── done/            # Completed implementation specifications

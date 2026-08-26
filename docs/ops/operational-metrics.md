@@ -60,6 +60,8 @@ Rotation tạo các file `.1`, `.2`, …; mặc định giữ tối đa khoảng
 GET /api/v1/operational-metrics?window_minutes=60
 ```
 
+Remote Vision v2 ghi event `vision_tracking_state_persisted` với đúng ba loại bằng chứng vận hành: `outcome` (`created`/`advanced`), `duration_ms` của CAS và `payload_bytes`. Event không chứa monitoring-session ID, JSON state, JPEG hoặc provider response body.
+
 `window_minutes` nhận từ 1 đến 1440 phút. Response chỉ gồm aggregate:
 
 - `requests`: count và min/mean/P50/P95/max latency theo method, route, status class.

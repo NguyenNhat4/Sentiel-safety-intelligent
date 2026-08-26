@@ -23,6 +23,8 @@ The repository is transitioning from a legacy SQLite-compatible path. Until `boo
 
 PostgreSQL uses a bounded LIFO connection pool with TCP keepalive and five-minute connection recycling. `DATABASE_POOL_PRE_PING` defaults to `false` so a warm connection checkout does not add a database round-trip to every request. Enable it only for a provider that repeatedly drops idle sessions. ORM sessions keep loaded values after commit, avoiding an automatic response-time reload; explicit queries remain the source of truth for subsequent requests.
 
+Remote Vision defaults to backward-compatible `safety_vision_v1`. Setting `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2` makes the backend persist the worker-neutral ByteTrack/PPE continuation envelope in PostgreSQL with short revision compare-and-swap transactions. `VISION_TRACKING_STATE_TTL_SECONDS` defaults to `86400` and `VISION_TRACKING_STATE_MAX_BYTES` to `524288`. The GPU call occurs outside the database transaction, state is deleted when the monitoring session ends, and corrupt/expired/conflicting state fails closed instead of resetting in worker RAM.
+
 ## Frontend–Backend Interaction
 
 US-29 uses backend-owned media and explicit sessions:

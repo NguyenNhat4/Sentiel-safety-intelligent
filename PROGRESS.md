@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
@@ -35,11 +35,15 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Vision
 
+- Issue #43 is implemented with additive `safety_vision_v2`: workers restore/export strict JSON ByteTrack + PPE smoother state, while backend owns bounded PostgreSQL JSONB persistence, TTL cleanup and revision/frame compare-and-swap. v1 remains unchanged as the rollback contract; Railway production selected v2 after the controlled worker probe passed on 2026-08-26.
 - `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
 - Decoded camera frames retain their source resolution until Ultralytics performs the sole resize/letterbox operation at the configured `960x960` YOLO input boundary.
 - The runtime checkpoint is the optimizer-stripped EMA FP16 artifact (`40543303` bytes, SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`) under Git LFS.
-- Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
+- Safety Vision can run in-process or through the versioned v1/v2 HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the development default and remote is selected explicitly in production.
 - The remote worker accepts an explicit Ultralytics compute device. The RunPod image uses `cuda:0` for both inference and tracking and fails startup when CUDA is unavailable instead of silently falling back to CPU.
+- RunPod Load Balancer endpoint `p047-vision` now serves the immutable dual-contract image `ntduc0112/p047-vision:gpu-v3-issue43-20260825` at digest `sha256:92e947c8b45662cb826510b4da3665a605a6926ee0dc7b1ee9678694ee8f45d1`, with one GPU per worker, FlashBoot enabled, `active workers = 0`, `max workers = 1`, and HTTP/health port `8000`.
+- The 2026-08-26 controlled production probe returned HTTP 200 for both `/ping` (`safety_vision_v1`) and `/v2/ping` (`safety_vision_v2`). Direct v1 inference detected three people; direct v2 frames 1-3 retained track IDs `[1, 2, 3]`, advanced portable tracker frames 1-3, and kept serialized state near 5 KiB.
+- Railway production deployment `4545db58-0f8a-40c3-bee7-1a27441cd697` switched `p047-app` to `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2` and reached `SUCCESS`; public health remained HTTP 200/ready with PostgreSQL and snapshot storage ready. A real production WebSocket session retained `[1, 2, 3]` across three frames through the PostgreSQL coordinator, and its exact `vision_tracking_states` row count was zero after disconnect. A second session retained the same IDs across a 20-second idle gap and also cleaned up, but its second-frame latency did not prove that a worker restart occurred; controlled restart/two-replica evidence remains pending.
 - `make vision-worker-benchmark` provides a reproducible same-machine CPU/CUDA comparison for YOLO11m Safety + ByteTrack, with deterministic synthetic input by default and an optional authorized camera image.
 - Missing PPE is derived by deterministic backend rules, not emitted by the model.
 - Local inference uses anatomical PPE association and ten-frame temporal confirmation without a second backend debounce. Remote v1 inference retains six-frame backend confirmation because its contract has no local absence-confirmation metadata. An unreviewed warning retracts only after two continuous seconds of explicit presence.
@@ -72,6 +76,11 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- Issue #43 focused verification passes `75` tests, including uninterrupted versus restore equivalence, alternating replicas, simulated worker restart, v1/v2 HTTP contracts, auth, hostile/oversized state, PostgreSQL JSONB migration, TTL and CAS conflicts. Alembic reports the single head `20260825_01` and `git diff --check` passes.
+- Full `make check` has no new regression: Ruff/format/type-check/build pass, root has `32 passed`, frontend has `89 passed`, and backend/Vision has exactly the documented baseline `9 failed, 288 passed`. The same stale debounce, camera-wide PPE and audit-copy expectations remain the only failures.
+- GPU image build succeeds as non-root `appuser` on `amd64`, contains Torch `2.9.1+cu128`/CUDA `12.8` and exposes `/v1/infer`, `/v2/ping`, `/v2/infer`. The immutable GPU image above and CPU proof image `ntduc0112/p047-vision:cpu-v2-issue43-20260826` (`sha256:2efadd373965435824eb645c844549d4bdbb0e496e679f64fa06cd523bb9526b`) are published.
+- Railway production worktree deployment `7fa46e2a-c38e-4820-95d7-f581ece2dddb` reached `SUCCESS`; PostgreSQL applied `20260824_02 -> 20260825_01` with `PostgresqlImpl`, `/health` returns HTTP 200/ready, and the backend deliberately remains on v1. The migration-on-start switch is reset to false for the next deploy.
+
 - Sync verification after merging `origin/develop2@ff89623` into the GPU worker branch: Ruff/format, TypeScript, frontend build, frontend `89 passed`, root `32 passed`, and focused Vision/GPU `34 passed`. The full backend/Vision suite has `9 failed, 259 passed`; the affected production and test files are identical to `origin/develop2`, where seven-frame debounce, camera-wide PPE, and updated audit wording have not yet been reconciled with older expectations.
 - Camera-wide PPE, HITL duplicate-request handling, immutable occurrence ownership across track handoff, and explicit missing-hat/missing-vest wording in the HITL popup and audit views are fixed locally. PostgreSQL migration `20260824_02` adds/backfills camera-level hat/vest requirements; Railway deployment and browser UAT are intentionally pending.
 
@@ -97,9 +106,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Inference hardening now applies restricted-area rules camera-wide, closes PPE occurrences when their zone/machine requirement becomes inapplicable, runs independent camera models concurrently, drops stale sampled frames, throttles per-frame session DB writes, records direct-camera latency/drop outcomes, validates fixed-camera occurrence ownership, and restores direct-camera HITL persistence.
 - Violation review alerts are now limited to one per person (`track_id`) for the full `monitoring_session_id`; later rules or re-violations remain observable without opening another review.
 - Railway worktree deployment `c617b5ca-93ca-4ad1-93f2-515024d8e1a0` reached `SUCCESS`; `/health` reports production ready with PostgreSQL and snapshot storage ready. The local Docker publish path was unavailable, so the configured mutable Docker Hub source still needs republishing before a later image-source redeploy.
+- RunPod `/ping` returned HTTP `200` with `safety_vision_v1` and `yolo11m_safety-gpu-v1`. A real 1280x720 project JPEG sent to `/v1/infer` returned HTTP `200`, one tracked person, and a vest observation. Railway production redeployed successfully with `VISION_PROVIDER=remote`, and its public `/health` returned `ready: true` and HTTP `200`. After enabling FlashBoot, the first measured idle recovery took 28.52 seconds and the next idle recovery took 6.74 seconds, both within the backend's 30-second timeout.
+- A 2026-08-24 direct production diagnostic confirmed the RunPod image is forced to `VISION_DEVICE=cuda:0`, rejects startup when CUDA is unavailable, and returned healthy GPU-worker responses. Scale-from-zero `/ping` took 25.82 seconds; after startup, the first tracked frame for a new monitoring session took 8.00 seconds and the next frame in the same session took 1.27 seconds. An end-to-end smoke through Railway production reproduced the operational impact: the first frame returned HTTP `500` after 31.14 seconds with a logged `httpx.ReadTimeout`, then the same session returned HTTP `200` in 8.42 seconds and 1.71 seconds for the next two frames. The dominant latency is cold startup plus per-session tracking-model initialization, not a CPU fallback.
 
 ## Open Gates
 
+- Update the RunPod `p047-vision` template to `ntduc0112/p047-vision:gpu-v3-issue43-20260825` with a management-capable credential, verify `/v2/ping` and restart/replica continuity, then set Railway `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2`. The current endpoint-restricted inference key returns 401 from the RunPod management API, so production remains safely on v1.
 - Measure end-to-end direct-file inference freshness and model latency on Railway; focused evidence does not yet prove four-camera throughput.
 - Complete browser UAT from upload through real-model HITL review and persisted event.
 - Run browser UAT for camera configuration, two-zone save/reload, mixed rule states, overlays, grouped review, Event Detail, and Area Manager follow-up.
@@ -108,7 +120,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - Add the retention cleanup scheduler for persisted US-16 metadata/snapshot deadlines.
 - Complete US-13 protocol, representative ground truth, calibration/final split, accuracy thresholds, association/tracking evidence, and target-device latency.
 - Configure and exercise the GitHub production environment, first protected release PR, and immutable rollback procedure.
-- Push the immutable GPU worker image, deploy one RunPod Load Balancer worker with `active workers = 0` and `max workers = 1`, then verify real CUDA inference and benchmark the Railway/RunPod hop.
+- Benchmark cold/warm Railway-to-RunPod latency and decide between FlashBoot, a warm worker, or an explicitly accepted cold-start delay before relying on realtime alerts continuously.
 
 ## Known Limitations
 
@@ -117,6 +129,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - JSONL operational metrics do not support multi-worker deployment; use a centralized sink before scaling backend workers.
 - Telegram delivery is disabled until `TELEGRAM_BOT_TOKEN` and recipient chat IDs are configured; provider failure never blocks inference.
 - Only three of four required local demo media assets were previously available, and browser DevTools automation is not configured.
+- RunPod `active workers = 0` avoids idle GPU spend. A pre-FlashBoot cold start exceeded the backend's allowed 30-second remote timeout; FlashBoot subsequently recovered within 28.52 seconds and then 6.74 seconds, but this small first-recovery margin still needs monitoring. An always-active 16 GB tier worker removes that risk but would consume the current small credit balance quickly.
 
 ## Next Steps
 
@@ -127,4 +140,4 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 4. Finalize and execute the US-13 evaluation protocol.
 5. Run the four-camera capacity soak and close production readiness dependencies.
 6. Implement retention cleanup and automate the proven US-08 browser sequence.
-7. Push and deploy the single-worker CUDA Safety Vision image on RunPod, verify one real GPU frame, and benchmark cold/warm Railway-to-RunPod latency before changing worker count or affinity.
+7. Run the remaining controlled RunPod restart/two-replica and v1 rollback smoke, then benchmark cold/warm latency before raising worker count.

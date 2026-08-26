@@ -9,25 +9,28 @@ Luồng production hiện tại:
 ```text
 Backend đọc image/video từ media volume
   -> Railway backend lấy frame ở nhịp giới hạn và gọi FrameInferenceService
-    -> RemoteVisionAdapter mã hóa JPEG
-    -> POST /v1/infer tới vision worker
-      -> YOLO11m Safety + ByteTrack
-      <- bbox person/hat/vest + track_id
-    <- contract safety_vision_v1
+    -> PostgreSQL load state + revision của monitoring session
+    -> RemoteVisionAdapter gửi JPEG + state tới POST /v2/infer
+      -> YOLO11m Safety + fresh ByteTrack/PPE smoother
+      <- bbox person/hat/vest + track_id + next state
+    -> PostgreSQL compare-and-swap revision/frame
   -> Railway áp rule, deduplicate và publish metadata camera
   -> Browser phát asset được xác thực và nhận overlay qua WebSocket hiện hữu
 ```
 
-Vision worker không đọc media trực tiếp; backend tiếp tục sở hữu asset, camera configuration, sampling, session, rule, review và persistence. Lần tách này chỉ thay nơi thực thi model.
+Vision worker không đọc media trực tiếp; backend tiếp tục sở hữu asset, camera configuration, sampling, session, rule, review và toàn bộ persistence. Worker v2 không giữ state giữa request và không có `DATABASE_URL`, nên frame tiếp theo có thể đến replica khác mà vẫn tiếp tục đúng `track_id` và PPE anti-flicker. v1 vẫn tồn tại để rollback nhưng giữ tracker trong RAM.
 
 ## Contract của worker
 
 - `GET /ping`: health không tải ảnh, trả contract/model version.
 - `POST /v1/infer`: multipart gồm JPEG `image`, UUID `request_id`, và `monitoring_session_id` tùy chọn.
+- `GET /v2/ping`: health cho contract `safety_vision_v2`.
+- `POST /v2/infer`: thêm UUID session, `frame_id`, `state_revision` và JSON state tùy chọn; response trả lại correlation cùng next state đã validation.
 - Worker đọc tối đa 8 MiB cho mỗi JPEG và trả `413` nếu vượt giới hạn; bounding box remote phải có tọa độ không âm, kích thước/thứ tự hợp lệ.
+- State v2 tối đa 512 KiB, chỉ nhận số hữu hạn và vector/matrix ByteTrack có dimension cố định; không nhận pickle hoặc class import động.
 - Response chỉ chứa canonical people, PPE observation và model detections. Worker không truy cập PostgreSQL hoặc S3.
-- `VISION_WORKER_API_KEY` là tùy chọn cho deployment trực tiếp. Khi có giá trị, `/v1/infer` yêu cầu `Authorization: Bearer <key>`; `/ping` vẫn public để nền tảng health-check.
-- Mỗi monitoring session giữ ByteTrack trong memory của một worker. Bản thử nghiệm nên dùng một worker; scale nhiều worker chỉ an toàn sau khi cấu hình worker affinity hoặc chuyển tracking state ra khỏi process.
+- `VISION_WORKER_API_KEY` là tùy chọn cho deployment trực tiếp. Khi có giá trị, cả `/v1/infer` và `/v2/infer` yêu cầu `Authorization: Bearer <key>`; hai health route vẫn public.
+- v2 lưu state kỹ thuật trong PostgreSQL backend bằng revision/frame CAS, TTL mặc định 24 giờ và xóa khi session kết thúc. v1 chỉ an toàn với một worker hoặc worker affinity.
 
 ## Chạy tách riêng trên máy local
 
@@ -52,6 +55,9 @@ Cài và chạy dự án như cũ bằng `make setup` và `make run` vẫn dùng
    VISION_REMOTE_URL=http://127.0.0.1:8100
    VISION_REMOTE_API_KEY=
    VISION_REMOTE_TIMEOUT_SECONDS=5
+   VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2
+   VISION_TRACKING_STATE_TTL_SECONDS=86400
+   VISION_TRACKING_STATE_MAX_BYTES=524288
    ```
 
 4. Terminal thứ hai chạy ứng dụng chính:
@@ -99,9 +105,12 @@ VISION_PROVIDER=remote
 VISION_REMOTE_URL=http://${{vision-worker.RAILWAY_PRIVATE_DOMAIN}}:${{vision-worker.PORT}}
 VISION_REMOTE_API_KEY=${{vision-worker.VISION_WORKER_API_KEY}}
 VISION_REMOTE_TIMEOUT_SECONDS=5
+VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2
+VISION_TRACKING_STATE_TTL_SECONDS=86400
+VISION_TRACKING_STATE_MAX_BYTES=524288
 ```
 
-Redeploy backend rồi gọi lại flow inference hiện hữu. Nếu cần rollback tức thời, chỉ đổi `VISION_PROVIDER=local` và redeploy; browser contract không thay đổi.
+Chạy Alembic migration trước khi chọn v2. Nếu cần rollback tức thời, đổi `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v1` và giữ một worker/affinity, hoặc đổi `VISION_PROVIDER=local`; browser contract không thay đổi.
 
 ## Build image GPU cho RunPod
 
@@ -148,11 +157,11 @@ Kết quả mong đợi là Torch `2.9.1` và CUDA `12.8`. `torch.cuda.is_availa
 
 Load Balancer nhận custom FastAPI image và forward trực tiếp HTTP, phù hợp hơn queue endpoint cho frame realtime. Quy trình triển khai:
 
-1. Push tag immutable `DOCKERHUB_USERNAME/p047-vision:gpu-v1` lên Docker Hub hoặc registry mà RunPod đọc được.
+1. Push một tag immutable mới chứa đồng thời v1/v2 lên Docker Hub hoặc registry mà RunPod đọc được.
 2. Tạo Serverless Load Balancer endpoint từ image đó, expose HTTP container port `8000`, health path `/ping`, chọn GPU tương thích CUDA 12.8 và cấp đủ container disk cho image/model.
-3. Trong giai đoạn test, đặt `active workers = 0` và `max workers = 1` để GPU scale về 0 khi không có request. Request đầu sau thời gian idle sẽ chịu cold start. Khi cần đo latency realtime ổn định mới đổi `active workers = 1`; vẫn giữ `max workers = 1` để ByteTrack của một camera ở cùng process.
-4. Đặt `VISION_REMOTE_URL` trên Railway thành URL Load Balancer endpoint và `VISION_REMOTE_API_KEY` thành RunPod API key. Không đặt `VISION_WORKER_API_KEY` trong container nếu RunPod đã kiểm soát `Authorization` ở gateway.
-5. Kiểm tra `/ping`, sau đó gửi một JPEG nhỏ qua `/v1/infer` trước khi bật `VISION_PROVIDER=remote` trên backend.
+3. Giữ Railway ở v1, kiểm tra `/ping`, `/v2/ping`, một request `/v1/infer` và một chuỗi `/v2/infer` có state trước khi thay backend.
+4. Áp dụng migration `20260825_01`, deploy backend vẫn ở v1, rồi đặt `VISION_REMOTE_URL`, `VISION_REMOTE_API_KEY` và `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2`. Không đặt `VISION_WORKER_API_KEY` trong container nếu RunPod đã kiểm soát `Authorization` ở gateway.
+5. Chạy một session liên tục qua restart/replica, xác nhận revision tăng, `track_id` và PPE anti-flicker không reset. Sau bằng chứng này mới tăng `max workers`; `active workers = 0` vẫn có cold start, còn `active workers = 1` giảm first-frame latency.
 
 Các biến tối thiểu trên RunPod:
 
@@ -170,8 +179,10 @@ RunPod tính GPU Serverless theo thời gian worker thực sự chạy. `active 
 ## Điều kiện xác nhận deploy thành công
 
 - `/ping` trả `healthy`, `safety_vision_v1` và đúng model version.
+- `/v2/ping` trả `healthy`, `safety_vision_v2`; request v2 đầu tiên tạo revision 1 trong PostgreSQL.
 - Log startup không có lỗi CUDA và một lần infer thực tế xác nhận `torch.cuda.is_available()` là `true` trong worker.
 - Backend khởi động thành công ở `VISION_PROVIDER=remote`; nếu worker không sẵn sàng thì backend fail-closed thay vì âm thầm dùng local model.
-- Một frame từ direct-file camera session giữ nguyên observation contract và có bbox/track ID hợp lệ.
+- Một direct-file session giữ nguyên numeric track ID và trạng thái PPE qua ít nhất hai replica hoặc một worker restart; row state bị xóa khi session kết thúc.
 - Worker không có credential PostgreSQL, S3, Telegram hoặc OpenAI.
 - Log không chứa JPEG, bearer token hoặc response body chi tiết từ provider.
+- Rollback về v1 được smoke với `max workers = 1` hoặc affinity, sau đó có thể bật lại v2 mà không đổi browser/rule contract.
