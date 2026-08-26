@@ -210,6 +210,7 @@ P-047/
 │   ├── architecture/                # Architecture diagrams, problem statement and alert contracts
 │   │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
+│   │   ├── local-video-frame-flow.md    # Local upload, sampled inference and browser overlay flow
 │   │   └── project-problem-statement.md # Safety monitoring problem formulation
 │   ├── ops/                         # Operations, CI/CD, Vision deployment and metrics
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines

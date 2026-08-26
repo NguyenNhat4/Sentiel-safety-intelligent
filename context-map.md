@@ -67,6 +67,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Xem tiến độ hoặc quyết định đã chốt | [PROGRESS.md](PROGRESS.md), [DECISIONS.md](DECISIONS.md) |
 | Tuân thủ workflow AI/contributor | [AGENTS.md](AGENTS.md) |
 | Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md), [System diagrams](docs/architecture/architecture_diagram.md) |
+| Hiểu video upload, xử lý từng frame và hiển thị khi chạy local | [Local video frame flow](docs/architecture/local-video-frame-flow.md) |
 | Xem filesystem hiện có | [Current Project Structure](docs/PROJECT_STRUCTURE.md) |
 | Sửa production code | [Future Project Structure](docs/FUTURE_PROJECT_STRUCTURE.md), rồi README của owner |
 | Sửa REST/WebSocket payload | FastAPI routes/Pydantic schemas, frontend wire types và test liên quan; [backend README](backend/README.md) cho protocol inference |

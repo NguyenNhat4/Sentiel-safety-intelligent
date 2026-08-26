@@ -15,6 +15,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Cross-cutting
 
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
+- Luồng local từ upload video đến playback, sampled frame inference, metadata WebSocket, SVG overlay, HITL và Replay được mô tả trong `docs/architecture/local-video-frame-flow.md` cùng source-of-truth code map.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.
 - The implemented safety flow covers four fixed camera slots, per-camera zones/rules, direct video/image inference, Human-in-the-Loop review, immutable decision context, privacy-redacted evidence, event history, and area-scoped follow-up.
