@@ -253,6 +253,17 @@ def test_inference_websocket_returns_empty_people(client, monkeypatch):
     assert body["review_required"] is False
 
 
+def test_inference_websocket_releases_vision_state_on_disconnect(client, monkeypatch):
+    released = []
+    session_id = uuid4()
+    monkeypatch.setattr(frame_inference_service, "release_vision_session", released.append)
+
+    with client.websocket_connect("/api/v1/ws/inference") as websocket:
+        configure_inference_websocket(websocket, monitoring_session_id=str(session_id))
+
+    assert released == [str(session_id)]
+
+
 def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,

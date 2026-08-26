@@ -49,6 +49,26 @@ def test_operational_metrics_writer_accepts_privacy_fallback_warning(tmp_path):
     assert event["error_kind"] == "yunet_inference_failed"
 
 
+def test_tracking_state_metric_records_only_bounded_operational_fields(tmp_path):
+    log_path = tmp_path / "operational-metrics.jsonl"
+    configure_operational_metrics_logger(log_path, max_bytes=1024, backup_count=1)
+
+    record_operational_event(
+        "vision_tracking_state_persisted",
+        route="/v2/infer-state",
+        outcome="advanced",
+        duration_ms=3.5,
+        payload_bytes=2048,
+        state_payload={"must": "not appear"},
+        monitoring_session_id="must-not-appear",
+    )
+
+    event = json.loads(log_path.read_text(encoding="utf-8"))
+    assert event["payload_bytes"] == 2048
+    assert "state_payload" not in event
+    assert "monitoring_session_id" not in event
+
+
 def test_operational_metrics_summary_skips_malformed_records_and_uses_nearest_rank(tmp_path):
     log_path = tmp_path / "operational-metrics.jsonl"
     timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")

@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     vision_remote_url: str = ""
     vision_remote_api_key: SecretStr = SecretStr("")
     vision_remote_timeout_seconds: float = Field(default=5.0, ge=0.1, le=30.0)
+    vision_remote_contract_version: Literal["safety_vision_v1", "safety_vision_v2"] = "safety_vision_v1"
+    vision_tracking_state_ttl_seconds: int = Field(default=86400, ge=60, le=604800)
+    vision_tracking_state_max_bytes: int = Field(default=512 * 1024, ge=1024, le=2 * 1024 * 1024)
     face_detector_model_path: str = "models/face_detection_yunet_2023mar.onnx"
     face_detector_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     face_redaction_margin_ratio: float = Field(default=0.2, ge=0.0, le=1.0)
