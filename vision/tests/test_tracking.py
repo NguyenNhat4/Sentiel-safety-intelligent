@@ -1,8 +1,15 @@
 from types import SimpleNamespace
 
 import numpy as np
+from ultralytics.engine.results import Boxes, Results
+from ultralytics.trackers.basetrack import TrackState
 
 from vision.api import PpeTemporalSmoother, PpeVisionFacade
+from vision.tracking_state import (
+    create_bytetrack,
+    export_bytetrack_state,
+    restore_bytetrack_state,
+)
 
 
 class FakeValue:
@@ -323,3 +330,158 @@ def test_facade_session_expiry_and_explicit_end_clear_smoothing_state():
 
     assert "ended" not in facade._sessions
     assert "ended" not in facade._smoothers
+
+
+def _update_tracker(tracker, x: float):
+    detections = (
+        Boxes(
+            np.array([[x, 10, x + 20, 60, 0.9, 3]], dtype=np.float32),
+            orig_shape=(100, 100),
+        )
+        .cpu()
+        .numpy()
+    )
+    return tracker.update(detections, np.zeros((100, 100, 3), dtype=np.uint8))
+
+
+def test_bytetrack_state_round_trip_matches_uninterrupted_continuation():
+    uninterrupted = create_bytetrack()
+    for x in (10.0, 11.0):
+        _update_tracker(uninterrupted, x)
+    expected = _update_tracker(uninterrupted, 12.0)
+
+    split = create_bytetrack()
+    for x in (10.0, 11.0):
+        _update_tracker(split, x)
+    restored = restore_bytetrack_state(export_bytetrack_state(split))
+    actual = _update_tracker(restored, 12.0)
+
+    np.testing.assert_allclose(actual, expected, rtol=0.0, atol=1e-6)
+    assert actual[0, 4] == expected[0, 4] == 1
+    assert restored.frame_id == uninterrupted.frame_id == 3
+
+
+def test_bytetrack_export_excludes_terminal_tracks_from_lost_pool():
+    tracker = create_bytetrack()
+    _update_tracker(tracker, 10.0)
+    terminal_track = tracker.tracked_stracks[0]
+    terminal_track.mark_removed()
+    tracker.tracked_stracks = []
+    tracker.lost_stracks = [terminal_track]
+    tracker.removed_stracks = [terminal_track]
+
+    state = export_bytetrack_state(tracker)
+
+    assert terminal_track.state == TrackState.Removed
+    assert state["lost"] == []
+
+
+def test_smoother_state_round_trip_preserves_presence_and_missing_streaks():
+    uninterrupted = PpeTemporalSmoother(temporal_frames=3)
+    split = PpeTemporalSmoother(temporal_frames=3)
+    for raw_hat, raw_vest in ((True, False), (True, True), (True, True), (False, False)):
+        uninterrupted.smooth(7, raw_hat=raw_hat, raw_vest=raw_vest)
+        split.smooth(7, raw_hat=raw_hat, raw_vest=raw_vest)
+    split.advance_tracks(set())
+    uninterrupted.advance_tracks(set())
+
+    restored = PpeTemporalSmoother.from_state(split.export_state())
+
+    assert restored.export_state() == uninterrupted.export_state()
+    assert restored.smooth(7, raw_hat=False, raw_vest=False) == uninterrupted.smooth(
+        7,
+        raw_hat=False,
+        raw_vest=False,
+    )
+
+
+def test_portable_facade_state_preserves_ids_and_antiflicker_across_fresh_workers():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+
+    class PredictSequence:
+        names = FakeModel.names
+
+        def __init__(self, detections):
+            self._detections = iter(detections)
+
+        def predict(self, image, **kwargs):
+            boxes = next(self._detections)
+            return [Results(image, path="frame.jpg", names=self.names, boxes=np.asarray(boxes, dtype=np.float32))]
+
+    frames = [
+        [[10, 20, 30, 80, 0.9, 3], [12, 21, 22, 31, 0.9, 0]],
+        [[11, 20, 31, 80, 0.9, 3], [13, 21, 23, 31, 0.9, 0]],
+        [[12, 20, 32, 80, 0.9, 3], [14, 21, 24, 31, 0.9, 0]],
+        [[13, 20, 33, 80, 0.9, 3]],
+        [[14, 20, 34, 80, 0.9, 3]],
+    ]
+    uninterrupted = PpeVisionFacade(
+        "unused.pt",
+        model_factory=lambda _: PredictSequence(frames),
+        temporal_frames=3,
+    )
+    expected = [uninterrupted.analyze_with_state(frame, None)]
+    for _ in frames[1:]:
+        expected.append(uninterrupted.analyze_with_state(frame, expected[-1][1]))
+
+    first_worker = PpeVisionFacade(
+        "unused.pt",
+        model_factory=lambda _: PredictSequence(frames[:3]),
+        temporal_frames=3,
+    )
+    state = None
+    actual = []
+    for _ in frames[:3]:
+        result, state = first_worker.analyze_with_state(frame, state)
+        actual.append((result, state))
+    restarted_worker = PpeVisionFacade(
+        "unused.pt",
+        model_factory=lambda _: PredictSequence(frames[3:]),
+        temporal_frames=3,
+    )
+    for _ in frames[3:]:
+        result, state = restarted_worker.analyze_with_state(frame, state)
+        actual.append((result, state))
+
+    assert [item[0]["canonical_people"][0][5] for item in actual] == [
+        item[0]["canonical_people"][0][5] for item in expected
+    ]
+    assert (
+        [item[0]["people"][0]["hat"]["status"] for item in actual]
+        == [item[0]["people"][0]["hat"]["status"] for item in expected]
+        == ["present"] * 5
+    )
+    assert actual[-1][1] == expected[-1][1]
+
+
+def test_portable_facade_keeps_alternating_session_states_isolated():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+
+    class AlternatingPredictor:
+        names = FakeModel.names
+
+        def predict(self, image, **kwargs):
+            return [
+                Results(
+                    image,
+                    path="frame.jpg",
+                    names=self.names,
+                    boxes=np.asarray([[10, 20, 30, 80, 0.9, 3]], dtype=np.float32),
+                )
+            ]
+
+    facade = PpeVisionFacade(
+        "unused.pt",
+        model_factory=lambda _: AlternatingPredictor(),
+        temporal_frames=3,
+    )
+    states = {"a": None, "b": None}
+    track_ids = {"a": [], "b": []}
+
+    for session_id in ("a", "b", "a", "b"):
+        result, states[session_id] = facade.analyze_with_state(frame, states[session_id])
+        track_ids[session_id].append(result["canonical_people"][0][5])
+
+    assert track_ids == {"a": [1, 1], "b": [1, 1]}
+    assert states["a"]["tracker"]["frame_id"] == 2
+    assert states["b"]["tracker"]["frame_id"] == 2

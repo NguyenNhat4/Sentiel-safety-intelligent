@@ -59,7 +59,7 @@ Các bất biến an toàn:
 
 Hiện đã có React → FastAPI qua REST/WebSocket, person detection, collection nhiều polygon với
 machine state riêng, zone-scoped occurrence, grouped review, privacy gate in-memory, PostgreSQL
-event history, PPE production model và RBAC. Safety Vision có thể chạy trong backend hoặc qua worker HTTP `safety_vision_v1`; phiên video/ảnh trực tiếp đi qua `FrameInferenceService`, còn rule, occurrence, HITL và persistence vẫn thuộc backend. PostgreSQL là database duy nhất cho mọi môi trường; SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
+event history, PPE production model và RBAC. Safety Vision có thể chạy trong backend hoặc qua worker HTTP. `safety_vision_v1` giữ tracker trong RAM để tương thích; `safety_vision_v2` nhận/trả state ByteTrack + PPE đã version hóa, còn backend lưu một row JSONB theo session bằng revision CAS. Vì worker v2 không giữ state giữa request và không có database credential, bất kỳ replica khỏe nào cũng có thể xử lý frame kế tiếp. Phiên video/ảnh trực tiếp đi qua `FrameInferenceService`; rule, occurrence, HITL và toàn bộ persistence vẫn thuộc backend. PostgreSQL là database duy nhất cho mọi môi trường; SQLite và database fallback là đường tương thích cũ phải được loại bỏ trước khi tuyên bố hoàn tất chuyển đổi. Các capability nâng cao khác vẫn là đích cần triển khai.
 
 Thứ tự tiến hóa theo backlog:
 
@@ -117,7 +117,10 @@ flowchart LR
     volume[(OpenCV media cache)] --> backend
     backend --> postgres[(PostgreSQL)]
     backend --> vision[Optional Safety Vision worker]
+    vision -->|v2 result + next technical state| backend
 ```
 
 Streamer, MediaMTX, FFmpeg publisher, HLS, RTSP và MJPEG simulation không còn là
 runtime hoặc deployment dependency.
+
+Ở remote v2, backend đọc state và revision trong transaction ngắn, gọi worker khi không giữ connection, rồi conditional-update nếu revision/frame vẫn còn mới nhất. State hết hạn, hỏng hoặc conflict lặp lại đều fail-closed; backend không dựng lại continuity giả bằng RAM.

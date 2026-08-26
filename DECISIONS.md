@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-24
+Updated: 2026-08-26
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -74,10 +74,21 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-21: [Vision/Backend] Optional remote Safety Vision worker
 
 - `FrameInferenceService` selects the in-process facade by default or the versioned `safety_vision_v1` HTTP provider when `VISION_PROVIDER=remote`; direct-file sessions use the same rule pipeline.
-- The worker owns YOLO11m Safety and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
+- The worker owns YOLO11m Safety. The legacy v1 path also owns session-scoped ByteTrack state in memory; the v2 path below makes the worker request-stateless.
 - Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
-- The first deployment uses one worker. Multiple workers require affinity or an explicit decision to relocate tracker state.
+- A v1 deployment remains limited to one worker or requires affinity. Horizontal workers without affinity require the v2 PostgreSQL-backed continuation contract.
+- Keep the CPU worker image as the rollback artifact. The RunPod image separately pins PyTorch `2.9.1`, torchvision `0.24.1`, and CUDA `12.8`, passes `cuda:0` explicitly to every Ultralytics predict/track call, and fails startup when CUDA is unavailable rather than silently running CPU inference.
+- CPU/GPU performance claims use the same CUDA image, checkpoint, input, classes and ByteTrack pipeline on one machine, run sequentially after warm-up, and report mean/P50/P95 plus throughput. Model load, media decode and network latency remain separate measurements.
+- The developer comparison UI is a separate, noindex Vite entrypoint. It sends the same browser frame to CPU and GPU concurrently, allows only one comparison cycle in flight, and counts skipped video frames; its RTT is an end-to-end responsiveness diagnostic, not the controlled sequential model-performance claim.
 - Independent camera sessions may infer concurrently with one isolated YOLO/ByteTrack instance per session; calls for the same session remain serialized. Terminal sessions release model state while lightweight occurrence context remains available through its TTL for queued human review.
+
+### 2026-08-25: [Vision/Backend] PostgreSQL-backed portable tracking state
+
+- `safety_vision_v2` transfers a strict JSON-only `bytetrack_ppe_state_v1` envelope on every tracked frame. It contains active/recoverable-lost ByteTrack continuation data and PPE smoother counters, but no image, identity, credential, executable serialization, or terminal removed track.
+- Backend is the sole persistence owner. It stores one bounded JSONB row per `monitoring_session_id` in PostgreSQL; Vision and the standalone GPU worker have no database dependency or credentials.
+- Short load and compare-and-swap transactions guard monotonically increasing frame/revision values. GPU inference runs outside a database transaction; one conflict retries from the winning state and a repeated conflict or expired/corrupt state fails closed.
+- State is capped at 512 KiB, expires after 24 hours by default, and is deleted on normal session termination. Metrics may record only persistence outcome, duration, and payload size.
+- v1 remains unchanged as the compatibility and rollback contract. Deploy the dual-contract worker and migration first, then opt the backend into v2 with `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2`; reverting that variable to v1 also requires one worker/affinity.
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 

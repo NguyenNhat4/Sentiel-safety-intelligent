@@ -9,7 +9,15 @@ from typing import Any
 
 LOGGER_NAME = "backend.operational_metrics"
 _HANDLER_MARKER = "_is_operational_metrics_handler"
-_ALLOWED_FIELDS = {"method", "route", "status_class", "duration_ms", "outcome", "error_kind"}
+_ALLOWED_FIELDS = {
+    "method",
+    "route",
+    "status_class",
+    "duration_ms",
+    "outcome",
+    "error_kind",
+    "payload_bytes",
+}
 _EVENT_TYPES = {
     "http_request_completed",
     "websocket_connection_opened",
@@ -18,6 +26,7 @@ _EVENT_TYPES = {
     "inference_dropped",
     "inference_failed",
     "privacy_redaction_completed",
+    "vision_tracking_state_persisted",
 }
 
 

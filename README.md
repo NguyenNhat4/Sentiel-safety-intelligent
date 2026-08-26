@@ -76,6 +76,7 @@ Production requires:
 - `MEDIA_ASSET_DIR=/app/data/media-assets`
 - Optional S3-compatible snapshot variables for production evidence readiness
 - Optional separate Safety Vision worker when `VISION_PROVIDER=remote`
+- `safety_vision_v2` for PostgreSQL-backed tracking continuity across stateless GPU replicas; v1 remains the rollback contract
 
 Release automation deploys only `p047-app`:
 

@@ -18,4 +18,3 @@ def test_cleanup_rejects_production_even_on_local_host():
 def test_runtime_directory_must_be_inside_repository(tmp_path: Path):
     with pytest.raises(SystemExit, match="outside repository"):
         _safe_runtime_dir("/tmp", tmp_path)
-

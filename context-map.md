@@ -73,6 +73,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Sửa database/query/migration | ORM models, Alembic migrations và backend tests liên quan |
 | PPE hat/vest | [US-28](specs/done/US-28.md), [US-07](specs/done/US-07-SPEC.md), [alert rule contract](docs/architecture/alert-rule-contract.md) |
 | Tracking và chống event trùng | [US-08](specs/done/US-08-SPEC.md) |
+| Distributed ByteTrack/PPE state qua PostgreSQL (Issue #43) | [Issue #43 tracking-state spec](specs/ISSUE-43-DISTRIBUTED-TRACKING-STATE-SPEC.md) |
 | Audit quyết định sự kiện US-16 | [US-16](specs/done/US-16.md), [implementation plan](docs/plans/2026-08-15-001-feat-us16-event-decision-audit-plan.md) |
 | Multi-zone | [US-27](specs/done/US-27-MULTI-ZONE-SPEC.md) |
 | Dataset/evaluation US-13 | [dataset guide](docs/data/US-13-task2-datapreparation.md), [evaluation workspace](data/evaluation/README.md) |

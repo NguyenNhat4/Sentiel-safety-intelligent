@@ -4,6 +4,7 @@ from backend.app.models.media_asset import MediaAsset
 from backend.app.models.monitoring_zone import MonitoringZoneCollection, MonitoringZoneRecord
 from backend.app.models.ppe_requirement import PpeRequirement
 from backend.app.models.user import User, UserSession
+from backend.app.models.vision_tracking_state import VisionTrackingState
 
 __all__ = [
     "EventOccurrence",
@@ -16,4 +17,5 @@ __all__ = [
     "SafetyEvent",
     "User",
     "UserSession",
+    "VisionTrackingState",
 ]

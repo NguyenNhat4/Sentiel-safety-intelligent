@@ -91,6 +91,61 @@ def test_stateless_safety_analysis_uses_model_person_as_canonical_in_one_call():
     assert model.calls == [{"classes": [0, 3, 4], "conf": 0.2, "imgsz": 960, "rect": False, "verbose": False}]
 
 
+def test_safety_facade_routes_predict_and_track_to_configured_cuda_device():
+    class FakeModel:
+        names = {0: "hat", 1: "nohat", 2: "novest", 3: "person", 4: "vest"}
+
+        def __init__(self):
+            self.calls = []
+
+        def predict(self, frame, **kwargs):
+            self.calls.append(("predict", kwargs))
+            result = type("Result", (), {})()
+            result.names = self.names
+            result.boxes = []
+            return [result]
+
+        def track(self, frame, **kwargs):
+            self.calls.append(("track", kwargs))
+            result = type("Result", (), {})()
+            result.names = self.names
+            result.boxes = []
+            return [result]
+
+    model = FakeModel()
+    facade = PpeVisionFacade("unused.pt", device="cuda:0", model_factory=lambda _: model)
+
+    facade.analyze(np.zeros((40, 40, 3), dtype=np.uint8), None, now=1.0)
+    facade.analyze(np.zeros((40, 40, 3), dtype=np.uint8), "camera-1", now=2.0)
+
+    assert model.calls == [
+        (
+            "predict",
+            {
+                "classes": [0, 3, 4],
+                "conf": 0.2,
+                "imgsz": 960,
+                "rect": False,
+                "device": "cuda:0",
+                "verbose": False,
+            },
+        ),
+        (
+            "track",
+            {
+                "persist": True,
+                "tracker": "bytetrack.yaml",
+                "classes": [0, 3, 4],
+                "conf": 0.2,
+                "imgsz": 960,
+                "rect": False,
+                "device": "cuda:0",
+                "verbose": False,
+            },
+        ),
+    ]
+
+
 def test_person_confidence_is_configurable_independently_from_ppe_confidence():
     class FakeBox:
         def __init__(self, class_id: int, bbox: list[int], confidence: float) -> None:

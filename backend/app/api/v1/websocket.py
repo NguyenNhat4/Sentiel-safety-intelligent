@@ -304,5 +304,7 @@ async def websocket_inference_endpoint(websocket: WebSocket, db: Session = Depen
         pass
     finally:
         if configuration is not None:
-            active_inference_sessions.discard(str(configuration.monitoring_session_id))
+            session_id = str(configuration.monitoring_session_id)
+            active_inference_sessions.discard(session_id)
+            frame_inference_service.release_vision_session(session_id)
         record_operational_event("websocket_connection_closed", route="/api/v1/ws/inference", outcome="disconnected")

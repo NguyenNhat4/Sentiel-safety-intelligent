@@ -139,6 +139,79 @@ def test_remote_provider_routes_inference_through_http_adapter(monkeypatch):
     assert service._model_preloader == remote_adapter.preload
 
 
+def test_remote_v2_routes_tracked_frames_through_postgres_state_coordinator(monkeypatch):
+    calls = []
+
+    class FakeRemoteAdapter:
+        @staticmethod
+        def analyze(frame, monitoring_session_id, now):
+            raise AssertionError("tracked v2 frame used the v1 path")
+
+        @staticmethod
+        def analyze_with_state(
+            frame,
+            *,
+            monitoring_session_id,
+            frame_id,
+            state_revision,
+            tracking_state,
+        ):
+            calls.append((monitoring_session_id, frame_id, state_revision, tracking_state))
+            return {"canonical_people": [], "people": [], "detections": []}, {"next": "state"}
+
+        @staticmethod
+        def preload():
+            return None
+
+    class FakeStateService:
+        def __init__(self):
+            self.ended = []
+
+        def process_frame(self, session_id, frame_id, infer):
+            return infer(4, {"stored": "state"})[0]
+
+        def end_session(self, session_id):
+            self.ended.append(session_id)
+
+    state_service = FakeStateService()
+    monkeypatch.setattr(
+        "backend.app.core.config.get_settings",
+        lambda: Settings(
+            vision_provider="remote",
+            vision_remote_url="https://vision.example",
+            vision_remote_api_key="secret-token",
+            vision_remote_contract_version="safety_vision_v2",
+        ),
+    )
+    monkeypatch.setattr(
+        "backend.app.services.frame_inference_service.get_remote_vision_adapter",
+        lambda **kwargs: FakeRemoteAdapter(),
+    )
+    monkeypatch.setattr(
+        "backend.app.services.frame_inference_service.VisionTrackingStateService",
+        lambda: state_service,
+    )
+    service = FrameInferenceService(
+        requirement_loader=lambda camera_id, zone_id: PpeRequirementResponse(
+            camera_id=camera_id,
+            zone_id=zone_id,
+            profile="hat_vest_v1",
+            hat_required=False,
+            vest_required=False,
+            updated_at=None,
+        )
+    )
+    tracked_request = request().model_copy(
+        update={"monitoring_session_id": uuid4(), "frame_id": 7},
+    )
+
+    service.infer(tracked_request)
+    service.release_vision_session(str(tracked_request.monitoring_session_id))
+
+    assert calls == [(str(tracked_request.monitoring_session_id), 7, 4, {"stored": "state"})]
+    assert state_service.ended == [str(tracked_request.monitoring_session_id)]
+
+
 def test_unified_analyzer_supplies_canonical_people_and_ppe_with_one_call():
     calls = 0
 

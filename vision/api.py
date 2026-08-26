@@ -17,8 +17,15 @@ from vision.pipeline import (
     redact_identity_regions,
     redact_person_head_regions,
 )
+from vision.tracking_state import (
+    TRACKING_STATE_SCHEMA_VERSION,
+    create_bytetrack,
+    export_bytetrack_state,
+    restore_bytetrack_state,
+)
 
 logger = logging.getLogger(__name__)
+_PORTABLE_TRACKING_LOCK = threading.Lock()
 
 CanonicalPerson = tuple[int, int, int, int, float, int]
 
@@ -127,6 +134,30 @@ class PpeTemporalSmoother:
         """Return the set of track IDs currently held in memory."""
         return set(self._history.keys())
 
+    def export_state(self) -> dict[str, Any]:
+        """Return JSON-compatible temporal state for a later consecutive frame."""
+        return {
+            "temporal_frames": self._temporal_frames,
+            "tracks": [
+                {
+                    "track_id": track_id,
+                    **{slot: getattr(history, slot) for slot in _TrackPpeHistory.__slots__},
+                }
+                for track_id, history in sorted(self._history.items())
+            ],
+        }
+
+    @classmethod
+    def from_state(cls, state: dict[str, Any]) -> PpeTemporalSmoother:
+        """Restore temporal state previously returned by :meth:`export_state`."""
+        smoother = cls(temporal_frames=int(state["temporal_frames"]))
+        for item in state["tracks"]:
+            history = _TrackPpeHistory()
+            for slot in _TrackPpeHistory.__slots__:
+                setattr(history, slot, item[slot])
+            smoother._history[int(item["track_id"])] = history
+        return smoother
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -184,6 +215,7 @@ class PpeVisionFacade:
         session_ttl_seconds: float = 300.0,
         model_factory: Callable[[str], Any] | None = None,
         temporal_frames: int = 10,
+        device: str | None = None,
     ) -> None:
         if not 0.0 < confidence_threshold <= 1.0:
             raise ValueError("confidence_threshold must be in (0, 1]")
@@ -200,6 +232,7 @@ class PpeVisionFacade:
         self._session_ttl_seconds = session_ttl_seconds
         self._model_factory = model_factory
         self._temporal_frames = temporal_frames
+        self._device = device.strip() if device and device.strip() else None
         self._model = None
         # session_id -> (model, last_seen_timestamp)
         self._sessions: dict[str, tuple[Any, float]] = {}
@@ -228,6 +261,7 @@ class PpeVisionFacade:
                 imgsz=self._inference_image_size,
                 rect=False,
                 verbose=False,
+                **self._device_options(),
             )[0]
             # Stateless: geometric validation only, no temporal smoothing
             return self._safety_result(result, require_track_ids=False, smoother=None)
@@ -253,11 +287,48 @@ class PpeVisionFacade:
                 imgsz=self._inference_image_size,
                 rect=False,
                 verbose=False,
+                **self._device_options(),
             )[0]
             vision_result = self._safety_result(result, require_track_ids=True, smoother=smoother)
             present_track_ids = {person[5] for person in vision_result["canonical_people"]}
             smoother.advance_tracks(present_track_ids)
         return vision_result
+
+    def analyze_with_state(
+        self,
+        frame: np.ndarray,
+        state: dict[str, Any] | None,
+    ) -> tuple[SafetyVisionResult, dict[str, Any]]:
+        """Analyze one tracked frame using only caller-supplied continuation state."""
+        with _PORTABLE_TRACKING_LOCK:
+            tracker = create_bytetrack() if state is None else restore_bytetrack_state(state["tracker"])
+            smoother = (
+                PpeTemporalSmoother(temporal_frames=self._temporal_frames)
+                if state is None
+                else PpeTemporalSmoother.from_state(state["smoother"])
+            )
+            result = self._load_model().predict(
+                frame,
+                classes=[0, 3, 4],
+                conf=self._model_confidence_threshold,
+                imgsz=self._inference_image_size,
+                rect=False,
+                verbose=False,
+                **self._device_options(),
+            )[0]
+            detections = result.boxes.cpu().numpy()
+            tracks = tracker.update(detections, result.orig_img)
+            if len(tracks):
+                result = result[tracks[:, -1].astype(int)]
+                result.update(boxes=tracks[:, :-1])
+            vision_result = self._safety_result(result, require_track_ids=True, smoother=smoother)
+            smoother.advance_tracks({person[5] for person in vision_result["canonical_people"]})
+            next_state = {
+                "schema_version": TRACKING_STATE_SCHEMA_VERSION,
+                "tracker": export_bytetrack_state(tracker),
+                "smoother": smoother.export_state(),
+            }
+        return vision_result, next_state
 
     def observe(
         self,
@@ -387,6 +458,7 @@ class PpeVisionFacade:
             imgsz=self._inference_image_size,
             rect=False,
             verbose=False,
+            **self._device_options(),
         )[0]
         names = result.names
         selected_boxes: list[tuple[int, str, list[int], float]] = []
@@ -481,6 +553,10 @@ class PpeVisionFacade:
         from ultralytics import YOLO
 
         return YOLO(str(Path(self._model_path)))
+
+    def _device_options(self) -> dict[str, str]:
+        """Return an Ultralytics device override only when explicitly configured."""
+        return {"device": self._device} if self._device is not None else {}
 
     def _expire_sessions(self, now: float) -> None:
         expired = [

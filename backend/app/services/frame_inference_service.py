@@ -30,6 +30,10 @@ from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.monitoring_zone_service import validate_zone_geometry
 from backend.app.services.safety_rule_engine import RulePersonObservation, SafetyRuleEngine
 from backend.app.services.violation_tracking_service import ViolationTrackingService
+from backend.app.services.vision_tracking_state_service import (
+    StaleVisionFrameError,
+    VisionTrackingStateService,
+)
 
 
 class InvalidFrameError(ValueError):
@@ -60,6 +64,8 @@ class FrameInferenceService:
         self._inference_image_size = settings.yolo_inference_image_size
         self._ppe_temporal_frames = settings.ppe_temporal_frames
         self._fallback_model = None
+        self._stateful_vision_analyzer = None
+        self._tracking_state_service = None
         if vision_analyzer is not None:
             self._vision_analyzer = vision_analyzer
             self._ppe_observer = ppe_observer
@@ -73,8 +79,12 @@ class FrameInferenceService:
                 base_url=settings.vision_remote_url,
                 api_key=settings.vision_remote_api_key.get_secret_value(),
                 timeout_seconds=settings.vision_remote_timeout_seconds,
+                contract_version=settings.vision_remote_contract_version,
             )
             self._vision_analyzer = adapter.analyze
+            if settings.vision_remote_contract_version == "safety_vision_v2":
+                self._stateful_vision_analyzer = adapter.analyze_with_state
+                self._tracking_state_service = VisionTrackingStateService()
             self._ppe_observer = None
             self._model_preloader = adapter.preload
         else:
@@ -173,11 +183,26 @@ class FrameInferenceService:
 
         absence_confirmations = None
         if self._vision_analyzer is not None:
-            vision_result = self._vision_analyzer(
-                frame,
-                str(request.monitoring_session_id) if request.monitoring_session_id is not None else None,
-                now,
-            )
+            session_id = str(request.monitoring_session_id) if request.monitoring_session_id is not None else None
+            if session_id is not None and self._stateful_vision_analyzer is not None:
+                if request.frame_id is None:
+                    raise StaleFrameError("tracked inference requires frame_id")
+                try:
+                    vision_result = self._tracking_state_service.process_frame(
+                        session_id,
+                        request.frame_id,
+                        lambda revision, state: self._stateful_vision_analyzer(
+                            frame,
+                            monitoring_session_id=session_id,
+                            frame_id=request.frame_id,
+                            state_revision=revision,
+                            tracking_state=state,
+                        ),
+                    )
+                except StaleVisionFrameError as exc:
+                    raise StaleFrameError(str(exc)) from exc
+            else:
+                vision_result = self._vision_analyzer(frame, session_id, now)
             detected_people = vision_result["canonical_people"]
             observations = vision_result["people"]
             detections = self._public_detections(vision_result["detections"])
@@ -412,6 +437,8 @@ class FrameInferenceService:
         self.release_vision_session(session_id)
 
     def release_vision_session(self, session_id: str) -> None:
+        if self._tracking_state_service is not None:
+            self._tracking_state_service.end_session(session_id)
         analyzer_owner = getattr(self._vision_analyzer, "__self__", None)
         if analyzer_owner is not None and hasattr(analyzer_owner, "end_session"):
             analyzer_owner.end_session(session_id)
