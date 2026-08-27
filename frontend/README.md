@@ -56,7 +56,7 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 6. The UI ignores stale session output and draws canonical person/hat/vest observations in source coordinates.
 7. Run creates fresh sessions for every valid configured camera. Replay creates one
    fresh session for only the selected camera and remounts playback at the beginning.
-8. Newly opened occurrences are queued for mandatory HITL review with their own transient snapshot; duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.
+8. Newly opened occurrences are persisted as privacy-protected pending events. PPE opens a dismissible toast and remains in the shared inbox; zone alerts use one FIFO modal. Duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.
 
 ## Source Boundaries
 

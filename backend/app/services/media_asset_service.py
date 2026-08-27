@@ -283,6 +283,7 @@ class MediaAssetService:
             status=asset.status,
             content_type=asset.content_type,
             size_bytes=asset.size_bytes,
+            storage_backend=asset.storage_backend,
             uploaded_at=asset.uploaded_at,
             assigned_camera_id=assigned_camera_id,
             can_delete=assigned_camera_id is None and referenced is None,

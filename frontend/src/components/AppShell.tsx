@@ -1,4 +1,4 @@
-import {memo, type ReactNode} from "react";
+import {memo, type ReactNode, useState} from "react";
 import type {AuthenticatedUser} from "../types";
 
 export type Page = "monitor" | "events" | "operations" | "area" | "admin" | "media-library" | "camera-config";
@@ -13,12 +13,14 @@ interface AppShellProps {
 }
 
 export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout, children, selectedCameraId}: AppShellProps) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const title = page === "monitor" ? "Live Monitor" : page === "events" ? "Nhật ký vi phạm" : page === "operations" ? "Quan sát hệ thống" : page === "area" ? "Dashboard khu vực" : page === "media-library" ? "Thư viện media" : page === "camera-config" ? `Cấu hình Camera ${cameraNumber(selectedCameraId)}` : "Quản trị hệ thống";
   const initials = user.full_name.split(" ").filter(Boolean).slice(-2).map(part => part[0]).join("").toUpperCase();
 
   return <>
-    <aside className="sidebar">
+    <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
       <a className="brand" href="/"><span className="brand-mark">S</span><span>Sentinel<small>Safety intelligence</small></span></a>
+      <button type="button" className="sidebar-toggle" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed(value => !value)}>{sidebarCollapsed ? "›" : "‹"}</button>
       <nav>
         {(user.role === "safety_manager" || user.role === "system_admin") && <button className={`nav-item ${page === "monitor" ? "active" : ""}`} onClick={() => onNavigate("monitor")}><span>◉</span> Live monitor</button>}
         {(user.role === "safety_manager" || user.role === "system_admin") && <button className={`nav-item ${page === "events" ? "active" : ""}`} onClick={() => onNavigate("events")}><span>▤</span> Nhật ký vi phạm</button>}
@@ -39,7 +41,7 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
         <button className="logout-button" aria-label="Đăng xuất" onClick={onLogout}>Đăng xuất</button>
       </div>
     </aside>
-    <main>
+    <main className={sidebarCollapsed ? "sidebar-collapsed" : ""}>
       <header>
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
       </header>

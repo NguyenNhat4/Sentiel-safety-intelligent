@@ -85,6 +85,10 @@ describe("ReviewModal", () => {
 
     expect(screen.getByLabelText("Bounding box của khung hình review")).toBeInTheDocument();
     expect(screen.getAllByTestId("snapshot-box")).toHaveLength(3);
+    const labels = screen.getAllByTestId("snapshot-box-label");
+    expect(labels).toHaveLength(3);
+    expect(labels[0].querySelector("rect")).toHaveAttribute("fill", "#ff4940");
+    expect(labels[0].querySelector("text")).toHaveAttribute("fill", "#ffffff");
   });
 
   it("draws configured zones over a review snapshot", () => {

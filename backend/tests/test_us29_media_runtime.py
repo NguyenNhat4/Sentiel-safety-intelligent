@@ -67,6 +67,90 @@ def _configuration_payload(asset_id: str, revision: int = 0) -> dict:
     }
 
 
+def test_direct_camera_runtime_persists_pending_alert_before_publish(monkeypatch):
+    captured = []
+
+    class DummySession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    class StoredEvent:
+        id = 73
+
+    class FakeEventService:
+        def __init__(self, _db):
+            pass
+
+        def create_event(self, event):
+            captured.append(event)
+            return StoredEvent()
+
+    monkeypatch.setattr(camera_session_runtime_module, "EventService", FakeEventService)
+    runtime = CameraSessionRuntime(session_factory=DummySession, publish=lambda _payload: None)
+    occurrence_id = str(uuid4())
+    event_ids = runtime._persist_pending_reviews(
+        {
+            "type": "camera_inference_result",
+            "camera_id": "cam_1",
+            "session_id": str(uuid4()),
+            "monitoring_session_id": str(uuid4()),
+            "asset_id": str(uuid4()),
+            "media_type": "video",
+            "video_time": 3.5,
+            "frame_id": 7,
+            "frame_width": 100,
+            "frame_height": 100,
+            "session_status": "RUNNING",
+            "inference_fps": 2.0,
+            "result": "violate",
+            "review_required": True,
+            "snapshot_data": "data:image/jpeg;base64,AA==",
+            "detections": [],
+            "people": [
+                {
+                    "track_id": 9,
+                    "bbox": [1, 2, 3, 4],
+                    "confidence": 0.9,
+                    "foot_point": [2, 4],
+                    "inside_zone": False,
+                    "ppe": {
+                        "hat": {"status": "missing", "confidence": None},
+                        "vest": {"status": "present", "confidence": 0.8},
+                    },
+                    "missing_required_ppe": ["hat"],
+                    "active_violations": [
+                        {
+                            "occurrence_id": occurrence_id,
+                            "rule_key": "missing_ppe:hat",
+                            "zone_id": "camera_wide",
+                            "is_new": True,
+                        }
+                    ],
+                }
+            ],
+            "rule": {
+                "person_inside_zone": False,
+                "machine_state": "running",
+                "ppe_profile": "hat_vest_v1",
+                "camera_id": "cam_1",
+                "zone_id": "camera_wide",
+                "ppe_requirements": {"profile": "hat_vest_v1", "hat_required": True, "vest_required": False},
+                "ppe_alert": True,
+            },
+        }
+    )
+
+    assert event_ids == [73]
+    assert len(captured) == 1
+    assert captured[0].status == "unacknowledged"
+    assert captured[0].event_type == "missing_ppe"
+    assert [str(item) for item in captured[0].occurrence_ids] == [occurrence_id]
+    assert "snapshot_data" not in captured[0].details["pending_review"]
+
+
 def test_media_upload_is_admin_only_and_content_supports_ranges(client, db_session, tmp_path, monkeypatch):
     monkeypatch.setattr(media_asset_settings, "media_asset_dir", str(tmp_path))
     denied = client.post(
@@ -86,6 +170,7 @@ def test_media_upload_is_admin_only_and_content_supports_ranges(client, db_sessi
     body = uploaded.json()
     assert body["status"] == "READY"
     assert body["media_type"] == "image"
+    assert body["storage_backend"] == "filesystem"
     assert "path" not in body
     assert list(tmp_path.iterdir())[0].name.startswith(body["id"])
 
@@ -160,6 +245,7 @@ def test_direct_bucket_upload_validates_object_and_returns_presigned_playback(
     completed = client.post(f"/api/v1/media-assets/{asset_id}/complete")
     assert completed.status_code == 200
     assert completed.json()["status"] == "READY"
+    assert completed.json()["storage_backend"] == "s3"
     playback = client.get(f"/api/v1/media-assets/{asset_id}/playback-url")
     assert playback.status_code == 200
     assert playback.json()["url"].startswith("https://bucket.example/media-assets/")

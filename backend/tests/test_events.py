@@ -91,6 +91,41 @@ def test_repeated_occurrence_create_is_idempotent(client):
     assert repeated.json()["occurrence_ids"] == [occurrence_id]
 
 
+def test_pending_occurrence_survives_listing_and_transitions_on_hitl_review(client):
+    occurrence_id = str(uuid4())
+    session_id = str(uuid4())
+    pending_payload = {
+        "zone_id": "camera_wide",
+        "camera_id": "uploaded_video",
+        "event_type": "missing_ppe",
+        "status": "unacknowledged",
+        "monitoring_session_id": session_id,
+        "track_id": 12,
+        "occurrence_ids": [occurrence_id],
+        "details": {"violations": ["missing_ppe:hat"], "pending_review": {"frame_id": 9}},
+    }
+
+    created = client.post("/api/v1/events", json=pending_payload)
+    assert created.status_code == 201
+    pending = client.get("/api/v1/events?status=unacknowledged")
+    assert pending.status_code == 200
+    assert [item["id"] for item in pending.json()] == [created.json()["id"]]
+
+    reviewed = client.post(
+        "/api/v1/events",
+        json={
+            **pending_payload,
+            "status": "false_alarm",
+            "details": {"violations": ["missing_ppe:hat"], "review_result": "normal"},
+        },
+    )
+    assert reviewed.status_code == 201
+    assert reviewed.json()["id"] == created.json()["id"]
+    assert reviewed.json()["status"] == "false_alarm"
+    assert reviewed.json()["details"]["pending_review"] == {"frame_id": 9}
+    assert client.get("/api/v1/events?status=unacknowledged").json() == []
+
+
 def test_fixed_camera_event_rejects_occurrence_from_unknown_session(client):
     response = client.post(
         "/api/v1/events",
