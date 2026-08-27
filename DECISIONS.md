@@ -22,6 +22,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-27: [Backend/Frontend] Media playback routing follows the asset storage backend
+
+- Media inventory responses expose the additive `storage_backend` discriminator (`filesystem` or `s3`).
+- The browser loads filesystem assets directly through the authenticated `/content` fallback and requests `/playback-url` only for S3 assets.
+- Older responses without the discriminator retain the previous probe-and-fallback behavior for compatibility.
+
 ### 2026-08-23: [Cross-cutting] Camera disconnect và rule contract
 
 - Camera configuration cho phép `asset_id=null`; UI có nút “Ngắt kết nối nguồn media” ngoài dropdown và vẫn lưu được trạng thái null.
@@ -52,6 +58,13 @@ This file contains only decisions that currently constrain implementation. Super
 - `hat_required` and `vest_required` are persisted on the fixed camera configuration, remain saveable with `zones=[]`, and apply to every qualified person in the frame only while camera-wide machine state is `running`.
 - Zone records continue to own `zone_intrusion_enabled` and `restricted_area_detection_enabled`; their embedded PPE fields remain additive compatibility data during migration.
 - A grouped HITL popup may contain multiple people, but the browser claims each occurrence ID once, serializes event writes, blocks duplicate submit, and advances the queue only after every valid write succeeds.
+
+### 2026-08-27: [Cross-cutting] Durable Live Monitor pending-alert inbox
+
+- Persist every newly opened direct-camera occurrence as a `SafetyEvent` with status `unacknowledged` before publishing its WebSocket result. Existing occurrence and `(monitoring_session_id, track_id)` constraints keep creation idempotent.
+- The processed violation log continues to query only `acknowledged` and `false_alarm`; HITL review transitions the same event instead of copying or deleting it.
+- PPE alerts use a dismissible toast plus the shared inbox and never auto-open. Zone or combined zone/PPE alerts take priority in one FIFO automatic modal. Closing a surface leaves the event pending.
+- Pending snapshots use the existing fail-closed privacy pipeline. Browser memory is only presentation state and is rebuilt from PostgreSQL after reload or navigation.
 
 ### 2026-08-24: [Cross-cutting] Seven-frame HITL debounce
 

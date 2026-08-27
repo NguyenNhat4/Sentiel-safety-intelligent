@@ -6,6 +6,17 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
+### 2026-08-27 Storage-aware media playback routing
+
+- [Backend/Frontend] Media inventory now identifies filesystem versus S3 storage so Live Monitor and camera preview avoid the intentional `playback-url` 409 for local assets while retaining presigned S3 playback.
+- [Verification] Frontend passes 95/95 tests, lint, type-check and production build; Ruff and `git diff --check` pass. `make check` reached the root suite and was stopped after the same unrelated stall following its first two passing tests. PostgreSQL-backed focused backend tests also stalled before producing a result. Railway deployment remains pending because the dirty worktree contains unrelated unfinished changes that cannot safely be included or discarded as part of this narrow fix.
+
+### 2026-08-27 Durable Live Monitor violation inbox
+
+- [Backend] Direct-camera sessions persist new review occurrences as privacy-protected `unacknowledged` safety events before WebSocket publication; reviewed submissions transition the same idempotent event.
+- [Frontend] Live Monitor reloads one newest-first pending list across all four cameras. PPE uses a closeable lower-right toast without auto-opening HITL; zone alerts use one automatic FIFO popup, and closing never removes the pending row.
+- [Verification] Release-focused US-29 tests pass 13/13; frontend passes 91/91 tests, lint with zero warnings, type-check and production build; Ruff and the focused runtime persistence test pass. `make check` reached the root suite and was stopped after that unrelated suite stalled. Production image build was canceled on user direction before push or Railway redeploy, so production is unchanged.
+
 ### 2026-08-24 PPE and HITL correction
 
 - [Cross-cutting] Đã hợp nhất conflict camera configuration: `asset_id` nullable, disconnect ngoài dropdown, preview empty state và lưu được trạng thái null.
@@ -77,6 +88,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- [Frontend] Live Monitor now keeps the four-camera 2x2 grid on the left and the durable pending-alert inbox on the right at desktop widths, with responsive stacking below 1180px. The application sidebar can collapse/expand, and PPE toasts close after three seconds without removing the pending event. Focused monitor tests pass `9/9`; App shell regression, browser UAT, and Railway deployment remain pending.
 - Issue #43 focused verification passes `75` tests, including uninterrupted versus restore equivalence, alternating replicas, simulated worker restart, v1/v2 HTTP contracts, auth, hostile/oversized state, PostgreSQL JSONB migration, TTL and CAS conflicts. Alembic reports the single head `20260825_01` and `git diff --check` passes.
 - Full `make check` has no new regression: Ruff/format/type-check/build pass, root has `32 passed`, frontend has `89 passed`, and backend/Vision has exactly the documented baseline `9 failed, 288 passed`. The same stale debounce, camera-wide PPE and audit-copy expectations remain the only failures.
 - GPU image build succeeds as non-root `appuser` on `amd64`, contains Torch `2.9.1+cu128`/CUDA `12.8` and exposes `/v1/infer`, `/v2/ping`, `/v2/infer`. The immutable GPU image above and CPU proof image `ntduc0112/p047-vision:cpu-v2-issue43-20260826` (`sha256:2efadd373965435824eb645c844549d4bdbb0e496e679f64fa06cd523bb9526b`) are published.

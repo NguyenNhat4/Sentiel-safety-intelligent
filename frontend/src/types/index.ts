@@ -7,6 +7,7 @@ export type AssignableUserRole = UserRole;
 export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export type MediaType = "video" | "image";
 export type MediaAssetStatus = "UPLOADING" | "READY" | "ERROR";
+export type MediaStorageBackend = "filesystem" | "s3";
 export type CameraSessionStatus = "STARTING" | "RUNNING" | "COMPLETED" | "ERROR" | "STOPPED";
 
 export interface MediaAsset {
@@ -16,6 +17,7 @@ export interface MediaAsset {
   status: MediaAssetStatus;
   content_type: string;
   size_bytes: number;
+  storage_backend?: MediaStorageBackend;
   uploaded_at: string;
   assigned_camera_id: string | null;
   can_delete?: boolean;
@@ -186,6 +188,15 @@ export interface CameraInferenceResult extends Omit<InferenceResult, "type" | "v
   captured_at?: number;
   frame_width: number;
   frame_height: number;
+  pending_event_ids?: number[];
+}
+
+export interface PendingReviewDetails {
+  violations?: string[];
+  video_timestamp_seconds?: number;
+  pending_review?: CameraInferenceResult;
+  review_result?: string;
+  people?: PersonDetection[];
 }
 
 export interface SafetyEvent {
@@ -198,11 +209,7 @@ export interface SafetyEvent {
   status: EventStatus;
   acknowledged_by?: string | null;
   snapshot_path?: string | null;
-  details?: {
-    people?: PersonDetection[];
-    video_timestamp_seconds?: number;
-    review_result?: string;
-  };
+  details?: PendingReviewDetails;
   monitoring_session_id?: string | null;
   track_id?: number | null;
   occurrence_ids?: string[];

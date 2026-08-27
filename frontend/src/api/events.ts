@@ -22,6 +22,15 @@ export async function loadReviewedEvents(status: ReviewStatus): Promise<SafetyEv
   return response.json() as Promise<SafetyEvent[]>;
 }
 
+export async function loadPendingEvents(signal?: AbortSignal): Promise<SafetyEvent[]> {
+  const response = await fetch(apiUrl("/events?status=unacknowledged&limit=200"), {
+    headers: authorizationHeaders(),
+    signal,
+  });
+  if (!response.ok) throw new Error(`Không thể tải cảnh báo chờ xử lý (HTTP ${response.status})`);
+  return response.json() as Promise<SafetyEvent[]>;
+}
+
 export async function loadEventDetail(eventId: number): Promise<EventDetail> {
   const response = await fetch(
     apiUrl(`/events/${encodeURIComponent(String(eventId))}`),

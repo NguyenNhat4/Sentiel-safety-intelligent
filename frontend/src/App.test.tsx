@@ -97,6 +97,16 @@ describe("Sentinel authentication", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/login", expect.objectContaining({method: "POST"}));
   });
 
+  it("collapses and expands the Live Monitor navigation sidebar", async () => {
+    mockAuthenticatedSession();
+    render(<App />);
+    const collapse = await screen.findByRole("button", {name: "Thu gọn thanh điều hướng"});
+    fireEvent.click(collapse);
+    expect(screen.getByRole("button", {name: "Mở rộng thanh điều hướng"})).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", {name: "Mở rộng thanh điều hướng"}));
+    expect(screen.getByRole("button", {name: "Thu gọn thanh điều hướng"})).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("opens the tabbed system administration page for a system admin", async () => {
     const admin = {
       ...user,

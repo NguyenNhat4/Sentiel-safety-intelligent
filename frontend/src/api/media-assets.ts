@@ -1,4 +1,4 @@
-import type {MediaAsset} from "../types";
+import type {MediaAsset, MediaStorageBackend} from "../types";
 import {getAccessToken} from "./auth";
 import {apiUrl} from "./config";
 
@@ -42,7 +42,10 @@ export async function loadMediaContent(assetId: string, signal?: AbortSignal): P
   return response.blob();
 }
 
-export async function loadMediaSource(assetId: string, signal?: AbortSignal): Promise<{url: string; revoke: boolean}> {
+export async function loadMediaSource(assetId: string, storageBackend?: MediaStorageBackend, signal?: AbortSignal): Promise<{url: string; revoke: boolean}> {
+  if (storageBackend === "filesystem") {
+    return {url: URL.createObjectURL(await loadMediaContent(assetId, signal)), revoke: true};
+  }
   const response = await authorizedFetch(`/media-assets/${encodeURIComponent(assetId)}/playback-url`, {signal});
   if (response.ok) return {url: ((await response.json()) as {url: string}).url, revoke: false};
   if (response.status !== 409) throw new Error(await responseError(response, "Không thể tải nội dung media"));

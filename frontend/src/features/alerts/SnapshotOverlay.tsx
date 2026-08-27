@@ -85,10 +85,16 @@ function SnapshotBox({
   thickness?: number;
 }) {
   const [x1, y1, x2, y2] = bbox;
+  const labelTop = Math.max(0, y1 - 15);
+  const labelWidth = Math.max(36, label.length * 6.4 + 10);
+
   return (
     <g data-testid="snapshot-box">
       <rect fill="none" height={y2 - y1} stroke={color} strokeWidth={thickness} width={x2 - x1} x={x1} y={y1} />
-      <text fill={color} fontSize="11" fontWeight="700" x={x1} y={Math.max(12, y1 - 4)}>{label}</text>
+      <g data-testid="snapshot-box-label">
+        <rect fill={color} height="15" rx="2" width={labelWidth} x={x1} y={labelTop} />
+        <text fill="#ffffff" fontSize="11" fontWeight="700" x={x1 + 5} y={labelTop + 11}>{label}</text>
+      </g>
     </g>
   );
 }

@@ -19,16 +19,16 @@ export default function App() {
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
 
-  useEffect(() => {
-    void getCurrentUser().then(currentUser => {
-      if (currentUser) handleAuthenticated(currentUser);
-    }).catch(() => undefined).finally(() => setCheckingSession(false));
-  }, []);
-
   const handleAuthenticated = useCallback((authenticatedUser: AuthenticatedUser) => {
     setUser(authenticatedUser);
     setPage(authenticatedUser.role === "area_manager" ? "area" : authenticatedUser.role === "system_admin" ? "media-library" : "monitor");
   }, []);
+
+  useEffect(() => {
+    void getCurrentUser().then(currentUser => {
+      if (currentUser) handleAuthenticated(currentUser);
+    }).catch(() => undefined).finally(() => setCheckingSession(false));
+  }, [handleAuthenticated]);
 
   const handleLogout = useCallback(async () => {
     try {
