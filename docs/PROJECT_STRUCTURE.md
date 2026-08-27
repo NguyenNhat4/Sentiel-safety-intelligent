@@ -206,6 +206,7 @@ P-047/
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines
 │   │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   │   ├── DEPLOYMENT_FLOW.md           # Visual deployment flow diagrams, service matrix and team runbook
+│   │   ├── RAILWAY_SEED_DATA.md         # Why production deploys do not auto-seed and staging2 seed runbook
 │   │   ├── local-docker-postgres.md     # Local Docker PostgreSQL configuration
 │   │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   │   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook

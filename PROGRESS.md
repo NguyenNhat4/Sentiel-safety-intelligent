@@ -19,6 +19,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Cross-cutting
 
+- Railway seed behavior is documented: production startup migrates schema but intentionally does not create demo users; the staging2-only one-off seed procedure and the misleading always-visible frontend demo cards are recorded in the operations runbook.
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.
