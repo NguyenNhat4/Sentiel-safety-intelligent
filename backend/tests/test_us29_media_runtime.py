@@ -165,7 +165,8 @@ def test_direct_bucket_upload_validates_object_and_returns_presigned_playback(
     assert playback.json()["url"].startswith("https://bucket.example/media-assets/")
 
 
-def test_run_starts_every_configured_camera_and_replay_starts_only_requested_camera(client, monkeypatch):
+def test_system_admin_runs_every_configured_camera_and_replays_only_requested_camera(client, db_session, monkeypatch):
+    _set_role(client, db_session, UserRole.SYSTEM_ADMIN)
     calls = []
 
     def start(db, camera_id):
@@ -209,8 +210,6 @@ def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session,
         data={"display_name": "Still"},
         files={"file": ("still.png", _png_bytes(), "image/png")},
     ).json()
-    _set_role(client, db_session, UserRole.SAFETY_MANAGER)
-
     initial = client.get("/api/v1/camera-configurations").json()
     assert [item["camera_id"] for item in initial] == ["cam_1", "cam_2", "cam_3", "cam_4"]
     saved = client.put("/api/v1/camera-configurations/cam_1", json=_configuration_payload(asset["id"]))

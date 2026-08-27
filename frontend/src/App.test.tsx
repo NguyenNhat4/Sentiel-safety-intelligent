@@ -127,13 +127,18 @@ describe("Sentinel authentication", () => {
     await screen.findByRole("button", {name: /Thư viện media/});
     expect(screen.getByRole("button", {name: /Quan sát hệ thống/})).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", {name: /Live monitor/})).not.toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Live monitor/})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Quản trị hệ thống/}));
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Thư viện media/})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
+    expect(await screen.findByRole("heading", {name: "Live Monitor"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Camera 1"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Chạy mô phỏng"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Cấu hình Camera 1"})).toBeInTheDocument();
   });
 
   it("forces a temporary-password user to change password before opening the app", async () => {

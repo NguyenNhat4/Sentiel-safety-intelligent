@@ -19,16 +19,16 @@ export default function App() {
   const [selectedCameraId, setSelectedCameraId] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
 
-  useEffect(() => {
-    void getCurrentUser().then(currentUser => {
-      if (currentUser) handleAuthenticated(currentUser);
-    }).catch(() => undefined).finally(() => setCheckingSession(false));
-  }, []);
-
   const handleAuthenticated = useCallback((authenticatedUser: AuthenticatedUser) => {
     setUser(authenticatedUser);
     setPage(authenticatedUser.role === "area_manager" ? "area" : authenticatedUser.role === "system_admin" ? "media-library" : "monitor");
   }, []);
+
+  useEffect(() => {
+    void getCurrentUser().then(currentUser => {
+      if (currentUser) handleAuthenticated(currentUser);
+    }).catch(() => undefined).finally(() => setCheckingSession(false));
+  }, [handleAuthenticated]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -54,9 +54,9 @@ export default function App() {
 
   return (
     <AppShell page={page} onNavigate={setPage} user={user} selectedCameraId={selectedCameraId} onLogout={() => void handleLogout()}>
-      {user.role === "safety_manager" && <MonitorPage active={page === "monitor"} role={user.role} onConfigure={handleConfigureCamera} />}
-      {user.role === "safety_manager" && selectedCameraId && page === "camera-config" && <CameraConfigurationPage active={page === "camera-config"} cameraId={selectedCameraId} showTitle={false} onBack={handleBackToMonitor} onSaved={handleBackToMonitor} />}
-      {user.role === "safety_manager" && page === "events" && <EventLogPage active />}
+      {(user.role === "safety_manager" || user.role === "system_admin") && <MonitorPage active={page === "monitor"} role={user.role} onConfigure={handleConfigureCamera} />}
+      {(user.role === "safety_manager" || user.role === "system_admin") && selectedCameraId && page === "camera-config" && <CameraConfigurationPage active={page === "camera-config"} cameraId={selectedCameraId} showTitle={false} onBack={handleBackToMonitor} onSaved={handleBackToMonitor} />}
+      {(user.role === "safety_manager" || user.role === "system_admin") && page === "events" && <EventLogPage active />}
       {user.role === "system_admin" && page === "operations" && <OperationalMetricsPage active />}
       {user.role !== "safety_manager" && page === "area" && <AreaManagerPage active />}
       {user.role === "system_admin" && page === "media-library" && <MediaLibraryPage active />}

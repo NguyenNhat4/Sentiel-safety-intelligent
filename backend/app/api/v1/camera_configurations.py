@@ -40,7 +40,7 @@ def get_camera_configuration(
 def save_camera_configuration(
     camera_id: str,
     payload: CameraConfigurationUpdate,
-    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER)),
+    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN)),
     db: Session = Depends(get_db),
 ):
     try:

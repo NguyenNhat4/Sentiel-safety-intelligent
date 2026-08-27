@@ -1,10 +1,14 @@
 # Project Progress
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
 ## Current State
+
+### 2026-08-27 System-admin Live Monitor access
+
+- [Cross-cutting] `system_admin` has full operational authority: Live Monitor, camera configuration, simulation run/replay, event history/review, media, account administration, and operational metrics. `area_manager` remains scoped to its assigned area.
 
 ### 2026-08-24 PPE and HITL correction
 

@@ -58,11 +58,13 @@ it("runs once, ignores stale sessions, displays rolling FPS, and replays one com
   expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playing", "true");
 });
 
-it("does not expose run or configuration actions to system admins", async () => {
-  render(<StreamViewer role="system_admin" onConfigure={vi.fn()} />);
+it("exposes run and configuration actions to system admins", async () => {
+  const configure = vi.fn();
+  render(<StreamViewer role="system_admin" onConfigure={configure} />);
   await screen.findByRole("heading", {name: "Camera 1"});
-  expect(screen.queryByRole("button", {name: "Chạy mô phỏng"})).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", {name: "Cấu hình Camera 1"})).not.toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Chạy mô phỏng"})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Cấu hình Camera 1"}));
+  expect(configure).toHaveBeenCalledWith("cam_1");
   expect(CameraDetectionClient).toHaveBeenCalled();
 });
 

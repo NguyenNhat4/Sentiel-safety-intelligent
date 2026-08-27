@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -13,6 +13,11 @@ This file contains only decisions that currently constrain implementation. Super
 - Vision emits observations through its public facade; backend owns deterministic safety rules, authorization, event lifecycle, and persistence. Frontend does not decide violations.
 - Cross-owner calls use public facades, adapters, or versioned contracts. New top-level boundaries require an explicit architecture decision.
 - FastAPI routes, Pydantic schemas, frontend wire types, SQLAlchemy models, Alembic migrations, and focused tests are runtime contract truth.
+
+### 2026-08-27: [Cross-cutting] System administrator operational authority
+
+- `system_admin` has full application authority: Live Monitor, camera configuration, simulation run/replay, event review/history, media management, account administration, and operational metrics.
+- `safety_manager` retains the operational safety workspace; `area_manager` remains restricted to its assigned area.
 
 ### [Cross-cutting] Documentation and tracking
 

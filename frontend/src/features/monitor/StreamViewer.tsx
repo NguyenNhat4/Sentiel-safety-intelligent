@@ -16,7 +16,7 @@ import "./stream.css";
 export const CAMERA_IDS = ["cam_1", "cam_2", "cam_3", "cam_4"] as const;
 
 export function StreamViewer({active = true, role, onConfigure}: {active?: boolean; role: UserRole; onConfigure: (cameraId: string) => void}) {
-  const canConfigure = role === "safety_manager";
+  const canConfigure = role === "safety_manager" || role === "system_admin";
   const [configurations, setConfigurations] = useState<Record<string, CameraConfiguration>>({});
   const [assets, setAssets] = useState<Record<string, MediaAsset>>({});
   const [sessions, setSessions] = useState<Record<string, CameraSession>>({});
