@@ -14,6 +14,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Cross-cutting
 
+- Camera detail now uses a responsive two-column layout: configuration/preview on the left and a camera-scoped violation log on the right, loaded through the optional `camera_id` event filter with per-event detail access and empty/error states.
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.

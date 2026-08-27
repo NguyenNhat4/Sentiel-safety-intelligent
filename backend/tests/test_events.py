@@ -53,6 +53,21 @@ def test_update_event_status(client):
     assert patch_resp.json()["acknowledged_by"] == "Safety Officer A"
 
 
+def test_list_events_filters_by_camera_id(client):
+    for camera_id in ("cam_1", "cam_2"):
+        response = client.post(
+            "/api/v1/events",
+            json={"zone_id": "zone_01", "camera_id": camera_id, "event_type": "zone_intrusion"},
+        )
+        assert response.status_code == 201
+
+    response = client.get("/api/v1/events?camera_id=cam_1")
+
+    assert response.status_code == 200
+    assert response.json()
+    assert {event["camera_id"] for event in response.json()} == {"cam_1"}
+
+
 def test_create_event_with_completed_review(client):
     response = client.post(
         "/api/v1/events",

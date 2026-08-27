@@ -22,6 +22,15 @@ export async function loadReviewedEvents(status: ReviewStatus): Promise<SafetyEv
   return response.json() as Promise<SafetyEvent[]>;
 }
 
+export async function loadCameraEvents(cameraId: string): Promise<SafetyEvent[]> {
+  const response = await fetch(
+    apiUrl(`/events?camera_id=${encodeURIComponent(cameraId)}&limit=50`),
+    {headers: authorizationHeaders()},
+  );
+  if (!response.ok) throw new Error(`Không thể tải log Camera (HTTP ${response.status})`);
+  return response.json() as Promise<SafetyEvent[]>;
+}
+
 export async function loadEventDetail(eventId: number): Promise<EventDetail> {
   const response = await fetch(
     apiUrl(`/events/${encodeURIComponent(String(eventId))}`),
