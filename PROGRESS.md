@@ -6,6 +6,13 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
+### 2026-08-28 Confirmed-event Telegram delivery
+
+- [Backend] Telegram delivery follows the durable event lifecycle: no message for AI-created `unacknowledged` candidates, one message on the first human-confirmed `acknowledged` transition, and no duplicate on an idempotent retry.
+- [Backend] Confirmed rules are aggregated per assigned area manager, preserving zone intrusion and specific missing hat/vest labels instead of dropping same-area events or producing an empty description.
+- [Known limitation] PPE-only events intentionally remain `camera_wide`; the current zone-based `managed_area_id` assignment cannot infer their Telegram recipient until a camera-wide recipient policy is chosen.
+- [Verification] Six focused Telegram, reviewed-event transition, and camera-runtime tests pass. Full `make check` passes Ruff, frontend lint/type-check/build and 95/95 frontend plus 32/32 root tests; backend/vision has 293 passes and the same nine pre-existing safety debounce, summary, event-batch, and multi-zone contract failures.
+
 ### 2026-08-27 System-admin Live Monitor access
 
 - [Cross-cutting] `system_admin` has full operational authority: Live Monitor, camera configuration, simulation run/replay, event history/review, media, account administration, and operational metrics. `area_manager` remains scoped to its assigned area.

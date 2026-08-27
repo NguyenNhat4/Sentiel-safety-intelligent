@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy.exc import OperationalError
 
+from backend.app.api.v1 import events as events_api
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.models.user import User, UserRole
 from backend.app.services.auth_service import AuthService, hash_password
@@ -124,6 +125,38 @@ def test_pending_occurrence_survives_listing_and_transitions_on_hitl_review(clie
     assert reviewed.json()["status"] == "false_alarm"
     assert reviewed.json()["details"]["pending_review"] == {"frame_id": 9}
     assert client.get("/api/v1/events?status=unacknowledged").json() == []
+
+
+def test_pending_occurrence_queues_telegram_once_when_review_confirms_it(client, monkeypatch):
+    queued_event_ids: list[int] = []
+
+    def record_confirmed_events(db, events):
+        queued_event_ids.extend(event.id for event in events)
+        return len(events)
+
+    monkeypatch.setattr(events_api.alert_notification_service, "queue_confirmed_events", record_confirmed_events)
+    occurrence_id = str(uuid4())
+    session_id = str(uuid4())
+    payload = {
+        "zone_id": "zone_01",
+        "camera_id": "uploaded_video",
+        "event_type": "missing_ppe",
+        "monitoring_session_id": session_id,
+        "track_id": 12,
+        "occurrence_ids": [occurrence_id],
+        "details": {"violations": ["missing_ppe:hat"]},
+    }
+
+    pending = client.post("/api/v1/events", json={**payload, "status": "unacknowledged"})
+    reviewed = client.post("/api/v1/events", json={**payload, "status": "acknowledged"})
+    retried = client.post("/api/v1/events", json={**payload, "status": "acknowledged"})
+
+    assert pending.status_code == 201
+    assert reviewed.status_code == 201
+    assert retried.status_code == 201
+    assert reviewed.json()["id"] == pending.json()["id"]
+    assert retried.json()["id"] == pending.json()["id"]
+    assert queued_event_ids == [pending.json()["id"]]
 
 
 def test_fixed_camera_event_rejects_occurrence_from_unknown_session(client):

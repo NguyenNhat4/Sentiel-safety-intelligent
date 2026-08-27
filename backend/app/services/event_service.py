@@ -80,6 +80,7 @@ class EventService:
         if existing:
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
                 existing[0]._was_created = False
+                existing[0]._became_acknowledged = False
                 return existing[0]
             raise EventConflictError("One or more occurrences already belong to another event")
         reviewed = event_in.status in {"acknowledged", "false_alarm"}
@@ -134,6 +135,7 @@ class EventService:
             existing = self._events_for_occurrences(occurrence_ids)
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
                 existing[0]._was_created = False
+                existing[0]._became_acknowledged = False
                 return existing[0]
             raise EventConflictError("One or more occurrences already belong to another event") from exc
         except Exception as exc:
@@ -142,6 +144,7 @@ class EventService:
                 self._snapshot_file(snapshot_path).unlink(missing_ok=True)
             raise EventPersistenceError("Could not save the event to the database") from exc
         db_event._was_created = True
+        db_event._became_acknowledged = event_in.status == "acknowledged"
         return db_event
 
     def _event_for_track(self, event_in: EventCreate) -> SafetyEvent | None:
@@ -175,6 +178,7 @@ class EventService:
         incoming_details = event_in.details or {}
         violations = sorted(set(existing_details.get("violations", [])) | set(incoming_details.get("violations", [])))
         event.details = {**existing_details, **incoming_details, "violations": violations}
+        was_acknowledged = event.status == "acknowledged"
         event.status = event_in.status
         now = datetime.now(UTC)
         acknowledged_by = actor.full_name if actor else event_in.acknowledged_by
@@ -205,6 +209,7 @@ class EventService:
             self.db.rollback()
             raise EventPersistenceError("Could not update the person's event") from exc
         event._was_created = False
+        event._became_acknowledged = event_in.status == "acknowledged" and not was_acknowledged
         return event
 
     def create_batch(
@@ -219,6 +224,7 @@ class EventService:
         if retried is not None:
             for event in retried[2]:
                 event._was_created = False
+                event._became_acknowledged = False
             return retried
         if existing:
             raise EventConflictError("One or more occurrences already belong to another event")
@@ -285,6 +291,7 @@ class EventService:
             if retried is not None:
                 for event in retried[2]:
                     event._was_created = False
+                    event._became_acknowledged = False
                 return retried
             raise EventConflictError("One or more occurrences already belong to another event") from exc
         except Exception as exc:
@@ -294,6 +301,7 @@ class EventService:
             raise EventPersistenceError("Could not save the event batch to the database") from exc
         for event in events:
             event._was_created = True
+            event._became_acknowledged = batch_in.status == "acknowledged"
         return batch_id, snapshot_path, events
 
     def _build_decision_context(

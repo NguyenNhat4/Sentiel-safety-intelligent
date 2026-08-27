@@ -8,14 +8,13 @@ from backend.app.integrations.telegram_notifications import TelegramNotification
 from backend.app.models.event import SafetyEvent
 from backend.app.models.monitoring_zone import MonitoringZoneRecord
 from backend.app.models.user import User, UserRole
-from backend.app.schemas.analysis import FrameInferenceResponse
 
 logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
 class AlertNotificationService:
-    """Routes newly opened safety occurrences to assigned area managers."""
+    """Routes human-confirmed safety violations to assigned area managers."""
 
     def __init__(self, adapter: TelegramNotificationAdapter | None = None) -> None:
         settings = get_settings()
@@ -30,10 +29,12 @@ class AlertNotificationService:
         if not confirmed or not self._adapter.configured:
             return 0
 
-        event_by_area = {event.zone_id: event for event in confirmed}
+        rules_by_area: dict[str, set[str]] = {}
+        for event in confirmed:
+            rules_by_area.setdefault(event.zone_id, set()).update(self._rules_for_event(event))
         area_names = dict(
             db.query(MonitoringZoneRecord.zone_id, MonitoringZoneRecord.display_name)
-            .filter(MonitoringZoneRecord.zone_id.in_(event_by_area))
+            .filter(MonitoringZoneRecord.zone_id.in_(rules_by_area))
             .all()
         )
         recipients = (
@@ -41,52 +42,9 @@ class AlertNotificationService:
             .filter(
                 User.role == UserRole.AREA_MANAGER.value,
                 User.is_active.is_(True),
-                User.managed_area_id.in_(event_by_area),
+                User.managed_area_id.in_(rules_by_area),
                 User.telegram_chat_id.is_not(None),
-            )
-            .all()
-        )
-        for recipient in recipients:
-            event = event_by_area[recipient.managed_area_id]
-            task = asyncio.create_task(
-                self._deliver(
-                    recipient.telegram_chat_id,
-                    self._message(area_names.get(event.zone_id, event.zone_id), {event.event_type}),
-                )
-            )
-            _background_tasks.add(task)
-            task.add_done_callback(_background_tasks.discard)
-        return len(recipients)
-
-    def queue_new_alerts(
-        self,
-        db: Session,
-        result: FrameInferenceResponse,
-        *,
-        fallback_area_id: str,
-    ) -> int:
-        new_rules_by_area: dict[str, set[str]] = {}
-        for person in result.people:
-            for violation in person.active_violations:
-                if not violation.is_new:
-                    continue
-                area_id = violation.zone_id or fallback_area_id
-                new_rules_by_area.setdefault(area_id, set()).add(violation.rule_key)
-        if not new_rules_by_area or not self._adapter.configured:
-            return 0
-
-        area_names = dict(
-            db.query(MonitoringZoneRecord.zone_id, MonitoringZoneRecord.display_name)
-            .filter(MonitoringZoneRecord.zone_id.in_(new_rules_by_area))
-            .all()
-        )
-        recipients = (
-            db.query(User)
-            .filter(
-                User.role == UserRole.AREA_MANAGER.value,
-                User.is_active.is_(True),
-                User.managed_area_id.in_(new_rules_by_area),
-                User.telegram_chat_id.is_not(None),
+                User.telegram_chat_id != "",
             )
             .all()
         )
@@ -95,7 +53,7 @@ class AlertNotificationService:
             task = asyncio.create_task(
                 self._deliver(
                     recipient.telegram_chat_id,
-                    self._message(area_names.get(area_id, area_id), new_rules_by_area.get(area_id, set())),
+                    self._message(area_names.get(area_id, area_id), rules_by_area[area_id]),
                 )
             )
             _background_tasks.add(task)
@@ -113,13 +71,41 @@ class AlertNotificationService:
         labels = []
         if any(rule.startswith("zone_intrusion") for rule in rules):
             labels.append("có người vào vùng cấm")
-        if "person_safety_violation" in rules:
-            labels.append("person safety violation")
+        if any(rule.startswith("restricted_area_person") for rule in rules):
+            labels.append("phát hiện người trong khu vực hạn chế")
         missing = {rule.split(":", 1)[1] for rule in rules if rule.startswith("missing_ppe:")}
         if missing:
             ppe_labels = {"hat": "mũ bảo hộ", "vest": "áo phản quang"}
             labels.append("thiếu " + ", ".join(ppe_labels.get(item, item) for item in sorted(missing)))
-        return f"SENTINEL - CẢNH BÁO AN TOÀN\nKhu vực: {area_name}\nPhát hiện: {'; '.join(labels)}\nVui lòng mở hệ thống để review."
+        elif "missing_ppe" in rules:
+            labels.append("thiếu PPE bắt buộc")
+        if not labels:
+            labels.append("vi phạm an toàn")
+        return (
+            f"SENTINEL - CẢNH BÁO AN TOÀN\nKhu vực: {area_name}\n"
+            f"Đã xác nhận: {'; '.join(labels)}\nVui lòng mở hệ thống để xử lý."
+        )
+
+    @staticmethod
+    def _rules_for_event(event: SafetyEvent) -> set[str]:
+        details = event.details if isinstance(event.details, dict) else {}
+        detail_rules = details.get("violations", [])
+        if isinstance(detail_rules, list):
+            rules = {str(rule) for rule in detail_rules if str(rule)}
+            if rules:
+                return rules
+
+        context = event.decision_context if isinstance(event.decision_context, dict) else {}
+        rule_context = context.get("rule", {}) if isinstance(context, dict) else {}
+        context_rules = rule_context.get("triggered_rule_keys", []) if isinstance(rule_context, dict) else []
+        if isinstance(context_rules, list):
+            rules = {str(rule) for rule in context_rules if str(rule)}
+            if rules:
+                return rules
+
+        if event.event_type == "missing_ppe_and_intrusion":
+            return {"missing_ppe", "zone_intrusion"}
+        return {event.event_type}
 
 
 alert_notification_service = AlertNotificationService()

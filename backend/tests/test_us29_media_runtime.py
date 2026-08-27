@@ -125,7 +125,7 @@ def test_direct_camera_runtime_persists_pending_alert_before_publish(monkeypatch
                         {
                             "occurrence_id": occurrence_id,
                             "rule_key": "missing_ppe:hat",
-                            "zone_id": "camera_wide",
+                            "zone_id": None,
                             "is_new": True,
                         }
                     ],
@@ -136,7 +136,7 @@ def test_direct_camera_runtime_persists_pending_alert_before_publish(monkeypatch
                 "machine_state": "running",
                 "ppe_profile": "hat_vest_v1",
                 "camera_id": "cam_1",
-                "zone_id": "camera_wide",
+                "zone_id": "zone_01",
                 "ppe_requirements": {"profile": "hat_vest_v1", "hat_required": True, "vest_required": False},
                 "ppe_alert": True,
             },
@@ -147,6 +147,7 @@ def test_direct_camera_runtime_persists_pending_alert_before_publish(monkeypatch
     assert len(captured) == 1
     assert captured[0].status == "unacknowledged"
     assert captured[0].event_type == "missing_ppe"
+    assert captured[0].zone_id == "camera_wide"
     assert [str(item) for item in captured[0].occurrence_ids] == [occurrence_id]
     assert "snapshot_data" not in captured[0].details["pending_review"]
 

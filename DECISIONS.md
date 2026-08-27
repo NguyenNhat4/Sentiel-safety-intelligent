@@ -155,7 +155,7 @@ This file contains only decisions that currently constrain implementation. Super
 
 - Roles are exactly `system_admin`, `safety_manager`, and `area_manager`; sessions are server-side and stored as token digests.
 - Area managers can view and transition only events in their assigned area. New/updated area-manager accounts require a valid managed area.
-- Confirmed events route to the assigned manager. Telegram delivery uses numeric chat IDs, is non-blocking, and never changes inference or in-app persistence on provider failure.
+- Confirmed events route to the assigned manager. Telegram is queued exactly once when an event transitions from `unacknowledged` to `acknowledged`; AI-opened candidates and idempotent review retries do not send. Multiple confirmed events for one area are aggregated without dropping their rule labels. Delivery uses numeric chat IDs, is non-blocking, and never changes inference or in-app persistence on provider failure.
 - New and administrator-reset accounts must replace temporary passwords; forgotten-password recovery returns to System Admin.
 
 ### 2026-08-20: [Backend] PostgreSQL-only database contract
