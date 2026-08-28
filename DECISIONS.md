@@ -27,6 +27,11 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-28: [Frontend] Review snapshot uses backend annotation only
+
+- Review Modal và Event Detail hiển thị trực tiếp snapshot đã được backend annotate.
+- Không render box, label hoặc zone SVG ở các màn hình snapshot vi phạm; `DetectionOverlay` chỉ còn dùng cho Live Monitor trên media trực tiếp.
+
 ### 2026-08-27: [Backend/Frontend] Media playback routing follows the asset storage backend
 
 - Media inventory responses expose the additive `storage_backend` discriminator (`filesystem` or `s3`).

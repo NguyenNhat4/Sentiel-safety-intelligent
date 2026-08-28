@@ -1,13 +1,10 @@
-import type {ModelDetection, MonitoringZone, PersonDetection, ReviewStatus} from "../../types";
-import {SnapshotOverlay} from "./SnapshotOverlay";
+import type {PersonDetection, ReviewStatus} from "../../types";
 
 interface ReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   snapshot?: string;
   people?: PersonDetection[];
-  detections?: ModelDetection[];
-  zones?: MonitoringZone[];
   timer: string;
   reviewSaving: boolean;
   alertTitle: string;
@@ -21,8 +18,6 @@ export function ReviewModal({
   onClose,
   snapshot,
   people,
-  detections,
-  zones,
   timer,
   reviewSaving,
   alertTitle,
@@ -65,7 +60,7 @@ export function ReviewModal({
           )}
           {snapshot ? (
             <div className="modal-snapshot-container">
-              <SnapshotOverlay snapshot={snapshot} people={people} detections={detections} zones={zones?.filter(zone => affectedZones.includes(zone.zone_id))} />
+              <img className="modal-snapshot" src={snapshot} alt="Khung hình vi phạm cần xác minh" />
             </div>
           ) : (
             <div className="modal-snapshot-placeholder">Không có hình ảnh xem trước</div>

@@ -1,6 +1,6 @@
 # Safety Alerts
 
-Presents inference rule outcomes, snapshots, timer state, and Human-in-the-Loop review actions. `SnapshotOverlay` renders typed canonical people plus `hat`/`vest` boxes over the reviewed frame with the image's preserved aspect ratio; persistence is delegated through callbacks.
+Presents inference rule outcomes, backend-annotated snapshots, timer state, and Human-in-the-Loop review actions. Review displays the persisted snapshot as an image without adding a browser overlay; persistence is delegated through callbacks.
 
 `PendingViolationList` presents the durable cross-camera review inbox and
 `PpeAlertToast` provides the non-blocking PPE notification and closes after three

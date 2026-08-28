@@ -10,6 +10,10 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 - [Cross-cutting] `system_admin` has full operational authority: Live Monitor, camera configuration, simulation run/replay, event history/review, media, account administration, and operational metrics. `area_manager` remains scoped to its assigned area.
 - [Verification] Merged the latest three `origin/develop2` commits while retaining the system-admin access rules and the new durable alert/toast flow. Frontend passes 95/95 tests, lint, type-check and production build; focused system-admin and alert-persistence backend tests pass. Full `make check` passes Ruff, frontend, 32/32 root tests, and 290 backend/vision tests, with the same nine pre-existing debounce, deterministic-summary, event-batch, and multi-zone contract failures.
+### 2026-08-28 Backend-annotated review snapshots
+
+- [Frontend] Review Modal và Event Detail chỉ hiển thị snapshot JPG đã được backend annotate; đã bỏ browser SVG overlay để tránh vẽ box/text hai lần.
+- [Verification] Frontend focused tests pass 6/6; toàn bộ frontend pass 94/94 tests, lint, type-check, production build và `git diff --check`. Release script bị stall ở backend media test trước bước build/push/redeploy; Railway production chưa thay đổi.
 
 ### 2026-08-27 Storage-aware media playback routing
 
