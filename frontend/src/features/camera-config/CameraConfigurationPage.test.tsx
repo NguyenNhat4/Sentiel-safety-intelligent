@@ -39,6 +39,7 @@ it("loads the exact camera prop with READY media and no camera selector", async 
   expect(screen.getByRole("option", {name: "Ảnh máy dập · Hình ảnh"})).toBeInTheDocument();
   expect(screen.queryByText("Đang xử lý")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Preview Camera 3")).toBeInTheDocument();
+  expect(screen.getByText("Camera đã kết nối")).toBeInTheDocument();
 });
 
 it("saves asset, machine, zones and PPE once then returns without starting inference", async () => {
@@ -67,6 +68,44 @@ it("loads persisted hat and vest requirements as enabled", async () => {
 
   expect(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).toBeChecked();
   expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).toBeChecked();
+});
+
+it("shows explicit machine-state choices and updates the draft accessibly", async () => {
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  const offButton = await screen.findByRole("button", {name: "TẮT"});
+  const onButton = screen.getByRole("button", {name: "BẬT"});
+  expect(offButton).toHaveAttribute("aria-pressed", "true");
+  expect(onButton).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByText("Máy đã dừng, quy tắc PPE tạm thời không được kiểm tra.")).toBeInTheDocument();
+
+  fireEvent.click(onButton);
+  expect(onButton).toHaveAttribute("aria-pressed", "true");
+  expect(offButton).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByText("Hệ thống tự động kiểm tra mũ bảo hiểm và áo phản quang.")).toBeInTheDocument();
+});
+
+it("shows zone drawing progress and explains why save is blocked", async () => {
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  expect(await screen.findByText("4/4 điểm")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Tạo vùng"}));
+  expect(screen.getByText("0/4 điểm")).toBeInTheDocument();
+  expect(screen.getByText("Bấm lần lượt 4 điểm trên khung camera để khép vùng.")).toBeInTheDocument();
+  expect(screen.getByText("Vùng đang chọn cần đủ 4 điểm (0/4).")).toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+});
+
+it("reports a dirty draft before delegating navigation to the application", async () => {
+  const onBack = vi.fn();
+  const onDirtyChange = vi.fn();
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={vi.fn()} onDirtyChange={onDirtyChange} />);
+
+  fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+  await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+  const back = screen.getByRole("button", {name: "Quay lại"});
+  fireEvent.click(back);
+  expect(onBack).toHaveBeenCalledOnce();
 });
 
 it("keeps the controlled draft and reports a revision conflict", async () => {

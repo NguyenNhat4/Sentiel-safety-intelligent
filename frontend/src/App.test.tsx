@@ -196,6 +196,24 @@ describe("Sentinel React application", () => {
     expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   });
 
+  it("shows a branded confirmation before discarding an unsaved camera draft", async () => {
+    mockAuthenticatedSession();
+    render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+    fireEvent.click(await screen.findByRole("button", {name: "Cấu hình Camera 2"}));
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    const dialog = await screen.findByRole("alertdialog", {name: "Bạn chưa lưu thay đổi"});
+    expect(dialog).toHaveTextContent("Các thay đổi trong cấu hình Camera sẽ bị mất");
+    fireEvent.click(screen.getByRole("button", {name: "Tiếp tục chỉnh sửa"}));
+    expect(screen.getByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    fireEvent.click(await screen.findByRole("button", {name: "Bỏ thay đổi"}));
+    expect(await screen.findByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument();
+  });
+
   it("does not render the removed local video upload controls", async () => {
     mockAuthenticatedSession();
     const {container} = render(<App />);
