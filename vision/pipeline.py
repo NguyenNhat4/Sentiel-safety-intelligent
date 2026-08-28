@@ -50,7 +50,7 @@ def redact_person_head_regions(
     frame: np.ndarray,
     people: list[SnapshotPerson],
 ) -> PrivacyRedactionResult:
-    """Conservatively blur the top 40% of every canonical person box.
+    """Redact only detected face regions.
 
     The input frame is never mutated. A frame with no usable canonical person box is
     rejected so callers cannot persist it by accident. This privacy path is independent
@@ -67,7 +67,7 @@ def redact_identity_regions(
     face_margin_ratio: float = 0.2,
     face_detector_failed: bool = False,
 ) -> PrivacyRedactionResult:
-    """Blur YuNet faces and use the person-head fallback for each unmatched person."""
+    """Blur YuNet face regions; leave the image unchanged when no face is detected."""
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise PrivacyRedactionError("snapshot must be a three-channel image")
     if not 0.0 <= face_margin_ratio <= 1.0:
@@ -84,17 +84,7 @@ def redact_identity_regions(
     face_regions = _merged_regions(
         [_expanded_region(region, face_margin_ratio, width=width, height=height) for region in bounded_faces]
     )
-    matched_people = {
-        person_index
-        for face_region in bounded_faces
-        if (person_index := _associated_person_index(face_region, person_regions)) is not None
-    }
-    fallback_regions = [
-        _person_head_region(person_region)
-        for person_index, person_region in enumerate(person_regions)
-        if person_index not in matched_people
-    ]
-    redacted_regions = _merged_regions([*face_regions, *fallback_regions])
+    redacted_regions = face_regions
 
     redacted = frame.copy()
     for x1, y1, x2, y2 in redacted_regions:
@@ -108,9 +98,9 @@ def redact_identity_regions(
     return {
         "image": redacted,
         "redacted_regions": redacted_regions,
-        "used_person_fallback": bool(fallback_regions),
+        "used_person_fallback": False,
         "detected_face_count": len(bounded_faces),
-        "fallback_person_count": len(fallback_regions),
+        "fallback_person_count": 0,
         "face_detector_failed": face_detector_failed,
     }
 
@@ -229,7 +219,10 @@ def _draw_box(
     scale = 0.45
     text_thickness = 1
     (text_width, text_height), baseline = cv2.getTextSize(label, font, scale, text_thickness)
-    label_top = max(0, y1 - text_height - baseline - 6)
+    label_height = text_height + baseline + 6
+    # Keep the label attached to the bottom edge of the box. If the box reaches
+    # the image boundary, move it inside the frame so the text remains visible.
+    label_top = min(y2, max(0, image.shape[0] - label_height))
     label_bottom = label_top + text_height + baseline + 6
     cv2.rectangle(image, (x1, label_top), (min(image.shape[1], x1 + text_width + 8), label_bottom), color, -1)
     cv2.putText(

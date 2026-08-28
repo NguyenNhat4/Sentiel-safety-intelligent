@@ -13,6 +13,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### 2026-08-28 Backend-annotated review snapshots
 
 - [Frontend] Review Modal và Event Detail chỉ hiển thị snapshot JPG đã được backend annotate; đã bỏ browser SVG overlay để tránh vẽ box/text hai lần.
+- [Vision] Label và confidence của box snapshot được đặt ở cạnh dưới bounding box, tự co vào trong ảnh khi box sát mép dưới.
 - [Verification] Frontend focused tests pass 6/6; toàn bộ frontend pass 94/94 tests, lint, type-check, production build và `git diff --check`. Release script bị stall ở backend media test trước bước build/push/redeploy; Railway production chưa thay đổi.
 
 ### 2026-08-27 Storage-aware media playback routing

@@ -15,7 +15,6 @@ from vision.pipeline import (
     SnapshotPerson,
     annotate_snapshot,
     redact_identity_regions,
-    redact_person_head_regions,
 )
 from vision.tracking_state import (
     TRACKING_STATE_SCHEMA_VERSION,
@@ -660,7 +659,7 @@ class PpeVisionFacade:
 
 
 class PrivacyRedactionFacade:
-    """Redacts YuNet faces with a per-person conservative fallback."""
+    """Redacts detected YuNet faces without a person-box fallback."""
 
     def __init__(
         self,
@@ -685,7 +684,7 @@ class PrivacyRedactionFacade:
         people: list[SnapshotPerson],
     ) -> PrivacyRedactionResult:
         if self._face_detector is None:
-            return redact_person_head_regions(frame, people)
+            return redact_identity_regions(frame, people, [])
         detector_failed = False
         try:
             faces = self._face_detector.detect(frame)
@@ -693,7 +692,7 @@ class PrivacyRedactionFacade:
             detector_failed = True
             faces = []
             logger.warning(
-                "YuNet face detection failed; using person-head fallback (%s).",
+                "YuNet face detection failed; snapshot will not be blurred (%s).",
                 type(exc).__name__,
             )
         return redact_identity_regions(

@@ -135,7 +135,7 @@ P-047/
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
 │   ├── face_detection.py # Thread-safe OpenCV YuNet provider
-│   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
+│   ├── pipeline.py      # Face blur and post-redaction annotation
 │   ├── tracking_state.py # Versioned JSON-safe ByteTrack continuation codec
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md

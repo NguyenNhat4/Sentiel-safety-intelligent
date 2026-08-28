@@ -33,7 +33,7 @@ def face(bbox: list[int], confidence: float = 0.9) -> dict:
     return {"bbox": bbox, "confidence": confidence}
 
 
-def test_person_head_fallback_redacts_a_person_without_a_detected_face():
+def test_no_detected_face_leaves_person_region_unchanged():
     frame = _patterned_frame()
 
     result = redact_person_head_regions(
@@ -41,13 +41,12 @@ def test_person_head_fallback_redacts_a_person_without_a_detected_face():
         [{"bbox": [20, 10, 80, 90], "confidence": 0.9, "inside_zone": False}],
     )
 
-    assert result["used_person_fallback"] is True
-    assert result["redacted_regions"] == [[20, 10, 80, 42]]
-    assert not np.array_equal(result["image"][10:42, 20:80], frame[10:42, 20:80])
-    assert np.array_equal(result["image"][42:90, 20:80], frame[42:90, 20:80])
+    assert result["used_person_fallback"] is False
+    assert result["redacted_regions"] == []
+    assert np.array_equal(result["image"], frame)
 
 
-def test_multiple_canonical_people_are_all_redacted():
+def test_multiple_people_remain_unchanged_without_detected_faces():
     frame = _patterned_frame()
     people = [
         {"bbox": [10, 10, 50, 90], "confidence": 0.9, "inside_zone": False},
@@ -56,10 +55,9 @@ def test_multiple_canonical_people_are_all_redacted():
 
     result = redact_person_head_regions(frame, people)
 
-    assert result["used_person_fallback"] is True
-    assert result["redacted_regions"] == [[10, 10, 50, 42], [65, 10, 110, 42]]
-    assert not np.array_equal(result["image"][10:42, 10:50], frame[10:42, 10:50])
-    assert not np.array_equal(result["image"][10:42, 65:110], frame[10:42, 65:110])
+    assert result["used_person_fallback"] is False
+    assert result["redacted_regions"] == []
+    assert np.array_equal(result["image"], frame)
 
 
 def test_yunet_face_is_expanded_and_replaces_person_fallback():
@@ -78,7 +76,7 @@ def test_yunet_face_is_expanded_and_replaces_person_fallback():
     assert np.array_equal(frame, original)
 
 
-def test_mixed_people_use_face_and_per_person_fallback():
+def test_detected_faces_are_blurred_without_person_fallback():
     frame = _patterned_frame()
     people = [
         {"bbox": [5, 5, 55, 95], "confidence": 0.9, "inside_zone": False},
@@ -87,20 +85,20 @@ def test_mixed_people_use_face_and_per_person_fallback():
 
     result = redact_identity_regions(frame, people, [face([20, 15, 40, 35])], face_margin_ratio=0.0)
 
-    assert result["redacted_regions"] == [[20, 15, 40, 35], [65, 10, 115, 42]]
+    assert result["redacted_regions"] == [[20, 15, 40, 35]]
     assert result["detected_face_count"] == 1
-    assert result["fallback_person_count"] == 1
-    assert result["used_person_fallback"] is True
+    assert result["fallback_person_count"] == 0
+    assert result["used_person_fallback"] is False
 
 
-def test_unassociated_face_is_blurred_while_person_still_falls_back():
+def test_unassociated_face_is_blurred_without_person_fallback():
     frame = _patterned_frame()
     people = [{"bbox": [10, 10, 50, 90], "confidence": 0.9, "inside_zone": False}]
 
     result = redact_identity_regions(frame, people, [face([80, 10, 110, 40])], face_margin_ratio=0.0)
 
-    assert result["redacted_regions"] == [[80, 10, 110, 40], [10, 10, 50, 42]]
-    assert result["fallback_person_count"] == 1
+    assert result["redacted_regions"] == [[80, 10, 110, 40]]
+    assert result["fallback_person_count"] == 0
 
 
 def test_multiple_faces_inside_one_person_do_not_trigger_fallback():
@@ -140,7 +138,7 @@ def test_face_margin_is_clamped_to_frame_bounds():
     assert result["redacted_regions"] == [[0, 0, 30, 30]]
 
 
-def test_yunet_error_falls_back_for_all_people_and_is_reported():
+def test_yunet_error_does_not_blur_and_is_reported():
     class FailingDetector:
         def preload(self):
             pass
@@ -153,9 +151,9 @@ def test_yunet_error_falls_back_for_all_people_and_is_reported():
 
     result = facade.redact_snapshot(_patterned_frame(), people)
 
-    assert result["redacted_regions"] == [[20, 10, 80, 42]]
+    assert result["redacted_regions"] == []
     assert result["face_detector_failed"] is True
-    assert result["fallback_person_count"] == 1
+    assert result["fallback_person_count"] == 0
 
 
 def test_yunet_runs_once_for_one_snapshot():
@@ -204,4 +202,5 @@ def test_snapshot_annotation_draws_person_and_hat_boxes_without_mutating_input()
     assert np.array_equal(frame, np.zeros((100, 120, 3), dtype=np.uint8))
     assert annotated[20, 10].tolist() == [64, 73, 255]
     assert annotated[30, 60].tolist() == [11, 158, 245]
+    assert annotated[95, 10].tolist() == [64, 73, 255]
     assert np.array_equal(annotated[0, 0], frame[0, 0])
