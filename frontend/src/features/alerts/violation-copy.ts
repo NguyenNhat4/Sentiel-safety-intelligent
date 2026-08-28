@@ -1,7 +1,7 @@
 export function violationRuleLabel(ruleKeys: string[]): string {
   const labels: string[] = [];
   if (ruleKeys.some(key => key.startsWith("restricted_area_person"))) labels.push("Người trong phạm vi hạn chế");
-  else if (ruleKeys.some(key => key.startsWith("zone_intrusion"))) labels.push("Xâm nhập vùng nguy hiểm");
+  else if (ruleKeys.some(key => key.startsWith("zone_intrusion"))) labels.push("Xâm nhập vùng cấm");
 
   const missingHat = ruleKeys.includes("missing_ppe:hat");
   const missingVest = ruleKeys.includes("missing_ppe:vest");
@@ -15,7 +15,7 @@ export function violationRuleLabel(ruleKeys: string[]): string {
 export function violationRuleItemLabel(ruleKey: string): string {
   if (ruleKey === "missing_ppe:hat") return "Thiếu mũ bảo hộ";
   if (ruleKey === "missing_ppe:vest") return "Thiếu áo phản quang";
-  if (ruleKey.startsWith("zone_intrusion")) return "Xâm nhập vùng nguy hiểm";
+  if (ruleKey.startsWith("zone_intrusion")) return "Xâm nhập vùng cấm";
   if (ruleKey.startsWith("restricted_area_person")) return "Người trong phạm vi hạn chế";
   return ruleKey;
 }

@@ -2,6 +2,11 @@
 
 Updated: 2026-08-27
 
+### 2026-08-28 Restricted-area wording
+
+- [Frontend] Đổi toàn bộ nhãn hiển thị còn sót lại từ “vùng nguy hiểm” thành “vùng cấm” trong Live Monitor và violation copy; giữ nguyên rule key `zone_intrusion` và runtime contract.
+- [Verification] Focused wording test pass 3/3; frontend lint, type-check, production build và `git diff --check` pass. Railway release chưa vượt qua gate `backend/tests/test_us29_media_runtime.py` sau khoảng 30 giây nên chưa build/push/redeploy; production chưa thay đổi.
+
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
 ## Current State
