@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from "react";
 import {assetUrl} from "../../api/config";
 import {loadEventDetail} from "../../api/events";
 import type {EventDetail, StoredDecisionContext} from "../../types";
+import {SnapshotZoneOverlay} from "../alerts/SnapshotZoneOverlay";
 import {violationRuleItemLabel} from "../alerts/violation-copy";
 import "./event-detail.css";
 
@@ -76,7 +77,9 @@ function EventDetailContent({detail}: {detail: EventDetail}) {
       <p>{renderHighlightedSummary(detail.summary.text, context?.human_review.actor_name)}</p>
     </section>
     {snapshot ? (
-      <img className="event-detail-snapshot" src={snapshot} alt={`Snapshot đã làm mờ của sự kiện ${detail.id}`} />
+      <div className="event-detail-snapshot event-detail-snapshot-overlay">
+        <SnapshotZoneOverlay snapshot={snapshot} alt={`Snapshot đã làm mờ của sự kiện ${detail.id}`} zones={context?.scene.zone_points.length === 4 ? [{zone_id: context.scene.zone_id, display_name: context.scene.zone_name, points: context.scene.zone_points, enabled: true, order: 0}] : []} />
+      </div>
     ) : null}
     {context ? <AuditChain context={context} /> : <section className="event-limited-audit">
       <h3>Audit hạn chế</h3>

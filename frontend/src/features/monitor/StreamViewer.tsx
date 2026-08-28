@@ -281,6 +281,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       onClose={closeReview}
       snapshot={pendingReview?.snapshot_data}
       people={pendingReview?.people}
+      zones={pendingReview ? configurations[pendingReview.camera_id]?.zones : undefined}
       timer={reviewTimer}
       reviewSaving={reviewSaving}
       alertTitle={reviewTitle}

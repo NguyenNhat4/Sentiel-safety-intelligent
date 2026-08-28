@@ -30,7 +30,7 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-28: [Frontend] Review snapshot uses backend annotation only
 
 - Review Modal và Event Detail hiển thị trực tiếp snapshot đã được backend annotate.
-- Không render box, label hoặc zone SVG ở các màn hình snapshot vi phạm; `DetectionOverlay` chỉ còn dùng cho Live Monitor trên media trực tiếp.
+- Không render person/PPE box hoặc confidence label ở các màn hình snapshot vi phạm; zone polygon và tên zone vẫn được render bằng overlay SVG riêng. `DetectionOverlay` chỉ dùng cho Live Monitor trên media trực tiếp.
 - Label snapshot đặt ở cạnh dưới box; khi chạm mép ảnh thì label được giữ trong frame.
 
 ### 2026-08-27: [Backend/Frontend] Media playback routing follows the asset storage backend

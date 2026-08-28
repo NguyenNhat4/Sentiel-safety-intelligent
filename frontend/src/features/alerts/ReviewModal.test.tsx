@@ -62,7 +62,9 @@ describe("ReviewModal", () => {
             vest: {status: "unknown", confidence: null},
           },
           missing_required_ppe: [],
+          active_violations: [{occurrence_id: "occ-1", rule_key: "zone_intrusion", zone_id: "zone_01", is_new: true}],
         }]}
+        zones={[{zone_id: "zone_01", display_name: "Khu vực máy dập", enabled: true, order: 0, points: [{x: 0.1, y: 0.2}, {x: 0.8, y: 0.2}, {x: 0.8, y: 0.9}, {x: 0.1, y: 0.9}]}]}
         timer="00:12"
         reviewSaving={false}
         alertTitle="Review"
@@ -72,8 +74,12 @@ describe("ReviewModal", () => {
     );
 
     expect(screen.getByRole("img", {name: "Khung hình vi phạm cần xác minh"})).toHaveAttribute("src", "data:image/jpeg;base64,1234");
+    const image = screen.getByRole("img", {name: "Khung hình vi phạm cần xác minh"});
+    Object.defineProperties(image, {naturalWidth: {configurable: true, value: 100}, naturalHeight: {configurable: true, value: 100}});
+    fireEvent.load(image);
+    expect(screen.getByTestId("snapshot-zone")).toBeInTheDocument();
+    expect(screen.getByText("Khu vực máy dập")).toBeInTheDocument();
     expect(screen.queryByTestId("snapshot-box")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("snapshot-zone")).not.toBeInTheDocument();
     expect(screen.queryByRole("graphics-document")).not.toBeInTheDocument();
   });
 });

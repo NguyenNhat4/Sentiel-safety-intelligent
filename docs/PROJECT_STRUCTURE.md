@@ -167,7 +167,7 @@ P-047/
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
 │   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── alerts/  # Rule result, pending list, PPE toast and ReviewModal
+│   │   │   ├── alerts/  # Rule result, pending list, PPE toast, ReviewModal and zone-only snapshot overlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx
