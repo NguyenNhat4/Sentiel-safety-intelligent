@@ -10,7 +10,7 @@ interface CameraConfigurationPageProps { cameraId: string; active?: boolean; sho
 
 const EMPTY_RULES: PpeRequirementUpdate = {profile: "hat_vest_v1", hat_required: false, vest_required: false, restricted_area_detection_enabled: false, zone_intrusion_enabled: true};
 
-export function CameraConfigurationPage({cameraId, active = true, showTitle = true, onBack, onSaved, onDirtyChange}: CameraConfigurationPageProps) {
+export function CameraConfigurationPage({cameraId, active = true, showTitle = true, onBack, onDirtyChange}: CameraConfigurationPageProps) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [saved, setSaved] = useState<CameraConfiguration>();
   const [draft, setDraft] = useState<CameraConfiguration>();
@@ -21,6 +21,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   const savingRef = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
   const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
 
   useEffect(() => {
@@ -52,6 +53,12 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
     };
   }, [dirty, onDirtyChange]);
 
+  useEffect(() => {
+    if (!saveNotice) return;
+    const timer = window.setTimeout(() => setSaveNotice(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [saveNotice]);
+
   if (loading || !draft || !saved) return <section className={`camera-config-page page ${active ? "active" : ""}`} role="status">{error || `Đang tải cấu hình Camera ${cameraNumber(cameraId)}…`}</section>;
 
   const selectedZone = draft.zones.find(zone => zone.zone_id === selectedZoneId);
@@ -70,7 +77,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
 
   function updateDraft(update: Partial<CameraConfiguration>) {
     setDraft(current => current ? {...current, ...update} : current);
-    setError(""); setMessage("");
+    setError(""); setMessage(""); setSaveNotice("");
   }
   function updateSelected(update: Partial<CameraConfigurationZone>) { updateDraft({zones: draft!.zones.map(zone => zone.zone_id === selectedZoneId ? {...zone, ...update} : zone)}); }
   function updateRules(update: Partial<PpeRequirementUpdate>) {
@@ -111,8 +118,8 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
     if (savingRef.current || !currentDraft || incomplete || conflict) return;
     savingRef.current = true; setSaving(true); setError(""); setMessage("");
     try {
-      await saveCameraConfiguration(cameraId, {expected_revision: currentDraft.revision, asset_id: currentDraft.asset_id, machine_state: currentDraft.machine_state, ppe_requirements: currentDraft.ppe_requirements, zones: currentDraft.zones.map((zone, order) => ({...zone, order}))});
-      onSaved();
+      const persisted = await saveCameraConfiguration(cameraId, configurationUpdate(currentDraft));
+      setSaved(persisted); setDraft(persisted); setSaveNotice("Đã lưu");
     } catch (reason) { setError(errorText(reason, "Không thể lưu cấu hình camera.")); }
     finally { savingRef.current = false; setSaving(false); }
   }
@@ -159,6 +166,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
     </div>
     <div className="camera-config-footer"><div className={`camera-save-state ${dirty && !incomplete && !conflict ? "is-ready" : ""}`}><strong>{dirty ? "Cấu hình chưa lưu" : "Cấu hình đã đồng bộ"}</strong><small>{saveBlocker}</small></div><div className="zone-save-actions"><button type="button" className="secondary-btn" onClick={leavePage}>Quay lại</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div>
     </div>
+    {saveNotice && <aside className="toast show camera-config-save-toast" role="status" aria-live="polite"><span aria-hidden="true">✓</span><div><strong>{saveNotice}</strong></div></aside>}
   </section>;
 }
 
@@ -166,3 +174,6 @@ function RuleSwitch({label, checked, onChange}: {label: string; checked: boolean
 function cameraNumber(cameraId: string): string { return cameraId.replace("cam_", ""); }
 function clamp(value: number): number { return Math.max(0, Math.min(1, value)); }
 function errorText(reason: unknown, fallback: string): string { return reason instanceof Error ? reason.message : fallback; }
+function configurationUpdate(configuration: CameraConfiguration) {
+  return {expected_revision: configuration.revision, asset_id: configuration.asset_id, machine_state: configuration.machine_state, ppe_requirements: configuration.ppe_requirements, zones: configuration.zones.map((zone, order) => ({...zone, order}))};
+}

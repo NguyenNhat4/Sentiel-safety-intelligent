@@ -42,9 +42,10 @@ it("loads the exact camera prop with READY media and no camera selector", async 
   expect(screen.getByText("Camera đã kết nối")).toBeInTheDocument();
 });
 
-it("saves asset, machine, zones and PPE once then returns without starting inference", async () => {
+it("saves asset, machine, zones and PPE once and clears the dirty draft", async () => {
   const onSaved = vi.fn();
-  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+  const onBack = vi.fn();
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={onSaved} />);
   fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
   fireEvent.click(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"}));
   const save = screen.getByRole("button", {name: "Lưu cấu hình"});
@@ -55,7 +56,11 @@ it("saves asset, machine, zones and PPE once then returns without starting infer
     ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true}),
     zones: [expect.objectContaining({zone_id: "press", ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true, zone_intrusion_enabled: true})})],
   }));
-  expect(onSaved).toHaveBeenCalledOnce();
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+  expect(onSaved).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  expect(onBack).toHaveBeenCalledOnce();
 });
 
 it("loads persisted hat and vest requirements as enabled", async () => {
@@ -152,23 +157,26 @@ it("saves camera-wide PPE without requiring a zone", async () => {
     ppe_requirements: expect.objectContaining({hat_required: true, vest_required: false}),
     zones: [],
   })));
-  expect(onSaved).toHaveBeenCalledOnce();
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  expect(onSaved).not.toHaveBeenCalled();
 });
 
 it("allows disconnecting camera source and saves asset_id as null", async () => {
-  const onSaved = vi.fn();
-  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+  const onBack = vi.fn();
+  saveMock.mockResolvedValue({...configuration, revision: 8, asset_id: null});
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={vi.fn()} />);
   const disconnectBtn = await screen.findByRole("button", {name: "Ngắt kết nối nguồn media"});
   expect(disconnectBtn).toBeInTheDocument();
   fireEvent.click(disconnectBtn);
 
   expect(screen.queryByRole("button", {name: "Ngắt kết nối nguồn media"})).not.toBeInTheDocument();
   expect(screen.getByText("Chọn media để xem preview và vẽ vùng.")).toBeInTheDocument();
+  const saveButton = screen.getByRole("button", {name: "Lưu cấu hình"});
+  expect(saveButton).toBeEnabled();
+  fireEvent.click(saveButton);
 
-  const saveBtn = screen.getByRole("button", {name: "Lưu cấu hình"});
-  expect(saveBtn).toBeEnabled();
-  fireEvent.click(saveBtn);
-  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
-    asset_id: null,
-  })));
+  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({asset_id: null})));
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  expect(onBack).toHaveBeenCalledOnce();
 });

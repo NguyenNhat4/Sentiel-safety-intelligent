@@ -2,6 +2,21 @@
 
 Updated: 2026-08-27
 
+### 2026-08-28 Stopped-machine PPE warning emphasis
+
+- [Frontend] Khi máy ở trạng thái TẮT, thông báo PPE tạm ngừng kiểm tra dùng chữ đỏ đậm, nền đỏ nhạt và viền cảnh báo để thu hút sự chú ý; trạng thái BẬT giữ màu xanh hiện hành.
+- [Verification] Camera configuration focused tests pass 10/10; frontend lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Live Monitor HITL panel alignment
+
+- [Frontend] Panel HUMAN IN THE LOOP căn các hàng nội dung lên đầu card, không còn để CSS Grid kéo giãn khiến tiêu đề và trạng thái rỗng nằm giữa theo chiều dọc.
+- [Verification] Full frontend suite pass 99/99; lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Camera configuration save feedback
+
+- [Frontend] Sau khi người dùng bấm Lưu cấu hình và API thành công, trang cập nhật draft cùng revision từ response và hiện toast “Đã lưu”; Quay lại Live Monitor sau đó không còn bị chặn sai bởi cảnh báo draft chưa lưu. Luồng vẫn giữ nút lưu thủ công, không tự lưu khi chọn nguồn camera.
+- [Verification] Camera configuration focused tests pass 10/10; full frontend suite pass 99/99; frontend lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
 ### 2026-08-28 Live Monitor viewport-fit camera grid
 
 - [Frontend] Trên desktop từ `1181px`, Live Monitor khóa trong một viewport, chia phần camera thành grid 2x2 có bốn ô cao bằng nhau và giữ media `object-fit: contain`; danh sách cảnh báo dùng chiều cao còn lại và cuộn độc lập. Dưới breakpoint này, layout tiếp tục xếp dọc và cuộn trang như trước để không ép nhỏ camera trên tablet/mobile.

@@ -47,4 +47,5 @@ main.camera-config-main>header .eyebrow{font-size:9px;color:var(--green);margin:
 .unsaved-dialog-actions .secondary-btn:focus-visible,.unsaved-dialog-actions .discard-changes-btn:focus-visible{outline:3px solid #2f73e833;outline-offset:2px}
 .discard-changes-btn{border:1px solid #c94747;color:#fff;background:#c94747}
 .discard-changes-btn:hover{background:#af3636}
+.camera-config-main .machine-state-options:has(button:last-child[aria-pressed="true"])+.machine-state-description{padding:9px 10px;border-left:3px solid #dc2626;border-radius:3px;background:#fff1f1;color:#c81e1e;font-weight:800}
 @media(max-width:480px){.unsaved-dialog{grid-template-columns:1fr;padding:18px}.unsaved-dialog-actions{display:grid;grid-template-columns:1fr}.unsaved-dialog-actions button{width:100%}}
