@@ -2,9 +2,14 @@
 
 Updated: 2026-08-27
 
+### 2026-08-28 Live Monitor viewport-fit camera grid
+
+- [Frontend] Trên desktop từ `1181px`, Live Monitor khóa trong một viewport, chia phần camera thành grid 2x2 có bốn ô cao bằng nhau và giữ media `object-fit: contain`; danh sách cảnh báo dùng chiều cao còn lại và cuộn độc lập. Dưới breakpoint này, layout tiếp tục xếp dọc và cuộn trang như trước để không ép nhỏ camera trên tablet/mobile.
+- [Verification] Focused App/Live Monitor tests pass 19/19; full frontend suite pass 99/99; lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
 ### 2026-08-28 Camera configuration shell alignment
 
-- [Frontend] Giữ nguyên shared sidebar/shell trên màn cấu hình Camera để đồng bộ navigation, profile và trạng thái thu gọn với các trang khác; chỉ áp dụng layout compact cho phần cấu hình bên phải, với preview chữ nhật `3:2` và các control xếp dọc. Card trạng thái máy dùng segmented control BẬT/TẮT có vùng bấm lớn, `aria-pressed`, focus ring và mô tả trạng thái rõ ràng. Badge preview phản ánh kết nối camera độc lập với trạng thái máy; luồng vùng hiển thị tiến độ 0/4–4/4, hướng dẫn tại chỗ và thao tác xóa; footer giải thích save blocker; PPE bỏ nhãn ON/OFF trùng lặp. Draft chưa lưu được bảo vệ khi bấm Quay lại, điều hướng sidebar, reload hoặc đóng tab bằng xác nhận bỏ thay đổi.
+- [Frontend] Giữ nguyên shared sidebar/shell trên màn cấu hình Camera để đồng bộ navigation, profile và trạng thái thu gọn với các trang khác; chỉ áp dụng layout compact cho phần cấu hình bên phải, với preview chữ nhật `3:2` và các control xếp dọc. Card trạng thái máy dùng segmented control BẬT/TẮT có vùng bấm lớn, `aria-pressed`, focus ring và mô tả trạng thái rõ ràng. Badge preview phản ánh kết nối camera độc lập với trạng thái máy; luồng vùng hiển thị tiến độ 0/4–4/4, hướng dẫn tại chỗ và thao tác xóa; footer giải thích save blocker; PPE bỏ nhãn ON/OFF trùng lặp. Quay lại, sidebar và đăng xuất dùng modal Sentinel để xác nhận bỏ draft chưa lưu; reload/đóng tab giữ cảnh báo native bắt buộc của trình duyệt.
 - [Verification] Camera configuration focused tests pass 10/10; frontend lint, type-check, production build và `git diff --check` pass. Full frontend suite gần nhất pass 94/95; một assertion Live Monitor cũ vẫn chờ cập nhật theo wording hiện hành và không liên quan thay đổi layout. Docker build đã được hủy trước push/redeploy theo yêu cầu; Railway production không thay đổi.
 
 ### 2026-08-28 Restricted-area wording
