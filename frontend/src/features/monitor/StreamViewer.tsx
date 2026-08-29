@@ -255,7 +255,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 
   return <div className="monitor-stream-shell">
-    <div className="monitor-actions"><div>{canConfigure && <p className="monitor-config-hint">Đã upload video? Bấm vào camera, sau đó bấm vào camera thêm một lần nữa để mở cấu hình.</p>}</div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
+    <div className="monitor-actions"><div>{canConfigure && <p className="monitor-config-hint">Đã upload video? Bấm vào camera để mở cấu hình.</p>}</div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
     {error && <p className="stream-config-error" role="alert">{error}</p>}
     <div className="monitor-workspace"><div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => {
       const configuration = configurations[cameraId];
@@ -281,7 +281,6 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       onClose={closeReview}
       snapshot={pendingReview?.snapshot_data}
       people={pendingReview?.people}
-      detections={pendingReview?.detections}
       zones={pendingReview ? configurations[pendingReview.camera_id]?.zones : undefined}
       timer={reviewTimer}
       reviewSaving={reviewSaving}

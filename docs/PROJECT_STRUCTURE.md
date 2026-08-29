@@ -135,7 +135,7 @@ P-047/
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
 │   ├── face_detection.py # Thread-safe OpenCV YuNet provider
-│   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
+│   ├── pipeline.py      # Face blur and post-redaction annotation
 │   ├── tracking_state.py # Versioned JSON-safe ByteTrack continuation codec
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
@@ -167,7 +167,7 @@ P-047/
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
 │   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── alerts/  # Rule result, pending list, PPE toast, ReviewModal, and SnapshotOverlay
+│   │   │   ├── alerts/  # Rule result, pending list, PPE toast, ReviewModal and zone-only snapshot overlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx

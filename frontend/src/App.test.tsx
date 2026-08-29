@@ -174,12 +174,14 @@ describe("Sentinel React application", () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
+    expect(screen.getByRole("main")).toHaveClass("monitor-main");
     expect(screen.queryByRole("button", {name: /Quan sát hệ thống/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
+    expect(screen.getByRole("main")).not.toHaveClass("monitor-main");
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
     expect(await screen.findAllByText("Bấm vào đây để cấu hình")).toHaveLength(4);
-    expect(screen.getByText(/Đã upload video.*bấm vào camera thêm một lần nữa để mở cấu hình/i)).toBeInTheDocument();
+    expect(screen.getByText(/Đã upload video.*bấm vào camera để mở cấu hình/i)).toBeInTheDocument();
     expect(screen.queryByText("Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.")).not.toBeInTheDocument();
   });
 
@@ -194,6 +196,24 @@ describe("Sentinel React application", () => {
     expect(await screen.findByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
     expect(screen.queryAllByText("Cấu hình Camera 2")).toHaveLength(1);
     expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
+  });
+
+  it("shows a branded confirmation before discarding an unsaved camera draft", async () => {
+    mockAuthenticatedSession();
+    render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+    fireEvent.click(await screen.findByRole("button", {name: "Cấu hình Camera 2"}));
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    const dialog = await screen.findByRole("alertdialog", {name: "Bạn chưa lưu thay đổi"});
+    expect(dialog).toHaveTextContent("Các thay đổi trong cấu hình Camera sẽ bị mất");
+    fireEvent.click(screen.getByRole("button", {name: "Tiếp tục chỉnh sửa"}));
+    expect(screen.getByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    fireEvent.click(await screen.findByRole("button", {name: "Bỏ thay đổi"}));
+    expect(await screen.findByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument();
   });
 
   it("does not render the removed local video upload controls", async () => {

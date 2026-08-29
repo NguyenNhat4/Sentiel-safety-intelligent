@@ -12,7 +12,7 @@
 - **Scope Alignment**: We are in the MVP phase; scope is defined in [`specs/PRD.md`](specs/PRD.md). If a request is out of scope, ask questions for clarification.
 - **Central Tracking**: The repository has exactly one root [`DECISIONS.md`](DECISIONS.md) and one root [`PROGRESS.md`](PROGRESS.md). Record every module's decisions and progress there using an owning-area label such as `[Backend]`, `[Frontend]`, `[Vision]`, or `[Cross-cutting]`. Do not create module-level `DECISIONS.md` or `PROGRESS.md` files.
 - **Dont read `src` folder when im not directly ask for it. **
-- **Railway Deployment Workflow**: Code is currently deployed on Railway. The current workflow requires completing code changes and deploying to Railway (no local runtime execution).
+- **Railway Deployment Workflow**: Code is currently deployed on Railway. Never build, push, redeploy, or otherwise mutate Railway/production unless the user explicitly requests deployment in the current conversation. A code-change request alone does not authorize deployment. By default, stop after the applicable local checks/build and report that deployment was not run.
 
 ### Target Structure Compliance
 
@@ -26,7 +26,7 @@ When implementing code, agents must interpret `docs/FUTURE_PROJECT_STRUCTURE.md`
 6. Boundary/provider folders must include their required `README.md`, tests must live in the documented test layer, and the actual filesystem change must be reflected in `docs/PROJECT_STRUCTURE.md`.
 7. If no single owner/layer can be identified, or the task requires a new top-level directory, do not invent a boundary. Report the ambiguity and request a decision from the user.
 8. Existing code outside the target layout is not permission for a broad refactor. Preserve current contracts and migrate incrementally unless the user explicitly scopes a larger migration.
-9. Updated code: after completing code changes, deploy to Railway environment (no local runtime execution).
+9. Updated code: run the applicable local checks/build. Deploy to Railway only when the user explicitly requests deployment in the current conversation; otherwise report that deployment was not run.
 ---
 
 ## Session Workflow

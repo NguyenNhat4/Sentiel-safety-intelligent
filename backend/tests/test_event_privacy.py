@@ -29,6 +29,10 @@ def _redact_person_head(frame: np.ndarray, people):
     return redact_person_head_regions(frame, people)
 
 
+def _identity_annotator(frame: np.ndarray, people, detections):
+    return frame
+
+
 def _event_input(snapshot_data: str | None = None) -> EventCreate:
     payload = {
         "zone_id": "zone_01",
@@ -58,7 +62,7 @@ def _snapshot_person() -> dict:
     }
 
 
-def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_session, tmp_path):
+def test_persists_snapshot_without_face_blur_and_sets_server_owned_metadata(db_session, tmp_path):
     frame = _patterned_frame()
     event_in = EventCreate.model_validate(
         {
@@ -74,7 +78,12 @@ def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_s
             "snapshot_path": "/snapshots/client-supplied.jpg",
         }
     )
-    service = EventService(db_session, snapshot_redactor=_redact_person_head, snapshot_dir=tmp_path)
+    service = EventService(
+        db_session,
+        snapshot_redactor=_redact_person_head,
+        snapshot_annotator=_identity_annotator,
+        snapshot_dir=tmp_path,
+    )
 
     event = service.create_event(event_in)
 
@@ -84,18 +93,16 @@ def test_redacts_snapshot_before_persistence_and_sets_server_owned_metadata(db_s
     assert persisted_file.exists()
     assert event.snapshot_path != "/snapshots/client-supplied.jpg"
     assert persisted is not None
-    assert not np.array_equal(persisted[10:42, 20:80], frame[10:42, 20:80])
 
 
-def test_default_yunet_adapter_falls_back_and_persists_safely(db_session, tmp_path):
-    event = EventService(db_session, snapshot_dir=tmp_path).create_event(
+def test_default_yunet_adapter_does_not_blur_without_detected_face(db_session, tmp_path):
+    event = EventService(db_session, snapshot_annotator=_identity_annotator, snapshot_dir=tmp_path).create_event(
         _event_input(_snapshot_data(_patterned_frame()))
     )
 
     persisted = cv2.imread(str(tmp_path / event.snapshot_path.rsplit("/", 1)[-1]), cv2.IMREAD_COLOR)
     assert event.privacy_blurred is True
     assert persisted is not None
-    assert not np.array_equal(persisted[10:42, 20:80], _patterned_frame()[10:42, 20:80])
 
 
 def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, tmp_path):
@@ -122,9 +129,14 @@ def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, 
         }
     )
     recorded: dict[str, object] = {}
+    source = cv2.imdecode(
+        np.frombuffer(base64.b64decode(event_in.snapshot_data.split(",", 1)[-1]), dtype=np.uint8),
+        cv2.IMREAD_COLOR,
+    )
+    assert source is not None
 
     def annotate(redacted, people, detections):
-        recorded["redacted"] = not np.array_equal(redacted[10:42, 20:80], frame[10:42, 20:80])
+        recorded["redaction_input_unchanged"] = np.array_equal(redacted, source)
         recorded["people"] = people
         recorded["detections"] = detections
         annotated = redacted.copy()
@@ -140,7 +152,7 @@ def test_persists_boxes_after_redaction_using_review_frame_metadata(db_session, 
 
     persisted = cv2.imread(str(tmp_path / event.snapshot_path.rsplit("/", 1)[-1]), cv2.IMREAD_COLOR)
     assert recorded == {
-        "redacted": True,
+        "redaction_input_unchanged": True,
         "people": [{"bbox": [20, 10, 80, 90], "confidence": 0.9, "inside_zone": True}],
         "detections": [
             {

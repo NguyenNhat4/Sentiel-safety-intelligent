@@ -15,6 +15,7 @@ const detail: EventDetail = {
   severity: "high",
   status: "acknowledged",
   acknowledged_by: "Nguyễn Anh Tuấn",
+  snapshot_path: "/snapshots/event-42.jpg",
   decision_context: {
     schema_version: "decision_context_v1",
     rule: {
@@ -88,6 +89,12 @@ describe("EventDetailDialog", () => {
     expect(screen.getByText(/Nguồn: Mẫu xác định/)).toBeInTheDocument();
     expect(screen.getByText("xâm nhập vùng")).toHaveProperty("tagName", "STRONG");
     expect(screen.getAllByText("Nguyễn Anh Tuấn").every(element => element.tagName === "STRONG")).toBe(true);
+    const image = screen.getByRole("img", {name: "Snapshot đã làm mờ của sự kiện 42"});
+    Object.defineProperties(image, {naturalWidth: {configurable: true, value: 100}, naturalHeight: {configurable: true, value: 100}});
+    fireEvent.load(image);
+    expect(screen.getByTestId("snapshot-zone")).toBeInTheDocument();
+    expect(screen.getAllByText("Máy dập A").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByTestId("snapshot-box")).not.toBeInTheDocument();
   });
 
   it("shows a limited-audit explanation for legacy events", async () => {

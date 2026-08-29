@@ -13,4 +13,9 @@ describe("violation copy", () => {
     expect(violationRuleItemLabel("missing_ppe:hat")).toBe("Thiếu mũ bảo hộ");
     expect(violationRuleItemLabel("missing_ppe:vest")).toBe("Thiếu áo phản quang");
   });
+
+  it("uses the restricted-area product wording", () => {
+    expect(violationRuleLabel(["zone_intrusion:zone_01"])).toBe("Xâm nhập vùng cấm");
+    expect(violationRuleItemLabel("zone_intrusion:zone_01")).toBe("Xâm nhập vùng cấm");
+  });
 });

@@ -6,7 +6,7 @@ Runtime sử dụng `vision.api.PpeVisionFacade` với checkpoint duy nhất `yo
 
 Facade nhận compute device tùy chọn và truyền cùng device vào cả `predict` lẫn `track`. Worker CPU không đặt device nên giữ hành vi hiện tại; image RunPod GPU đặt `VISION_DEVICE=cuda:0` và từ chối startup nếu CUDA không khả dụng, tránh âm thầm fallback sang CPU.
 
-Privacy không phụ thuộc model PPE. `PrivacyRedactionFacade` chạy OpenCV YuNet đúng một lần trên snapshot, mở rộng và làm mờ mọi face box, rồi làm mờ 40% phía trên riêng từng person canonical không có face tương ứng. Nếu YuNet lỗi, mọi person dùng fallback; nếu không có person box hợp lệ thì facade fail-closed và backend không lưu snapshot. Pipeline chỉ annotate person/`hat`/`vest` trên frame **đã** redact, không quyết định safety rule và không mutate ảnh đầu vào.
+Privacy không phụ thuộc model PPE. `PrivacyRedactionFacade` chạy OpenCV YuNet đúng một lần trên snapshot và chỉ mở rộng/làm mờ các face box được phát hiện. Nếu không phát hiện được mặt hoặc YuNet lỗi thì không blur fallback; trạng thái lỗi vẫn được ghi nhận qua operational metrics. Nếu không có person box hợp lệ thì facade fail-closed và backend không lưu snapshot. Pipeline chỉ annotate person/`hat`/`vest` trên frame **đã** xử lý, không quyết định safety rule và không mutate ảnh đầu vào.
 
 ByteTrack được tích hợp trong cùng facade/model call. Local và worker v1 giữ mỗi monitoring session trong RAM, gọi frame liên tiếp bằng `persist=True`, và tự hết hạn sau TTL. Worker v2 dùng fresh tracker cho từng request rồi restore/export state rõ ràng. `track_id` chỉ là association kỹ thuật trong phiên; vision không nhận diện danh tính và không quyết định occurrence/event.
 

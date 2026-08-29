@@ -41,7 +41,7 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
         <button className="logout-button" aria-label="Đăng xuất" onClick={onLogout}>Đăng xuất</button>
       </div>
     </aside>
-    <main className={sidebarCollapsed ? "sidebar-collapsed" : ""}>
+    <main className={`${sidebarCollapsed ? "sidebar-collapsed" : ""} ${page === "monitor" ? "monitor-main" : ""} ${page === "camera-config" ? "camera-config-main" : ""}`}>
       <header>
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
       </header>
