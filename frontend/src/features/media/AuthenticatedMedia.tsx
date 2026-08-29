@@ -18,8 +18,7 @@ type VideoFrameElement = HTMLVideoElement & {
   cancelVideoFrameCallback?: (handle: number) => void;
 };
 
-export function AuthenticatedMedia({assetId, mediaType, label, playing = false, playbackKey = "", onPlaybackTime, onEnded}: AuthenticatedMediaProps) {
-export function AuthenticatedMedia({assetId, mediaType, storageBackend, label, playing = false, playbackKey = "", onEnded}: AuthenticatedMediaProps) {
+export function AuthenticatedMedia({assetId, mediaType, storageBackend, label, playing = false, playbackKey = "", onPlaybackTime, onEnded}: AuthenticatedMediaProps) {
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);

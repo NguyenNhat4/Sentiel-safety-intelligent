@@ -45,6 +45,11 @@ Updated: 2026-08-27
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
+### 2026-08-29 Frontend merge-conflict repair
+
+- [Frontend] Hợp nhất hai thay đổi bị dán chồng trong `AuthenticatedMedia` và `StreamViewer`: giữ đồng thời định tuyến `storageBackend` và callback `onPlaybackTime` để tải media đúng backend và đồng bộ overlay theo thời gian phát.
+- [Verification] Frontend type-check, production build, toàn bộ 105 test frontend và `git diff --check` pass.
+
 ## Current State
 
 ### 2026-08-25 YOLO11n Safety KD experiment
