@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-25
+Updated: 2026-08-28
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -46,6 +46,12 @@ This file contains only decisions that currently constrain implementation. Super
 - Backend verifies object size/type and decodes the first frame before `READY`. PostgreSQL stores each asset's canonical backend/key; legacy volume rows remain readable until the one-time copy migration completes.
 - Playback uses a short-lived presigned GET so video byte ranges bypass the application service. `MEDIA_ASSET_DIR` remains a server-owned OpenCV read-through cache.
 - Run starts fresh inference for every valid configured camera. Replay starts only the selected camera and its new session ID resets playback, tracking and overlays.
+
+### 2026-08-28: [Frontend] Playback-time-gated detection overlays
+
+- Direct-camera video results are buffered per camera/session and are rendered only when the browser's presented media time is within 200 ms of `camera_inference_result.video_time`.
+- `requestVideoFrameCallback` supplies presented-frame time when available; metadata/time-update events are the compatibility fallback. Results outside the synchronization window are not drawn, and old buffered results are discarded.
+- Images still render their one inference result immediately. Session lifecycle, rolling FPS, and HITL review delivery remain immediate and are not delayed by visual overlay synchronization.
 
 ### 2026-08-24: [Backend/Frontend] Camera-wide PPE and deterministic HITL persistence
 

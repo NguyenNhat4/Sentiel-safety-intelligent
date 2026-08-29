@@ -14,6 +14,8 @@ import {buildEventPayload} from "./use-monitor";
 import "./stream.css";
 
 export const CAMERA_IDS = ["cam_1", "cam_2", "cam_3", "cam_4"] as const;
+const DETECTION_SYNC_TOLERANCE_SECONDS = 0.2;
+const MAX_BUFFERED_DETECTIONS_PER_CAMERA = 240;
 
 export function StreamViewer({active = true, role, onConfigure}: {active?: boolean; role: UserRole; onConfigure: (cameraId: string) => void}) {
   const canConfigure = role === "safety_manager";
@@ -38,6 +40,9 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
   const reviewQueueRef = useRef<CameraInferenceResult[]>([]);
   const seenReviewOccurrencesRef = useRef(new Set<string>());
+  const detectionBuffersRef = useRef<Record<string, CameraInferenceResult[]>>({});
+  const playbackTimesRef = useRef<Record<string, number>>({});
+  const displayedDetectionKeysRef = useRef<Record<string, string>>({});
   sessionsRef.current = sessions;
   configurationsRef.current = configurations;
 
@@ -94,9 +99,11 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
         const updated = {...current, status: result.session_status, inference_fps: result.inference_fps};
         sessionsRef.current = {...sessionsRef.current, [result.camera_id]: updated};
         if (result.session_status === "ERROR") {
-          setDetections(values => without(values, result.camera_id));
+          clearDetectionSync(result.camera_id);
+        } else if (result.media_type === "image") {
+          showSynchronizedDetection(result.camera_id, result);
         } else {
-          setDetections(values => ({...values, [result.camera_id]: result}));
+          bufferDetection(result);
         }
         if (result.review_required) enqueueReview(result);
         setSessions(values => ({...values, [result.camera_id]: updated}));
@@ -107,7 +114,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
         const updated = {...current, status: status.session_status, inference_fps: status.inference_fps, error_code: status.error_code ?? null};
         sessionsRef.current = {...sessionsRef.current, [status.camera_id]: updated};
         setSessions(values => ({...values, [status.camera_id]: updated}));
-        if (status.session_status === "ERROR") setDetections(values => without(values, status.camera_id));
+        if (status.session_status === "ERROR") clearDetectionSync(status.camera_id);
       },
       onFailure: message => { setError(message); scheduleRetry(); },
     });
@@ -120,12 +127,18 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   function applySessions(next: CameraSession[]) {
     const compatible = next.filter(session => configurationsRef.current[session.camera_id]?.asset_id === session.asset_id);
     const indexed = indexLatestBy(compatible, "camera_id");
+    const previousSessions = sessionsRef.current;
     setDetections(current => {
       const retained = {...current};
       for (const cameraId of CAMERA_IDS) {
-        const previous = sessionsRef.current[cameraId];
+        const previous = previousSessions[cameraId];
         const incoming = indexed[cameraId];
-        if (!incoming || incoming.status === "ERROR" || previous?.id !== incoming.id) delete retained[cameraId];
+        if (!incoming || incoming.status === "ERROR" || previous?.id !== incoming.id) {
+          delete detectionBuffersRef.current[cameraId];
+          delete playbackTimesRef.current[cameraId];
+          delete displayedDetectionKeysRef.current[cameraId];
+          delete retained[cameraId];
+        }
       }
       return retained;
     });
@@ -141,6 +154,58 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
     });
     sessionsRef.current = indexed;
     setSessions(indexed);
+  }
+
+  function bufferDetection(result: CameraInferenceResult) {
+    const current = detectionBuffersRef.current[result.camera_id] ?? [];
+    const sessionResults = current.filter(item => item.session_id === result.session_id && item.frame_id !== result.frame_id);
+    sessionResults.push(result);
+    sessionResults.sort((left, right) => left.video_time - right.video_time || left.frame_id - right.frame_id);
+    detectionBuffersRef.current[result.camera_id] = sessionResults.slice(-MAX_BUFFERED_DETECTIONS_PER_CAMERA);
+    const playbackTime = playbackTimesRef.current[result.camera_id];
+    if (playbackTime !== undefined) synchronizeDetection(result.camera_id, playbackTime);
+  }
+
+  function handlePlaybackTime(cameraId: string, playbackTime: number) {
+    playbackTimesRef.current[cameraId] = playbackTime;
+    synchronizeDetection(cameraId, playbackTime);
+  }
+
+  function synchronizeDetection(cameraId: string, playbackTime: number) {
+    const session = sessionsRef.current[cameraId];
+    if (!session) {
+      showSynchronizedDetection(cameraId);
+      return;
+    }
+    const cutoff = playbackTime - DETECTION_SYNC_TOLERANCE_SECONDS;
+    const candidates = (detectionBuffersRef.current[cameraId] ?? []).filter(
+      result => result.session_id === session.id && result.video_time >= cutoff,
+    );
+    detectionBuffersRef.current[cameraId] = candidates;
+    let closest: CameraInferenceResult | undefined;
+    let closestDelta = Number.POSITIVE_INFINITY;
+    for (const candidate of candidates) {
+      const delta = Math.abs(candidate.video_time - playbackTime);
+      if (delta <= DETECTION_SYNC_TOLERANCE_SECONDS && delta < closestDelta) {
+        closest = candidate;
+        closestDelta = delta;
+      }
+    }
+    showSynchronizedDetection(cameraId, closest);
+  }
+
+  function showSynchronizedDetection(cameraId: string, result?: CameraInferenceResult) {
+    const nextKey = result ? `${result.session_id}:${result.frame_id}` : "";
+    if ((displayedDetectionKeysRef.current[cameraId] ?? "") === nextKey) return;
+    if (nextKey) displayedDetectionKeysRef.current[cameraId] = nextKey;
+    else delete displayedDetectionKeysRef.current[cameraId];
+    setDetections(values => result ? {...values, [cameraId]: result} : without(values, cameraId));
+  }
+
+  function clearDetectionSync(cameraId: string) {
+    delete detectionBuffersRef.current[cameraId];
+    delete playbackTimesRef.current[cameraId];
+    showSynchronizedDetection(cameraId);
   }
 
   async function run() {
@@ -235,7 +300,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       const replayVisible = asset?.media_type === "video" && (ended[cameraId] || session?.status === "COMPLETED");
       return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình Camera ${index + 1}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>
         <h3>Camera {index + 1}</h3>
-        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
+        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onPlaybackTime={time => handlePlaybackTime(cameraId, time)} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
           {session && <div className={`stream-badge ${session.status.toLowerCase()}`}>{session.status}</div>}
           {session?.inference_fps != null && <div className="inference-fps">FPS infer <strong>{session.inference_fps.toFixed(1)}</strong></div>}
           {session?.status === "ERROR" && <div className="session-error">{session.error_code || "Phiên mô phỏng gặp lỗi."}</div>}

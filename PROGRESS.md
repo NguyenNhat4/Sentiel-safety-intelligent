@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-08-25
+Updated: 2026-08-28
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
@@ -53,6 +53,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Frontend
 
+- Live Monitor buffers direct-camera video detections per camera/session and renders an overlay only when the browser's presented media time is within 200 ms of the inference result timestamp; image results remain immediate.
 - Sidebar no longer renders the unused disabled `Log JSON` placeholder tab.
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
 - Live Monitor reloads camera configuration, media inventory, and compatible sessions whenever the page becomes active; disconnected cameras and sessions belonging to a previously assigned asset are removed from the rendered slot.
@@ -73,6 +74,10 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `Dockerfile.ai` and `requirements.ai.txt` package a standalone CPU proof worker with `/ping` and `/v1/infer`; deployment remains a separate rollout step.
 
 ## Latest Verification
+
+- [Cross-cutting] The playback-synchronized overlay worktree was promoted to Railway production, then production inference was aligned with `staging2`: `VISION_PROVIDER=local`, `PPE_MODEL_PATH=models/yolo11n_safety_kd_best.pt`, `YOLO_INFERENCE_IMAGE_SIZE=640`, and `MEDIA_INFERENCE_MAX_FPS=20`. Final production deployment `86f4f3b4-9028-447c-ab31-b8e42743213d` reached `SUCCESS` with image digest `sha256:8a9c56d36463ae6f96ce802583d8b7cf0b693641642870274fbe7dd26b09e24b`; local model preload completed without the prior remote-health warning, and public `/health` reports ready.
+
+- [Frontend] Added playback-time-gated video overlays using `requestVideoFrameCallback` with metadata/time-update fallback and regression coverage for early detection delivery. Per repository policy, no local runtime was executed. Railway `staging2` deployment `dea9fc8a-4da1-4de0-8ae0-b1d6ef51f6a1` built successfully as image digest `sha256:a875a49d3d524ea66bf3af12800e115d8a088e90169e3025d05bf0a999837766`; application startup completed and public `/health` reports ready with PostgreSQL and snapshot storage ready.
 
 - YOLO11n Safety KD cutover: the actual checkpoint hash matches the pinned SHA-256; 10 settings/startup tests and 39 Vision API/tracking tests pass. The backend PPE file has 16 passing tests and 3 pre-existing debounce expectation failures (4/immediate versus the active 7-frame contract). Ruff, format, frontend type-check, 82 frontend tests and production build pass; ESLint retains the known `App.tsx:26` warning. Full root pytest and the Railway release gate both stall in the known Starlette `TestClient` path, so the release stopped before Docker build/push and no production deployment was made.
 
