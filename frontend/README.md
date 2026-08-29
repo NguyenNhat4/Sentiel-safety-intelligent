@@ -49,6 +49,8 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 
 1. System Admin uploads a named image/video directly to the configured Railway Bucket
    through a presigned request; only backend-validated `READY` assets are selectable.
+   Each media response identifies its `storage_backend`; the browser requests a presigned
+   playback URL for `s3` assets and authenticated `/content` bytes for filesystem assets.
 2. Safety Manager selects a Live Monitor slot, previews its asset, edits camera-wide PPE and optional normalized zones, then saves one atomic draft.
 3. Save returns to Live Monitor and does not start inference.
 4. **Chạy mô phỏng** starts fresh server-owned sessions for valid cameras; Replay starts one completed video again.

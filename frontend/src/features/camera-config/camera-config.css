@@ -4,7 +4,7 @@
 @media(max-width:720px){.camera-config-page{gap:12px}.camera-config-toolbar{align-items:stretch;flex-direction:column;padding:16px}.camera-config-toolbar .secondary-btn{min-height:40px}.camera-config-section-heading,.camera-config-section-footer{align-items:stretch;flex-direction:column}.asset-config-section,.zone-config-panel{padding:16px}.asset-select-field-group,.zone-config-actions{align-items:stretch;flex-direction:column}.asset-select-field{max-width:none}.asset-actions,.zone-actions{justify-content:stretch}.asset-actions button,.zone-actions button{flex:1;min-height:40px}.camera-config-workspace{display:flex;flex-direction:column;gap:12px}.camera-config-media{width:100%;aspect-ratio:4 / 3}.camera-config-live-state{right:8px;top:8px;font-size:8px}.camera-rule-switches{grid-template-columns:1fr}.zone-save-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.zone-save-actions button{min-height:42px}}
 
 /* Compact camera configuration content; the shared application shell stays unchanged. */
-main.camera-config-main{background:#f7f9fc}main.camera-config-main>header{height:46px;background:#fff;padding:7px 24px;border-bottom:1px solid #dbe3ee}main.camera-config-main>header h1{font-size:13px;letter-spacing:-.2px}main.camera-config-main>header .eyebrow{font:800 9px "DM Mono";color:#2456c8;letter-spacing:1.6px;margin-bottom:1px}.camera-config-main .camera-config-page{padding:24px 24px 68px;gap:18px;min-height:calc(100vh - 46px)}.camera-config-main .camera-config-toolbar{display:none}.camera-config-main .asset-config-section{padding:12px;border-radius:6px;background:#fff;box-shadow:0 2px 5px #132e5c16}.camera-config-main .camera-config-section-heading{display:flex;align-items:center}.camera-config-main .camera-config-section-heading>div{display:flex;align-items:center;gap:12px}.camera-config-main .camera-config-section-heading strong{font-size:0}.camera-config-main .camera-config-section-heading strong:after{content:""}.camera-config-main .camera-config-section-heading small{display:none}.camera-config-main .camera-config-section-kicker{font:800 9px "DM Mono";color:#657895;letter-spacing:1px}.camera-config-main .asset-select-field-group{gap:12px}.camera-config-main .asset-select-field{max-width:290px;flex:none;display:flex;align-items:center;gap:12px;color:#657895;font:800 9px "DM Mono";letter-spacing:.8px}.camera-config-main .asset-select-field select{width:186px;height:32px}.camera-config-main .disconnect-asset-btn{height:32px;border-color:#ff6464;color:#f05252;border-radius:4px}.camera-config-main .camera-config-workspace{grid-template-columns:minmax(0,2.12fr) minmax(220px,1fr);gap:18px;align-items:start}.camera-config-main .camera-config-media{aspect-ratio:3 / 2;border-radius:5px;border-color:#dce3ed;background:#18263b}.camera-config-main .camera-config-title{left:12px;top:12px;border-radius:0;background:#f2f6fc;color:#17365d;padding:6px 9px;font:500 10px "DM Mono"}.camera-config-main .camera-config-live-state{right:12px;top:12px;background:#c8f5dd;color:#168c60;border:0;border-radius:7px;padding:7px 10px;font-size:9px}.camera-config-main .zone-config-panel{padding:16px;border-radius:5px;border-color:#dce3ed;box-shadow:0 2px 5px #132e5c0d;gap:12px}.camera-config-main .camera-config-controls{display:grid;gap:12px;align-content:start}.camera-config-main .camera-config-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.camera-config-main .camera-config-card-heading strong{display:block;color:#17365d;font-size:14px;line-height:1.35}.camera-config-main .camera-config-card-heading small{display:block;color:#667d99;font-size:11px;line-height:1.45;margin-top:4px}.camera-config-main .camera-config-card-heading>span{color:#8093ae;font-size:16px}.camera-config-main .machine-state-control{padding:0;border:0;background:transparent;display:grid;gap:10px}.camera-config-main .machine-state-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}.camera-config-main .machine-state-options button{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;height:40px;border:1px solid #d4deeb;border-radius:4px;background:#f5f7fb;color:#73849b;font-size:12px;font-weight:800;letter-spacing:.02em}.camera-config-main .machine-state-options button i{width:8px;height:8px;border-radius:50%;background:#c7d1df}.camera-config-main .machine-state-options button[aria-pressed="true"]{border-color:#2f73e8;background:#fff;color:#17365d;box-shadow:0 0 0 1px #2f73e81f}.camera-config-main .machine-state-options button:first-child[aria-pressed="true"] i{background:#0eae7a}.camera-config-main .machine-state-options button:last-child[aria-pressed="true"] i{background:#6f8199}.camera-config-main .machine-state-options button:focus-visible{outline:3px solid #2f73e833;outline-offset:2px}.camera-config-main .machine-state-description{margin:0;color:#168c60;font-size:11px;line-height:1.5}.camera-config-main .machine-state-options:has(button:last-child[aria-pressed="true"])+.machine-state-description{color:#667d99}.camera-config-main .zone-config-actions{display:grid;gap:10px}.camera-config-main .zone-config-actions label{color:#6e819b;font:800 9px "DM Mono";letter-spacing:.8px}.camera-config-main .zone-config-actions select{min-width:0;width:100%;height:36px;border-radius:3px}.camera-config-main .zone-actions{display:block}.camera-config-main .zone-actions button{width:100%;height:36px;border:1px solid #c8d5e7;border-radius:3px;background:#fff;color:#2164d1;font-size:11px;font-weight:700}.camera-config-main .zone-actions .danger-link{display:none}.camera-config-main .zone-name-field{max-width:none}.camera-config-main .camera-rule-switches{display:grid;grid-template-columns:1fr;gap:8px}.camera-config-main .ppe-switch-row{min-height:36px;padding:0 10px;background:#f4f7fc;border:1px solid #e3eaf3;color:#284566;font-size:12px}.camera-config-main .ppe-switch-row em{color:#72849c}.camera-config-main .camera-config-workspace>p[role="alert"],.camera-config-main .camera-config-workspace>p[role="status"]{grid-column:1 / -1;margin:0}.camera-config-main .camera-config-footer{position:fixed;z-index:5;right:0;bottom:0;left:248px;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:10px 24px;background:#fff;border-top:1px solid #dce3ed}.camera-config-main.sidebar-collapsed .camera-config-footer{left:76px}.camera-config-main .camera-config-footer small{color:#7890ad}.camera-config-main .camera-config-footer .secondary-btn{height:36px;border-radius:4px;color:#25476e}.camera-config-main .camera-config-footer .ppe-save-button{height:36px;border-radius:4px;background:#367cf0;color:#fff;padding:0 24px;border:0;font-weight:800}
+main.camera-config-main{background:#f7f9fc}main.camera-config-main>header{height:46px;background:#fff;padding:7px 24px;border-bottom:1px solid #dbe3ee;display:flex;align-items:center;justify-content:space-between;gap:16px}main.camera-config-main>header h1{font-size:13px;letter-spacing:-.2px}main.camera-config-main>header .eyebrow{font:800 9px "DM Mono";color:#2456c8;letter-spacing:1.6px;margin-bottom:1px}main.camera-config-main>header .camera-config-header-back{height:32px;padding:0 12px;border-color:#cbd7e5;border-radius:5px;background:#fff;color:#25476e;font-size:11px}.camera-config-main .camera-config-page{padding:24px 24px 68px;gap:18px;min-height:calc(100vh - 46px)}.camera-config-main .camera-config-toolbar{display:none}.camera-config-main .asset-config-section{padding:12px;border-radius:6px;background:#fff;box-shadow:0 2px 5px #132e5c16}.camera-config-main .camera-config-section-heading{display:flex;align-items:center}.camera-config-main .camera-config-section-heading>div{display:flex;align-items:center;gap:12px}.camera-config-main .camera-config-section-heading strong{font-size:0}.camera-config-main .camera-config-section-heading strong:after{content:""}.camera-config-main .camera-config-section-heading small{display:none}.camera-config-main .camera-config-section-kicker{font:800 9px "DM Mono";color:#657895;letter-spacing:1px}.camera-config-main .asset-select-field-group{gap:12px}.camera-config-main .asset-select-field{max-width:290px;flex:none;display:flex;align-items:center;gap:12px;color:#657895;font:800 9px "DM Mono";letter-spacing:.8px}.camera-config-main .asset-select-field select{width:186px;height:32px}.camera-config-main .disconnect-asset-btn{height:32px;border-color:#ff6464;color:#f05252;border-radius:4px}.camera-config-main .camera-config-workspace{grid-template-columns:minmax(0,2.12fr) minmax(220px,1fr);gap:18px;align-items:start}.camera-config-main .camera-config-media{aspect-ratio:3 / 2;border-radius:5px;border-color:#dce3ed;background:#18263b}.camera-config-main .camera-config-title{left:12px;top:12px;border-radius:0;background:#f2f6fc;color:#17365d;padding:6px 9px;font:500 10px "DM Mono"}.camera-config-main .camera-config-live-state{right:12px;top:12px;background:#c8f5dd;color:#168c60;border:0;border-radius:7px;padding:7px 10px;font-size:9px}.camera-config-main .zone-config-panel{padding:16px;border-radius:5px;border-color:#dce3ed;box-shadow:0 2px 5px #132e5c0d;gap:12px}.camera-config-main .camera-config-controls{display:grid;gap:12px;align-content:start}.camera-config-main .camera-config-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.camera-config-main .camera-config-card-heading strong{display:block;color:#17365d;font-size:14px;line-height:1.35}.camera-config-main .camera-config-card-heading small{display:block;color:#667d99;font-size:11px;line-height:1.45;margin-top:4px}.camera-config-main .camera-config-card-heading>span{color:#8093ae;font-size:16px}.camera-config-main .machine-state-control{padding:0;border:0;background:transparent;display:grid;gap:10px}.camera-config-main .machine-state-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}.camera-config-main .machine-state-options button{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;height:40px;border:1px solid #d4deeb;border-radius:4px;background:#f5f7fb;color:#73849b;font-size:12px;font-weight:800;letter-spacing:.02em}.camera-config-main .machine-state-options button i{width:8px;height:8px;border-radius:50%;background:#c7d1df}.camera-config-main .machine-state-options button[aria-pressed="true"]{border-color:#2f73e8;background:#fff;color:#17365d;box-shadow:0 0 0 1px #2f73e81f}.camera-config-main .machine-state-options button:first-child[aria-pressed="true"] i{background:#0eae7a}.camera-config-main .machine-state-options button:last-child[aria-pressed="true"] i{background:#6f8199}.camera-config-main .machine-state-options button:focus-visible{outline:3px solid #2f73e833;outline-offset:2px}.camera-config-main .machine-state-description{margin:0;color:#168c60;font-size:11px;line-height:1.5}.camera-config-main .machine-state-options:has(button:last-child[aria-pressed="true"])+.machine-state-description{color:#667d99}.camera-config-main .zone-config-actions{display:grid;gap:10px}.camera-config-main .zone-config-actions label{color:#6e819b;font:800 9px "DM Mono";letter-spacing:.8px}.camera-config-main .zone-config-actions select{min-width:0;width:100%;height:36px;border-radius:3px}.camera-config-main .zone-actions{display:block}.camera-config-main .zone-actions button{width:100%;height:36px;border:1px solid #c8d5e7;border-radius:3px;background:#fff;color:#2164d1;font-size:11px;font-weight:700}.camera-config-main .zone-actions .danger-link{display:none}.camera-config-main .zone-name-field{max-width:none}.camera-config-main .camera-rule-switches{display:grid;grid-template-columns:1fr;gap:8px}.camera-config-main .ppe-switch-row{min-height:36px;padding:0 10px;background:#f4f7fc;border:1px solid #e3eaf3;color:#284566;font-size:12px}.camera-config-main .ppe-switch-row em{color:#72849c}.camera-config-main .camera-config-workspace>p[role="alert"],.camera-config-main .camera-config-workspace>p[role="status"]{grid-column:1 / -1;margin:0}.camera-config-main .camera-config-footer{position:fixed;z-index:5;right:0;bottom:0;left:248px;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:10px 24px;background:#fff;border-top:1px solid #dce3ed}.camera-config-main.sidebar-collapsed .camera-config-footer{left:76px}.camera-config-main .camera-config-footer small{color:#7890ad}.camera-config-main .camera-config-footer .secondary-btn{height:36px;border-radius:4px;color:#25476e}.camera-config-main .camera-config-footer .ppe-save-button{height:36px;border-radius:4px;background:#367cf0;color:#fff;padding:0 24px;border:0;font-weight:800}
 @media(max-width:1050px) and (min-width:721px){.camera-config-main .camera-config-footer{left:205px}.camera-config-main.sidebar-collapsed .camera-config-footer{left:76px}}
 @media(max-width:720px){.camera-config-main .camera-config-page{padding:16px 12px 68px}.camera-config-main .camera-config-workspace{display:grid;grid-template-columns:1fr;gap:12px}.camera-config-main .camera-config-media{aspect-ratio:4 / 3}.camera-config-main .camera-config-footer,.camera-config-main.sidebar-collapsed .camera-config-footer{left:0;padding:10px 12px}.camera-config-main .camera-config-footer .zone-save-actions{display:flex;width:auto}.camera-config-main .camera-config-footer .zone-save-actions button{min-height:36px}.camera-config-main .asset-select-field{max-width:none;flex:1}.camera-config-main .asset-select-field select{width:auto;flex:1}}
 
@@ -47,5 +47,182 @@ main.camera-config-main>header .eyebrow{font-size:9px;color:var(--green);margin:
 .unsaved-dialog-actions .secondary-btn:focus-visible,.unsaved-dialog-actions .discard-changes-btn:focus-visible{outline:3px solid #2f73e833;outline-offset:2px}
 .discard-changes-btn{border:1px solid #c94747;color:#fff;background:#c94747}
 .discard-changes-btn:hover{background:#af3636}
+.camera-violation-log{display:grid;gap:14px;padding:18px 20px;background:#fff;border:1px solid #d8e5de;border-radius:10px}.camera-log-heading-copy{display:grid;gap:4px}.camera-log-heading-copy small{color:#64748b;font-weight:500}.camera-log-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.camera-log-summary div{display:grid;gap:3px;padding:10px 11px;border:1px solid #e1ebe6;border-radius:7px;background:#f7faf8}.camera-log-summary span{font:800 9px "DM Mono";letter-spacing:.06em;color:#64748b}.camera-log-summary strong{font-size:20px;color:#08785b}.camera-violation-log-status{margin:0;color:#64748b}.camera-violation-list{display:grid;gap:8px;max-height:360px;overflow:auto;padding-right:3px}.camera-violation-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid #e1ebe6;border-radius:8px;background:#f7faf8}.camera-violation-row>div:first-child{display:grid;gap:4px;min-width:0}.camera-violation-row small{color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.camera-violation-row small b{font-size:9px;color:#08785b}.camera-violation-row-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.camera-event-status{font-size:10px;font-weight:800;letter-spacing:.04em;color:#08785b;white-space:nowrap}.camera-event-status.false_alarm{color:#a15c00}.camera-event-status.unacknowledged{color:#8a4b00}.camera-event-status.resolved{color:#64748b}
 .camera-config-main .machine-state-options:has(button:last-child[aria-pressed="true"])+.machine-state-description{padding:9px 10px;border-left:3px solid #dc2626;border-radius:3px;background:#fff1f1;color:#c81e1e;font-weight:800}
 @media(max-width:480px){.unsaved-dialog{grid-template-columns:1fr;padding:18px}.unsaved-dialog-actions{display:grid;grid-template-columns:1fr}.unsaved-dialog-actions button{width:100%}}
+
+/* Three-zone camera detail: visual workspace, settings inspector, control log. */
+.camera-config-main .camera-config-page{grid-template-columns:1fr;gap:24px}
+.camera-config-main .camera-config-workspace{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(320px,.72fr);gap:24px;align-items:start}
+.camera-config-main .camera-preview-panel{display:grid;gap:12px;min-width:0;position:sticky;top:16px}
+.camera-config-main .camera-panel-heading,.camera-config-main .settings-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.camera-config-main .camera-panel-heading>div,.camera-config-main .settings-panel-heading>div{display:grid;gap:4px}
+.camera-config-main .camera-panel-heading h3,.camera-config-main .settings-panel-heading h3{margin:0;color:#17365d;font-size:16px;letter-spacing:-.2px}
+.camera-config-main .camera-panel-heading small,.camera-config-main .settings-panel-heading small{max-width:280px;color:#667d99;font-size:11px;line-height:1.45;text-align:right}
+.camera-config-main .camera-config-media{aspect-ratio:16 / 9;border-radius:6px;box-shadow:0 12px 28px #132e5c14}
+.camera-config-main .camera-config-controls{display:grid;gap:0;overflow:hidden;background:#fff;border:1px solid #dce3ed;border-radius:6px;box-shadow:0 8px 22px #132e5c0d}
+.camera-config-main .settings-panel-heading{padding:16px;border-bottom:1px solid #e6ebf2}
+.camera-config-main .settings-panel-heading small{text-align:left}
+.camera-config-main .asset-config-section,.camera-config-main .zone-config-panel{padding:16px;border:0;border-bottom:1px solid #e6ebf2;border-radius:0;box-shadow:none}
+.camera-config-main .asset-select-field-group{display:grid;gap:10px;align-items:stretch}
+.camera-config-main .asset-select-field{max-width:none;display:grid;gap:7px;color:#6e819b}
+.camera-config-main .asset-select-field select{width:100%;height:38px}
+.camera-config-main .asset-actions{margin:0;justify-content:flex-end}
+.camera-config-main .camera-config-footer{position:static;display:grid;gap:12px;margin:0;padding:16px;background:#f8fafc;border:0;box-shadow:none}
+.camera-config-main .camera-save-state{margin:0}
+.camera-config-main .zone-save-actions{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:8px}
+.camera-config-main .zone-save-actions button{width:100%}
+.camera-config-main .camera-violation-log{padding:0;border:0;border-top:1px solid #dce3ed;border-radius:0;background:transparent;box-shadow:none}
+.camera-config-main .camera-violation-log>.camera-config-section-heading{padding-top:20px}
+.camera-config-main .camera-log-summary{grid-template-columns:repeat(3,minmax(0,150px));gap:12px}
+.camera-config-main .camera-log-summary div{padding:12px 14px;border-color:#dce3ed;background:#fff}
+.camera-config-main .camera-violation-list{max-height:320px;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+
+@media(max-width:1050px){
+  .camera-config-main .camera-config-workspace{grid-template-columns:minmax(0,1.35fr) minmax(300px,.8fr);gap:16px}
+  .camera-config-main .camera-panel-heading{display:grid;gap:4px}
+  .camera-config-main .camera-panel-heading small{text-align:left}
+  .camera-config-main .camera-violation-list{grid-template-columns:1fr}
+}
+
+@media(max-width:760px){
+  .camera-config-main .camera-config-page{gap:18px}
+  .camera-config-main .camera-config-workspace{display:flex;flex-direction:column;gap:16px}
+  .camera-config-main .camera-preview-panel{position:static;width:100%}
+  .camera-config-main .camera-config-controls{width:100%}
+  .camera-config-main .camera-panel-heading,.camera-config-main .settings-panel-heading{display:grid;gap:4px}
+  .camera-config-main .camera-panel-heading small,.camera-config-main .settings-panel-heading small{max-width:none;text-align:left}
+  .camera-config-main .camera-config-media{aspect-ratio:4 / 3}
+  .camera-config-main .camera-config-footer,.camera-config-main.sidebar-collapsed .camera-config-footer{margin:0;padding:14px}
+  .camera-config-main .camera-log-summary{grid-template-columns:repeat(3,1fr)}
+  .camera-config-main .camera-violation-row{align-items:flex-start;flex-direction:column}
+  .camera-config-main .camera-violation-row-meta{width:100%;justify-content:space-between}
+}
+
+@media(max-width:480px){
+  .camera-config-main .camera-log-summary{gap:6px}
+  .camera-config-main .camera-log-summary div{padding:10px 8px}
+  .camera-config-main .camera-log-summary strong{font-size:17px}
+  .camera-config-main .zone-save-actions{grid-template-columns:1fr}
+}
+
+/* Desktop control-room view: left workspace, right incident log, one viewport. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-page{height:calc(100vh - 90px);min-height:0;overflow:hidden;padding-bottom:24px;grid-template-rows:minmax(0,1fr)}
+  .camera-config-main .camera-detail-layout{display:grid;grid-template-columns:minmax(0,2.25fr) minmax(300px,.9fr);gap:20px;min-height:0;overflow:hidden}
+  .camera-config-main .camera-config-workspace{grid-template-columns:minmax(0,1.65fr) minmax(300px,.78fr);gap:16px;min-height:0;height:100%;overflow:hidden}
+  .camera-config-main .camera-preview-panel{position:static;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden}
+  .camera-config-main .camera-config-media{height:100%;min-height:0;aspect-ratio:auto}
+  .camera-config-main .camera-config-controls{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+  .camera-config-main .camera-violation-log{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);align-content:start;min-width:0;min-height:0;height:100%;overflow:hidden;padding:16px;background:#fff;border:1px solid #dce3ed;border-radius:6px;box-shadow:0 8px 22px #132e5c0d}
+  .camera-config-main .camera-violation-log>.camera-config-section-heading{padding-top:0}
+  .camera-config-main .camera-log-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .camera-config-main .camera-log-summary div{padding:10px 8px}
+  .camera-config-main .camera-violation-list{grid-template-columns:1fr;max-height:none;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .camera-config-main .camera-violation-row{align-items:flex-start;flex-direction:column}
+  .camera-config-main .camera-violation-row-meta{width:100%;justify-content:space-between}
+}
+
+@media(max-width:980px){
+  .camera-config-main .camera-detail-layout{display:grid;gap:18px}
+}
+
+/* Left column stacks camera over a horizontal settings strip. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-workspace{display:grid;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto;gap:14px}
+  .camera-config-main .camera-preview-panel{min-height:0}
+  .camera-config-main .camera-config-controls{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));grid-template-rows:auto minmax(0,1fr) auto;height:390px;max-height:410px;overflow-x:auto;overflow-y:hidden;scrollbar-gutter:auto;overscroll-behavior-inline:contain}
+  .camera-config-main .settings-panel-heading{grid-column:1 / -1;padding:10px 14px}
+  .camera-config-main .settings-panel-heading>div{display:flex;align-items:baseline;gap:10px}
+  .camera-config-main .settings-panel-heading small{margin-left:auto;text-align:right}
+  .camera-config-main .asset-config-section,.camera-config-main .zone-config-panel{min-width:180px;padding:12px 14px;border-right:1px solid #e6ebf2;border-bottom:0;align-content:start}
+  .camera-config-main .ppe-card{border-right:0}
+  .camera-config-main .camera-config-card-heading strong{font-size:12px}
+  .camera-config-main .camera-config-card-heading small{font-size:10px}
+  .camera-config-main .machine-state-options{grid-template-columns:1fr 1fr}
+  .camera-config-main .machine-state-options button{height:34px}
+  .camera-config-main .machine-state-description{font-size:10px}
+  .camera-config-main .zone-config-actions{gap:8px}
+  .camera-config-main .zone-config-actions select{height:34px}
+  .camera-config-main .zone-actions button{height:34px}
+  .camera-config-main .camera-rule-switches{gap:6px}
+  .camera-config-main .ppe-switch-row{min-height:34px}
+  .camera-config-main .camera-config-controls>p[role="alert"],.camera-config-main .camera-config-controls>p[role="status"]{grid-column:1 / -1;margin:0;padding:8px 14px;border-top:1px solid #e6ebf2}
+  .camera-config-main .camera-config-footer{grid-column:1 / -1;display:flex;align-items:center;gap:16px;padding:10px 14px;border-top:1px solid #e6ebf2}
+  .camera-config-main .camera-save-state{margin-right:auto}
+  .camera-config-main .zone-save-actions{display:flex;grid-template-columns:none;width:auto}
+  .camera-config-main .zone-save-actions button{width:auto;min-width:110px}
+}
+
+/* Settings rail visual refinement. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-controls{background:#f8fafc;border-color:#d8e1ec;box-shadow:0 10px 24px #17365d12}
+  .camera-config-main .settings-panel-heading{min-height:44px;padding:9px 14px;background:#fff;border-bottom-color:#d8e1ec}
+  .camera-config-main .settings-panel-heading>div{gap:12px}
+  .camera-config-main .settings-panel-heading h3{font-size:14px}
+  .camera-config-main .settings-panel-heading small{color:#71849c;font-size:10px}
+  .camera-config-main .asset-config-section,.camera-config-main .zone-config-panel{position:relative;gap:10px;padding:13px 14px 14px;background:#fbfcfe;border-right-color:#dfe6ef;transition:background-color .16s ease}
+  .camera-config-main .asset-config-section:hover,.camera-config-main .zone-config-panel:hover{background:#fff}
+  .camera-config-main .asset-config-section:before,.camera-config-main .zone-config-panel:before{content:"";position:absolute;top:0;right:14px;left:14px;height:2px;border-radius:2px;background:#dce6e2}
+  .camera-config-main .machine-card:before{background:#46a5e5}
+  .camera-config-main .zone-card:before{background:#e0a449}
+  .camera-config-main .ppe-card:before{background:#20a77a}
+  .camera-config-main .camera-config-card-heading{min-height:42px}
+  .camera-config-main .camera-config-card-heading strong{color:#193b63;font-size:12px;letter-spacing:-.1px}
+  .camera-config-main .camera-config-card-heading small{max-width:220px;margin-top:3px;color:#7b8da4;font-size:9px;line-height:1.4}
+  .camera-config-main .asset-select-field{gap:5px;color:#71849c;font:800 8px "DM Mono";letter-spacing:.7px}
+  .camera-config-main .asset-select-field select,.camera-config-main .zone-config-actions select,.camera-config-main .zone-name-field input{height:36px;min-height:36px;border-color:#cbd7e5;border-radius:5px;background-color:#fff;color:#24415f;box-shadow:0 1px 2px #17365d0a}
+  .camera-config-main .disconnect-asset-btn{height:34px;border-radius:5px;background:#fff;color:#c84747}
+  .camera-config-main .machine-state-options{padding:3px;border:1px solid #d9e2ed;border-radius:6px;background:#eef3f8}
+  .camera-config-main .machine-state-options button{height:30px;border:0;background:transparent}
+  .camera-config-main .machine-state-options button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 4px #17365d1f}
+  .camera-config-main .machine-state-description{min-height:40px;padding:8px 9px;border-left:2px solid #22a777;background:#eef9f5;color:#14795b;line-height:1.4}
+  .camera-config-main .camera-config-card-heading .zone-progress{padding:3px 6px;border-radius:999px}
+  .camera-config-main .zone-actions{grid-template-columns:minmax(0,1fr) auto;gap:6px}
+  .camera-config-main .zone-actions button{border-radius:5px;background:#fff}
+  .camera-config-main .zone-name-field{gap:5px;color:#71849c;font:800 8px "DM Mono";letter-spacing:.7px}
+  .camera-config-main .ppe-switch-row{min-height:36px;border-color:#dce5ee;border-radius:6px;background:#f2f6fa;color:#294967}
+  .camera-config-main .ppe-switch-row:hover{border-color:#bcd8cc;background:#f7fcfa}
+  .camera-config-main .camera-config-footer{min-height:54px;padding:9px 14px;background:#fff;border-top-color:#d8e1ec}
+  .camera-config-main .camera-save-state{padding-left:10px;border-left:3px solid #cbd6e2}
+  .camera-config-main .camera-save-state.is-ready{border-left-color:#20a77a}
+  .camera-config-main .camera-config-footer .secondary-btn,.camera-config-main .camera-config-footer .ppe-save-button{height:34px;border-radius:5px}
+  .camera-config-main .camera-config-footer .ppe-save-button:not(:disabled){box-shadow:0 5px 12px #367cf02e}
+}
+
+/* Approved unified settings block: one surface, internal dividers, no sub-cards. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-controls{background:#fff;border-color:#d7e1eb;border-radius:8px;box-shadow:0 12px 32px #17365d14}
+  .camera-config-main .settings-panel-heading{padding:11px 16px;background:#fff}
+  .camera-config-main .asset-config-section,.camera-config-main .zone-config-panel{padding:15px 16px 16px;background:transparent;border-right:1px solid #dce4ed;transition:none}
+  .camera-config-main .asset-config-section:hover,.camera-config-main .zone-config-panel:hover{background:transparent}
+  .camera-config-main .asset-config-section:before,.camera-config-main .zone-config-panel:before{display:none}
+  .camera-config-main .asset-config-section{padding-left:16px}
+  .camera-config-main .ppe-card{padding-right:16px;border-right:0}
+  .camera-config-main .camera-config-card-heading{min-height:auto}
+  .camera-config-main .camera-config-card-heading small{min-height:28px}
+  .camera-config-main .camera-config-footer{padding:10px 16px;background:#f8fafc}
+}
+
+/* Three-part settings rail: source, combined operation/PPE, zone. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-controls{grid-template-columns:minmax(190px,1fr) minmax(340px,1.7fr) minmax(230px,1.2fr)}
+  .camera-config-main .zone-card{border-right:0}
+  .camera-config-main .operation-ppe-layout{display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1fr);gap:14px;min-width:0}
+  .camera-config-main .operation-setting,.camera-config-main .ppe-setting{display:grid;align-content:start;gap:7px;min-width:0}
+  .camera-config-main .ppe-setting{padding-left:14px;border-left:1px solid #dce4ed}
+  .camera-config-main .setting-subtitle{color:#71849c;font:800 8px "DM Mono";letter-spacing:.7px}
+  .camera-config-main .operation-ppe-layout .machine-state-description{min-height:36px;margin:0}
+  .camera-config-main .operation-ppe-layout .camera-rule-switches{grid-template-columns:1fr;gap:6px}
+  .camera-config-main .ppe-scope-note{margin:0;color:#71849c;font-size:9px;line-height:1.35}
+  .camera-config-main .zone-card{gap:8px}
+  .camera-config-main .zone-card .camera-config-card-heading small{min-height:0}
+  .camera-config-main .zone-card .zone-config-actions{gap:7px}
+  .camera-config-main .zone-card .zone-drawing-help{margin:0;padding:9px 10px;font-size:10px;line-height:1.35}
+  .camera-config-main .zone-card .zone-name-field{gap:4px}
+}
+
+@media(max-width:700px){
+  .camera-config-main .operation-ppe-layout{display:grid;gap:12px}
+  .camera-config-main .ppe-setting{padding-top:12px;border-top:1px solid #dce4ed}
+}

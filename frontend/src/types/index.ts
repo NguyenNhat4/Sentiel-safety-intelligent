@@ -17,7 +17,7 @@ export interface MediaAsset {
   status: MediaAssetStatus;
   content_type: string;
   size_bytes: number;
-  storage_backend?: MediaStorageBackend;
+  storage_backend: MediaStorageBackend;
   uploaded_at: string;
   assigned_camera_id: string | null;
   can_delete?: boolean;

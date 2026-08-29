@@ -44,6 +44,7 @@ export const AppShell = memo(function AppShell({page, onNavigate, user, onLogout
     <main className={`${sidebarCollapsed ? "sidebar-collapsed" : ""} ${page === "monitor" ? "monitor-main" : ""} ${page === "camera-config" ? "camera-config-main" : ""}`}>
       <header>
         <div><p className="eyebrow">TRUNG TÂM GIÁM SÁT</p><h1>{title}</h1></div>
+        {page === "camera-config" && <button type="button" className="secondary-btn camera-config-header-back" onClick={() => onNavigate("monitor")}>← Quay lại</button>}
       </header>
       {children}
     </main>

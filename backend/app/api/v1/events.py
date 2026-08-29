@@ -67,6 +67,7 @@ async def create_event_batch(
 async def list_events(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    camera_id: str | None = None,
     zone_id: str | None = None,
     status: str | None = None,
     event_type: str | None = None,
@@ -74,10 +75,13 @@ async def list_events(
     db: Session = Depends(get_db),
 ):
     """Retrieve safety violation events with filtering."""
+    if actor.role == UserRole.AREA_MANAGER.value and not actor.managed_area_id:
+        raise HTTPException(status_code=403, detail="Area manager has no assigned area")
     service = EventService(db)
     return service.get_events(
         skip=skip,
         limit=limit,
+        camera_id=camera_id,
         zone_id=actor.managed_area_id if actor.role == UserRole.AREA_MANAGER.value else zone_id,
         status=status,
         event_type=event_type,

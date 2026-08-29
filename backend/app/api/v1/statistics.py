@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.api.dependencies import require_roles
@@ -16,5 +16,7 @@ async def get_summary_statistics(
     db: Session = Depends(get_db),
 ):
     """Get overall safety compliance & violation statistics."""
+    if actor.role == UserRole.AREA_MANAGER.value and not actor.managed_area_id:
+        raise HTTPException(status_code=403, detail="Area manager has no assigned area")
     service = StatisticsService(db)
     return service.get_summary(zone_id=actor.managed_area_id if actor.role == UserRole.AREA_MANAGER.value else None)
