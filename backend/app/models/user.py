@@ -2,7 +2,7 @@ import datetime
 import enum
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from backend.app.core.database import Base
@@ -29,6 +29,7 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     must_change_password = Column(Boolean, nullable=False, default=False)
     managed_area_id = Column(String(50), nullable=True, index=True)
+    managed_camera_ids = Column(JSON, nullable=False, default=list)
     telegram_username = Column(String(64), nullable=True)
     telegram_chat_id = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
@@ -45,3 +46,14 @@ class UserSession(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     user = relationship("User", back_populates="sessions")
+
+
+class TelegramLinkChallenge(Base):
+    __tablename__ = "telegram_link_challenges"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    secret_digest = Column(String(64), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)

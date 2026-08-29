@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import get_settings
 from backend.app.integrations.telegram_notifications import TelegramNotificationAdapter
 from backend.app.models.event import SafetyEvent
-from backend.app.models.monitoring_zone import MonitoringZoneRecord
 from backend.app.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
@@ -29,31 +28,29 @@ class AlertNotificationService:
         if not confirmed or not self._adapter.configured:
             return 0
 
-        rules_by_area: dict[str, set[str]] = {}
+        rules_by_camera: dict[str, set[str]] = {}
         for event in confirmed:
-            rules_by_area.setdefault(event.zone_id, set()).update(self._rules_for_event(event))
-        area_names = dict(
-            db.query(MonitoringZoneRecord.zone_id, MonitoringZoneRecord.display_name)
-            .filter(MonitoringZoneRecord.zone_id.in_(rules_by_area))
-            .all()
-        )
+            rules_by_camera.setdefault(event.camera_id, set()).update(self._rules_for_event(event))
         recipients = (
             db.query(User)
             .filter(
                 User.role == UserRole.AREA_MANAGER.value,
                 User.is_active.is_(True),
-                User.managed_area_id.in_(rules_by_area),
                 User.telegram_chat_id.is_not(None),
                 User.telegram_chat_id != "",
             )
             .all()
         )
         for recipient in recipients:
-            area_id = recipient.managed_area_id
+            camera_ids = recipient.managed_camera_ids or []
+            matching_cameras = set(camera_ids).intersection(rules_by_camera)
+            if not matching_cameras:
+                continue
+            camera_id = sorted(matching_cameras)[0]
             task = asyncio.create_task(
                 self._deliver(
                     recipient.telegram_chat_id,
-                    self._message(area_names.get(area_id, area_id), rules_by_area[area_id]),
+                    self._message(camera_id, rules_by_camera[camera_id]),
                 )
             )
             _background_tasks.add(task)

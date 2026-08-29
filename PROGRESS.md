@@ -46,6 +46,16 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
+### 2026-08-29 Telegram account linking
+
+- [Backend/Frontend] System Admin can create a one-time Telegram deep link for an account, open the bot, then confirm/retry to capture the sender chat ID. Link challenges store only a digest and expire after ten minutes; bot username is discovered from the configured bot token.
+- [Verification] Ruff, frontend type-check, and focused auth-service tests pass. Railway deployment was not run.
+
+### 2026-08-29 Alembic legacy-head compatibility
+
+- [Backend] Local PostgreSQL reported legacy revision `20260825_03` although its schema already includes `vision_tracking_states`. A no-op compatibility revision reconnects that recorded head to the current tracking-state migration history, avoiding database stamping or destructive repair.
+- [Verification] `alembic upgrade head` now recognizes `20260825_03 (head)` without DDL, and focused migration tests pass 4/4. `make check` passed Ruff and all frontend checks (99/99) but its output stalled during the Vite production build before backend/root tests started.
+
 ### 2026-08-28 Confirmed-event Telegram delivery
 
 - [Backend] Telegram delivery follows the durable event lifecycle: no message for AI-created `unacknowledged` candidates, one message on the first human-confirmed `acknowledged` transition, and no duplicate on an idempotent retry.

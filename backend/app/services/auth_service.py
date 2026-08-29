@@ -181,6 +181,7 @@ class AuthService:
         telegram_username: str | None = None,
         telegram_chat_id: str | None = None,
         update_telegram: bool = False,
+        managed_camera_ids: list[str] | None = None,
     ) -> User:
         try:
             target = self._get_managed_user(target_user_id)
@@ -191,6 +192,11 @@ class AuthService:
             self._validate_area_assignment(role, managed_area_id)
             target.role = role.value
             target.managed_area_id = managed_area_id if role == UserRole.AREA_MANAGER else None
+            if managed_camera_ids is not None:
+                allowed = {"cam_1", "cam_2", "cam_3", "cam_4"}
+                if not set(managed_camera_ids).issubset(allowed):
+                    raise UserManagementError("Unsupported camera assignment")
+                target.managed_camera_ids = sorted(set(managed_camera_ids)) if role == UserRole.AREA_MANAGER else []
             if update_telegram:
                 target.telegram_username = telegram_username
                 target.telegram_chat_id = telegram_chat_id

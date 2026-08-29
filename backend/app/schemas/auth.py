@@ -37,6 +37,7 @@ class UserRoleUpdate(BaseModel):
     managed_area_id: str | None = Field(default=None, min_length=1, max_length=50)
     telegram_username: str | None = Field(default=None, min_length=6, max_length=33, pattern=r"^@[A-Za-z0-9_]{5,32}$")
     telegram_chat_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^-?[0-9]+$")
+    managed_camera_ids: list[str] | None = None
 
     @model_validator(mode="after")
     def require_area_for_area_manager(self):
@@ -58,6 +59,7 @@ class AuthUser(BaseModel):
     role_label: str
     must_change_password: bool
     managed_area_id: str | None = None
+    managed_camera_ids: list[str] = Field(default_factory=list)
     telegram_username: str | None = None
     telegram_chat_id: str | None = None
 
@@ -76,3 +78,14 @@ class SessionResponse(BaseModel):
 class ManagedUser(AuthUser):
     is_active: bool
     created_at: datetime
+
+
+class TelegramLinkStart(BaseModel):
+    link_url: str
+    expires_at: datetime
+
+
+class TelegramLinkComplete(BaseModel):
+    status: str
+    chat_id: str | None = None
+    telegram_username: str | None = None

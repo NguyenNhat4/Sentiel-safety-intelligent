@@ -46,7 +46,7 @@ P-047/
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   │   ├── media_storage.py # Railway Bucket presigned media and cache transfer adapter
-│   │   │   └── telegram_notifications.py # Telegram Bot API delivery adapter
+│   │   │   └── telegram_notifications.py # Telegram Bot API delivery and inbound link polling adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── camera_configuration.py # Fixed camera configuration and session lifecycle
 │   │   │   ├── event.py
@@ -71,6 +71,7 @@ P-047/
 │   │   ├── services/    # Core Services & AI Reasoning
 │   │   │   ├── alert_notification_service.py # Area-scoped alert recipient routing
 │   │   │   ├── auth_service.py
+│   │   │   ├── telegram_link_service.py # One-time account-link challenge orchestration
 │   │   │   ├── camera_configuration_service.py # Atomic asset, zones and rules transaction
 │   │   │   ├── camera_session_runtime.py # Direct finite image/video inference sessions
 │   │   │   ├── event_service.py
@@ -108,7 +109,8 @@ P-047/
 │   │       ├── 20260823_02_add_media_storage_backend.py # Bucket/volume storage metadata
 │   │       ├── 20260824_01_repair_sqlite_camera_session_index.py # Legacy replay-safe index repair
 │   │       ├── 20260824_02_camera_wide_ppe_requirements.py # Camera-wide hat/vest requirements
-│   │       └── 20260825_01_add_vision_tracking_states.py # v2 JSONB continuation state and TTL index
+│   │       ├── 20260825_01_add_vision_tracking_states.py # v2 JSONB continuation state and TTL index
+│   │       └── 20260829_01_add_telegram_link_challenges.py # One-time Telegram account-link challenges
 │   └── tests/           # Pytest API & Agent test suite
 │       ├── conftest.py
 │       ├── test_agent.py
