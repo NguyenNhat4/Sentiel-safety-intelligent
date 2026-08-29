@@ -1,10 +1,62 @@
 # Project Progress
 
-Updated: 2026-08-26
+Updated: 2026-08-27
+
+### 2026-08-28 Stopped-machine PPE warning emphasis
+
+- [Frontend] Khi máy ở trạng thái TẮT, thông báo PPE tạm ngừng kiểm tra dùng chữ đỏ đậm, nền đỏ nhạt và viền cảnh báo để thu hút sự chú ý; trạng thái BẬT giữ màu xanh hiện hành.
+- [Verification] Camera configuration focused tests pass 10/10; frontend lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Live Monitor HITL panel alignment
+
+- [Frontend] Panel HUMAN IN THE LOOP căn các hàng nội dung lên đầu card, không còn để CSS Grid kéo giãn khiến tiêu đề và trạng thái rỗng nằm giữa theo chiều dọc.
+- [Verification] Full frontend suite pass 99/99; lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Camera configuration save feedback
+
+- [Frontend] Sau khi người dùng bấm Lưu cấu hình và API thành công, trang cập nhật draft cùng revision từ response và hiện toast “Đã lưu”; Quay lại Live Monitor sau đó không còn bị chặn sai bởi cảnh báo draft chưa lưu. Luồng vẫn giữ nút lưu thủ công, không tự lưu khi chọn nguồn camera.
+- [Verification] Camera configuration focused tests pass 10/10; full frontend suite pass 99/99; frontend lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Live Monitor viewport-fit camera grid
+
+- [Frontend] Trên desktop từ `1181px`, Live Monitor khóa trong một viewport, chia phần camera thành grid 2x2 có bốn ô cao bằng nhau và giữ media `object-fit: contain`; danh sách cảnh báo dùng chiều cao còn lại và cuộn độc lập. Dưới breakpoint này, layout tiếp tục xếp dọc và cuộn trang như trước để không ép nhỏ camera trên tablet/mobile.
+- [Verification] Focused App/Live Monitor tests pass 19/19; full frontend suite pass 99/99; lint, type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
+### 2026-08-28 Camera configuration shell alignment
+
+- [Frontend] Giữ nguyên shared sidebar/shell trên màn cấu hình Camera để đồng bộ navigation, profile và trạng thái thu gọn với các trang khác; chỉ áp dụng layout compact cho phần cấu hình bên phải, với preview chữ nhật `3:2` và các control xếp dọc. Card trạng thái máy dùng segmented control BẬT/TẮT có vùng bấm lớn, `aria-pressed`, focus ring và mô tả trạng thái rõ ràng. Badge preview phản ánh kết nối camera độc lập với trạng thái máy; luồng vùng hiển thị tiến độ 0/4–4/4, hướng dẫn tại chỗ và thao tác xóa; footer giải thích save blocker; PPE bỏ nhãn ON/OFF trùng lặp. Quay lại, sidebar và đăng xuất dùng modal Sentinel để xác nhận bỏ draft chưa lưu; reload/đóng tab giữ cảnh báo native bắt buộc của trình duyệt.
+- [Verification] Camera configuration focused tests pass 10/10; frontend lint, type-check, production build và `git diff --check` pass. Full frontend suite gần nhất pass 94/95; một assertion Live Monitor cũ vẫn chờ cập nhật theo wording hiện hành và không liên quan thay đổi layout. Docker build đã được hủy trước push/redeploy theo yêu cầu; Railway production không thay đổi.
+
+### 2026-08-28 Restricted-area wording
+
+- [Frontend] Đổi toàn bộ nhãn hiển thị còn sót lại từ “vùng nguy hiểm” thành “vùng cấm” trong Live Monitor và violation copy; giữ nguyên rule key `zone_intrusion` và runtime contract.
+- [Verification] Focused wording test pass 3/3; frontend lint, type-check, production build và `git diff --check` pass. Railway release chưa vượt qua gate `backend/tests/test_us29_media_runtime.py` sau khoảng 30 giây nên chưa build/push/redeploy; production chưa thay đổi.
 
 This file is the current project snapshot, not a chronological changelog. Use Git history for completed implementation detail. Entries are grouped by owning area so contributors can load only the context relevant to the next task.
 
 ## Current State
+
+### 2026-08-27 System-admin Live Monitor access
+
+- [Cross-cutting] `system_admin` has full operational authority: Live Monitor, camera configuration, simulation run/replay, event history/review, media, account administration, and operational metrics. `area_manager` remains scoped to its assigned area.
+- [Verification] Merged the latest three `origin/develop2` commits while retaining the system-admin access rules and the new durable alert/toast flow. Frontend passes 95/95 tests, lint, type-check and production build; focused system-admin and alert-persistence backend tests pass. Full `make check` passes Ruff, frontend, 32/32 root tests, and 290 backend/vision tests, with the same nine pre-existing debounce, deterministic-summary, event-batch, and multi-zone contract failures.
+### 2026-08-28 Backend-annotated review snapshots
+
+- [Frontend] Review Modal và Event Detail chỉ hiển thị snapshot JPG đã được backend annotate; đã bỏ browser SVG overlay để tránh vẽ box/text hai lần.
+- [Frontend] Review Modal và Event Detail vẫn render polygon + tên zone vùng cấm bằng component zone-only; không render person/PPE box hoặc confidence label.
+- [Vision] Label và confidence của box snapshot được đặt ở cạnh dưới bounding box, tự co vào trong ảnh khi box sát mép dưới.
+- [Verification] Frontend focused tests pass 6/6; toàn bộ frontend pass 94/94 tests, lint, type-check, production build và `git diff --check`. Release script bị stall ở backend media test trước bước build/push/redeploy; Railway production chưa thay đổi.
+
+### 2026-08-27 Storage-aware media playback routing
+
+- [Backend/Frontend] Media inventory now identifies filesystem versus S3 storage so Live Monitor and camera preview avoid the intentional `playback-url` 409 for local assets while retaining presigned S3 playback.
+- [Verification] Frontend passes 95/95 tests, lint, type-check and production build; Ruff and `git diff --check` pass. `make check` reached the root suite and was stopped after the same unrelated stall following its first two passing tests. PostgreSQL-backed focused backend tests also stalled before producing a result. Railway deployment remains pending because the dirty worktree contains unrelated unfinished changes that cannot safely be included or discarded as part of this narrow fix.
+
+### 2026-08-27 Durable Live Monitor violation inbox
+
+- [Backend] Direct-camera sessions persist new review occurrences as privacy-protected `unacknowledged` safety events before WebSocket publication; reviewed submissions transition the same idempotent event.
+- [Frontend] Live Monitor reloads one newest-first pending list across all four cameras. PPE uses a closeable lower-right toast without auto-opening HITL; zone alerts use one automatic FIFO popup, and closing never removes the pending row.
+- [Verification] Release-focused US-29 tests pass 13/13; frontend passes 91/91 tests, lint with zero warnings, type-check and production build; Ruff and the focused runtime persistence test pass. `make check` reached the root suite and was stopped after that unrelated suite stalled. Production image build was canceled on user direction before push or Railway redeploy, so production is unchanged.
 
 ### 2026-08-24 PPE and HITL correction
 
@@ -16,6 +68,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 - Camera detail now uses a responsive two-column layout: configuration/preview on the left and a camera-scoped violation log on the right, loaded through the optional `camera_id` event filter with per-event detail access and empty/error states.
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
+- Luồng local từ upload video đến playback, sampled frame inference, metadata WebSocket, SVG overlay, HITL và Replay được mô tả trong `docs/architecture/local-video-frame-flow.md` cùng source-of-truth code map.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
 - Three authenticated roles are supported: `system_admin`, `safety_manager`, and `area_manager`. New and administrator-reset accounts must replace their temporary password.
 - The implemented safety flow covers four fixed camera slots, per-camera zones/rules, direct video/image inference, Human-in-the-Loop review, immutable decision context, privacy-redacted evidence, event history, and area-scoped follow-up.
@@ -77,6 +130,11 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Latest Verification
 
+- [Frontend] Camera Configuration đã được căn theo mẫu light-theme mới: sidebar compact, header thấp, source bar full-width, preview dọc bên trái, ba card trạng thái/vùng/PPE bên phải và footer lưu full-width. Mobile chuyển workspace thành một cột. Camera-configuration tests `7/7`, lint, type-check, production build và `git diff --check` pass.
+
+- [Frontend] Camera Configuration now follows the reference composition with the media source bar above, a large preview/zone editor on the left, and a safety-rule panel on the right. Below 720px it stacks into one column, enlarges touch targets, and keeps the existing save, PPE, zone, and disconnect behavior. Frontend lint, type-check, production build, and the camera-configuration focused tests pass; the full frontend suite still has one pre-existing Live Monitor copy assertion failure.
+
+- [Frontend] Live Monitor now keeps the four-camera 2x2 grid on the left and the durable pending-alert inbox on the right at desktop widths, with responsive stacking below 1180px. The application sidebar can collapse/expand, and PPE toasts close after three seconds without removing the pending event. Focused monitor tests pass `9/9`; App shell regression, browser UAT, and Railway deployment remain pending.
 - Issue #43 focused verification passes `75` tests, including uninterrupted versus restore equivalence, alternating replicas, simulated worker restart, v1/v2 HTTP contracts, auth, hostile/oversized state, PostgreSQL JSONB migration, TTL and CAS conflicts. Alembic reports the single head `20260825_01` and `git diff --check` passes.
 - Full `make check` has no new regression: Ruff/format/type-check/build pass, root has `32 passed`, frontend has `89 passed`, and backend/Vision has exactly the documented baseline `9 failed, 288 passed`. The same stale debounce, camera-wide PPE and audit-copy expectations remain the only failures.
 - GPU image build succeeds as non-root `appuser` on `amd64`, contains Torch `2.9.1+cu128`/CUDA `12.8` and exposes `/v1/infer`, `/v2/ping`, `/v2/infer`. The immutable GPU image above and CPU proof image `ntduc0112/p047-vision:cpu-v2-issue43-20260826` (`sha256:2efadd373965435824eb645c844549d4bdbb0e496e679f64fa06cd523bb9526b`) are published.

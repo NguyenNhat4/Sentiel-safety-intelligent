@@ -97,6 +97,16 @@ describe("Sentinel authentication", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/login", expect.objectContaining({method: "POST"}));
   });
 
+  it("collapses and expands the Live Monitor navigation sidebar", async () => {
+    mockAuthenticatedSession();
+    render(<App />);
+    const collapse = await screen.findByRole("button", {name: "Thu gọn thanh điều hướng"});
+    fireEvent.click(collapse);
+    expect(screen.getByRole("button", {name: "Mở rộng thanh điều hướng"})).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", {name: "Mở rộng thanh điều hướng"}));
+    expect(screen.getByRole("button", {name: "Thu gọn thanh điều hướng"})).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("opens the tabbed system administration page for a system admin", async () => {
     const admin = {
       ...user,
@@ -127,13 +137,18 @@ describe("Sentinel authentication", () => {
     await screen.findByRole("button", {name: /Thư viện media/});
     expect(screen.getByRole("button", {name: /Quan sát hệ thống/})).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", {name: /Live monitor/})).not.toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Live monitor/})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Quản trị hệ thống/}));
     expect(await screen.findByRole("tab", {name: "Tài khoản"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Vai trò & quyền"})).toBeInTheDocument();
     expect(screen.getByRole("tab", {name: "Bảo mật"})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Thư viện media/})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: /Quản trị hệ thống/})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
+    expect(await screen.findByRole("heading", {name: "Live Monitor"})).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name: "Camera 1"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Chạy mô phỏng"})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Cấu hình Camera 1"})).toBeInTheDocument();
   });
 
   it("forces a temporary-password user to change password before opening the app", async () => {
@@ -159,12 +174,14 @@ describe("Sentinel React application", () => {
     mockAuthenticatedSession();
     render(<App />);
     await screen.findByRole("heading", {name: "Live Monitor"});
+    expect(screen.getByRole("main")).toHaveClass("monitor-main");
     expect(screen.queryByRole("button", {name: /Quan sát hệ thống/})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
     await waitFor(() => expect(screen.getByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument());
+    expect(screen.getByRole("main")).not.toHaveClass("monitor-main");
     fireEvent.click(screen.getByRole("button", {name: /Live monitor/}));
     expect(await screen.findAllByText("Bấm vào đây để cấu hình")).toHaveLength(4);
-    expect(screen.getByText(/Đã upload video.*bấm vào camera thêm một lần nữa để mở cấu hình/i)).toBeInTheDocument();
+    expect(screen.getByText(/Đã upload video.*bấm vào camera để mở cấu hình/i)).toBeInTheDocument();
     expect(screen.queryByText("Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.")).not.toBeInTheDocument();
   });
 
@@ -179,6 +196,24 @@ describe("Sentinel React application", () => {
     expect(await screen.findByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
     expect(screen.queryAllByText("Cấu hình Camera 2")).toHaveLength(1);
     expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
+  });
+
+  it("shows a branded confirmation before discarding an unsaved camera draft", async () => {
+    mockAuthenticatedSession();
+    render(<App />);
+    await screen.findByRole("heading", {name: "Live Monitor"});
+    fireEvent.click(await screen.findByRole("button", {name: "Cấu hình Camera 2"}));
+    fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    const dialog = await screen.findByRole("alertdialog", {name: "Bạn chưa lưu thay đổi"});
+    expect(dialog).toHaveTextContent("Các thay đổi trong cấu hình Camera sẽ bị mất");
+    fireEvent.click(screen.getByRole("button", {name: "Tiếp tục chỉnh sửa"}));
+    expect(screen.getByRole("heading", {name: "Cấu hình Camera 2"})).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {name: /Nhật ký vi phạm/}));
+    fireEvent.click(await screen.findByRole("button", {name: "Bỏ thay đổi"}));
+    expect(await screen.findByText("Chưa có vi phạm nào được xác nhận.")).toBeInTheDocument();
   });
 
   it("does not render the removed local video upload controls", async () => {

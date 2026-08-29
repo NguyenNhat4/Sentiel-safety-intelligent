@@ -39,11 +39,13 @@ it("loads the exact camera prop with READY media and no camera selector", async 
   expect(screen.getByRole("option", {name: "Ảnh máy dập · Hình ảnh"})).toBeInTheDocument();
   expect(screen.queryByText("Đang xử lý")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Preview Camera 3")).toBeInTheDocument();
+  expect(screen.getByText("Camera đã kết nối")).toBeInTheDocument();
 });
 
-it("saves asset, machine, zones and PPE once then returns without starting inference", async () => {
+it("saves asset, machine, zones and PPE once and clears the dirty draft", async () => {
   const onSaved = vi.fn();
-  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+  const onBack = vi.fn();
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={onSaved} />);
   fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
   fireEvent.click(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"}));
   const save = screen.getByRole("button", {name: "Lưu cấu hình"});
@@ -54,7 +56,11 @@ it("saves asset, machine, zones and PPE once then returns without starting infer
     ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true}),
     zones: [expect.objectContaining({zone_id: "press", ppe_requirements: expect.objectContaining({hat_required: true, vest_required: true, zone_intrusion_enabled: true})})],
   }));
-  expect(onSaved).toHaveBeenCalledOnce();
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+  expect(onSaved).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  expect(onBack).toHaveBeenCalledOnce();
 });
 
 it("loads persisted hat and vest requirements as enabled", async () => {
@@ -67,6 +73,44 @@ it("loads persisted hat and vest requirements as enabled", async () => {
 
   expect(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"})).toBeChecked();
   expect(screen.getByRole("checkbox", {name: "Yêu cầu áo phản quang"})).toBeChecked();
+});
+
+it("shows explicit machine-state choices and updates the draft accessibly", async () => {
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  const offButton = await screen.findByRole("button", {name: "TẮT"});
+  const onButton = screen.getByRole("button", {name: "BẬT"});
+  expect(offButton).toHaveAttribute("aria-pressed", "true");
+  expect(onButton).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByText("Máy đã dừng, quy tắc PPE tạm thời không được kiểm tra.")).toBeInTheDocument();
+
+  fireEvent.click(onButton);
+  expect(onButton).toHaveAttribute("aria-pressed", "true");
+  expect(offButton).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByText("Hệ thống tự động kiểm tra mũ bảo hiểm và áo phản quang.")).toBeInTheDocument();
+});
+
+it("shows zone drawing progress and explains why save is blocked", async () => {
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  expect(await screen.findByText("4/4 điểm")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", {name: "Tạo vùng"}));
+  expect(screen.getByText("0/4 điểm")).toBeInTheDocument();
+  expect(screen.getByText("Bấm lần lượt 4 điểm trên khung camera để khép vùng.")).toBeInTheDocument();
+  expect(screen.getByText("Vùng đang chọn cần đủ 4 điểm (0/4).")).toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
+});
+
+it("reports a dirty draft before delegating navigation to the application", async () => {
+  const onBack = vi.fn();
+  const onDirtyChange = vi.fn();
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={vi.fn()} onDirtyChange={onDirtyChange} />);
+
+  fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
+  await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+  const back = screen.getByRole("button", {name: "Quay lại"});
+  fireEvent.click(back);
+  expect(onBack).toHaveBeenCalledOnce();
 });
 
 it("keeps the controlled draft and reports a revision conflict", async () => {
@@ -113,23 +157,26 @@ it("saves camera-wide PPE without requiring a zone", async () => {
     ppe_requirements: expect.objectContaining({hat_required: true, vest_required: false}),
     zones: [],
   })));
-  expect(onSaved).toHaveBeenCalledOnce();
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  expect(onSaved).not.toHaveBeenCalled();
 });
 
 it("allows disconnecting camera source and saves asset_id as null", async () => {
-  const onSaved = vi.fn();
-  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={onSaved} />);
+  const onBack = vi.fn();
+  saveMock.mockResolvedValue({...configuration, revision: 8, asset_id: null});
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={onBack} onSaved={vi.fn()} />);
   const disconnectBtn = await screen.findByRole("button", {name: "Ngắt kết nối nguồn media"});
   expect(disconnectBtn).toBeInTheDocument();
   fireEvent.click(disconnectBtn);
 
   expect(screen.queryByRole("button", {name: "Ngắt kết nối nguồn media"})).not.toBeInTheDocument();
   expect(screen.getByText("Chọn media để xem preview và vẽ vùng.")).toBeInTheDocument();
+  const saveButton = screen.getByRole("button", {name: "Lưu cấu hình"});
+  expect(saveButton).toBeEnabled();
+  fireEvent.click(saveButton);
 
-  const saveBtn = screen.getByRole("button", {name: "Lưu cấu hình"});
-  expect(saveBtn).toBeEnabled();
-  fireEvent.click(saveBtn);
-  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({
-    asset_id: null,
-  })));
+  await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({asset_id: null})));
+  expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  expect(onBack).toHaveBeenCalledOnce();
 });

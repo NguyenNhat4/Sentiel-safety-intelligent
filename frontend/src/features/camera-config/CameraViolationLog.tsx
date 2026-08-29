@@ -10,15 +10,18 @@ interface CameraViolationLogProps {
 export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
   const [events, setEvents] = useState<SafetyEvent[]>([]);
   const [status, setStatus] = useState("Đang tải log vi phạm...");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setStatus("Đang tải log vi phạm...");
+    setLoadFailed(false);
     try {
       const loaded = await loadCameraEvents(cameraId);
       setEvents(loaded);
       setStatus(loaded.length ? "" : "Camera này chưa có log vi phạm.");
     } catch (reason) {
+      setLoadFailed(true);
       setStatus(reason instanceof Error ? reason.message : "Không thể tải log vi phạm của camera.");
     }
   }, [cameraId]);
@@ -39,7 +42,7 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
       <div><span>ĐANG XỬ LÝ</span><strong>{openCount}</strong></div>
       <div><span>ĐÃ ĐÓNG</span><strong>{Math.max(events.length - openCount, 0)}</strong></div>
     </div>
-    {status && <p className="camera-violation-log-status" role="status">{status}</p>}
+    {status && <p className="camera-violation-log-status" role={loadFailed ? undefined : "status"} aria-live={loadFailed ? "assertive" : undefined}>{status}</p>}
     {events.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log Camera ${cameraNumber(cameraId)}`}>
       {events.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => setSelectedEventId(event.id)} />)}
     </div>}

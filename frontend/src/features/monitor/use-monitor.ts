@@ -259,7 +259,7 @@ export function useMonitor() {
       alertTitle: violation ? activeAlertTitle : "Trạng thái bình thường",
       severity: violation ? "VIOLATE" : "NORMAL",
       alertSummary: violation ? activeAlertSummary : "Frame hiện tại không vi phạm rule an toàn đã định nghĩa.",
-      zoneRule: {yes: inside, text: inside ? "Trong vùng nguy hiểm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
+      zoneRule: {yes: inside, text: inside ? "Trong vùng cấm" : "Ngoài vùng", badge: inside ? "YES" : "NO"},
       ppeRule: buildPpeRule(result),
       humanReviewTone: criticalCount > 0 ? "critical" : humanReview.tone,
       reviewMessage: humanReview.message,

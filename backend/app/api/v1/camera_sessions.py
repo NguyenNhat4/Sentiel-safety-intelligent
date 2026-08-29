@@ -14,7 +14,7 @@ router = APIRouter(tags=["Camera Sessions"])
 
 @router.post("/simulation-runs", response_model=SimulationRunResponse)
 def start_simulation_run(
-    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER)),
+    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN)),
     db: Session = Depends(get_db),
 ):
     sessions = []
@@ -36,7 +36,7 @@ def start_simulation_run(
 @router.post("/camera-sessions/{camera_id}/replay", response_model=CameraSessionResponse)
 def replay_camera_session(
     camera_id: str,
-    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER)),
+    _: User = Depends(require_roles(UserRole.SAFETY_MANAGER, UserRole.SYSTEM_ADMIN)),
     db: Session = Depends(get_db),
 ):
     try:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import math
 import threading
@@ -22,9 +24,11 @@ from backend.app.models.camera_configuration import CameraSession
 from backend.app.schemas.analysis import FrameInferenceRequest
 from backend.app.schemas.camera_configuration import CameraConfigurationResponse
 from backend.app.schemas.camera_session import CameraSessionResponse
+from backend.app.schemas.event import EventCreate
 from backend.app.schemas.ppe_requirement import PpeRequirementResponse
 from backend.app.services.camera_configuration_service import CameraConfigurationService
 from backend.app.services.camera_detection_hub import camera_detection_hub
+from backend.app.services.event_service import EventService
 from backend.app.services.frame_inference_service import frame_inference_service
 from backend.app.services.media_asset_service import MediaAssetService
 
@@ -288,6 +292,8 @@ class CameraSessionRuntime:
             "frame_width": int(frame.shape[1]),
             "frame_height": int(frame.shape[0]),
         }
+        if payload.get("review_required"):
+            payload["pending_event_ids"] = self._persist_pending_reviews(payload)
         self._publish_if_current(context, payload)
         record_operational_event(
             "inference_completed",
@@ -295,6 +301,75 @@ class CameraSessionRuntime:
             outcome=result.get("result", "completed"),
             duration_ms=duration_ms,
         )
+
+    def _persist_pending_reviews(self, payload: dict) -> list[int]:
+        """Persist review candidates before notifying browsers.
+
+        Safety events in ``unacknowledged`` state are the durable pending-alert
+        inbox. A later HITL submission reuses the occurrence IDs and transitions
+        the same per-person event to its reviewed outcome.
+        """
+        if self._session_factory is None:
+            return []
+        event_ids: list[int] = []
+        claimed_occurrences: set[str] = set()
+        with self._session_factory() as db:
+            service = EventService(db)
+            for person in payload.get("people", []):
+                violations = [
+                    item
+                    for item in person.get("active_violations", [])
+                    if item.get("is_new") and item.get("occurrence_id") not in claimed_occurrences
+                ]
+                if not violations:
+                    continue
+                claimed_occurrences.update(item["occurrence_id"] for item in violations)
+                rule_keys = [item["rule_key"] for item in violations]
+                has_zone = any(
+                    key.startswith("zone_intrusion") or key.startswith("restricted_area_person") for key in rule_keys
+                )
+                has_ppe = any(key.startswith("missing_ppe:") for key in rule_keys)
+                event_type = (
+                    "missing_ppe_and_intrusion"
+                    if has_zone and has_ppe
+                    else "zone_intrusion"
+                    if has_zone
+                    else "missing_ppe"
+                )
+                zone_id = next(
+                    (
+                        item.get("zone_id")
+                        for item in violations
+                        if item.get("zone_id") and item.get("zone_id") != "camera_wide"
+                    ),
+                    "camera_wide",
+                )
+                pending_review = {
+                    key: value for key, value in payload.items() if key not in {"snapshot_data", "pending_event_ids"}
+                }
+                pending_review["people"] = [{**person, "active_violations": violations}]
+                event = service.create_event(
+                    EventCreate(
+                        zone_id=zone_id,
+                        camera_id=payload["camera_id"],
+                        event_type=event_type,
+                        severity="critical" if has_zone else "high",
+                        status="unacknowledged",
+                        details={
+                            "violations": rule_keys,
+                            "video_timestamp_seconds": payload["video_time"],
+                            "pending_review": pending_review,
+                        },
+                        monitoring_session_id=payload["monitoring_session_id"],
+                        track_id=person.get("track_id"),
+                        occurrence_ids=[item["occurrence_id"] for item in violations],
+                        snapshot_data=payload.get("snapshot_data"),
+                        snapshot_people=[person],
+                        snapshot_detections=payload.get("detections", []),
+                    )
+                )
+                event_ids.append(event.id)
+        return event_ids
 
     def _infer_frame(
         self,

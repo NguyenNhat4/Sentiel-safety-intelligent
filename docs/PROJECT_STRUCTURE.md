@@ -135,7 +135,7 @@ P-047/
 │   ├── README.md
 │   ├── api.py           # Public hat/vest, independent redaction and session-tracking facades
 │   ├── face_detection.py # Thread-safe OpenCV YuNet provider
-│   ├── pipeline.py      # Face blur, per-person fallback and post-redaction annotation
+│   ├── pipeline.py      # Face blur and post-redaction annotation
 │   ├── tracking_state.py # Versioned JSON-safe ByteTrack continuation codec
 │   └── tests/           # Unit tests for vision-only behavior
 │       ├── README.md
@@ -151,6 +151,7 @@ P-047/
 │   │   │   ├── vision-worker-compare.ts # Dev-only typed CPU/CUDA worker client and latency summary
 │   │   │   ├── camera-configurations.ts # Atomic fixed-camera configuration transport
 │   │   │   ├── media-assets.ts # Inventory, upload and protected content transport
+│   │   │   ├── media-assets.test.ts # Filesystem direct-content and S3 presigned playback routing
 │   │   │   ├── simulation.ts # Run, Replay and session lifecycle transport
 │   │   │   ├── events.ts  # Reviewed-event list, detail and persistence transport
 │   │   │   ├── events.test.ts
@@ -166,7 +167,7 @@ P-047/
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
 │   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── alerts/  # Rule result, shared violation copy, ReviewModal, and SnapshotOverlay
+│   │   │   ├── alerts/  # Rule result, pending list, PPE toast, ReviewModal and zone-only snapshot overlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx
@@ -210,6 +211,7 @@ P-047/
 │   ├── architecture/                # Architecture diagrams, problem statement and alert contracts
 │   │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams
+│   │   ├── local-video-frame-flow.md    # Local upload, sampled inference and browser overlay flow
 │   │   └── project-problem-statement.md # Safety monitoring problem formulation
 │   ├── ops/                         # Operations, CI/CD, Vision deployment and metrics
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines

@@ -2,10 +2,14 @@ import {useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {listCameraConfigurations} from "../../api/camera-configurations";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
-import {saveReviewedEvent} from "../../api/events";
+import {loadPendingEvents, saveReviewedEvent} from "../../api/events";
+import {assetUrl} from "../../api/config";
 import {listMediaAssets} from "../../api/media-assets";
 import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
-import type {CameraConfiguration, CameraInferenceResult, CameraSession, InferenceResult, MediaAsset, ReviewStatus, UserRole} from "../../types";
+import type {CameraConfiguration, CameraInferenceResult, CameraSession, InferenceResult, MediaAsset, ReviewStatus, SafetyEvent, UserRole} from "../../types";
+import {PendingViolationList} from "../alerts/PendingViolationList";
+import {PpeAlertToast} from "../alerts/PpeAlertToast";
+import {isZoneAlert} from "../alerts/pending-violation";
 import {ReviewModal} from "../alerts/ReviewModal";
 import {violationRuleLabel} from "../alerts/violation-copy";
 import {AuthenticatedMedia} from "../media/AuthenticatedMedia";
@@ -16,7 +20,7 @@ import "./stream.css";
 export const CAMERA_IDS = ["cam_1", "cam_2", "cam_3", "cam_4"] as const;
 
 export function StreamViewer({active = true, role, onConfigure}: {active?: boolean; role: UserRole; onConfigure: (cameraId: string) => void}) {
-  const canConfigure = role === "safety_manager";
+  const canConfigure = role === "safety_manager" || role === "system_admin";
   const [configurations, setConfigurations] = useState<Record<string, CameraConfiguration>>({});
   const [assets, setAssets] = useState<Record<string, MediaAsset>>({});
   const [sessions, setSessions] = useState<Record<string, CameraSession>>({});
@@ -27,6 +31,9 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const [running, setRunning] = useState(false);
   const [replaying, setReplaying] = useState("");
   const [error, setError] = useState("");
+  const [pendingAlerts, setPendingAlerts] = useState<SafetyEvent[]>([]);
+  const [activeAlert, setActiveAlert] = useState<SafetyEvent | null>(null);
+  const [ppeToast, setPpeToast] = useState<SafetyEvent | null>(null);
   const [pendingReview, setPendingReview] = useState<CameraInferenceResult | null>(null);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
@@ -35,9 +42,11 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const reviewSavingRef = useRef(false);
   const sessionsRef = useRef(sessions);
   const configurationsRef = useRef(configurations);
+  const activeAlertRef = useRef<SafetyEvent | null>(null);
+  const openAlertRef = useRef<(alert: SafetyEvent) => void>(() => undefined);
   const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
-  const reviewQueueRef = useRef<CameraInferenceResult[]>([]);
-  const seenReviewOccurrencesRef = useRef(new Set<string>());
+  const zoneQueueRef = useRef<SafetyEvent[]>([]);
+  const announcedAlertIdsRef = useRef(new Set<number>());
   sessionsRef.current = sessions;
   configurationsRef.current = configurations;
 
@@ -45,13 +54,15 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
     if (!active) return;
     const controller = new AbortController();
     setLoading(true);
-    void Promise.all([listCameraConfigurations(controller.signal), listMediaAssets(), listCameraSessions(controller.signal)])
-      .then(([configurationList, inventory, sessionList]) => {
+    void Promise.all([listCameraConfigurations(controller.signal), listMediaAssets(), listCameraSessions(controller.signal), loadPendingEvents(controller.signal)])
+      .then(([configurationList, inventory, sessionList, alerts]) => {
         const indexedConfigurations = indexBy(configurationList, "camera_id");
         configurationsRef.current = indexedConfigurations;
         setConfigurations(indexedConfigurations);
         setAssets(indexBy(inventory, "id"));
         applySessions(sessionList);
+        setPendingAlerts(alerts);
+        alerts.forEach(alert => announcedAlertIdsRef.current.add(alert.id));
       })
       .catch(reason => { if (!controller.signal.aborted) setError(errorText(reason)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -71,19 +82,19 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
     if (!accessToken) return;
     let disposed = false;
     let retryTimer: number | undefined;
-    const enqueueReview = (result: CameraInferenceResult) => {
-      const occurrenceIds = result.people.flatMap(person => person.active_violations
-        ?.filter(violation => violation.is_new)
-        .map(violation => violation.occurrence_id) ?? []);
-      if (!occurrenceIds.length || occurrenceIds.every(id => seenReviewOccurrencesRef.current.has(id))) return;
-      occurrenceIds.forEach(id => seenReviewOccurrencesRef.current.add(id));
-      if (pendingReviewRef.current) {
-        reviewQueueRef.current.push(result);
-        return;
-      }
-      pendingReviewRef.current = result;
-      setPendingReview(result);
-      setReviewStartedAt(Date.now());
+    const announcePersistedAlerts = (eventIds: number[]) => {
+      void loadPendingEvents().then(alerts => {
+        setPendingAlerts(alerts);
+        const fresh = alerts.filter(alert => eventIds.includes(alert.id) && !announcedAlertIdsRef.current.has(alert.id));
+        fresh.forEach(alert => announcedAlertIdsRef.current.add(alert.id));
+        for (const alert of fresh) {
+          if (isZoneAlert(alert)) {
+            if (activeAlertRef.current) zoneQueueRef.current.push(alert);
+            else openAlertRef.current(alert);
+          }
+          else setPpeToast(alert);
+        }
+      }).catch(reason => setError(errorText(reason)));
     };
     const client = new CameraDetectionClient({
       accessToken,
@@ -98,7 +109,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
         } else {
           setDetections(values => ({...values, [result.camera_id]: result}));
         }
-        if (result.review_required) enqueueReview(result);
+        if (result.review_required && result.pending_event_ids?.length) announcePersistedAlerts(result.pending_event_ids);
         setSessions(values => ({...values, [result.camera_id]: updated}));
       },
       onSessionStatus: status => {
@@ -167,10 +178,28 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
     finally { replayingRef.current = false; setReplaying(""); }
   }
 
-  function showReview(result: CameraInferenceResult | null) {
+  function showReview(result: CameraInferenceResult | null, alert: SafetyEvent | null = null) {
+    activeAlertRef.current = alert;
+    setActiveAlert(alert);
     pendingReviewRef.current = result;
     setPendingReview(result);
     setReviewStartedAt(result ? Date.now() : null);
+  }
+
+  function openAlert(alert: SafetyEvent) {
+    const result = alert.details?.pending_review;
+    if (!result) {
+      setError("Cảnh báo không còn đủ dữ liệu để mở HITL.");
+      return;
+    }
+    showReview({...result, snapshot_data: assetUrl(alert.snapshot_path) ?? undefined}, alert);
+  }
+  openAlertRef.current = openAlert;
+
+  function closeReview() {
+    showReview(null);
+    const next = zoneQueueRef.current.shift();
+    if (next) openAlert(next);
   }
 
   async function review(status: ReviewStatus) {
@@ -206,7 +235,9 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       });
       if (!payloads.length) throw new Error("Không có occurrence mới để lưu.");
       for (const payload of payloads) await saveReviewedEvent(payload);
-      showReview(reviewQueueRef.current.shift() ?? null);
+      const reviewedId = activeAlertRef.current?.id;
+      if (reviewedId != null) setPendingAlerts(current => current.filter(item => item.id !== reviewedId));
+      closeReview();
     } catch (reason) {
       setError(errorText(reason));
     } finally {
@@ -224,9 +255,9 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   if (loading) return <div className="stream-empty-state" role="status"><strong>Đang tải Live Monitor</strong></div>;
 
   return <div className="monitor-stream-shell">
-    <div className="monitor-actions"><div>{canConfigure && <p className="monitor-config-hint">Đã upload video? Bấm vào camera, sau đó bấm vào camera thêm một lần nữa để mở cấu hình.</p>}</div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
+    <div className="monitor-actions"><div>{canConfigure && <p className="monitor-config-hint">Đã upload video? Bấm vào camera để mở cấu hình.</p>}</div>{canConfigure && <button className="inference-btn" disabled={running || !Object.values(configurations).some(item => item.asset_id)} onClick={() => void run()}>{running ? "Đang khởi động…" : "Chạy mô phỏng"}</button>}</div>
     {error && <p className="stream-config-error" role="alert">{error}</p>}
-    <div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => {
+    <div className="monitor-workspace"><div className="monitor-camera-grid">{CAMERA_IDS.map((cameraId, index) => {
       const configuration = configurations[cameraId];
       const asset = configuration?.asset_id ? assets[configuration.asset_id] : undefined;
       const storedSession = sessions[cameraId];
@@ -235,7 +266,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       const replayVisible = asset?.media_type === "video" && (ended[cameraId] || session?.status === "COMPLETED");
       return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình Camera ${index + 1}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>
         <h3>Camera {index + 1}</h3>
-        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
+        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} storageBackend={asset.storage_backend} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
           {session && <div className={`stream-badge ${session.status.toLowerCase()}`}>{session.status}</div>}
           {session?.inference_fps != null && <div className="inference-fps">FPS infer <strong>{session.inference_fps.toFixed(1)}</strong></div>}
           {session?.status === "ERROR" && <div className="session-error">{session.error_code || "Phiên mô phỏng gặp lỗi."}</div>}
@@ -243,19 +274,20 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
         </> : <div className="stream-empty-state"><strong>{canConfigure ? "Bấm vào đây để cấu hình" : "Camera chưa được cấu hình"}</strong><span>Camera {index + 1}</span></div>}
       </article>;
     })}</div>
+    <PendingViolationList alerts={pendingAlerts} onOpen={openAlert} /></div>
+    <PpeAlertToast alert={ppeToast} onOpen={() => { if (ppeToast) openAlert(ppeToast); setPpeToast(null); }} onClose={() => setPpeToast(null)} />
     <ReviewModal
       isOpen={pendingReview !== null}
-      onClose={() => undefined}
+      onClose={closeReview}
       snapshot={pendingReview?.snapshot_data}
       people={pendingReview?.people}
-      detections={pendingReview?.detections}
       zones={pendingReview ? configurations[pendingReview.camera_id]?.zones : undefined}
       timer={reviewTimer}
       reviewSaving={reviewSaving}
       alertTitle={reviewTitle}
-      alertSummary={pendingReview ? `${pendingReview.camera_id} · ${pendingReview.video_time.toFixed(1)}s` : ""}
+      alertSummary={pendingReview ? `${pendingReview.camera_id} · ${new Date(activeAlert?.timestamp ?? Date.now()).toLocaleString("vi-VN")}` : ""}
       onReview={status => void review(status)}
-      closeable={false}
+      closeable
     />
   </div>;
 }

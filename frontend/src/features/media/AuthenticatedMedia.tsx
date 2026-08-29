@@ -1,17 +1,18 @@
 import {useEffect, useState} from "react";
 import {loadMediaSource} from "../../api/media-assets";
-import type {MediaType} from "../../types";
+import type {MediaStorageBackend, MediaType} from "../../types";
 
 interface AuthenticatedMediaProps {
   assetId: string;
   mediaType: MediaType;
+  storageBackend?: MediaStorageBackend;
   label: string;
   playing?: boolean;
   playbackKey?: string;
   onEnded?: () => void;
 }
 
-export function AuthenticatedMedia({assetId, mediaType, label, playing = false, playbackKey = "", onEnded}: AuthenticatedMediaProps) {
+export function AuthenticatedMedia({assetId, mediaType, storageBackend, label, playing = false, playbackKey = "", onEnded}: AuthenticatedMediaProps) {
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
 
@@ -20,7 +21,7 @@ export function AuthenticatedMedia({assetId, mediaType, label, playing = false, 
     let revocableUrl = "";
     setSource("");
     setError("");
-    void loadMediaSource(assetId, controller.signal)
+    void loadMediaSource(assetId, storageBackend, controller.signal)
       .then(mediaSource => {
         if (controller.signal.aborted) return;
         if (mediaSource.revoke) revocableUrl = mediaSource.url;
@@ -33,7 +34,7 @@ export function AuthenticatedMedia({assetId, mediaType, label, playing = false, 
       controller.abort();
       if (revocableUrl) URL.revokeObjectURL(revocableUrl);
     };
-  }, [assetId, playbackKey]);
+  }, [assetId, playbackKey, storageBackend]);
 
   if (error) return <div className="stream-empty-state" role="alert"><strong>Không thể tải media</strong><span>{error}</span></div>;
   if (!source) return <div className="stream-empty-state" role="status"><strong>Đang tải media</strong></div>;

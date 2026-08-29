@@ -12,6 +12,7 @@ class MediaAssetResponse(BaseModel):
     status: Literal["UPLOADING", "READY", "ERROR"]
     content_type: str
     size_bytes: int
+    storage_backend: Literal["filesystem", "s3"]
     uploaded_at: datetime
     assigned_camera_id: str | None = None
     can_delete: bool = False

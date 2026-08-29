@@ -39,7 +39,7 @@ US-29 uses backend-owned media and explicit sessions:
 - `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
 - `GET /api/v1/events` accepts an optional `camera_id` filter for camera-scoped violation logs; existing status, zone and event-type filters remain compatible.
 - `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.
-- A newly opened direct-camera occurrence carries one transient review JPEG; Live Monitor queues human review and persists only the operator outcome through the existing event API. Terminal model state is released without invalidating queued occurrence context.
+- Before publishing a newly opened direct-camera occurrence, the runtime persists it as an `unacknowledged` safety event with a privacy-redacted snapshot. Live Monitor reloads this durable pending inbox after navigation or refresh; a completed HITL submission transitions the same occurrence-backed event to `acknowledged` or `false_alarm`. Terminal model state is released without invalidating queued occurrence context.
 - HITL debounce is seven consecutive accepted violating frames for every violation type. A normal or unknown observation resets the pending sequence; vision-side PPE confirmation remains a separate observation gate.
 - Streamer, MediaMTX, HLS, RTSP and Connect/Disconnect are not runtime contracts.
 
@@ -297,7 +297,7 @@ Example confirmed violation:
 
 `EventService` validates and decodes `snapshot_data`, then calls the privacy adapter independently from PPE inference. It accepts transient `snapshot_people` and `snapshot_detections` from the reviewed frame, redacts first, and only then draws canonical person plus `hat`/`vest` boxes before JPEG encoding; these fields are excluded from event persistence/response. It writes only the processed JPEG under `data/snapshots`, sets `privacy_blurred=true` itself, then commits the event. Client-provided privacy/path values cannot bypass this gate.
 
-The privacy policy runs OpenCV YuNet once per reviewed snapshot, expands and blurs every detected face, then blurs the top 40% of each canonical person box without an associated face. A YuNet inference error degrades to the same fallback for all people and emits a stable operational warning; a missing/corrupt artifact fails startup. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. YuNet is independent from YOLO11m Safety and does not add privacy classes to the PPE contract.
+The privacy policy runs OpenCV YuNet once per reviewed snapshot and expands/blurs only detected face regions. If no face is detected, or YuNet inference fails, no person-head fallback blur is applied; the detector failure is still emitted as a stable operational warning. A missing/corrupt artifact fails startup. If no valid person region exists or any redaction/annotation/encoding step fails, processing is fail-closed: no snapshot and no reviewed event are created. YuNet is independent from YOLO11m Safety and does not add privacy classes to the PPE contract.
 
 The baseline also persists `false_alarm` using the same endpoint so model quality can be evaluated.
 

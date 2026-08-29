@@ -1,6 +1,6 @@
 # Project Design Decisions
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
@@ -14,6 +14,11 @@ This file contains only decisions that currently constrain implementation. Super
 - Cross-owner calls use public facades, adapters, or versioned contracts. New top-level boundaries require an explicit architecture decision.
 - FastAPI routes, Pydantic schemas, frontend wire types, SQLAlchemy models, Alembic migrations, and focused tests are runtime contract truth.
 
+### 2026-08-27: [Cross-cutting] System administrator operational authority
+
+- `system_admin` has full application authority: Live Monitor, camera configuration, simulation run/replay, event review/history, media management, account administration, and operational metrics.
+- `safety_manager` retains the operational safety workspace; `area_manager` remains restricted to its assigned area.
+
 ### [Cross-cutting] Documentation and tracking
 
 - `context-map.md` is the only documentation index. Documents remain standalone.
@@ -21,6 +26,18 @@ This file contains only decisions that currently constrain implementation. Super
 - `docs/FUTURE_PROJECT_STRUCTURE.md` is the read-only routing and dependency policy.
 
 ## Camera, Media, And Rules
+
+### 2026-08-28: [Frontend] Review snapshot uses backend annotation only
+
+- Review Modal và Event Detail hiển thị trực tiếp snapshot đã được backend annotate.
+- Không render person/PPE box hoặc confidence label ở các màn hình snapshot vi phạm; zone polygon và tên zone vẫn được render bằng overlay SVG riêng. `DetectionOverlay` chỉ dùng cho Live Monitor trên media trực tiếp.
+- Label snapshot đặt ở cạnh dưới box; khi chạm mép ảnh thì label được giữ trong frame.
+
+### 2026-08-27: [Backend/Frontend] Media playback routing follows the asset storage backend
+
+- Media inventory responses expose the additive `storage_backend` discriminator (`filesystem` or `s3`).
+- The browser loads filesystem assets directly through the authenticated `/content` fallback and requests `/playback-url` only for S3 assets.
+- Older responses without the discriminator retain the previous probe-and-fallback behavior for compatibility.
 
 ### 2026-08-23: [Cross-cutting] Camera disconnect và rule contract
 
@@ -52,6 +69,13 @@ This file contains only decisions that currently constrain implementation. Super
 - `hat_required` and `vest_required` are persisted on the fixed camera configuration, remain saveable with `zones=[]`, and apply to every qualified person in the frame only while camera-wide machine state is `running`.
 - Zone records continue to own `zone_intrusion_enabled` and `restricted_area_detection_enabled`; their embedded PPE fields remain additive compatibility data during migration.
 - A grouped HITL popup may contain multiple people, but the browser claims each occurrence ID once, serializes event writes, blocks duplicate submit, and advances the queue only after every valid write succeeds.
+
+### 2026-08-27: [Cross-cutting] Durable Live Monitor pending-alert inbox
+
+- Persist every newly opened direct-camera occurrence as a `SafetyEvent` with status `unacknowledged` before publishing its WebSocket result. Existing occurrence and `(monitoring_session_id, track_id)` constraints keep creation idempotent.
+- The processed violation log continues to query only `acknowledged` and `false_alarm`; HITL review transitions the same event instead of copying or deleting it.
+- PPE alerts use a dismissible toast plus the shared inbox and never auto-open. Zone or combined zone/PPE alerts take priority in one FIFO automatic modal. Closing a surface leaves the event pending.
+- Pending snapshots use the existing fail-closed privacy pipeline. Browser memory is only presentation state and is rebuilt from PostgreSQL after reload or navigation.
 
 ### 2026-08-24: [Cross-cutting] Seven-frame HITL debounce
 
