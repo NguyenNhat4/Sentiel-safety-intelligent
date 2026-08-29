@@ -4,6 +4,23 @@ import {loadCameraConfiguration, saveCameraConfiguration} from "../../api/camera
 import {listMediaAssets} from "../../api/media-assets";
 import {CameraConfigurationPage} from "./CameraConfigurationPage";
 
+it("orders the camera workspace, settings inspector, and violation control log", async () => {
+  render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
+
+  const camera = await screen.findByRole("region", {name: "Màn hình Camera 3"});
+  const settings = screen.getByRole("complementary", {name: "Thiết lập Camera 3"});
+  const violations = screen.getByRole("region", {name: "Nhật ký vi phạm Camera 3"});
+  const layout = camera.closest(".camera-detail-layout");
+
+  expect(layout).not.toBeNull();
+  expect(layout).toContainElement(settings);
+  expect(layout).toContainElement(violations);
+  expect(camera.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(settings.compareDocumentPosition(violations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(settings).toContainElement(screen.getByRole("combobox", {name: "Nguồn media"}));
+  expect(settings).toContainElement(screen.getByRole("button", {name: "Lưu cấu hình"}));
+});
+
 vi.mock("../../api/camera-configurations", () => ({loadCameraConfiguration: vi.fn(), saveCameraConfiguration: vi.fn()}));
 vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
 vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label}: {label: string}) => <video aria-label={label} />}));
@@ -24,9 +41,9 @@ beforeEach(() => {
   loadMock.mockResolvedValue(configuration);
   saveMock.mockResolvedValue({...configuration, revision: 8});
   assetsMock.mockResolvedValue([
-    {id: "asset-1", display_name: "Ca sáng", media_type: "video", status: "READY", content_type: "video/mp4", size_bytes: 10, uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: "cam_3", can_delete: false},
-    {id: "asset-2", display_name: "Ảnh máy dập", media_type: "image", status: "READY", content_type: "image/png", size_bytes: 10, uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: null, can_delete: true},
-    {id: "asset-3", display_name: "Đang xử lý", media_type: "video", status: "UPLOADING", content_type: "video/mp4", size_bytes: 10, uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: null, can_delete: false},
+    {id: "asset-1", display_name: "Ca sáng", media_type: "video", status: "READY", content_type: "video/mp4", size_bytes: 10, storage_backend: "s3", uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: "cam_3", can_delete: false},
+    {id: "asset-2", display_name: "Ảnh máy dập", media_type: "image", status: "READY", content_type: "image/png", size_bytes: 10, storage_backend: "filesystem", uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: null, can_delete: true},
+    {id: "asset-3", display_name: "Đang xử lý", media_type: "video", status: "UPLOADING", content_type: "video/mp4", size_bytes: 10, storage_backend: "s3", uploaded_at: "2026-08-23T08:00:00Z", assigned_camera_id: null, can_delete: false},
   ]);
 });
 
@@ -59,7 +76,7 @@ it("saves asset, machine, zones and PPE once and clears the dirty draft", async 
   expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
   expect(screen.getByRole("button", {name: "Lưu cấu hình"})).toBeDisabled();
   expect(onSaved).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại Live Monitor"}));
   expect(onBack).toHaveBeenCalledOnce();
 });
 
@@ -108,7 +125,7 @@ it("reports a dirty draft before delegating navigation to the application", asyn
 
   fireEvent.click(await screen.findByRole("checkbox", {name: "Yêu cầu mũ bảo hộ"}));
   await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
-  const back = screen.getByRole("button", {name: "Quay lại"});
+  const back = screen.getByRole("button", {name: "Quay lại Live Monitor"});
   fireEvent.click(back);
   expect(onBack).toHaveBeenCalledOnce();
 });
@@ -177,6 +194,6 @@ it("allows disconnecting camera source and saves asset_id as null", async () => 
 
   await waitFor(() => expect(saveMock).toHaveBeenCalledWith("cam_3", expect.objectContaining({asset_id: null})));
   expect(await screen.findByRole("status")).toHaveTextContent("Đã lưu");
-  fireEvent.click(screen.getByRole("button", {name: "Quay lại"}));
+  fireEvent.click(screen.getByRole("button", {name: "Quay lại Live Monitor"}));
   expect(onBack).toHaveBeenCalledOnce();
 });

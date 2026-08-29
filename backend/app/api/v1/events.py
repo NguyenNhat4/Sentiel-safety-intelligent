@@ -75,6 +75,8 @@ async def list_events(
     db: Session = Depends(get_db),
 ):
     """Retrieve safety violation events with filtering."""
+    if actor.role == UserRole.AREA_MANAGER.value and not actor.managed_area_id:
+        raise HTTPException(status_code=403, detail="Area manager has no assigned area")
     service = EventService(db)
     return service.get_events(
         skip=skip,

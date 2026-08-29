@@ -111,9 +111,6 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
     const point = pointFromEvent(event); if (!point) return;
     const points = [...selectedZone.points]; points[dragging] = point; updateSelected({points});
   }
-  function leavePage() {
-    onBack();
-  }
   async function save() {
     const currentDraft = draft;
     if (savingRef.current || !currentDraft || incomplete || conflict) return;
@@ -127,28 +124,37 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
 
   return <section className={`camera-config-page page ${active ? "active" : ""}`}>
     {showTitle && <div className="camera-config-toolbar"><div><p className="eyebrow">CAMERA {cameraNumber(cameraId)} · CONTROLLED DRAFT</p><h2>Cấu hình Camera {cameraNumber(cameraId)}</h2><p>Media, trạng thái máy, vùng và PPE chỉ được áp dụng trong một lần lưu.</p></div><button type="button" className="secondary-btn" onClick={onBack}>Quay lại Live Monitor</button></div>}
-    <div className="camera-config-section asset-config-section">
-      <div className="asset-select-field-group">
-        <label className="asset-select-field">Nguồn media<select aria-label="Nguồn media" value={draft.asset_id ?? ""} onChange={event => updateDraft({asset_id: event.target.value || null})}><option value="">Chọn media đã sẵn sàng</option>{assets.map(asset => <option key={asset.id} value={asset.id} disabled={Boolean(asset.assigned_camera_id && asset.assigned_camera_id !== cameraId)}>{asset.display_name} · {asset.media_type === "video" ? "Video" : "Hình ảnh"}</option>)}</select></label>
-        {draft.asset_id && <div className="asset-actions"><button type="button" className="secondary-btn disconnect-asset-btn" aria-label="Ngắt kết nối nguồn media" onClick={() => updateDraft({asset_id: null})}>Ngắt kết nối nguồn</button></div>}
-      </div>
-    </div>
-    <div className="camera-config-workspace">
-      <div className="camera-config-media">
-        {selectedAsset ? <AuthenticatedMedia assetId={selectedAsset.id} mediaType={selectedAsset.media_type} storageBackend={selectedAsset.storage_backend} label={`Preview Camera ${cameraNumber(cameraId)}`} playing /> : <div className="camera-config-empty">Chọn media để xem preview và vẽ vùng.</div>}
-        <svg className="zone-config-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" onPointerDown={addPoint} onPointerMove={movePoint} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>{draft.zones.map(zone => <g key={zone.zone_id} className={zone.zone_id === selectedZoneId ? "selected" : ""}>{zone.points.length > 1 && <polyline points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.length === 4 && <polygon points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" onPointerDown={event => { event.stopPropagation(); setSelectedZoneId(zone.zone_id); setDragging(index); }} />)}</g>)}</svg>
-        <strong className="camera-config-title">Camera {cameraNumber(cameraId)}</strong>
-        <span className={`camera-config-live-state ${selectedAsset ? "is-connected" : ""}`}><i />{selectedAsset ? "Camera đã kết nối" : "Chưa kết nối camera"}</span>
-      </div>
-      <aside className="camera-config-controls">
+    <div className="camera-detail-layout">
+      <div className="camera-config-workspace">
+      <section className="camera-preview-panel" aria-label={`Màn hình Camera ${cameraNumber(cameraId)}`}>
+        <div className="camera-config-media">
+          {selectedAsset ? <AuthenticatedMedia assetId={selectedAsset.id} mediaType={selectedAsset.media_type} storageBackend={selectedAsset.storage_backend} label={`Preview Camera ${cameraNumber(cameraId)}`} playing /> : <div className="camera-config-empty">Chọn media để xem preview và vẽ vùng.</div>}
+          <svg className="zone-config-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" onPointerDown={addPoint} onPointerMove={movePoint} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>{draft.zones.map(zone => <g key={zone.zone_id} className={zone.zone_id === selectedZoneId ? "selected" : ""}>{zone.points.length > 1 && <polyline points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.length === 4 && <polygon points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" onPointerDown={event => { event.stopPropagation(); setSelectedZoneId(zone.zone_id); setDragging(index); }} />)}</g>)}</svg>
+          <strong className="camera-config-title">Camera {cameraNumber(cameraId)}</strong>
+          <span className={`camera-config-live-state ${selectedAsset ? "is-connected" : ""}`}><i />{selectedAsset ? "Camera đã kết nối" : "Chưa kết nối camera"}</span>
+        </div>
+      </section>
+      <aside className="camera-config-controls" aria-label={`Thiết lập Camera ${cameraNumber(cameraId)}`}>
+        <div className="settings-panel-heading"><div><span className="camera-config-section-kicker">THIẾT LẬP</span><h3>Kiểm soát camera</h3></div><small>Nguồn phát, trạng thái máy, vùng cấm và PPE.</small></div>
+        <div className="camera-config-section asset-config-section">
+          <div className="camera-config-card-heading"><div><strong>Nguồn camera</strong><small>Media dùng cho preview và inference.</small></div></div>
+          <div className="asset-select-field-group">
+            <label className="asset-select-field">MEDIA ĐANG DÙNG<select aria-label="Nguồn media" value={draft.asset_id ?? ""} onChange={event => updateDraft({asset_id: event.target.value || null})}><option value="">Chọn media đã sẵn sàng</option>{assets.map(asset => <option key={asset.id} value={asset.id} disabled={Boolean(asset.assigned_camera_id && asset.assigned_camera_id !== cameraId)}>{asset.display_name} · {asset.media_type === "video" ? "Video" : "Hình ảnh"}</option>)}</select></label>
+            {draft.asset_id && <div className="asset-actions"><button type="button" className="secondary-btn disconnect-asset-btn" aria-label="Ngắt kết nối nguồn media" onClick={() => updateDraft({asset_id: null})}>Ngắt kết nối</button></div>}
+          </div>
+        </div>
         <div className="zone-config-panel camera-config-section machine-card">
-          <div className="camera-config-card-heading"><div><strong>Trạng thái máy</strong><small>Điều khiển việc áp dụng quy tắc PPE.</small></div></div>
-          <div className="machine-state-control">
-            <div className="machine-state-options" role="group" aria-label="Trạng thái máy">
-              <button type="button" aria-pressed={draft.machine_state === "running"} onClick={() => updateDraft({machine_state: "running"})}><i aria-hidden="true" />BẬT</button>
-              <button type="button" aria-pressed={draft.machine_state === "stopped"} onClick={() => updateDraft({machine_state: "stopped"})}><i aria-hidden="true" />TẮT</button>
+          <div className="camera-config-card-heading"><div><strong>Vận hành &amp; PPE</strong><small>Trạng thái máy quyết định thời điểm áp dụng quy tắc bảo hộ.</small></div></div>
+          <div className="operation-ppe-layout">
+            <div className="operation-setting"><span className="setting-subtitle">TRẠNG THÁI MÁY</span><div className="machine-state-control">
+              <div className="machine-state-options" role="group" aria-label="Trạng thái máy">
+                <button type="button" aria-pressed={draft.machine_state === "running"} onClick={() => updateDraft({machine_state: "running"})}><i aria-hidden="true" />BẬT</button>
+                <button type="button" aria-pressed={draft.machine_state === "stopped"} onClick={() => updateDraft({machine_state: "stopped"})}><i aria-hidden="true" />TẮT</button>
+              </div>
+              <p className="machine-state-description">{draft.machine_state === "running" ? "Hệ thống tự động kiểm tra mũ bảo hiểm và áo phản quang." : "Máy đã dừng, quy tắc PPE tạm thời không được kiểm tra."}</p>
             </div>
-            <p className="machine-state-description">{draft.machine_state === "running" ? "Hệ thống tự động kiểm tra mũ bảo hiểm và áo phản quang." : "Máy đã dừng, quy tắc PPE tạm thời không được kiểm tra."}</p>
+            </div>
+            <div className="ppe-setting"><span className="setting-subtitle">YÊU CẦU BẢO HỘ</span><div className="ppe-requirement-switches camera-rule-switches"><RuleSwitch label="Mũ bảo hiểm" checked={rules.hat_required} onChange={value => updateRules({hat_required: value})} /><RuleSwitch label="Áo phản quang" checked={rules.vest_required} onChange={value => updateRules({vest_required: value})} /></div>{!selectedZone && <p className="ppe-scope-note">PPE áp dụng toàn bộ khung hình; không cần tạo vùng.</p>}</div>
           </div>
         </div>
         <div className="zone-config-panel camera-config-section zone-card">
@@ -157,17 +163,12 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
           {incomplete && <p className="zone-drawing-help" role="status">Bấm lần lượt 4 điểm trên khung camera để khép vùng.</p>}
           {selectedZone && <label className="zone-name-field">Tên vùng<input aria-label="Tên vùng" value={selectedZone.display_name} onChange={event => updateSelected({display_name: event.target.value})} /></label>}
         </div>
-        <div className="zone-config-panel camera-config-section ppe-card">
-          <div className="camera-config-card-heading"><div><strong>Quy tắc bảo hộ PPE</strong><small>Áp dụng trên toàn bộ khung hình khi máy bật.</small></div></div>
-          <div className="ppe-requirement-switches camera-rule-switches"><RuleSwitch label="Mũ bảo hiểm" checked={rules.hat_required} onChange={value => updateRules({hat_required: value})} /><RuleSwitch label="Áo phản quang" checked={rules.vest_required} onChange={value => updateRules({vest_required: value})} /></div>
-          {!selectedZone && <p>PPE áp dụng toàn bộ khung hình; không cần tạo vùng.</p>}
-        </div>
+        {conflict && <p role="alert">Các vùng đang giao, chạm hoặc chứa nhau: {conflict.join(", ")}.</p>}{error && <p role="alert">{error}</p>}{!error && message && <p role="status">{message}</p>}
+        <div className="camera-config-footer"><div className={`camera-save-state ${dirty && !incomplete && !conflict ? "is-ready" : ""}`}><strong>{dirty ? "Cấu hình chưa lưu" : "Cấu hình đã đồng bộ"}</strong><small>{saveBlocker}</small></div><div className="zone-save-actions"><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div></div>
       </aside>
-      {conflict && <p role="alert">Các vùng đang giao, chạm hoặc chứa nhau: {conflict.join(", ")}.</p>}{error && <p role="alert">{error}</p>}{!error && message && <p role="status">{message}</p>}
+      </div>
+      <CameraViolationLog cameraId={cameraId} />
     </div>
-    <div className="camera-config-footer"><div className={`camera-save-state ${dirty && !incomplete && !conflict ? "is-ready" : ""}`}><strong>{dirty ? "Cấu hình chưa lưu" : "Cấu hình đã đồng bộ"}</strong><small>{saveBlocker}</small></div><div className="zone-save-actions"><button type="button" className="secondary-btn" onClick={leavePage}>Quay lại</button><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div>
-    </div>
-    <CameraViolationLog cameraId={cameraId} />
     {saveNotice && <aside className="toast show camera-config-save-toast" role="status" aria-live="polite"><span aria-hidden="true">✓</span><div><strong>{saveNotice}</strong></div></aside>}
   </section>;
 }

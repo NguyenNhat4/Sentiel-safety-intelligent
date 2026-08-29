@@ -5,7 +5,7 @@ import type {MediaStorageBackend, MediaType} from "../../types";
 interface AuthenticatedMediaProps {
   assetId: string;
   mediaType: MediaType;
-  storageBackend?: MediaStorageBackend;
+  storageBackend: MediaStorageBackend;
   label: string;
   playing?: boolean;
   playbackKey?: string;

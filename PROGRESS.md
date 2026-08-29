@@ -1,6 +1,16 @@
 # Project Progress
 
-Updated: 2026-08-27
+Updated: 2026-08-28
+
+### 2026-08-29 Camera detail three-zone layout
+
+- [Frontend] Tái cấu trúc trang chi tiết camera desktop thành một viewport: cột trái xếp preview camera ở trên và dải settings ngang gồm Nguồn/Vận hành & PPE/Vùng ở dưới; log vi phạm theo camera nằm bên phải. Trạng thái máy và yêu cầu bảo hộ được gộp trong cùng một nhóm, phân tách nội bộ để tiết kiệm diện tích. Settings dùng một surface liền khối, phân nhóm bằng divider mảnh, control cùng nhịp và footer save dùng chung khối; chỉ cuộn ngang khi thiếu chỗ, trong khi danh sách log cuộn nội bộ. Mobile giữ thứ tự Preview → Thiết lập → Log và cho phép cuộn trang.
+- [Frontend] Nút Quay lại của màn cấu hình camera được chuyển từ footer lên header chung cạnh tiêu đề trang; footer chỉ giữ trạng thái draft và thao tác lưu.
+- [Local runtime] Khôi phục PostgreSQL Compose cho backend local và cập nhật `.env.development` dùng cổng PostgreSQL trên host; `/api/v1/auth/me` trở lại `200` thay vì `503`. Frontend khai báo favicon SVG nội tuyến để trình duyệt không tiếp tục gọi `/favicon.ico` bị thiếu.
+- [Frontend] Tăng nhẹ chiều cao dải thiết lập desktop và thu gọn nhịp dọc panel Vùng cấm để trường Tên vùng không bị footer lưu che/cắt trong lúc polygon đang ở trạng thái 0/4 điểm.
+- [Frontend] Tái bố cục modal Chi tiết sự kiện theo luồng đọc trên xuống: tóm tắt, ảnh bằng chứng, rồi audit 3 bước trên một hàng; màn hình nhỏ xếp cả ba bước dọc và modal cuộn nội bộ.
+- [Backend] Chặn tài khoản Quản lý khu vực chưa có `managed_area_id` đọc danh sách log và thống kê toàn hệ thống; API trả `403` rõ ràng thay vì để danh sách lọt qua rồi chi tiết trả `404`.
+- [Verification] Focused camera configuration/log tests pass 14/14; frontend lint, type-check và production build pass.
 
 ### 2026-08-28 Stopped-machine PPE warning emphasis
 

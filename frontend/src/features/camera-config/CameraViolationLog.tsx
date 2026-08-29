@@ -34,7 +34,7 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
 
   return <section className="camera-config-section camera-violation-log" aria-labelledby="camera-violation-log-heading">
     <div className="camera-config-section-heading">
-      <div className="camera-log-heading-copy"><span className="camera-config-section-kicker">04 · LỊCH SỬ</span><strong id="camera-violation-log-heading">Nhật ký vi phạm Camera {cameraNumber(cameraId)}</strong><small>Event được ghi nhận riêng cho camera này.</small></div>
+      <div className="camera-log-heading-copy"><span className="camera-config-section-kicker">LỊCH SỬ</span><strong id="camera-violation-log-heading">Nhật ký vi phạm Camera {cameraNumber(cameraId)}</strong><small>Event được ghi nhận riêng cho camera này.</small></div>
       <button type="button" className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
     </div>
     <div className="camera-log-summary" aria-label="Tổng quan log vi phạm">
