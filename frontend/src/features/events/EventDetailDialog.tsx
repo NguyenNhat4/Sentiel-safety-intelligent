@@ -58,7 +58,7 @@ export function EventDetailDialog({eventId, onClose}: EventDetailDialogProps) {
           <p className="eyebrow">DECISION AUDIT</p>
           <h2 id={headingId}>Chi tiết sự kiện #{eventId}</h2>
         </div>
-        <button ref={closeRef} className="secondary-btn" aria-label="Đóng chi tiết sự kiện" onClick={onClose}>Đóng</button>
+        <button ref={closeRef} className="event-detail-close" aria-label="Đóng chi tiết sự kiện" onClick={onClose}>×</button>
       </div>
       {error ? <div className="event-detail-error" role="alert">{error}</div> : detail && <EventDetailContent detail={detail} />}
     </dialog>

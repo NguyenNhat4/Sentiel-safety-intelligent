@@ -3,6 +3,16 @@
 Updated: 2026-08-28
 Updated: 2026-08-27
 
+### 2026-08-29 Camera detail three-zone layout
+
+- [Frontend] Tái cấu trúc trang chi tiết camera desktop thành một viewport: cột trái xếp preview camera ở trên và dải settings ngang gồm Nguồn/Vận hành & PPE/Vùng ở dưới; log vi phạm theo camera nằm bên phải. Trạng thái máy và yêu cầu bảo hộ được gộp trong cùng một nhóm, phân tách nội bộ để tiết kiệm diện tích. Settings dùng một surface liền khối, phân nhóm bằng divider mảnh, control cùng nhịp và footer save dùng chung khối; chỉ cuộn ngang khi thiếu chỗ, trong khi danh sách log cuộn nội bộ. Mobile giữ thứ tự Preview → Thiết lập → Log và cho phép cuộn trang.
+- [Frontend] Nút Quay lại của màn cấu hình camera được chuyển từ footer lên header chung cạnh tiêu đề trang; footer chỉ giữ trạng thái draft và thao tác lưu.
+- [Local runtime] Khôi phục PostgreSQL Compose cho backend local và cập nhật `.env.development` dùng cổng PostgreSQL trên host; `/api/v1/auth/me` trở lại `200` thay vì `503`. Frontend khai báo favicon SVG nội tuyến để trình duyệt không tiếp tục gọi `/favicon.ico` bị thiếu.
+- [Frontend] Tăng nhẹ chiều cao dải thiết lập desktop và thu gọn nhịp dọc panel Vùng cấm để trường Tên vùng không bị footer lưu che/cắt trong lúc polygon đang ở trạng thái 0/4 điểm.
+- [Frontend] Tái bố cục modal Chi tiết sự kiện theo luồng đọc trên xuống: tóm tắt, ảnh bằng chứng, rồi audit 3 bước trên một hàng; màn hình nhỏ xếp cả ba bước dọc và modal cuộn nội bộ.
+- [Backend] Chặn tài khoản Quản lý khu vực chưa có `managed_area_id` đọc danh sách log và thống kê toàn hệ thống; API trả `403` rõ ràng thay vì để danh sách lọt qua rồi chi tiết trả `404`.
+- [Verification] Focused camera configuration/log tests pass 14/14; frontend lint, type-check và production build pass.
+
 ### 2026-08-28 Stopped-machine PPE warning emphasis
 
 - [Frontend] Khi máy ở trạng thái TẮT, thông báo PPE tạm ngừng kiểm tra dùng chữ đỏ đậm, nền đỏ nhạt và viền cảnh báo để thu hút sự chú ý; trạng thái BẬT giữ màu xanh hiện hành.
@@ -73,6 +83,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 ### Cross-cutting
 
 - Railway seed behavior is documented: production startup migrates schema but intentionally does not create demo users; the staging2-only one-off seed procedure and the misleading always-visible frontend demo cards are recorded in the operations runbook.
+- Camera detail now uses a responsive two-column layout: configuration/preview on the left and a camera-scoped violation log on the right, loaded through the optional `camera_id` event filter with per-event detail access and empty/error states.
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
 - Luồng local từ upload video đến playback, sampled frame inference, metadata WebSocket, SVG overlay, HITL và Replay được mô tả trong `docs/architecture/local-video-frame-flow.md` cùng source-of-truth code map.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.

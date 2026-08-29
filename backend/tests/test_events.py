@@ -53,6 +53,21 @@ def test_update_event_status(client):
     assert patch_resp.json()["acknowledged_by"] == "Safety Officer A"
 
 
+def test_list_events_filters_by_camera_id(client):
+    for camera_id in ("cam_1", "cam_2"):
+        response = client.post(
+            "/api/v1/events",
+            json={"zone_id": "zone_01", "camera_id": camera_id, "event_type": "zone_intrusion"},
+        )
+        assert response.status_code == 201
+
+    response = client.get("/api/v1/events?camera_id=cam_1")
+
+    assert response.status_code == 200
+    assert response.json()
+    assert {event["camera_id"] for event in response.json()} == {"cam_1"}
+
+
 def test_create_event_with_completed_review(client):
     response = client.post(
         "/api/v1/events",
@@ -388,3 +403,26 @@ def test_area_manager_only_sees_confirmed_events_for_their_assigned_area(client,
     other_event = db_session.query(SafetyEvent).filter(SafetyEvent.zone_id == "zone_3").first()
     denied = client.patch(f"/api/v1/events/{other_event.id}", json={"status": "resolved"})
     assert denied.status_code == 404
+
+
+def test_unassigned_area_manager_cannot_list_events_or_statistics(client, db_session):
+    db_session.add(
+        User(
+            email="area.unassigned@sentinel.local",
+            full_name="Unassigned Area Manager",
+            role=UserRole.AREA_MANAGER.value,
+            password_hash=hash_password("Sentinel123!"),
+            managed_area_id=None,
+        )
+    )
+    db_session.commit()
+    token, _, _ = AuthService(db_session).login("area.unassigned@sentinel.local", "Sentinel123!")
+    client.headers.update({"Authorization": f"Bearer {token}"})
+
+    events = client.get("/api/v1/events")
+    summary = client.get("/api/v1/statistics/summary")
+
+    assert events.status_code == 403
+    assert events.json()["detail"] == "Area manager has no assigned area"
+    assert summary.status_code == 403
+    assert summary.json()["detail"] == "Area manager has no assigned area"

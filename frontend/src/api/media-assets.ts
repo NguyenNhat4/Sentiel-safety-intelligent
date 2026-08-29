@@ -42,7 +42,7 @@ export async function loadMediaContent(assetId: string, signal?: AbortSignal): P
   return response.blob();
 }
 
-export async function loadMediaSource(assetId: string, storageBackend?: MediaStorageBackend, signal?: AbortSignal): Promise<{url: string; revoke: boolean}> {
+export async function loadMediaSource(assetId: string, storageBackend: MediaStorageBackend, signal?: AbortSignal): Promise<{url: string; revoke: boolean}> {
   if (storageBackend === "filesystem") {
     return {url: URL.createObjectURL(await loadMediaContent(assetId, signal)), revoke: true};
   }

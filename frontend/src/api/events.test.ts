@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {loadEventDetail, loadReviewedEvents, saveReviewedEvent} from "./events";
+import {loadCameraEvents, loadEventDetail, loadReviewedEvents, saveReviewedEvent} from "./events";
 import type {EventPayload} from "../types";
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -12,6 +12,18 @@ afterEach(() => {
 });
 
 describe("event audit transport", () => {
+  it("loads violation logs for one camera", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([{id: 7, camera_id: "cam_3"}]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadCameraEvents("cam_3")).resolves.toEqual([{id: 7, camera_id: "cam_3"}]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/events?camera_id=cam_3&limit=50",
+      expect.objectContaining({headers: expect.any(Object)}),
+    );
+  });
+
   it("loads a typed event detail with the current authenticated session", async () => {
     window.sessionStorage.setItem("sentinel.auth.access_token", "audit-token");
     const fetchMock = vi.fn(async () => jsonResponse({id: 42, summary: {text: "Audit", source: "deterministic"}}));

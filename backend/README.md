@@ -37,6 +37,7 @@ US-29 uses backend-owned media and explicit sessions:
   server-owned read-through cache under `MEDIA_ASSET_DIR` for inference.
 - `PUT /api/v1/camera-configurations/{camera_id}` atomically saves asset, machine state, zones and PPE for fixed `cam_1` through `cam_4`.
 - `POST /api/v1/simulation-runs` and per-camera Replay create fresh direct-file inference sessions.
+- `GET /api/v1/events` accepts an optional `camera_id` filter for camera-scoped violation logs; existing status, zone and event-type filters remain compatible.
 - `/api/v1/ws/camera-detections` carries session lifecycle, rolling FPS and source-coordinate inference results.
 - Before publishing a newly opened direct-camera occurrence, the runtime persists it as an `unacknowledged` safety event with a privacy-redacted snapshot. Live Monitor reloads this durable pending inbox after navigation or refresh; a completed HITL submission transitions the same occurrence-backed event to `acknowledged` or `false_alarm`. Terminal model state is released without invalidating queued occurrence context.
 - HITL debounce is seven consecutive accepted violating frames for every violation type. A normal or unknown observation resets the pending sequence; vision-side PPE confirmation remains a separate observation gate.
