@@ -2,18 +2,18 @@
 
 ## Mục tiêu và phạm vi hiện tại
 
-Lát cắt này tách phần YOLO11m Safety và ByteTrack ra thành một FastAPI process độc lập. Backend chính giữ nguyên REST/WebSocket phía trình duyệt, rule PPE/vùng nguy hiểm, vòng đời occurrence, HITL, database, snapshot và notification.
+Lát cắt này tách phần YOLO11n Safety KD và ByteTrack ra thành một FastAPI process độc lập. Backend chính giữ nguyên REST/WebSocket phía trình duyệt, rule PPE/vùng nguy hiểm, vòng đời occurrence, HITL, database, snapshot và notification.
 
 Luồng production hiện tại:
 
 ```text
 Backend đọc image/video từ media volume
   -> Railway backend lấy frame ở nhịp giới hạn và gọi FrameInferenceService
-    -> PostgreSQL load state + revision của monitoring session
-    -> RemoteVisionAdapter gửi JPEG + state tới POST /v2/infer
-      -> YOLO11m Safety + fresh ByteTrack/PPE smoother
-      <- bbox person/hat/vest + track_id + next state
-    -> PostgreSQL compare-and-swap revision/frame
+    -> RemoteVisionAdapter mã hóa JPEG
+    -> POST /v1/infer tới vision worker
+      -> YOLO11n Safety KD + ByteTrack
+      <- bbox person/hat/vest + track_id
+    <- contract safety_vision_v1
   -> Railway áp rule, deduplicate và publish metadata camera
   -> Browser phát asset được xác thực và nhận overlay qua WebSocket hiện hữu
 ```
@@ -96,7 +96,7 @@ Cách ít biến số nhất ở giai đoạn này là tạo service thứ hai t
 - Port: dùng biến `PORT` của nền tảng; image đã đọc biến này.
 - Health path: `/ping`.
 - Replica: `1`.
-- Biến worker: `PPE_MODEL_PATH=models/yolo11m_safety.pt`, `VISION_MODEL_VERSION=yolo11m_safety-cpu-v1`, và một `VISION_WORKER_API_KEY` bí mật.
+- Biến worker: `PPE_MODEL_PATH=models/yolo11n_safety_kd_best.pt`, `VISION_MODEL_VERSION=yolo11n_safety_kd-cpu-v1`, và một `VISION_WORKER_API_KEY` bí mật.
 
 Sau khi worker trả health, đặt trên service backend Railway. Khi hai service nằm trong cùng project/environment, ưu tiên private networking:
 

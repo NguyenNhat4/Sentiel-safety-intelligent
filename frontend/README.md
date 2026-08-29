@@ -55,7 +55,7 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 3. Save returns to Live Monitor and does not start inference.
 4. **Chạy mô phỏng** starts fresh server-owned sessions for valid cameras; Replay starts one completed video again.
 5. `/api/v1/ws/camera-detections` carries lifecycle, session ID, source time, rolling inference FPS and detections.
-6. The UI ignores stale session output and draws canonical person/hat/vest observations in source coordinates.
+6. The UI ignores stale session output, buffers video detections by `video_time`, and draws canonical person/hat/vest observations only when browser playback is within 200 ms of the inference frame. Images render their single result immediately.
 7. Run creates fresh sessions for every valid configured camera. Replay creates one
    fresh session for only the selected camera and remounts playback at the beginning.
 8. Newly opened occurrences are persisted as privacy-protected pending events. PPE opens a dismissible toast and remains in the shared inbox; zone alerts use one FIFO modal. Duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.

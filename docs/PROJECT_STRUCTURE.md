@@ -42,7 +42,7 @@ P-047/
 │   │   │   └── startup_validation.py # Production model and writable-volume validation
 │   │   ├── integrations/ # Provider adapters; no safety decisions
 │   │   │   ├── README.md
-│   │   │   ├── ppe_vision.py # Unified YOLO11m Safety person/tracking/PPE adapter
+│   │   │   ├── ppe_vision.py # Unified YOLO11n Safety KD person/tracking/PPE adapter
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   │   ├── media_storage.py # Railway Bucket presigned media and cache transfer adapter
@@ -203,7 +203,8 @@ P-047/
 │   ├── README.md        # Provenance, checksums, licenses and class mapping
 │   ├── face_detection_yunet_2023mar.onnx # Pinned OpenCV YuNet face detector
 │   ├── ppe_yolov8n.pt  # Retired SH17 artifact retained only for controlled history
-│   ├── yolo11m_safety.pt # Runtime wesjos YOLO11m Safety checkpoint
+│   ├── yolo11n_safety_kd_best.pt # Runtime knowledge-distilled Safety checkpoint
+│   ├── yolo11m_safety.pt # Retired Safety checkpoint retained for rollback/benchmark
 │   └── yolo11n.pt      # Retired person baseline retained for controlled history
 ├── docs/                # Problem statement, structure docs and technical guides
 │   ├── README.md                    # Documentation catalog
@@ -217,6 +218,7 @@ P-047/
 │   │   ├── AI_TEAM_WORKFLOW.md          # Multi-agent collaboration guidelines
 │   │   ├── CI_CD.md                     # New-contributor CI, Railway release and rollback runbook
 │   │   ├── DEPLOYMENT_FLOW.md           # Visual deployment flow diagrams, service matrix and team runbook
+│   │   ├── RAILWAY_SEED_DATA.md         # Why production deploys do not auto-seed and staging2 seed runbook
 │   │   ├── local-docker-postgres.md     # Local Docker PostgreSQL configuration
 │   │   ├── operational-metrics.md       # JSONL metrics operation, API, privacy and UI guide
 │   │   ├── RUNPOD_VISION_DEPLOYMENT.md # CPU/RunPod split-worker deployment runbook

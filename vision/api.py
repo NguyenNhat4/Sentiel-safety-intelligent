@@ -618,14 +618,13 @@ class PpeVisionFacade:
             "vest": {"status": "unknown", "confidence": None},
         }
 
-    @classmethod
-    def _validate_model_classes(cls, names: dict[int, str] | list[str]) -> None:
+    def _validate_model_classes(self, names: dict[int, str] | list[str]) -> None:
         normalized = {
             index: str(name) for index, name in dict(enumerate(names) if isinstance(names, list) else names).items()
         }
-        if normalized != cls.SOURCE_CLASS_NAMES:
+        if normalized != self.SOURCE_CLASS_NAMES:
             raise RuntimeError(
-                f"yolo11m_safety.pt class mapping must be {cls.SOURCE_CLASS_NAMES}, received {normalized}"
+                f"{Path(self._model_path).name} class mapping must be {self.SOURCE_CLASS_NAMES}, received {normalized}"
             )
 
     @staticmethod

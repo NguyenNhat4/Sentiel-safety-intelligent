@@ -23,14 +23,14 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}" \
     PORT=8000 \
-    PPE_MODEL_PATH=models/yolo11m_safety.pt \
-    VISION_MODEL_VERSION=yolo11m_safety-cpu
+    PPE_MODEL_PATH=models/yolo11n_safety_kd_best.pt \
+    VISION_MODEL_VERSION=yolo11n_safety_kd-cpu
 
 RUN useradd --create-home appuser
 
 COPY backend ./backend
 COPY vision ./vision
-COPY models/yolo11m_safety.pt ./models/yolo11m_safety.pt
+COPY models/yolo11n_safety_kd_best.pt ./models/yolo11n_safety_kd_best.pt
 
 RUN chown -R appuser:appuser /app
 USER appuser

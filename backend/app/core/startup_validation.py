@@ -10,7 +10,7 @@ import cv2
 from backend.app.core.config import Settings
 
 REQUIRED_MODEL_CHECKSUMS = {
-    "yolo11m_safety.pt": "e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218",
+    "yolo11n_safety_kd_best.pt": "940467d80536e1a26313bd700e33d3e7a17816659ca7346708e0dc8e03aa06c6",
     "face_detection_yunet_2023mar.onnx": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
 }
 

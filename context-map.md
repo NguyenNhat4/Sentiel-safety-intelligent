@@ -31,7 +31,7 @@ Baseline hiện có:
 
 - React 19 + TypeScript + Vite cho monitor, FastAPI cho REST/WebSocket và frontend build.
 - Sys Admin upload video/ảnh vào thư viện media; Safety Manager gán asset duy nhất cho bốn camera logic, cấu hình vùng/PPE và chủ động chạy phiên inference.
-- YOLO11m Safety chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
+- YOLO11n Safety KD chạy một lần mỗi frame với `person`, `hat`, `vest`; có thể chạy trong backend hoặc worker HTTP độc lập, còn `person` vẫn là nguồn canonical cho tracking/zone và PPE công khai chỉ dùng `hat`/`vest`.
 - ByteTrack theo phiên video, chống review/event lặp theo occurrence, HITL review và snapshot đã che danh tính.
 - PostgreSQL là database duy nhất cho local, test và deployment; không dùng SQLite hoặc database fallback. Session authentication hỗ trợ ba role.
 
@@ -58,6 +58,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
 | Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/ops/CI_CD.md) |
 | Xem luồng deployment và sơ đồ vận hành cho team | [Quy trình deployment](docs/ops/DEPLOYMENT_FLOW.md) |
+| Railway deploy mới không có tài khoản/data seed | [Railway seed data](docs/ops/RAILWAY_SEED_DATA.md) |
 | Tách/deploy YOLO worker CPU hoặc RunPod | [Safety Vision worker deployment](docs/ops/RUNPOD_VISION_DEPLOYMENT.md) |
 | Hiểu vấn đề và đầu ra | [Problem Statement](docs/architecture/project-problem-statement.md) |
 | Hiểu phạm vi MVP | [PRD](specs/PRD.md) |
