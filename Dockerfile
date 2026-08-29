@@ -46,7 +46,7 @@ COPY vision ./vision
 COPY scripts ./scripts
 COPY --chmod=755 scripts/container_entrypoint.sh /usr/local/bin/p047-entrypoint
 COPY alembic.ini ./
-COPY models/yolo11m_safety.pt ./models/
+COPY models/yolo11n_safety_kd_best.pt ./models/
 COPY models/face_detection_yunet_2023mar.onnx ./models/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 

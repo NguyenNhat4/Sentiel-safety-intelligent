@@ -35,12 +35,12 @@ def request(*, with_zone: bool = True, machine_state: str = "running") -> FrameI
 def test_default_inference_uses_only_the_safety_model(monkeypatch):
     monkeypatch.setattr(
         "backend.app.core.config.get_settings",
-        lambda: Settings(ppe_model_path="models/yolo11m_safety.pt"),
+        lambda: Settings(ppe_model_path="models/yolo11n_safety_kd_best.pt"),
     )
 
     service = FrameInferenceService()
 
-    assert service._model_path == "models/yolo11m_safety.pt"
+    assert service._model_path == "models/yolo11n_safety_kd_best.pt"
 
 
 def test_person_detection_confidence_is_forwarded_to_main_and_fallback_detectors(monkeypatch):
@@ -81,7 +81,7 @@ def test_person_detection_confidence_is_forwarded_to_main_and_fallback_detectors
         "backend.app.core.config.get_settings",
         lambda: Settings(
             _env_file=None,
-            ppe_model_path="models/yolo11m_safety.pt",
+            ppe_model_path="models/yolo11n_safety_kd_best.pt",
             person_detection_confidence=0.42,
             ppe_detection_confidence=0.23,
             yolo_inference_image_size=960,
@@ -107,7 +107,7 @@ def test_person_detection_confidence_is_forwarded_to_main_and_fallback_detectors
     service._fallback_model = model
 
     assert service._detect_people(np.zeros((10, 10, 3), dtype=np.uint8)) == []
-    assert adapter_calls == [("models/yolo11m_safety.pt", 0.42, 0.23, 960, 10)]
+    assert adapter_calls == [("models/yolo11n_safety_kd_best.pt", 0.42, 0.23, 960, 10)]
     assert model.calls == [{"classes": [3], "conf": 0.42, "imgsz": 960, "rect": False, "verbose": False}]
 
 

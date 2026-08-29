@@ -60,7 +60,7 @@ GET /api/v1/ppe-requirements/{camera_id}/{zone_id}
 PUT /api/v1/ppe-requirements/{camera_id}/{zone_id}
 ```
 
-GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans for compatibility. The fixed-camera aggregate persists `ppe_requirements` at camera level, including when `zones=[]`; hat/vest apply to every qualified person in the frame only while the camera-wide machine state is running. Restricted-area and intrusion switches remain per-zone. The PPE adapter invokes `yolo11m_safety.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`.
+GET returns `profile`, `hat_required`, `vest_required`, `restricted_area_detection_enabled`, and `zone_intrusion_enabled`; a missing record defaults intrusion ON and the other rules OFF with `is_configured=false`. PUT accepts the same additive booleans for compatibility. The fixed-camera aggregate persists `ppe_requirements` at camera level, including when `zones=[]`; hat/vest apply to every qualified person in the frame only while the camera-wide machine state is running. Restricted-area and intrusion switches remain per-zone. The PPE adapter invokes `yolo11n_safety_kd_best.pt` once per frame and the public detection contract accepts only `person`, `hat`, `vest`.
 
 US-08 adds a client-generated `monitoring_session_id` that remains stable for one selected video across pause, review, and reconnect. Each person has a session-local `track_id` and `active_violations`; only the first violation alert for that person in the session sets `review_required=true`. Later rules or re-violations remain observable without opening another review. Reviewed event requests carry the occurrence IDs, and the database unique constraint makes retries idempotent while conflicting reuse returns `409`.
 
@@ -104,7 +104,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11m Safety call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11n Safety KD call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
@@ -201,7 +201,7 @@ The backend returns one correlated JSON result for each accepted JPEG:
 |---|---|
 | `frame_id`, `video_time` | Copied from `frame_meta` so the frontend can match the result to the analyzed frame. |
 | `people` | Every person detected by YOLO; an empty array means no person was detected. |
-| `detections` | Typed list limited to canonical `person` plus YOLO11m Safety `hat`/`vest`: class ID/name, original-frame `bbox`, confidence and nullable `person_index`. It can contain unassociated PPE when `people` is empty. |
+| `detections` | Typed list limited to canonical `person` plus YOLO11n Safety KD `hat`/`vest`: class ID/name, original-frame `bbox`, confidence and nullable `person_index`. It can contain unassociated PPE when `people` is empty. |
 | `track_id` | ByteTrack association ID scoped to one monitoring session; it is not a personal identity. |
 | `active_violations` | Per-track rule occurrences. Only `is_new=true` opens a new review candidate. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |

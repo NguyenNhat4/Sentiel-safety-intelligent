@@ -53,14 +53,9 @@ def create_app(
     worker_api_key: str | None = None,
     compute_device: str | None = None,
 ) -> FastAPI:
-    configured_model_path = os.getenv("PPE_MODEL_PATH", "models/yolo11m_safety.pt")
-    configured_device_value = compute_device if compute_device is not None else os.getenv("VISION_DEVICE", "")
-    configured_device = configured_device_value.strip() or None
-    configured_analyzer = analyzer or PpeVisionFacade(
-        configured_model_path,
-        device=configured_device,
-    )
-    configured_model_version = model_version or os.getenv("VISION_MODEL_VERSION", "yolo11m_safety")
+    configured_model_path = os.getenv("PPE_MODEL_PATH", "models/yolo11n_safety_kd_best.pt")
+    configured_analyzer = analyzer or PpeVisionFacade(configured_model_path)
+    configured_model_version = model_version or os.getenv("VISION_MODEL_VERSION", "yolo11n_safety_kd")
     configured_api_key = worker_api_key or os.getenv("VISION_WORKER_API_KEY", "")
 
     @asynccontextmanager

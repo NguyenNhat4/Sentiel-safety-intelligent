@@ -1,5 +1,6 @@
 # Project Progress
 
+Updated: 2026-08-28
 Updated: 2026-08-27
 
 ### 2026-08-28 Stopped-machine PPE warning emphasis
@@ -36,6 +37,11 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ## Current State
 
+### 2026-08-25 YOLO11n Safety KD experiment
+
+- [Vision] Runtime configuration, startup checksum validation and container packaging now target the user-supplied `yolo11n_safety_kd_best.pt`; the public `[0,3,4]` person/hat/vest contract is unchanged.
+- [Vision] The former YOLO11m checkpoint remains available only for controlled rollback/benchmark. Training-code revision, dataset provenance and held-out US-13 accuracy/latency evidence for the KD checkpoint remain open gates.
+
 ### 2026-08-27 System-admin Live Monitor access
 
 - [Cross-cutting] `system_admin` has full operational authority: Live Monitor, camera configuration, simulation run/replay, event history/review, media, account administration, and operational metrics. `area_manager` remains scoped to its assigned area.
@@ -66,6 +72,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Cross-cutting
 
+- Railway seed behavior is documented: production startup migrates schema but intentionally does not create demo users; the staging2-only one-off seed procedure and the misleading always-visible frontend demo cards are recorded in the operations runbook.
 - The MVP is a React 19 frontend, FastAPI modular monolith, Vision facade, PostgreSQL persistence, and backend-owned media assets in a Railway Bucket with an application-volume inference cache.
 - Luồng local từ upload video đến playback, sampled frame inference, metadata WebSocket, SVG overlay, HITL và Replay được mô tả trong `docs/architecture/local-video-frame-flow.md` cùng source-of-truth code map.
 - The standard contributor workflow remains `make setup` then `make run`; Alembic upgrades are part of that flow.
@@ -88,9 +95,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Vision
 
+- `models/yolo11n_safety_kd_best.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
 - Issue #43 is implemented with additive `safety_vision_v2`: workers restore/export strict JSON ByteTrack + PPE smoother state, while backend owns bounded PostgreSQL JSONB persistence, TTL cleanup and revision/frame compare-and-swap. v1 remains unchanged as the rollback contract; Railway production selected v2 after the controlled worker probe passed on 2026-08-26.
 - `models/yolo11m_safety.pt` is the only runtime safety detector. One `[0,3,4]` call per sampled frame supplies canonical `person`, `hat`, and `vest` observations plus session-isolated ByteTrack IDs.
 - Decoded camera frames retain their source resolution until Ultralytics performs the sole resize/letterbox operation at the configured `960x960` YOLO input boundary.
+- The runtime checkpoint is the user-supplied knowledge-distilled artifact (`5480154` bytes, SHA-256 `940467d80536e1a26313bd700e33d3e7a17816659ca7346708e0dc8e03aa06c6`) under Git LFS.
+- Safety Vision can run in-process or through the versioned `safety_vision_v1` HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the default and remote is opt-in.
 - The runtime checkpoint is the optimizer-stripped EMA FP16 artifact (`40543303` bytes, SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`) under Git LFS.
 - Safety Vision can run in-process or through the versioned v1/v2 HTTP worker. The backend keeps rule evaluation and persistence in both modes; local remains the development default and remote is selected explicitly in production.
 - The remote worker accepts an explicit Ultralytics compute device. The RunPod image uses `cuda:0` for both inference and tracking and fails startup when CUDA is unavailable instead of silently falling back to CPU.
@@ -106,6 +116,7 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 ### Frontend
 
+- Live Monitor buffers direct-camera video detections per camera/session and renders an overlay only when the browser's presented media time is within 200 ms of the inference result timestamp; image results remain immediate.
 - Sidebar no longer renders the unused disabled `Log JSON` placeholder tab.
 - Live Monitor always renders four slots with direct video/image playback, source-coordinate overlays, server lifecycle, rolling inference FPS, and per-video Replay at EOF.
 - Live Monitor reloads camera configuration, media inventory, and compatible sessions whenever the page becomes active; disconnected cameras and sessions belonging to a previously assigned asset are removed from the rendered slot.
@@ -128,6 +139,12 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `Dockerfile.ai.gpu` packages the same worker contract with pinned PyTorch `2.9.1+cu128` for RunPod; it remains an independently published immutable image.
 
 ## Latest Verification
+
+- [Cross-cutting] The playback-synchronized overlay worktree was promoted to Railway production, then production inference was aligned with `staging2`: `VISION_PROVIDER=local`, `PPE_MODEL_PATH=models/yolo11n_safety_kd_best.pt`, `YOLO_INFERENCE_IMAGE_SIZE=640`, and `MEDIA_INFERENCE_MAX_FPS=20`. Final production deployment `86f4f3b4-9028-447c-ab31-b8e42743213d` reached `SUCCESS` with image digest `sha256:8a9c56d36463ae6f96ce802583d8b7cf0b693641642870274fbe7dd26b09e24b`; local model preload completed without the prior remote-health warning, and public `/health` reports ready.
+
+- [Frontend] Added playback-time-gated video overlays using `requestVideoFrameCallback` with metadata/time-update fallback and regression coverage for early detection delivery. Per repository policy, no local runtime was executed. Railway `staging2` deployment `dea9fc8a-4da1-4de0-8ae0-b1d6ef51f6a1` built successfully as image digest `sha256:a875a49d3d524ea66bf3af12800e115d8a088e90169e3025d05bf0a999837766`; application startup completed and public `/health` reports ready with PostgreSQL and snapshot storage ready.
+
+- YOLO11n Safety KD cutover: the actual checkpoint hash matches the pinned SHA-256; 10 settings/startup tests and 39 Vision API/tracking tests pass. The backend PPE file has 16 passing tests and 3 pre-existing debounce expectation failures (4/immediate versus the active 7-frame contract). Ruff, format, frontend type-check, 82 frontend tests and production build pass; ESLint retains the known `App.tsx:26` warning. Full root pytest and the Railway release gate both stall in the known Starlette `TestClient` path, so the release stopped before Docker build/push and no production deployment was made.
 
 - [Frontend] Camera Configuration đã được căn theo mẫu light-theme mới: sidebar compact, header thấp, source bar full-width, preview dọc bên trái, ba card trạng thái/vùng/PPE bên phải và footer lưu full-width. Mobile chuyển workspace thành một cột. Camera-configuration tests `7/7`, lint, type-check, production build và `git diff --check` pass.
 
@@ -168,6 +185,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - A 2026-08-24 direct production diagnostic confirmed the RunPod image is forced to `VISION_DEVICE=cuda:0`, rejects startup when CUDA is unavailable, and returned healthy GPU-worker responses. Scale-from-zero `/ping` took 25.82 seconds; after startup, the first tracked frame for a new monitoring session took 8.00 seconds and the next frame in the same session took 1.27 seconds. An end-to-end smoke through Railway production reproduced the operational impact: the first frame returned HTTP `500` after 31.14 seconds with a logged `httpx.ReadTimeout`, then the same session returned HTTP `200` in 8.42 seconds and 1.71 seconds for the next two frames. The dominant latency is cold startup plus per-session tracking-model initialization, not a CPU fallback.
 
 ## Open Gates
+
+- Record the YOLO11n Safety KD training-code revision and dataset provenance/license, then run held-out US-13 accuracy and target-device latency evaluation before pilot use.
 
 - Update the RunPod `p047-vision` template to `ntduc0112/p047-vision:gpu-v3-issue43-20260825` with a management-capable credential, verify `/v2/ping` and restart/replica continuity, then set Railway `VISION_REMOTE_CONTRACT_VERSION=safety_vision_v2`. The current endpoint-restricted inference key returns 401 from the RunPod management API, so production remains safely on v1.
 - Measure end-to-end direct-file inference freshness and model latency on Railway; focused evidence does not yet prove four-camera throughput.

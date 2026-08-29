@@ -1,5 +1,6 @@
 # Project Design Decisions
 
+Updated: 2026-08-28
 Updated: 2026-08-27
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
@@ -64,6 +65,12 @@ This file contains only decisions that currently constrain implementation. Super
 - Playback uses a short-lived presigned GET so video byte ranges bypass the application service. `MEDIA_ASSET_DIR` remains a server-owned OpenCV read-through cache.
 - Run starts fresh inference for every valid configured camera. Replay starts only the selected camera and its new session ID resets playback, tracking and overlays.
 
+### 2026-08-28: [Frontend] Playback-time-gated detection overlays
+
+- Direct-camera video results are buffered per camera/session and are rendered only when the browser's presented media time is within 200 ms of `camera_inference_result.video_time`.
+- `requestVideoFrameCallback` supplies presented-frame time when available; metadata/time-update events are the compatibility fallback. Results outside the synchronization window are not drawn, and old buffered results are discarded.
+- Images still render their one inference result immediately. Session lifecycle, rolling FPS, and HITL review delivery remain immediate and are not delayed by visual overlay synchronization.
+
 ### 2026-08-24: [Backend/Frontend] Camera-wide PPE and deterministic HITL persistence
 
 - `hat_required` and `vest_required` are persisted on the fixed camera configuration, remain saveable with `zones=[]`, and apply to every qualified person in the frame only while camera-wide machine state is `running`.
@@ -98,6 +105,7 @@ This file contains only decisions that currently constrain implementation. Super
 ### 2026-08-21: [Vision/Backend] Optional remote Safety Vision worker
 
 - `FrameInferenceService` selects the in-process facade by default or the versioned `safety_vision_v1` HTTP provider when `VISION_PROVIDER=remote`; direct-file sessions use the same rule pipeline.
+- The worker owns the pinned Safety detector and session-scoped ByteTrack state only. Backend keeps zone/PPE rules, occurrence lifecycle, HITL, privacy, persistence, and notifications.
 - The worker owns YOLO11m Safety. The legacy v1 path also owns session-scoped ByteTrack state in memory; the v2 path below makes the worker request-stateless.
 - Remote responses are untrusted input: validate contract version, request correlation, payload shape, timeout, and HTTP status; failure is closed and never becomes a fabricated `normal` result.
 - A v1 deployment remains limited to one worker or requires affinity. Horizontal workers without affinity require the v2 PostgreSQL-backed continuation contract.
@@ -106,6 +114,7 @@ This file contains only decisions that currently constrain implementation. Super
 - The developer comparison UI is a separate, noindex Vite entrypoint. It sends the same browser frame to CPU and GPU concurrently, allows only one comparison cycle in flight, and counts skipped video frames; its RTT is an end-to-end responsiveness diagnostic, not the controlled sequential model-performance claim.
 - Independent camera sessions may infer concurrently with one isolated YOLO/ByteTrack instance per session; calls for the same session remain serialized. Terminal sessions release model state while lightweight occurrence context remains available through its TTL for queued human review.
 
+### 2026-08-25: [Vision/Backend] One YOLO11n Safety KD call per frame
 ### 2026-08-25: [Vision/Backend] PostgreSQL-backed portable tracking state
 
 - `safety_vision_v2` transfers a strict JSON-only `bytetrack_ppe_state_v1` envelope on every tracked frame. It contains active/recoverable-lost ByteTrack continuation data and PPE smoother counters, but no image, identity, credential, executable serialization, or terminal removed track.
@@ -116,7 +125,8 @@ This file contains only decisions that currently constrain implementation. Super
 
 ### 2026-08-13: [Vision/Backend] One YOLO11m Safety call per frame
 
-- Pin source revision `95ffeeb1e0897d60564c811ace5935bcd43d982b` and source SHA-256 `f53324f39d76da6017d41038e74f95b3dceb33524738721e03f69f3ea58a1ece`; runtime uses the optimizer-stripped EMA FP16 artifact with SHA-256 `e5b2ad353a33579e821ed9be77ed8406b7bac14bb8abf5d6db77b071ea021218`.
+- Runtime uses user-supplied `models/yolo11n_safety_kd_best.pt` (`5480154` bytes, SHA-256 `940467d80536e1a26313bd700e33d3e7a17816659ca7346708e0dc8e03aa06c6`) under Git LFS. Embedded metadata identifies Ultralytics `8.4.128`, creation time `2026-08-25T08:02:19.095869+00:00`, and AGPL-3.0; training-code revision and dataset provenance remain pilot gates.
+- The previous `models/yolo11m_safety.pt` remains a retired rollback/benchmark artifact and is not accepted by startup or copied into runtime images.
 - Run source classes `[0,3,4]` once per sampled frame. Class `3` is canonical `person`; classes `0` and `4` provide `hat` and `vest`.
 - Local inference uses separate person/PPE confidence thresholds, `960` image size, anatomical hat/vest association, per-person/class cardinality, and session-local temporal smoothing.
 - The public PPE profile is `hat_vest_v1`. Missing PPE is qualified absence derived by backend rules and requires US-13 calibration before non-demo use.

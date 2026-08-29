@@ -10,13 +10,17 @@ import {PpeAlertToast} from "../alerts/PpeAlertToast";
 import {StreamViewer} from "./StreamViewer";
 
 let resultHandler: (result: CameraInferenceResult) => void = () => undefined;
+let playbackTimeHandlers: Record<string, (time: number) => void> = {};
 vi.mock("../../api/auth", () => ({getAccessToken: () => "token"}));
 vi.mock("../../api/camera-configurations", () => ({listCameraConfigurations: vi.fn()}));
 vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
 vi.mock("../../api/events", () => ({loadPendingEvents: vi.fn(), saveReviewedEvent: vi.fn()}));
 vi.mock("../../api/simulation", () => ({listCameraSessions: vi.fn(), replayCamera: vi.fn(), runSimulation: vi.fn()}));
 vi.mock("../../api/camera-detection-client", () => ({CameraDetectionClient: vi.fn(function(options: {onResult: typeof resultHandler}) { resultHandler = options.onResult; return {connect: vi.fn().mockResolvedValue(undefined), close: vi.fn()}; })}));
-vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, onEnded}: {label: string; playbackKey: string; playing?: boolean; onEnded: () => void}) => <button aria-label={label} data-playback-key={playbackKey} data-playing={String(Boolean(playing))} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>}));
+vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, onPlaybackTime, onEnded}: {label: string; playbackKey: string; playing?: boolean; onPlaybackTime?: (time: number) => void; onEnded: () => void}) => {
+  if (onPlaybackTime) playbackTimeHandlers[label] = onPlaybackTime;
+  return <button aria-label={label} data-playback-key={playbackKey} data-playing={String(Boolean(playing))} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>;
+}}));
 
 const session = {id: "session-current", camera_id: "cam_1", asset_id: "asset-1", media_type: "video" as const, status: "RUNNING" as const, config_revision: 1, inference_fps: 1.5, started_at: "2026-08-23T00:00:00Z", running_at: "2026-08-23T00:00:01Z", completed_at: null, error_code: null};
 const result = (sessionId: string, fps: number): CameraInferenceResult => ({type: "camera_inference_result", camera_id: "cam_1", session_id: sessionId, asset_id: "asset-1", media_type: "video", video_time: 1, session_status: "RUNNING", inference_fps: fps, source_timestamp_ms: 1, captured_at: 1, frame_width: 100, frame_height: 100, frame_id: 1, result: "normal", review_required: false, people: [], rule: {} as CameraInferenceResult["rule"]});
@@ -38,6 +42,7 @@ const pendingEvent = (id: number, inference: CameraInferenceResult, eventType = 
 
 beforeEach(() => {
   vi.resetAllMocks();
+  playbackTimeHandlers = {};
   vi.mocked(listCameraConfigurations).mockResolvedValue([{camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null}]);
   vi.mocked(listMediaAssets).mockResolvedValue([{id: "asset-1", display_name: "Demo", media_type: "video", status: "READY", content_type: "video/mp4", size_bytes: 10, uploaded_at: "2026-08-23T00:00:00Z", assigned_camera_id: "cam_1", can_delete: false}]);
   vi.mocked(listCameraSessions).mockResolvedValue([session]);
@@ -45,6 +50,22 @@ beforeEach(() => {
   vi.mocked(runSimulation).mockResolvedValue({sessions: [{...session, id: "session-run", status: "STARTING"}], errors: {}});
   vi.mocked(replayCamera).mockResolvedValue({...session, id: "session-replay", status: "STARTING"});
   vi.mocked(saveReviewedEvent).mockResolvedValue({id: 1} as never);
+});
+
+it("buffers detections until video playback reaches their timestamp", async () => {
+  render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
+  await screen.findByText("RUNNING");
+  resultHandler({...result("session-current", 2.5), video_time: 2});
+
+  expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
+  act(() => playbackTimeHandlers["Media Camera 1"]?.(1.6));
+  expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
+
+  act(() => playbackTimeHandlers["Media Camera 1"]?.(1.9));
+  expect(screen.getByLabelText("Detection overlay frame 1")).toBeInTheDocument();
+
+  act(() => playbackTimeHandlers["Media Camera 1"]?.(2.3));
+  expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
 });
 
 it("renders four permanent slots and opens the exact camera only for safety managers", async () => {
