@@ -18,3 +18,9 @@ It refreshes immediately when the camera-detection WebSocket announces persisted
 does not poll the events API, and reconnects automatically after socket failure. A successful initial
 connection or reconnection performs one reconciliation fetch so events persisted during a connection
 gap do not leave stale data on the detail screen.
+
+Successful review/status mutations from Live Monitor, Camera Detail, or another
+browser tab publish a shared event-update signal. The camera log reconciles only
+when the changed event belongs to its camera, and an open event-detail dialog
+reloads when its exact event ID changes. REST reconciliation requests bypass the
+browser cache so persisted backend state remains authoritative in both directions.

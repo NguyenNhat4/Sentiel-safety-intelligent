@@ -44,6 +44,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-30: [Frontend] Event status views reconcile from one persisted source
+
+- Live Monitor, Camera Detail, and an open event-detail dialog must not keep independent stale status after a successful event review or status transition.
+- Every frontend event mutation publishes a same-tab and cross-tab update signal containing only event and camera IDs; subscribers then reload authoritative event state from the backend instead of copying payload state between features.
+- New-event delivery remains owned by the camera-detection WebSocket. Status synchronization does not add polling, duplicate persistence, or a second event store.
+
 ### 2026-08-30: [Backend] Zone membership requires more than 20% person-box overlap
 
 - A canonical person belongs to a zone only when the polygon intersection covers more than 20% of that person's bounding-box area. Exactly 20%, boundary-only contact and smaller overlaps remain outside; the bottom-center `foot_point` no longer gates zone intrusion.

@@ -2,6 +2,12 @@
 
 Updated: 2026-08-30
 
+### 2026-08-30 Bidirectional event-status synchronization
+
+- [Frontend] Mọi review/status mutation thành công phát tín hiệu reconciliation dùng chung trong cùng tab và qua `BroadcastChannel` giữa các tab; tín hiệu chỉ chứa event/camera IDs, còn Live Monitor, Camera Detail và modal Event Detail luôn tải lại trạng thái authoritative từ backend.
+- [Frontend] Camera Detail chỉ refresh khi mutation thuộc đúng camera; Live Monitor đối soát lại pending inbox, loại event đã xử lý và đóng review/toast cũ; modal đang mở tải lại audit khi đúng event thay đổi. Các request reconciliation pending/camera/detail dùng `cache: no-store` và không thêm polling hay kho event thứ hai.
+- [Verification] 4 nhóm regression event API/Monitor/Camera Detail/Event Detail pass 26/26; toàn frontend pass 111/111 tests, lint không có error (còn warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Full `make check` tiếp tục bị chặn bởi một lỗi SQLite legacy migration có sẵn trong `20260829_02_add_manager_camera_assignments.py`; 31/32 root tests pass trước điểm dừng. Railway deployment không được chạy.
+
 ### 2026-08-30 Live Monitor as the primary landing page
 
 - [Frontend] Sau đăng nhập hoặc khôi phục session, `system_admin` và `safety_manager` đều mở Live Monitor trước tiên; chỉ `area_manager` mở dashboard khu vực. Thư viện media vẫn có trong navigation của System Admin nhưng không còn là trang mặc định.

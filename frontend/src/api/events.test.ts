@@ -1,5 +1,12 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {loadCameraEvents, loadEventDetail, loadReviewedEvents, saveReviewedEvent} from "./events";
+import {
+  loadCameraEvents,
+  loadEventDetail,
+  loadReviewedEvents,
+  saveReviewedEvent,
+  subscribeToSafetyEventUpdates,
+  updateAreaEvent,
+} from "./events";
 import type {EventPayload} from "../types";
 
 function jsonResponse(payload: unknown, status = 200): Response {
@@ -34,7 +41,7 @@ describe("event audit transport", () => {
     expect(detail.id).toBe(42);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/events/42",
-      {headers: {Authorization: "Bearer audit-token"}},
+      {cache: "no-store", headers: {Authorization: "Bearer audit-token"}},
     );
   });
 
@@ -53,7 +60,15 @@ describe("event audit transport", () => {
 
   it("attaches the authenticated actor token when saving a review", async () => {
     window.sessionStorage.setItem("sentinel.auth.access_token", "audit-token");
-    const fetchMock = vi.fn(async () => jsonResponse({id: 1}, 201));
+    const fetchMock = vi.fn(async () => jsonResponse({
+      id: 1,
+      timestamp: "2026-08-30T10:20:00Z",
+      zone_id: "zone_01",
+      camera_id: "uploaded_video",
+      event_type: "zone_intrusion",
+      severity: "high",
+      status: "acknowledged",
+    }, 201));
     vi.stubGlobal("fetch", fetchMock);
     const payload = {
       zone_id: "zone_01",
@@ -66,6 +81,8 @@ describe("event audit transport", () => {
       occurrence_ids: [],
     } satisfies EventPayload;
 
+    const listener = vi.fn();
+    const unsubscribe = subscribeToSafetyEventUpdates(listener);
     await saveReviewedEvent(payload);
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -75,5 +92,27 @@ describe("event audit transport", () => {
         headers: {"Content-Type": "application/json", Authorization: "Bearer audit-token"},
       }),
     );
+    expect(listener).toHaveBeenCalledWith({eventIds: [1], cameraIds: ["uploaded_video"]});
+    unsubscribe();
+  });
+
+  it("announces an event status update made from a detail workflow", async () => {
+    const updated = {
+      id: 9,
+      timestamp: "2026-08-30T10:20:00Z",
+      zone_id: "press",
+      camera_id: "cam_2",
+      event_type: "zone_intrusion",
+      severity: "high",
+      status: "resolved",
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(updated)));
+    const listener = vi.fn();
+    const unsubscribe = subscribeToSafetyEventUpdates(listener);
+
+    await updateAreaEvent(9, "resolved");
+
+    expect(listener).toHaveBeenCalledWith({eventIds: [9], cameraIds: ["cam_2"]});
+    unsubscribe();
   });
 });

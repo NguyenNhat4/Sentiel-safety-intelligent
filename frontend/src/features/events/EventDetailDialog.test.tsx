@@ -1,10 +1,18 @@
-import {fireEvent, render, screen} from "@testing-library/react";
+import {act, fireEvent, render, screen} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {loadEventDetail} from "../../api/events";
+import type {SafetyEventUpdate} from "../../api/events";
 import type {EventDetail} from "../../types";
 import {EventDetailDialog} from "./EventDetailDialog";
 
-vi.mock("../../api/events", () => ({loadEventDetail: vi.fn()}));
+let eventUpdateHandler: (update: SafetyEventUpdate) => void = () => undefined;
+vi.mock("../../api/events", () => ({
+  loadEventDetail: vi.fn(),
+  subscribeToSafetyEventUpdates: (listener: (update: SafetyEventUpdate) => void) => {
+    eventUpdateHandler = listener;
+    return vi.fn();
+  },
+}));
 
 const detail: EventDetail = {
   id: 42,
@@ -68,7 +76,10 @@ const detail: EventDetail = {
 };
 
 describe("EventDetailDialog", () => {
-  beforeEach(() => vi.mocked(loadEventDetail).mockResolvedValue(detail));
+  beforeEach(() => {
+    eventUpdateHandler = () => undefined;
+    vi.mocked(loadEventDetail).mockResolvedValue(detail);
+  });
 
   it("presents the persisted AI to rule to HITL audit chain", async () => {
     render(<EventDetailDialog eventId={42} onClose={vi.fn()} />);
@@ -114,5 +125,19 @@ describe("EventDetailDialog", () => {
     fireEvent.click(screen.getByRole("button", {name: "Đóng chi tiết sự kiện"}));
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("reloads an open detail when the same event is reviewed elsewhere", async () => {
+    vi.mocked(loadEventDetail)
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce({...detail, summary: {...detail.summary, text: "Audit đã cập nhật"}});
+    render(<EventDetailDialog eventId={42} onClose={vi.fn()} />);
+    await screen.findByRole("dialog");
+    const callsBeforeUpdate = vi.mocked(loadEventDetail).mock.calls.length;
+
+    act(() => eventUpdateHandler({eventIds: [42], cameraIds: ["uploaded_video"]}));
+
+    expect(await screen.findByText("Audit đã cập nhật")).toBeInTheDocument();
+    expect(loadEventDetail).toHaveBeenCalledTimes(callsBeforeUpdate + 1);
   });
 });

@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
-import {loadCameraEvents} from "../../api/events";
+import {loadCameraEvents, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {EventStatus, SafetyEvent} from "../../types";
 import {EventDetailDialog} from "../events/EventDetailDialog";
 
@@ -38,6 +38,10 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => subscribeToSafetyEventUpdates(update => {
+    if (update.cameraIds.includes(cameraId)) void load(false);
+  }), [cameraId, load]);
 
   useEffect(() => {
     const refresh = () => void load(false);

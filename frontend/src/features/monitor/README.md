@@ -15,3 +15,8 @@ stay in the shared newest-first inbox; zone alerts use one automatic modal and
 a FIFO queue. The toast closes automatically after three seconds. Closing either
 surface never deletes the pending event. On desktop, the four-camera grid stays
 on the left and the durable pending-alert inbox stays visible on the right.
+
+Every successful event review or status mutation publishes a browser-local and
+cross-tab reconciliation signal. Live Monitor reloads its pending inbox from the
+backend after that signal, removes events no longer pending, and closes a stale
+review surface if another screen already updated the same event.

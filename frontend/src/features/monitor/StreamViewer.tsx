@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {listCameraConfigurations} from "../../api/camera-configurations";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
-import {loadPendingEvents, saveReviewedEvent} from "../../api/events";
+import {loadPendingEvents, saveReviewedEvent, subscribeToSafetyEventUpdates} from "../../api/events";
 import {assetUrl} from "../../api/config";
 import {listMediaAssets} from "../../api/media-assets";
 import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
@@ -73,6 +73,25 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [active]);
+
+  useEffect(() => subscribeToSafetyEventUpdates(() => {
+    void loadPendingEvents().then(alerts => {
+      setPendingAlerts(alerts);
+      const pendingIds = new Set(alerts.map(alert => alert.id));
+      zoneQueueRef.current = zoneQueueRef.current.filter(alert => pendingIds.has(alert.id));
+      setPpeToast(current => current && pendingIds.has(current.id) ? current : null);
+      const openAlert = activeAlertRef.current;
+      if (openAlert && !pendingIds.has(openAlert.id)) {
+        activeAlertRef.current = null;
+        setActiveAlert(null);
+        pendingReviewRef.current = null;
+        setPendingReview(null);
+        setReviewStartedAt(null);
+        const next = zoneQueueRef.current.shift();
+        if (next) openAlertRef.current(next);
+      }
+    }).catch(reason => setError(errorText(reason)));
+  }), []);
 
   useEffect(() => {
     if (!active) return;
