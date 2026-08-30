@@ -12,3 +12,9 @@ a horizontal settings strip (source, combined operation/PPE, and zone), while th
 control log occupies the right rail. The settings strip scrolls horizontally only when necessary,
 and the event list scrolls inside its panel. Narrow screens retain Preview → Settings → Log and
 normal page scrolling.
+
+The camera-scoped violation log reads the same persisted `safety_events` source as Live Monitor.
+It refreshes immediately when the camera-detection WebSocket announces persisted pending event IDs,
+does not poll the events API, and reconnects automatically after socket failure. A successful initial
+connection or reconnection performs one reconciliation fetch so events persisted during a connection
+gap do not leave stale data on the detail screen.

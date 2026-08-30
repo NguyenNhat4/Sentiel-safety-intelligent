@@ -2,6 +2,25 @@
 
 Updated: 2026-08-30
 
+### 2026-08-30 Live Monitor as the primary landing page
+
+- [Frontend] Sau đăng nhập hoặc khôi phục session, `system_admin` và `safety_manager` đều mở Live Monitor trước tiên; chỉ `area_manager` mở dashboard khu vực. Thư viện media vẫn có trong navigation của System Admin nhưng không còn là trang mặc định.
+- [Frontend] Thẻ tài khoản demo của System Admin hiển thị đúng đích đến Live Monitor.
+- [Verification] App authentication/navigation tests, frontend lint/type-check/test/build và `git diff --check` cần được xác minh. Railway deployment không được chạy.
+
+### 2026-08-30 Realtime camera violation-log synchronization
+
+- [Frontend] Camera Detail subscribe camera-detection WebSocket theo đúng `camera_id` và refresh log ngay khi backend công bố `pending_event_ids`; Live Monitor và Detail tiếp tục dùng chung nguồn `safety_events`, không tạo kho log thứ hai.
+- [Frontend] Không polling events API; socket tự reconnect sau lỗi và chỉ đối soát một lần khi subscribe/re-subscribe thành công để bù event được persist trong khoảng mất kết nối. Request cũ không được phép ghi đè response mới.
+- [Verification] Camera configuration/log tests pass 15/15; full frontend suite pass 106/106; lint (còn một warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Full `make check` đạt 291 backend/vision tests pass và còn 10 lỗi contract ngoài phạm vi thay đổi ở debounce/PPE, event batch/audit, remote adapter và multi-zone. Railway deployment không được chạy.
+
+### 2026-08-30 Camera settings control styling
+
+- [Frontend] Đồng bộ hình thức các control trong khối “Kiểm soát camera” theo mẫu tham chiếu: segmented BẬT/TẮT, switch PPE, select/input có khoảng đệm chữ an toàn, ngắt kết nối, vẽ/xóa vùng và nút lưu dùng màu, bo góc, trạng thái focus/disabled nhất quán.
+- [Frontend] Mô tả “Vùng cấm” giải thích trực tiếp rằng polygon đã vẽ là vùng cấm và hệ thống ghi cảnh báo khi có người bước vào.
+- [Frontend] Tách preview và khối thiết lập thành hai hàng flow độc lập để media không còn tràn/đè xuyên qua control; log vẫn là rail riêng, sticky trong chiều cao viewport và không thay đổi markup/nội dung.
+- [Verification] Camera configuration/log tests pass 14/14; full frontend suite pass 105/105; frontend lint (còn một warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Full `make check` đạt 291 backend/vision tests pass và còn 10 lỗi contract ngoài phạm vi thay đổi ở debounce/PPE, event batch/audit, remote adapter và multi-zone. Railway deployment không được chạy.
+
 ### 2026-08-30 Local setup and PR #49 merge repair
 
 - [Cross-cutting] `make setup` completes against the local Docker PostgreSQL service; `make run` builds and serves the application on port 8000.

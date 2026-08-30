@@ -1,9 +1,26 @@
-import {render, screen, waitFor} from "@testing-library/react";
+import {act, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, expect, it, vi} from "vitest";
 import {loadCameraEvents} from "../../api/events";
+import type {CameraInferenceResult} from "../../types";
 import {CameraViolationLog} from "./CameraViolationLog";
 
+const detectionClient = vi.hoisted(() => ({
+  options: undefined as {onResult: (result: CameraInferenceResult) => void} | undefined,
+  close: vi.fn(),
+  connect: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../api/events", () => ({loadCameraEvents: vi.fn()}));
+vi.mock("../../api/auth", () => ({getAccessToken: () => "test-token"}));
+vi.mock("../../api/camera-detection-client", () => ({
+  CameraDetectionClient: class {
+    constructor(options: {onResult: (result: CameraInferenceResult) => void}) {
+      detectionClient.options = options;
+    }
+    connect = detectionClient.connect;
+    close = detectionClient.close;
+  },
+}));
 vi.mock("../events/EventDetailDialog", () => ({
   EventDetailDialog: ({eventId}: {eventId: number | null}) => eventId === null ? null : <div>EVENT DETAIL {eventId}</div>,
 }));
@@ -12,6 +29,8 @@ const loadMock = vi.mocked(loadCameraEvents);
 
 beforeEach(() => {
   vi.resetAllMocks();
+  detectionClient.options = undefined;
+  detectionClient.connect.mockResolvedValue(undefined);
 });
 
 it("loads and renders only the selected camera violation log", async () => {
@@ -56,4 +75,28 @@ it("opens the event detail for a camera log row", async () => {
   button.click();
 
   await waitFor(() => expect(screen.getByText("EVENT DETAIL 8")).toBeInTheDocument());
+});
+
+it("refreshes the selected camera log when its WebSocket announces a persisted event", async () => {
+  loadMock
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{
+      id: 21,
+      camera_id: "cam_3",
+      zone_id: "press",
+      event_type: "zone_intrusion",
+      severity: "high",
+      status: "unacknowledged",
+      timestamp: "2026-08-30T10:20:00Z",
+    }]);
+
+  render(<CameraViolationLog cameraId="cam_3" />);
+  expect(await screen.findByText("Camera này chưa có log vi phạm.")).toBeInTheDocument();
+  await waitFor(() => expect(loadMock).toHaveBeenCalledTimes(2));
+
+  act(() => detectionClient.options?.onResult({pending_event_ids: [21]} as CameraInferenceResult));
+
+  expect(await screen.findByText("#21 · Xâm nhập vùng")).toBeInTheDocument();
+  expect(loadMock).toHaveBeenCalledTimes(3);
 });

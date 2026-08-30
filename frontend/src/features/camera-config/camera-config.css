@@ -226,3 +226,188 @@ main.camera-config-main>header .eyebrow{font-size:9px;color:var(--green);margin:
   .camera-config-main .operation-ppe-layout{display:grid;gap:12px}
   .camera-config-main .ppe-setting{padding-top:12px;border-top:1px solid #dce4ed}
 }
+
+/* Reference-matched controls; intentionally contained inside the settings surface. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-controls .camera-config-section-kicker{
+    padding:4px 10px;
+    border-radius:999px;
+    background:#e8f1ec;
+    color:#1e7057
+  }
+
+  .camera-config-main .camera-config-controls .asset-select-field select,
+  .camera-config-main .camera-config-controls .zone-config-actions select,
+  .camera-config-main .camera-config-controls .zone-name-field input{
+    height:40px;
+    min-height:40px;
+    border:1px solid #d4ded8;
+    border-radius:8px;
+    background:#fff;
+    color:#17231f;
+    box-shadow:0 1px 2px rgba(23,35,31,.04)
+  }
+
+  .camera-config-main .camera-config-controls .asset-select-field select,
+  .camera-config-main .camera-config-controls .zone-config-actions select{
+    padding:0 38px 0 12px
+  }
+
+  .camera-config-main .camera-config-controls .zone-name-field input{
+    box-sizing:border-box;
+    padding:0 12px
+  }
+
+  .camera-config-main .camera-config-controls .asset-select-field select:focus,
+  .camera-config-main .camera-config-controls .zone-config-actions select:focus,
+  .camera-config-main .camera-config-controls .zone-name-field input:focus{
+    outline:3px solid rgba(30,112,87,.14);
+    border-color:#78a997
+  }
+
+  .camera-config-main .camera-config-controls .asset-actions,
+  .camera-config-main .camera-config-controls .asset-actions .disconnect-asset-btn{
+    width:100%
+  }
+
+  .camera-config-main .camera-config-controls .asset-actions .disconnect-asset-btn{
+    height:38px;
+    border:1px solid #efc9c5;
+    border-radius:8px;
+    background:#fffafa;
+    color:#bd3f38
+  }
+
+  .camera-config-main .camera-config-controls .machine-state-options{
+    gap:3px;
+    padding:3px;
+    border:1px solid #dce4df;
+    border-radius:9px;
+    background:#f1f5f2
+  }
+
+  .camera-config-main .camera-config-controls .machine-state-options button{
+    height:36px;
+    border:0;
+    border-radius:6px;
+    background:transparent;
+    color:#758399
+  }
+
+  .camera-config-main .camera-config-controls .machine-state-options button[aria-pressed="true"]{
+    color:#17231f;
+    background:#fff;
+    box-shadow:0 2px 6px rgba(23,35,31,.12)
+  }
+
+  .camera-config-main .camera-config-controls .machine-state-options button:focus-visible,
+  .camera-config-main .camera-config-controls .zone-actions button:focus-visible,
+  .camera-config-main .camera-config-controls .disconnect-asset-btn:focus-visible,
+  .camera-config-main .camera-config-controls .ppe-save-button:focus-visible{
+    outline:3px solid rgba(30,112,87,.18);
+    outline-offset:2px
+  }
+
+  .camera-config-main .camera-config-controls .ppe-switch-row{
+    grid-template-columns:minmax(0,1fr) 42px;
+    min-height:42px;
+    padding:8px 11px;
+    border:1px solid #dde5e0;
+    border-radius:8px;
+    background:#f6f8f7;
+    color:#31473f
+  }
+
+  .camera-config-main .camera-config-controls .ppe-switch-row:hover{
+    border-color:#a9c8bc;
+    background:#f1f8f5
+  }
+
+  .camera-config-main .camera-config-controls .zone-actions{
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:8px
+  }
+
+  .camera-config-main .camera-config-controls .zone-actions button{
+    height:40px;
+    min-width:0;
+    padding:0 12px;
+    border:1px solid #c7d8ee;
+    border-radius:8px;
+    background:#fff;
+    color:#1f5fc7;
+    white-space:nowrap
+  }
+
+  .camera-config-main .camera-config-controls .zone-actions .danger-link{
+    width:auto;
+    padding-inline:14px;
+    border-color:#efc9c5;
+    background:#fffafa;
+    color:#bd3f38
+  }
+
+  .camera-config-main .camera-config-controls .zone-actions button:disabled{
+    border-color:#dbe3df;
+    background:#eef2f0;
+    color:#7b8782
+  }
+
+  .camera-config-main .camera-config-controls .camera-config-footer .ppe-save-button{
+    min-width:142px;
+    height:40px;
+    border-radius:8px;
+    background:#1e7057;
+    border-color:#1e7057
+  }
+
+  .camera-config-main .camera-config-controls .camera-config-footer .ppe-save-button:disabled{
+    background:#9fc5b8;
+    border-color:#9fc5b8;
+    color:#fff;
+    opacity:1
+  }
+}
+
+/* Keep preview and settings in separate flow rows; the log remains an independent rail. */
+@media(min-width:981px){
+  .camera-config-main .camera-config-page{
+    height:auto;
+    min-height:calc(100vh - 90px);
+    overflow:visible
+  }
+
+  .camera-config-main .camera-detail-layout{
+    align-items:start;
+    overflow:visible
+  }
+
+  .camera-config-main .camera-config-workspace{
+    grid-template-rows:auto auto;
+    height:auto;
+    overflow:visible
+  }
+
+  .camera-config-main .camera-preview-panel{
+    grid-template-rows:auto;
+    height:auto;
+    overflow:hidden
+  }
+
+  .camera-config-main .camera-config-media{
+    height:auto;
+    aspect-ratio:16 / 9
+  }
+
+  .camera-config-main .camera-config-controls{
+    height:auto;
+    max-height:none;
+    overflow:hidden
+  }
+
+  .camera-config-main .camera-violation-log{
+    position:sticky;
+    top:16px;
+    height:calc(100vh - 130px)
+  }
+}
