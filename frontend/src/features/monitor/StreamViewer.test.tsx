@@ -5,7 +5,7 @@ import {listCameraConfigurations} from "../../api/camera-configurations";
 import {listMediaAssets} from "../../api/media-assets";
 import {loadPendingEvents, saveReviewedEvent} from "../../api/events";
 import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
-import type {CameraInferenceResult} from "../../types";
+import type {CameraInferenceResult, MediaStorageBackend} from "../../types";
 import {PpeAlertToast} from "../alerts/PpeAlertToast";
 import {StreamViewer} from "./StreamViewer";
 
@@ -17,9 +17,9 @@ vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
 vi.mock("../../api/events", () => ({loadPendingEvents: vi.fn(), saveReviewedEvent: vi.fn()}));
 vi.mock("../../api/simulation", () => ({listCameraSessions: vi.fn(), replayCamera: vi.fn(), runSimulation: vi.fn()}));
 vi.mock("../../api/camera-detection-client", () => ({CameraDetectionClient: vi.fn(function(options: {onResult: typeof resultHandler}) { resultHandler = options.onResult; return {connect: vi.fn().mockResolvedValue(undefined), close: vi.fn()}; })}));
-vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, onPlaybackTime, onEnded}: {label: string; playbackKey: string; playing?: boolean; onPlaybackTime?: (time: number) => void; onEnded: () => void}) => {
+vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, storageBackend, onPlaybackTime, onEnded}: {label: string; playbackKey: string; playing?: boolean; storageBackend: MediaStorageBackend; onPlaybackTime?: (time: number) => void; onEnded: () => void}) => {
   if (onPlaybackTime) playbackTimeHandlers[label] = onPlaybackTime;
-  return <button aria-label={label} data-playback-key={playbackKey} data-playing={String(Boolean(playing))} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>;
+  return <button aria-label={label} data-playback-key={playbackKey} data-playing={String(Boolean(playing))} data-storage-backend={storageBackend} onClick={event => { event.stopPropagation(); onEnded(); }}>media</button>;
 }}));
 
 const session = {id: "session-current", camera_id: "cam_1", asset_id: "asset-1", media_type: "video" as const, status: "RUNNING" as const, config_revision: 1, inference_fps: 1.5, started_at: "2026-08-23T00:00:00Z", running_at: "2026-08-23T00:00:01Z", completed_at: null, error_code: null};
@@ -55,6 +55,7 @@ beforeEach(() => {
 it("buffers detections until video playback reaches their timestamp", async () => {
   render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
   await screen.findByText("RUNNING");
+  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-storage-backend", "s3");
   resultHandler({...result("session-current", 2.5), video_time: 2});
 
   expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
