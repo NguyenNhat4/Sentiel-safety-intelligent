@@ -1,7 +1,13 @@
 # Project Progress
 
-Updated: 2026-08-28
-Updated: 2026-08-27
+Updated: 2026-08-30
+
+### 2026-08-30 Local setup and PR #49 merge repair
+
+- [Cross-cutting] `make setup` completes against the local Docker PostgreSQL service; `make run` builds and serves the application on port 8000.
+- [Frontend] Repaired PR #49 merge artifacts so storage-aware playback and video-time detection synchronization coexist; removed two orphaned refs. Focused StreamViewer tests pass 10/10 and the full frontend suite passes 105/105.
+- [Vision/Tooling] Restored `VISION_DEVICE` wiring for the KD worker and the deterministic 640px benchmark constant; worker tests pass 11/11 and GPU benchmark tests pass 4/4.
+- [Verification] Ruff, format, frontend lint/type-check/test/build, and 32 root tests pass. The full backend/Vision suite is 292 passed with the same nine pre-existing debounce/audit/event-batch/multi-zone contract failures. Local `/` returns 200; `/health` returns 200 but remains `degraded` because the current readiness policy requires S3 while local snapshot storage is filesystem. Railway deployment was not run.
 
 ### 2026-08-29 Camera detail three-zone layout
 

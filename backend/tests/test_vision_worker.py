@@ -191,7 +191,7 @@ def test_worker_constructs_facade_with_device_from_environment(monkeypatch):
     with TestClient(vision_worker.create_app(model_version="gpu-test")) as client:
         assert client.get("/ping").status_code == 200
 
-    assert captured == {"model_path": "models/yolo11m_safety.pt", "device": "cuda:0"}
+    assert captured == {"model_path": "models/yolo11n_safety_kd_best.pt", "device": "cuda:0"}
 
 
 def test_v2_worker_returns_correlated_result_and_next_tracking_state():

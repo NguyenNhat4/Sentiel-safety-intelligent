@@ -14,6 +14,7 @@ import numpy as np
 
 DEFAULT_SOURCE = "data/test.mp4"
 DEFAULT_MODEL = "models/yolo11n_safety_kd_best.pt"
+SYNTHETIC_SIZE = 640
 
 
 def percentile(values: list[float], fraction: float) -> float:

@@ -47,8 +47,6 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const activeAlertRef = useRef<SafetyEvent | null>(null);
   const openAlertRef = useRef<(alert: SafetyEvent) => void>(() => undefined);
   const pendingReviewRef = useRef<CameraInferenceResult | null>(null);
-  const reviewQueueRef = useRef<CameraInferenceResult[]>([]);
-  const seenReviewOccurrencesRef = useRef(new Set<string>());
   const detectionBuffersRef = useRef<Record<string, CameraInferenceResult[]>>({});
   const playbackTimesRef = useRef<Record<string, number>>({});
   const displayedDetectionKeysRef = useRef<Record<string, string>>({});
