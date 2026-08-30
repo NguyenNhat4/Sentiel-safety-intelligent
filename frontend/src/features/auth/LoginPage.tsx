@@ -6,7 +6,7 @@ import "./login.css";
 interface LoginPageProps { onAuthenticated: (user: AuthenticatedUser) => void; }
 
 const ROLE_CARDS: Array<{role: UserRole; title: string; description: string; destination: string}> = [
-  {role: "system_admin", title: "Quản trị hệ thống", description: "Quản lý tài khoản, vai trò và bảo mật truy cập.", destination: "Quản trị tài khoản"},
+  {role: "system_admin", title: "Quản trị hệ thống", description: "Giám sát an toàn và quản lý tài khoản, vai trò, bảo mật truy cập.", destination: "Live Monitor"},
   {role: "safety_manager", title: "Cán bộ an toàn", description: "Theo dõi cảnh báo, xác minh vi phạm và xem nhật ký an toàn.", destination: "Live Monitor & nhật ký vi phạm"},
   {role: "area_manager", title: "Quản lý khu vực", description: "Theo dõi tình trạng tuân thủ và các sự kiện tại khu vực phụ trách.", destination: "Dashboard khu vực"},
 ];
