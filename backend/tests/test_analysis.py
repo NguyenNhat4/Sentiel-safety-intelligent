@@ -159,6 +159,49 @@ def test_frame_inference_violates_for_person_inside_zone(client, monkeypatch):
     assert body["snapshot_data"].startswith("data:image/jpeg;base64,")
 
 
+def test_frame_inference_violates_when_person_box_overlaps_zone_with_foot_outside(client, monkeypatch):
+    monkeypatch.setattr(
+        frame_inference_service,
+        "_detect_people",
+        lambda frame: [(40, 40, 40, 60, 0.91)],
+    )
+    response = client.post(
+        "/api/v1/analysis/frame",
+        json={
+            "image_data": jpeg_data_url(),
+            "zone_points": [
+                {"x": 0.1, "y": 0.1},
+                {"x": 0.9, "y": 0.1},
+                {"x": 0.9, "y": 0.6},
+                {"x": 0.1, "y": 0.6},
+            ],
+            "machine_state": "stopped",
+        },
+    )
+
+    assert response.status_code == 200
+    person = response.json()["people"][0]
+    assert person["foot_point"] == [60, 100]
+    assert person["inside_zone"] is True
+    assert response.json()["result"] == "violate"
+
+
+@pytest.mark.parametrize(
+    ("bbox", "polygon", "expected"),
+    [
+        ((0, 0, 100, 100), [(0, 0), (21, 0), (21, 100), (0, 100)], True),
+        ((0, 0, 100, 100), [(0, 0), (20, 0), (20, 100), (0, 100)], False),
+        ((0, 0, 100, 100), [(0, 0), (19, 0), (19, 100), (0, 100)], False),
+        ((30, 30, 10, 10), [(0, 0), (100, 0), (100, 100), (0, 100)], True),
+        ((0, 40, 100, 20), [(40, 0), (61, 0), (61, 100), (40, 100)], True),
+        ((0, 0, 20, 20), [(20, 20), (40, 20), (40, 40), (20, 40)], False),
+        ((0, 0, 20, 20), [(21, 21), (40, 21), (40, 40), (21, 40)], False),
+    ],
+)
+def test_bbox_polygon_overlap_requires_more_than_twenty_percent(bbox, polygon, expected):
+    assert frame_inference_service._bbox_overlaps_polygon(*bbox, np.asarray(polygon, dtype=np.float32)) is expected
+
+
 def test_frame_inference_violates_for_zone_entry(client, monkeypatch):
     monkeypatch.setattr(
         frame_inference_service,
@@ -273,8 +316,8 @@ def test_inference_websocket_returns_person_outside_zone(client, monkeypatch):
     upper_zone = [
         {"x": 0.1, "y": 0.05},
         {"x": 0.9, "y": 0.05},
-        {"x": 0.9, "y": 0.5},
-        {"x": 0.1, "y": 0.5},
+        {"x": 0.9, "y": 0.45},
+        {"x": 0.1, "y": 0.45},
     ]
     with client.websocket_connect("/api/v1/ws/inference") as websocket:
         configure_inference_websocket(websocket, upper_zone)
@@ -407,8 +450,8 @@ def test_inference_websocket_opens_ppe_review_on_fourth_raw_miss(client, monkeyp
     upper_zone = [
         {"x": 0.1, "y": 0.05},
         {"x": 0.9, "y": 0.05},
-        {"x": 0.9, "y": 0.5},
-        {"x": 0.1, "y": 0.5},
+        {"x": 0.9, "y": 0.45},
+        {"x": 0.1, "y": 0.45},
     ]
 
     with client.websocket_connect("/api/v1/ws/inference") as websocket:
@@ -452,8 +495,8 @@ def test_inference_websocket_waits_for_three_initial_ppe_misses(client, monkeypa
     upper_zone = [
         {"x": 0.1, "y": 0.05},
         {"x": 0.9, "y": 0.05},
-        {"x": 0.9, "y": 0.5},
-        {"x": 0.1, "y": 0.5},
+        {"x": 0.9, "y": 0.45},
+        {"x": 0.1, "y": 0.45},
     ]
 
     with client.websocket_connect("/api/v1/ws/inference") as websocket:

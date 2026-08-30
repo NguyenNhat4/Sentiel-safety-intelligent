@@ -15,11 +15,14 @@ Bản chốt theo `DECISIONS.md` (2026-08-24):
 
 Một frame là `violate` khi có ít nhất một điều kiện sau:
 
-- Có ít nhất một người nằm trong zone có `zone_intrusion_enabled=true` (bất kể máy `running` hay `stopped`).
+- Có ít nhất một người có phần giao giữa bounding box và polygon lớn hơn 20% diện tích bounding box của chính người đó trong zone có `zone_intrusion_enabled=true` (bất kể máy `running` hay `stopped`).
 - Có ít nhất một người trong khung hình khi máy `running` mà thiếu PPE bắt buộc (`hat_required` hoặc `vest_required`).
 - Có ít nhất một người thuộc vùng nguy hiểm bị kích hoạt `restricted_area_detection_enabled=true`.
 
 Không có người thì frame luôn `normal`; không đánh giá thiếu PPE khi không có person detection.
+`inside_zone` chỉ là `true` khi diện tích giao hình học giữa person bounding box và polygon lớn hơn
+20% diện tích box người. Đúng 20% hoặc chỉ chạm biên không được tính; `foot_point` vẫn được trả về
+để hiển thị/debug nhưng không còn quyết định zone membership.
 
 ## Ma trận hành vi
 
@@ -42,9 +45,9 @@ HITL debounce: UI chỉ mở popup khi cùng một violation đã được xác 
 ```mermaid
 flowchart LR
     A[Frame JPEG] --> B[Vision facade]
-    B --> C[People + PPE observations + foot points]
+    B --> C[People boxes + PPE observations + foot points]
     C --> D[Backend SafetyRuleEngine]
-    D --> E{Any person in enabled zone?}
+    D --> E{Zone covers >20% of any person box?}
     D --> F{Any camera-wide PPE missing while running?}
     E --> G[Aggregate frame decision]
     F --> G
@@ -56,7 +59,7 @@ flowchart LR
 
 ## Boundary không thay đổi
 
-- Vision chỉ phát hiện/track/đo foot point và trả observation; không quyết định alert.
+- Vision chỉ phát hiện/track và trả bounding box, foot point cùng observation; không quyết định alert.
 - Backend service là nơi quyết định `result`, `review_required` và occurrence.
 - Camera configuration thêm `ppe_requirements` cấp camera; field PPE trong zone được giữ tương thích trong giai đoạn chuyển đổi.
 - Review được gộp ở UI theo frame; persistence tạo tối đa một request cho mỗi occurrence và một event theo track/session.

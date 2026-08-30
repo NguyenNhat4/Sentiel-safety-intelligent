@@ -45,6 +45,8 @@ class StaleFrameError(ValueError):
 
 
 class FrameInferenceService:
+    ZONE_BBOX_OVERLAP_THRESHOLD = 0.20
+
     """Evaluate one frame for browser compatibility and server-side camera flows."""
 
     def __init__(
@@ -232,7 +234,13 @@ class FrameInferenceService:
             memberships = [
                 ZoneMembership(
                     zone_id=zone.zone_id,
-                    inside=cv2.pointPolygonTest(polygons[zone.zone_id], tuple(foot_point), False) >= 0,
+                    inside=self._bbox_overlaps_polygon(
+                        x,
+                        y,
+                        box_width,
+                        box_height,
+                        polygons[zone.zone_id],
+                    ),
                 )
                 for zone in active_zones
             ]
@@ -458,6 +466,120 @@ class FrameInferenceService:
                 order=0,
             )
         ]
+
+    @classmethod
+    def _bbox_overlaps_polygon(
+        cls,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        polygon: np.ndarray,
+    ) -> bool:
+        """Require the zone to cover more than 20% of the person box."""
+        if width <= 0 or height <= 0 or len(polygon) < 3:
+            return False
+
+        overlap_area = cls._polygon_area(
+            cls._clip_polygon_to_bbox(
+                [(float(point[0]), float(point[1])) for point in polygon.reshape(-1, 2)],
+                left=float(x),
+                top=float(y),
+                right=float(x + width),
+                bottom=float(y + height),
+            )
+        )
+        return overlap_area / float(width * height) > cls.ZONE_BBOX_OVERLAP_THRESHOLD
+
+    @classmethod
+    def _clip_polygon_to_bbox(
+        cls,
+        points: list[tuple[float, float]],
+        *,
+        left: float,
+        top: float,
+        right: float,
+        bottom: float,
+    ) -> list[tuple[float, float]]:
+        clipped = points
+        clipped = cls._clip_polygon_edge(
+            clipped,
+            lambda point: point[0] >= left,
+            lambda start, end: cls._vertical_intersection(start, end, left),
+        )
+        clipped = cls._clip_polygon_edge(
+            clipped,
+            lambda point: point[0] <= right,
+            lambda start, end: cls._vertical_intersection(start, end, right),
+        )
+        clipped = cls._clip_polygon_edge(
+            clipped,
+            lambda point: point[1] >= top,
+            lambda start, end: cls._horizontal_intersection(start, end, top),
+        )
+        return cls._clip_polygon_edge(
+            clipped,
+            lambda point: point[1] <= bottom,
+            lambda start, end: cls._horizontal_intersection(start, end, bottom),
+        )
+
+    @staticmethod
+    def _clip_polygon_edge(
+        points: list[tuple[float, float]],
+        inside: Callable[[tuple[float, float]], bool],
+        intersection: Callable[
+            [tuple[float, float], tuple[float, float]],
+            tuple[float, float],
+        ],
+    ) -> list[tuple[float, float]]:
+        if not points:
+            return []
+
+        output: list[tuple[float, float]] = []
+        start = points[-1]
+        for end in points:
+            start_inside = inside(start)
+            end_inside = inside(end)
+            if end_inside:
+                if not start_inside:
+                    output.append(intersection(start, end))
+                output.append(end)
+            elif start_inside:
+                output.append(intersection(start, end))
+            start = end
+        return output
+
+    @staticmethod
+    def _vertical_intersection(
+        start: tuple[float, float],
+        end: tuple[float, float],
+        x_value: float,
+    ) -> tuple[float, float]:
+        ratio = (x_value - start[0]) / (end[0] - start[0])
+        return x_value, start[1] + ratio * (end[1] - start[1])
+
+    @staticmethod
+    def _horizontal_intersection(
+        start: tuple[float, float],
+        end: tuple[float, float],
+        y_value: float,
+    ) -> tuple[float, float]:
+        ratio = (y_value - start[1]) / (end[1] - start[1])
+        return start[0] + ratio * (end[0] - start[0]), y_value
+
+    @staticmethod
+    def _polygon_area(points: list[tuple[float, float]]) -> float:
+        if len(points) < 3:
+            return 0.0
+        return (
+            abs(
+                sum(
+                    start[0] * end[1] - end[0] * start[1]
+                    for start, end in zip(points, points[1:] + points[:1], strict=True)
+                )
+            )
+            / 2.0
+        )
 
     @staticmethod
     def _zone_id_for_rule(rule_key: str, legacy_zone_id: str) -> str | None:

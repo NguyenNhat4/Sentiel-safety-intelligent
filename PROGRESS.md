@@ -14,6 +14,12 @@ Updated: 2026-08-30
 - [Frontend] Không polling events API; socket tự reconnect sau lỗi và chỉ đối soát một lần khi subscribe/re-subscribe thành công để bù event được persist trong khoảng mất kết nối. Request cũ không được phép ghi đè response mới.
 - [Verification] Camera configuration/log tests pass 15/15; full frontend suite pass 106/106; lint (còn một warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Full `make check` đạt 291 backend/vision tests pass và còn 10 lỗi contract ngoài phạm vi thay đổi ở debounce/PPE, event batch/audit, remote adapter và multi-zone. Railway deployment không được chạy.
 
+### 2026-08-30 Bounding-box zone membership threshold
+
+- [Backend] Xác định xâm nhập vùng cấm khi diện tích polygon giao với box người lớn hơn 20% diện tích box của chính người đó; đúng 20%, chỉ chạm biên hoặc thấp hơn không tính. `foot_point` vẫn giữ trong payload để tương thích và debug.
+- [Contracts] Cập nhật decision record, alert-rule contract và backend inference contract theo ngưỡng bounding-box overlap đã được phê duyệt.
+- [Verification] 8/8 focused geometry/API tests pass; Ruff, frontend lint/type-check/test và production build pass. Toàn repo đạt 299 backend/vision tests pass, còn 10 lỗi contract nền có sẵn ở debounce/PPE, event batch/audit và remote adapter; không có lỗi mới thuộc phép tính overlap. Railway deployment không được chạy.
+
 ### 2026-08-30 Camera settings control styling
 
 - [Frontend] Đồng bộ hình thức các control trong khối “Kiểm soát camera” theo mẫu tham chiếu: segmented BẬT/TẮT, switch PPE, select/input có khoảng đệm chữ an toàn, ngắt kết nối, vẽ/xóa vùng và nút lưu dùng màu, bo góc, trạng thái focus/disabled nhất quán.
