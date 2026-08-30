@@ -81,10 +81,10 @@ sequenceDiagram
         UI->>WS: frame_meta(frame_id, video_time)
         UI->>WS: binary JPEG
         WS->>CV: infer(frame, zone, machine state)
-        CV-->>WS: boxes, foot points, inside_zone
+        CV-->>WS: boxes, foot points, >20% bbox-overlap inside_zone
         WS-->>UI: inference_result
     end
-    alt Person foot point enters zone
+    alt Zone covers more than 20% of person bounding box
         UI->>UI: Pause at result.video_time
         Officer->>UI: Confirm actual violation
         UI->>Events: POST reviewed event + snapshot
@@ -105,7 +105,7 @@ This section is the canonical protocol specification. It includes the message se
 ws://localhost:8000/api/v1/ws/inference
 ```
 
-This endpoint answers: **where are the people/hat/vest objects in this frame, and is any person's foot inside the configured danger zone while the machine is running?** One YOLO11n Safety KD call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for foot points and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
+This endpoint answers: **where are the people/hat/vest objects in this frame, and does a configured danger zone cover more than 20% of any person's bounding box?** One YOLO11n Safety KD call selects source classes `[0, 3, 4]`: class `3` supplies canonical people for zone geometry, foot-point diagnostics and ByteTrack, while `hat`/`vest` feed PPE observations. It uses a stateful WebSocket protocol rather than one HTTP request, so it does not appear in Swagger/OpenAPI.
 
 ### Input sequence
 
@@ -207,10 +207,10 @@ The backend returns one correlated JSON result for each accepted JPEG:
 | `active_violations` | Per-track rule occurrences. Only `is_new=true` opens a new review candidate. |
 | `bbox` | Person rectangle in original-frame pixels as `[x1, y1, x2, y2]`. |
 | `confidence` | YOLO's confidence that the detection is a person. |
-| `foot_point` | Bottom-center of `bbox`, in original-frame pixels; this is the point used for polygon evaluation. |
-| `inside_zone` | `true` when `foot_point` is inside or on the polygon boundary. |
+| `foot_point` | Bottom-center of `bbox`, retained in original-frame pixels for display and diagnostics. |
+| `inside_zone` | `true` only when the polygon intersection covers more than 20% of that person's `bbox`; exactly 20% and boundary-only contact are outside. |
 | `ppe`, `missing_required_ppe` | Per-person `hat`/`vest` observations and only the currently required items that passed qualified-absence guards. |
-| `review_required` | `true` when the machine is running and at least one foot point is inside, or when a required PPE is `missing` for a qualified person. The frontend pauses only for this value. |
+| `review_required` | `true` when a zone overlap or qualified missing-PPE occurrence becomes newly active after its confirmation gate. The frontend pauses only for this value. |
 | `result` | `violate` when `review_required=true`; otherwise `normal`. |
 | `snapshot_data` | The analyzed JPEG as a Base64 data URL, included only when review is required. It is not persisted until officer confirmation. |
 | `rule` | Decision inputs included for debugging and audit context, including the persisted PPE requirements active for this frame and whether an explicit missing-PPE alert fired. |
@@ -218,10 +218,11 @@ The backend returns one correlated JSON result for each accepted JPEG:
 The current decision is:
 
 ```text
-person_inside_zone = any(person.inside_zone for person in people)
-ppe_alert = any(person.missing_required_ppe for person in people)
-review_required = (person_inside_zone AND machine_state == "running") OR ppe_alert
-result = "violate" if review_required else "normal"
+person_inside_zone = any(zone/person-bbox intersection area > 20% of that bbox for person in people)
+ppe_violation = machine_state == "running" AND any(person.missing_required_ppe for person in people)
+observed_violation = person_inside_zone OR ppe_violation
+review_required = any newly confirmed per-track occurrence after debounce
+result = "violate" if observed_violation else "normal"
 ```
 
 Common outcomes:
@@ -230,10 +231,10 @@ Common outcomes:
 |---|---|---:|---|---:|---:|
 | No person | Running or stopped | — | `normal` | `false` | No |
 | Person outside zone | Running or stopped | `false` | `normal` | `false` | No |
-| Person inside zone | Stopped | `true` | `normal` | `false` | No |
+| Person inside zone | Stopped | `true` | `violate` | `true` | Yes |
 | Person inside zone | Running | `true` | `violate` | `true` | Yes |
 
-Bounding boxes and `inside_zone` remain available when the machine is stopped; zone-driven review, video pause, and snapshot generation are suppressed. A qualified required-PPE absence still requests review.
+Bounding boxes and `inside_zone` remain available when the machine is stopped; zone intrusion ignores machine state. A qualified required-PPE absence requests review only while the machine is running.
 
 ### Protocol errors
 
@@ -251,14 +252,14 @@ The server processes messages sequentially. The frontend additionally enforces o
 
 ### Detection and zone evaluation
 
-YOLO returns a person bounding box `[x1, y1, x2, y2]`. The service represents the person's ground position as the bottom-center point:
+YOLO returns a person bounding box `[x1, y1, x2, y2]`. The service still exposes the bottom-center point for display and diagnostics:
 
 ```text
 foot_x = (x1 + x2) / 2
 foot_y = y2
 ```
 
-The four normalized zone points are converted to frame pixels. OpenCV `pointPolygonTest` sets `inside_zone=true` when the foot point is on or inside the polygon. Zone review is based on this foot point, not bounding-box overlap. A review, snapshot, and violation are produced only when the foot point is inside while `machine_state` is `running`; bounding boxes remain available while the machine is stopped.
+The four normalized zone points are converted to frame pixels. The backend sets `inside_zone=true` when the person bounding box and polygon share any area or touch at a boundary. The test covers rectangle corners inside the polygon, polygon vertices inside the rectangle, and crossing edges. Zone intrusion ignores `machine_state`; `foot_point` no longer decides membership.
 
 The REST fallback `POST /api/v1/analysis/frame` remains available and returns the same core `FrameInferenceResponse` without WebSocket correlation fields.
 
@@ -333,7 +334,7 @@ detected in memory
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Candidate: foot point enters polygon
+    [*] --> Candidate: zone covers >20% of person box
     Candidate --> Confirmed: officer acknowledges
     Candidate --> FalseAlarm: officer rejects
     Confirmed --> PrivacyProcessing: blur and validate snapshot

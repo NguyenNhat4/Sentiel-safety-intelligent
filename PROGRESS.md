@@ -2,6 +2,24 @@
 
 Updated: 2026-08-30
 
+### 2026-08-30 Bounding-box zone membership threshold
+
+- [Backend] Xác định xâm nhập vùng cấm khi diện tích polygon giao với box người lớn hơn 20% diện tích box của chính người đó; đúng 20%, chỉ chạm biên hoặc thấp hơn không tính. `foot_point` vẫn giữ trong payload để tương thích và debug.
+- [Contracts] Cập nhật decision record, alert-rule contract và backend inference contract theo ngưỡng bounding-box overlap đã được phê duyệt.
+- [Verification] 8/8 focused geometry/API tests pass; Ruff, frontend lint/type-check/test và production build pass. Toàn repo đạt 299 backend/vision tests pass, còn 10 lỗi contract nền có sẵn ở debounce/PPE, event batch/audit và remote adapter; không có lỗi mới thuộc phép tính overlap. Railway deployment không được chạy.
+
+### 2026-08-30 Post-login landing page
+
+- [Frontend] Sau đăng nhập hoặc khôi phục session, `system_admin` và `safety_manager` đều mở Live Monitor; `area_manager` tiếp tục mở dashboard khu vực. Thẻ tài khoản demo của System Admin cũng hiển thị đúng đích đến Live Monitor.
+- [Verification] App authentication/navigation tests, frontend lint, type-check và production build pass. Railway deployment không được chạy.
+
+### 2026-08-30 Camera settings control styling
+
+- [Frontend] Đồng bộ hình thức các control trong khối “Kiểm soát camera” theo mẫu tham chiếu: segmented BẬT/TẮT, switch PPE, select/input có khoảng đệm chữ an toàn, ngắt kết nối, vẽ/xóa vùng và nút lưu dùng màu, bo góc, trạng thái focus/disabled nhất quán.
+- [Frontend] Mô tả “Vùng cấm” giải thích trực tiếp rằng polygon đã vẽ là vùng cấm và hệ thống ghi cảnh báo khi có người bước vào.
+- [Frontend] Tách preview và khối thiết lập thành hai hàng flow độc lập để media không còn tràn/đè xuyên qua control; log vẫn là rail riêng, sticky trong chiều cao viewport và không thay đổi markup/nội dung.
+- [Verification] Camera configuration/log tests pass 14/14; frontend lint (còn một warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Railway deployment không được chạy.
+
 ### 2026-08-30 Local setup and PR #49 merge repair
 
 - [Cross-cutting] `make setup` completes against the local Docker PostgreSQL service; `make run` builds and serves the application on port 8000.

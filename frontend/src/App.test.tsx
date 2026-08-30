@@ -134,6 +134,7 @@ describe("Sentinel authentication", () => {
     fireEvent.change(screen.getByLabelText(/Mật khẩu/), {target: {value: "Sentinel123!"}});
     fireEvent.click(screen.getByRole("button", {name: /Đăng nhập/}));
 
+    expect(await screen.findByRole("heading", {name: "Live Monitor"})).toBeInTheDocument();
     await screen.findByRole("button", {name: /Thư viện media/});
     expect(screen.getByRole("button", {name: /Quan sát hệ thống/})).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: /Cấu hình camera/})).not.toBeInTheDocument();

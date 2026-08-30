@@ -28,6 +28,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Camera, Media, And Rules
 
+### 2026-08-30: [Backend] Zone membership requires more than 20% person-box overlap
+
+- A canonical person belongs to a zone only when the polygon intersection covers more than 20% of that person's bounding-box area. Exactly 20%, boundary-only contact and smaller overlaps remain outside; the bottom-center `foot_point` no longer gates zone intrusion.
+- `foot_point` remains in REST/WebSocket payloads for rendering, diagnostics and compatibility. Existing per-track debounce, occurrence deduplication, machine-state-independent zone rule and event contracts remain unchanged.
+- The threshold is evaluated independently for every detected person, with focused regression coverage below, at and above 20%, plus a person whose box qualifies while the foot point remains outside.
+
 ### 2026-08-28: [Frontend] Review snapshot uses backend annotation only
 
 - Review Modal và Event Detail hiển thị trực tiếp snapshot đã được backend annotate.

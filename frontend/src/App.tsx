@@ -23,7 +23,7 @@ export default function App() {
 
   const handleAuthenticated = useCallback((authenticatedUser: AuthenticatedUser) => {
     setUser(authenticatedUser);
-    setPage(authenticatedUser.role === "area_manager" ? "area" : authenticatedUser.role === "system_admin" ? "media-library" : "monitor");
+    setPage(authenticatedUser.role === "area_manager" ? "area" : "monitor");
   }, []);
 
   useEffect(() => {
