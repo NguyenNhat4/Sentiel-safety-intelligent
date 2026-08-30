@@ -11,6 +11,8 @@ from backend.app.schemas.auth import (
     ManagedUser,
     PasswordChangeRequest,
     SessionResponse,
+    TelegramLinkComplete,
+    TelegramLinkStart,
     UserCreate,
     UserRoleUpdate,
 )
@@ -24,6 +26,7 @@ from backend.app.services.auth_service import (
     InvalidSessionError,
     UserManagementError,
 )
+from backend.app.services.telegram_link_service import TelegramLinkError, TelegramLinkService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -39,6 +42,7 @@ def as_auth_user(user) -> AuthUser:
             role_label=ROLE_LABELS[role],
             must_change_password=user.must_change_password,
             managed_area_id=user.managed_area_id,
+            managed_camera_ids=user.managed_camera_ids or [],
             telegram_username=user.telegram_username,
             telegram_chat_id=user.telegram_chat_id,
         )
@@ -163,8 +167,37 @@ def update_user_role(
                 telegram_username=payload.telegram_username,
                 telegram_chat_id=payload.telegram_chat_id,
                 update_telegram=bool({"telegram_username", "telegram_chat_id"} & payload.model_fields_set),
+                managed_camera_ids=payload.managed_camera_ids,
             )
         )
+    except UserManagementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AuthenticationUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/users/{user_id}/telegram-link", response_model=TelegramLinkStart)
+def start_telegram_link(user_id: str, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        link_url, expires_at = TelegramLinkService(db).start(user_id)
+        return TelegramLinkStart(link_url=link_url, expires_at=expires_at)
+    except TelegramLinkError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/users/{user_id}/telegram-link/complete", response_model=TelegramLinkComplete)
+def complete_telegram_link(user_id: str, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        status_value, chat_id, username = TelegramLinkService(db).complete(user_id)
+        return TelegramLinkComplete(status=status_value, chat_id=chat_id, telegram_username=username)
+    except TelegramLinkError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.delete("/users/{user_id}/telegram-link", response_model=ManagedUser)
+def disconnect_telegram_link(user_id: str, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        return as_managed_user(AuthService(db).disconnect_telegram(target_user_id=user_id))
     except UserManagementError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except AuthenticationUnavailableError as exc:

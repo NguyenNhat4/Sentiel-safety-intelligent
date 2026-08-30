@@ -27,6 +27,18 @@ Updated: 2026-08-30
 - [Frontend] Repaired PR #49 merge artifacts so storage-aware playback and video-time detection synchronization coexist; removed two orphaned refs. Focused StreamViewer tests pass 10/10 and the full frontend suite passes 105/105.
 - [Vision/Tooling] Restored `VISION_DEVICE` wiring for the KD worker and the deterministic 640px benchmark constant; worker tests pass 11/11 and GPU benchmark tests pass 4/4.
 - [Verification] Ruff, format, frontend lint/type-check/test/build, and 32 root tests pass. The full backend/Vision suite is 292 passed with the same nine pre-existing debounce/audit/event-batch/multi-zone contract failures. Local `/` returns 200; `/health` returns 200 but remains `degraded` because the current readiness policy requires S3 while local snapshot storage is filesystem. Railway deployment was not run.
+### 2026-08-30 Free-text area assignment
+
+- [Frontend] Replaced the responsible-area dropdown in account creation and role assignment with a required free-text area ID field. Values are trimmed before submission while backend existence validation remains authoritative.
+- [Verification] The changed frontend file passes ESLint; frontend type-check and production build pass.
+
+### 2026-08-30 Telegram alert disconnection
+
+- [Backend/Frontend] Added a Telegram disconnect action under the role-and-permissions tab, shown only for confirmed Telegram links. After confirmation it clears the stored Chat ID and username, so subsequent alert recipient queries exclude the account.
+- [Frontend] Added an account-row shortcut that opens the Security tab with that exact account selected for administrator password reset.
+- [Frontend] Made non-action areas of each account row open the role-and-permissions tab for that account, while preserving independent reset/delete controls and restyling delete as a compact destructive button.
+- [Frontend] Replaced the browser-native account deletion confirmation with a white Sentinel dialog using restrained red destructive emphasis, explicit account identity, cancel, loading, and irreversible-action copy.
+- [Verification] Focused auth-service tests pass 9/9, frontend auth transport tests pass 4/4, changed frontend files pass ESLint, and the production frontend build passes. The existing alert-notification suite still has its two pre-existing recipient-routing failures.
 
 ### 2026-08-29 Camera detail three-zone layout
 
@@ -81,6 +93,22 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 
 - [Vision] Runtime configuration, startup checksum validation and container packaging now target the user-supplied `yolo11n_safety_kd_best.pt`; the public `[0,3,4]` person/hat/vest contract is unchanged.
 - [Vision] The former YOLO11m checkpoint remains available only for controlled rollback/benchmark. Training-code revision, dataset provenance and held-out US-13 accuracy/latency evidence for the KD checkpoint remain open gates.
+### 2026-08-29 Telegram account linking
+
+- [Backend/Frontend] System Admin can create a one-time Telegram deep link for an account, open the bot, then confirm/retry to capture the sender chat ID. Link challenges store only a digest and expire after ten minutes; bot username is discovered from the configured bot token.
+- [Verification] Ruff, frontend type-check, and focused auth-service tests pass. Railway deployment was not run.
+
+### 2026-08-29 Alembic legacy-head compatibility
+
+- [Backend] Local PostgreSQL reported legacy revision `20260825_03` although its schema already includes `vision_tracking_states`. A no-op compatibility revision reconnects that recorded head to the current tracking-state migration history, avoiding database stamping or destructive repair.
+- [Verification] `alembic upgrade head` now recognizes `20260825_03 (head)` without DDL, and focused migration tests pass 4/4. `make check` passed Ruff and all frontend checks (99/99) but its output stalled during the Vite production build before backend/root tests started.
+
+### 2026-08-28 Confirmed-event Telegram delivery
+
+- [Backend] Telegram delivery follows the durable event lifecycle: no message for AI-created `unacknowledged` candidates, one message on the first human-confirmed `acknowledged` transition, and no duplicate on an idempotent retry.
+- [Backend] Confirmed rules are aggregated per assigned area manager, preserving zone intrusion and specific missing hat/vest labels instead of dropping same-area events or producing an empty description.
+- [Known limitation] PPE-only events intentionally remain `camera_wide`; the current zone-based `managed_area_id` assignment cannot infer their Telegram recipient until a camera-wide recipient policy is chosen.
+- [Verification] Six focused Telegram, reviewed-event transition, and camera-runtime tests pass. Full `make check` passes Ruff, frontend lint/type-check/build and 95/95 frontend plus 32/32 root tests; backend/vision has 293 passes and the same nine pre-existing safety debounce, summary, event-batch, and multi-zone contract failures.
 
 ### 2026-08-27 System-admin Live Monitor access
 

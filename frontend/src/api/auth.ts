@@ -8,6 +8,7 @@ import type {
   UserRole,
   UserRoleUpdate
 } from "../types";
+import type {TelegramLinkComplete, TelegramLinkStart} from "../types";
 import {apiUrl} from "./config";
 
 const TOKEN_STORAGE_KEY = "sentinel.auth.access_token";
@@ -82,6 +83,18 @@ export function changeOwnPassword(payload: PasswordChangeRequest): Promise<Authe
 
 export function deleteUser(userId: string): Promise<void> {
   return authenticatedRequest<void>(`/auth/users/${encodeURIComponent(userId)}`, {method: "DELETE"});
+}
+
+export function startTelegramLink(userId: string): Promise<TelegramLinkStart> {
+  return authenticatedRequest<TelegramLinkStart>(`/auth/users/${encodeURIComponent(userId)}/telegram-link`, {method: "POST"});
+}
+
+export function completeTelegramLink(userId: string): Promise<TelegramLinkComplete> {
+  return authenticatedRequest<TelegramLinkComplete>(`/auth/users/${encodeURIComponent(userId)}/telegram-link/complete`, {method: "POST"});
+}
+
+export function disconnectTelegramLink(userId: string): Promise<ManagedUser> {
+  return authenticatedRequest<ManagedUser>(`/auth/users/${encodeURIComponent(userId)}/telegram-link`, {method: "DELETE"});
 }
 
 async function authenticatedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {

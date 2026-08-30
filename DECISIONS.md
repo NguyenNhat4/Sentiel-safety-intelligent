@@ -7,6 +7,22 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Architecture And Ownership
 
+### 2026-08-29: [Backend/Frontend] Area managers may receive alerts from multiple cameras
+
+- Keep legacy area assignment compatible, and add an additive camera-ID collection for each area manager. Telegram routing uses the selected cameras when present.
+
+### 2026-08-29: [Backend/Frontend] Telegram account linking uses one-time deep links and polling
+
+- A system administrator creates a short-lived, single-use Telegram deep-link challenge for a selected account. The recipient opens the bot link and sends its generated `/start` payload; the administrator then confirms the link from the application.
+- The backend derives the bot username using Telegram `getMe` and reads matching updates through `getUpdates`; no webhook is configured for this bot.
+- Challenge secrets are stored only as digests, expire quickly, and bind at most one chat ID to the selected account. Existing manual username/chat-ID fields remain compatible.
+
+### 2026-08-29: [Backend] Preserve the legacy Alembic head as a compatibility revision
+
+- Some existing PostgreSQL databases record `20260825_03`, while the current source history uses `20260825_01` for the tracking-state schema. Keep `20260825_03` in the current graph as a no-op compatibility revision whose parent is the current tracking-state revision.
+- Reason: it lets Alembic recognize and advance an already-deployed schema without stamping, deleting migration metadata, or rerunning destructive DDL.
+- Constraint: this revision is a history bridge only; it must not alter data or schema. New migrations must descend from it and revision identifiers must never be reused.
+
 ### [Cross-cutting] Modular monolith with explicit production owners
 
 - `backend`, `frontend`, and `vision` are the only production owners.
@@ -171,7 +187,7 @@ This file contains only decisions that currently constrain implementation. Super
 
 - Roles are exactly `system_admin`, `safety_manager`, and `area_manager`; sessions are server-side and stored as token digests.
 - Area managers can view and transition only events in their assigned area. New/updated area-manager accounts require a valid managed area.
-- Confirmed events route to the assigned manager. Telegram delivery uses numeric chat IDs, is non-blocking, and never changes inference or in-app persistence on provider failure.
+- Confirmed events route to the assigned manager. Telegram is queued exactly once when an event transitions from `unacknowledged` to `acknowledged`; AI-opened candidates and idempotent review retries do not send. Multiple confirmed events for one area are aggregated without dropping their rule labels. Delivery uses numeric chat IDs, is non-blocking, and never changes inference or in-app persistence on provider failure.
 - New and administrator-reset accounts must replace temporary passwords; forgotten-password recovery returns to System Admin.
 
 ### 2026-08-20: [Backend] PostgreSQL-only database contract

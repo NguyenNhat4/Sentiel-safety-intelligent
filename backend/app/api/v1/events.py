@@ -50,7 +50,7 @@ async def create_event_batch(
         batch_id, snapshot_path, events = service.create_batch(batch_in, actor=actor)
         if batch_in.status == "acknowledged":
             alert_notification_service.queue_confirmed_events(
-                db, [event for event in events if getattr(event, "_was_created", False)]
+                db, [event for event in events if getattr(event, "_became_acknowledged", False)]
             )
         return {"batch_id": batch_id, "snapshot_path": snapshot_path, "events": events}
     except ValueError as exc:
@@ -114,7 +114,7 @@ async def create_event(
         ):
             raise HTTPException(status_code=409, detail="Occurrence does not belong to the requested session and track")
         event = service.create_event(event_in, actor=actor)
-        if event_in.status == "acknowledged" and getattr(event, "_was_created", False):
+        if event_in.status == "acknowledged" and getattr(event, "_became_acknowledged", False):
             alert_notification_service.queue_confirmed_events(db, [event])
         return event
     except ValueError as exc:

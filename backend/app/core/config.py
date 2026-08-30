@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # Telegram alert delivery
     telegram_bot_token: str = ""
+    telegram_link_ttl_seconds: int = Field(default=600, ge=60, le=3600)
     telegram_request_timeout_seconds: float = Field(default=5.0, ge=1.0, le=30.0)
 
     # Database Settings

@@ -4,7 +4,7 @@ export type EventStatus = ReviewStatus | "unacknowledged" | "resolved";
 export type UserRole = "system_admin" | "safety_manager" | "area_manager";
 export type AssignableUserRole = UserRole;
 
-export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
+export interface AuthenticatedUser { id: string; full_name: string; email: string; role: UserRole; role_label: string; must_change_password: boolean; managed_area_id?: string | null; managed_camera_ids?: string[]; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export type MediaType = "video" | "image";
 export type MediaAssetStatus = "UPLOADING" | "READY" | "ERROR";
 export type MediaStorageBackend = "filesystem" | "s3";
@@ -74,7 +74,9 @@ export interface LoginResponse { access_token: string; token_type: "bearer"; use
 export interface ManagedUser extends AuthenticatedUser { is_active: boolean; created_at: string; }
 export interface CreateUserRequest { full_name: string; email: string; password: string; role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
 export interface PasswordChangeRequest { new_password: string; current_password?: string; }
-export interface UserRoleUpdate { role: AssignableUserRole; managed_area_id?: string | null; telegram_username?: string | null; telegram_chat_id?: string | null; }
+export interface UserRoleUpdate { role: AssignableUserRole; managed_area_id?: string | null; managed_camera_ids?: string[]; telegram_username?: string | null; telegram_chat_id?: string | null; }
+export interface TelegramLinkStart { link_url: string; expires_at: string; }
+export interface TelegramLinkComplete { status: "linked" | "pending" | "expired"; chat_id?: string | null; telegram_username?: string | null; }
 
 export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
 export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
