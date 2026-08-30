@@ -194,6 +194,16 @@ def complete_telegram_link(user_id: str, _: User = Depends(require_admin), db: S
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.delete("/users/{user_id}/telegram-link", response_model=ManagedUser)
+def disconnect_telegram_link(user_id: str, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        return as_managed_user(AuthService(db).disconnect_telegram(target_user_id=user_id))
+    except UserManagementError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AuthenticationUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.put("/users/{user_id}/password", response_model=AuthUser)
 def change_user_password(
     user_id: str,

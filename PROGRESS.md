@@ -1,6 +1,19 @@
 # Project Progress
 
-Updated: 2026-08-28
+Updated: 2026-08-30
+
+### 2026-08-30 Free-text area assignment
+
+- [Frontend] Replaced the responsible-area dropdown in account creation and role assignment with a required free-text area ID field. Values are trimmed before submission while backend existence validation remains authoritative.
+- [Verification] The changed frontend file passes ESLint; frontend type-check and production build pass.
+
+### 2026-08-30 Telegram alert disconnection
+
+- [Backend/Frontend] Added a Telegram disconnect action under the role-and-permissions tab, shown only for confirmed Telegram links. After confirmation it clears the stored Chat ID and username, so subsequent alert recipient queries exclude the account.
+- [Frontend] Added an account-row shortcut that opens the Security tab with that exact account selected for administrator password reset.
+- [Frontend] Made non-action areas of each account row open the role-and-permissions tab for that account, while preserving independent reset/delete controls and restyling delete as a compact destructive button.
+- [Frontend] Replaced the browser-native account deletion confirmation with a white Sentinel dialog using restrained red destructive emphasis, explicit account identity, cancel, loading, and irreversible-action copy.
+- [Verification] Focused auth-service tests pass 9/9, frontend auth transport tests pass 4/4, changed frontend files pass ESLint, and the production frontend build passes. The existing alert-notification suite still has its two pre-existing recipient-routing failures.
 
 ### 2026-08-29 Camera detail three-zone layout
 

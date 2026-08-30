@@ -93,6 +93,10 @@ export function completeTelegramLink(userId: string): Promise<TelegramLinkComple
   return authenticatedRequest<TelegramLinkComplete>(`/auth/users/${encodeURIComponent(userId)}/telegram-link/complete`, {method: "POST"});
 }
 
+export function disconnectTelegramLink(userId: string): Promise<ManagedUser> {
+  return authenticatedRequest<ManagedUser>(`/auth/users/${encodeURIComponent(userId)}/telegram-link`, {method: "DELETE"});
+}
+
 async function authenticatedRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getAccessToken();
   if (!token) throw new Error("Phiên đăng nhập đã hết hạn.");

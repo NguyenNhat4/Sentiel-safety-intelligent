@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {deleteUser, getCurrentUser, listUsers, login, logout, updateUserRole} from "./auth";
+import {deleteUser, disconnectTelegramLink, getCurrentUser, listUsers, login, logout, updateUserRole} from "./auth";
 
 const user = {
   id: "user-1",
@@ -54,11 +54,16 @@ describe("authentication transport", () => {
 
     await listUsers("Safety", "safety_manager");
     await updateUserRole(user.id, {role: "area_manager"});
+    await disconnectTelegramLink(user.id);
     await deleteUser(user.id);
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/auth/users?query=Safety&role=safety_manager",
       expect.objectContaining({headers: expect.objectContaining({Authorization: "Bearer admin-token"})})
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/auth/users/${user.id}/telegram-link`,
+      expect.objectContaining({method: "DELETE", headers: expect.objectContaining({Authorization: "Bearer admin-token"})})
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/v1/auth/users/${user.id}`,

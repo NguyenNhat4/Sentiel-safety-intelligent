@@ -174,6 +174,23 @@ def test_non_admin_is_forbidden_from_admin_dependency():
         raise AssertionError("Non-admin sessions must be forbidden")
 
 
+def test_disconnect_telegram_clears_recipient_information():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    service = AuthService(session)
+    service.seed_demo_users()
+    user = session.query(User).filter(User.email == "khuvuc@sentinel.local").one()
+    user.telegram_chat_id = "123456789"
+    user.telegram_username = "@area_manager"
+    session.commit()
+
+    disconnected = service.disconnect_telegram(target_user_id=user.id)
+
+    assert disconnected.telegram_chat_id is None
+    assert disconnected.telegram_username is None
+
+
 def test_temporary_password_can_be_changed_once_and_admin_reset_reopens_flow():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)

@@ -249,6 +249,19 @@ class AuthService:
             self.db.rollback()
             raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
 
+    def disconnect_telegram(self, *, target_user_id: str) -> User:
+        try:
+            target = self._get_managed_user(target_user_id)
+            target.telegram_chat_id = None
+            target.telegram_username = None
+            self.db.commit()
+            return target
+        except AuthError:
+            raise
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise AuthenticationUnavailableError("Authentication storage is unavailable") from exc
+
     def get_current_user(self, token: str) -> tuple[User, datetime.datetime]:
         try:
             now = utc_now()

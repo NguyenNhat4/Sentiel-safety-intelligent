@@ -1,6 +1,6 @@
 import {memo, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode} from "react";
 import {QRCodeSVG} from "qrcode.react";
-import {changePassword, completeTelegramLink, createUser, deleteUser, listUsers, startTelegramLink, updateUserRole} from "../../api/auth";
+import {changePassword, completeTelegramLink, createUser, deleteUser, disconnectTelegramLink, listUsers, startTelegramLink, updateUserRole} from "../../api/auth";
 import {loadMonitoringZones} from "../../api/monitoring-zones";
 import type {AssignableUserRole, AuthenticatedUser, ManagedUser, MonitoringZone, UserRole} from "../../types";
 import "./admin-user.css";
@@ -26,6 +26,8 @@ export const AdminUserPage = memo(function AdminUserPage({currentUser, active = 
   const [loading, setLoading] = useState(() => adminUsersCache === null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [deleteCandidate, setDeleteCandidate] = useState<ManagedUser | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [areas, setAreas] = useState<MonitoringZone[]>(() => adminAreasCache ?? []);
   const selected = useMemo(() => users.find(user => user.id === selectedId) ?? users[0], [users, selectedId]);
 
@@ -57,10 +59,20 @@ export const AdminUserPage = memo(function AdminUserPage({currentUser, active = 
   }, [active]);
 
   async function remove(user: ManagedUser) {
-    if (!window.confirm(`Xóa tài khoản ${user.email}? Hành động này không thể hoàn tác.`)) return;
-    setError(""); setMessage("");
-    try { await deleteUser(user.id); setMessage(`Đã xóa ${user.email}.`); await load(); }
+    setDeleting(true); setError(""); setMessage("");
+    try { await deleteUser(user.id); setDeleteCandidate(null); setMessage(`Đã xóa ${user.email}.`); await load(); }
     catch (reason) { setError(errorMessage(reason)); }
+    finally { setDeleting(false); }
+  }
+
+  async function disconnectTelegram(user: ManagedUser) {
+    if (!window.confirm(`Ngắt liên kết Telegram của ${user.email}? Tài khoản này sẽ không nhận cảnh báo Telegram mới.`)) return;
+    setError(""); setMessage("");
+    try {
+      await disconnectTelegramLink(user.id);
+      setMessage(`Đã ngắt Telegram của ${user.email}.`);
+      await load();
+    } catch (reason) { setError(errorMessage(reason)); }
   }
 
   return <section className={`page admin-page ${active ? "active" : ""}`}>
@@ -74,17 +86,18 @@ export const AdminUserPage = memo(function AdminUserPage({currentUser, active = 
       <TabButton active={tab === "security"} onClick={() => setTab("security")}>Bảo mật</TabButton>
     </div>
     {(error || message) && <div className={`admin-feedback ${error ? "error" : "success"}`} role={error ? "alert" : "status"}>{error || message}</div>}
-    {tab === "accounts" && <AccountsTab areas={areas} users={users} loading={loading} currentUserId={currentUser.id} query={query} filterRole={filterRole} onQuery={setQuery} onFilterRole={setFilterRole} onCreated={async user => { setMessage(`Đã tạo ${user.email}.`); setSelectedId(user.id); await load(); }} onDelete={remove} onError={setError} />}
-    {tab === "roles" && <RoleTab areas={areas} users={users} selected={selected} onSelect={setSelectedId} onUpdated={async user => { setMessage(`Đã cập nhật vai trò cho ${user.email}.`); await load(); }} onError={setError} />}
+    {tab === "accounts" && <AccountsTab areas={areas} users={users} loading={loading} currentUserId={currentUser.id} query={query} filterRole={filterRole} onQuery={setQuery} onFilterRole={setFilterRole} onCreated={async user => { setMessage(`Đã tạo ${user.email}.`); setSelectedId(user.id); await load(); }} onOpenRole={user => { setSelectedId(user.id); setError(""); setMessage(""); setTab("roles"); }} onOpenPasswordReset={user => { setSelectedId(user.id); setError(""); setMessage(""); setTab("security"); }} onDelete={user => { setError(""); setMessage(""); setDeleteCandidate(user); }} onError={setError} />}
+    {tab === "roles" && <RoleTab users={users} selected={selected} onSelect={setSelectedId} onUpdated={async user => { setMessage(`Đã cập nhật vai trò cho ${user.email}.`); await load(); }} onDisconnectTelegram={disconnectTelegram} onError={setError} />}
     {tab === "security" && <SecurityTab users={users} selected={selected} currentUser={currentUser} onSelect={setSelectedId} onChanged={async user => { if (user.id === currentUser.id) { await onLogout(); return; } setMessage(`Đã cấp mật khẩu tạm cho ${user.email}. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.`); }} onError={setError} />}
+    {deleteCandidate && <div className="delete-account-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !deleting) setDeleteCandidate(null); }}><section className="delete-account-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-account-title" aria-describedby="delete-account-description"><div className="delete-account-icon" aria-hidden="true">!</div><div className="delete-account-copy"><span>XÁC NHẬN XÓA</span><h2 id="delete-account-title">Xóa tài khoản?</h2><p id="delete-account-description">Tài khoản <strong>{deleteCandidate.full_name}</strong> ({deleteCandidate.email}) sẽ bị xóa vĩnh viễn và không thể hoàn tác.</p></div><div className="delete-account-actions"><button type="button" className="delete-account-cancel" disabled={deleting} autoFocus onClick={() => setDeleteCandidate(null)}>Hủy</button><button type="button" className="delete-account-confirm" disabled={deleting} onClick={() => void remove(deleteCandidate)}>{deleting ? "Đang xóa..." : "Xóa tài khoản"}</button></div></section></div>}
   </section>;
 });
 
-function AccountsTab({areas, users, loading, currentUserId, query, filterRole, onQuery, onFilterRole, onCreated, onDelete, onError}: {
+function AccountsTab({areas, users, loading, currentUserId, query, filterRole, onQuery, onFilterRole, onCreated, onOpenRole, onOpenPasswordReset, onDelete, onError}: {
   areas: MonitoringZone[];
   users: ManagedUser[]; loading: boolean; currentUserId: string; query: string; filterRole: UserRole | "";
   onQuery: (value: string) => void; onFilterRole: (value: UserRole | "") => void;
-  onCreated: (user: ManagedUser) => Promise<void>; onDelete: (user: ManagedUser) => Promise<void>; onError: (message: string) => void;
+  onCreated: (user: ManagedUser) => Promise<void>; onOpenRole: (user: ManagedUser) => void; onOpenPasswordReset: (user: ManagedUser) => void; onDelete: (user: ManagedUser) => void; onError: (message: string) => void;
 }) {
   const [fullName, setFullName] = useState(""); const [email, setEmail] = useState("");
   const [password, setPassword] = useState(""); const [role, setRole] = useState<AssignableUserRole>("safety_manager");
@@ -92,26 +105,27 @@ function AccountsTab({areas, users, loading, currentUserId, query, filterRole, o
   const [saving, setSaving] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); onError("");
-    try { const user = await createUser({full_name: fullName, email, password, role, managed_area_id: role === "area_manager" ? managedAreaId : null}); setFullName(""); setEmail(""); setPassword(""); setManagedAreaId(""); await onCreated(user); }
+    try { const user = await createUser({full_name: fullName, email, password, role, managed_area_id: role === "area_manager" ? managedAreaId.trim() : null}); setFullName(""); setEmail(""); setPassword(""); setManagedAreaId(""); await onCreated(user); }
     catch (reason) { onError(errorMessage(reason)); } finally { setSaving(false); }
   }
   return <div className="admin-account-grid">
     <article className="admin-card"><div className="admin-card-title"><div><h3>Danh sách tài khoản</h3><p>Tìm kiếm, lọc và xóa tài khoản.</p></div><div className="admin-filters"><input aria-label="Tìm tài khoản" placeholder="Tên hoặc email" value={query} onChange={event => onQuery(event.target.value)} /><select aria-label="Lọc vai trò" value={filterRole} onChange={event => onFilterRole(event.target.value as UserRole | "")}><option value="">Tất cả vai trò</option>{roleOptions()}</select></div></div>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Khu vực & Telegram</th><th>Trạng thái</th><th /></tr></thead><tbody>{loading ? <tr><td colSpan={5}>Đang tải...</td></tr> : users.map(user => <tr key={user.id}><td><strong>{user.full_name}</strong><small>{user.email}</small></td><td><span className="role-pill">{ROLE_LABELS[user.role]}</span></td><td><strong>{user.managed_area_id ? areaLabel(areas, user.managed_area_id) : "—"}</strong><small>{user.telegram_username || "Chưa liên kết Telegram"}</small></td><td><span className={user.is_active ? "status-active" : "status-inactive"}>{user.is_active ? "Hoạt động" : "Đã khóa"}</span></td><td><button className="danger-link" disabled={user.id === currentUserId} onClick={() => void onDelete(user)}>Xóa</button></td></tr>)}</tbody></table></div>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Khu vực & Telegram</th><th>Trạng thái</th><th /></tr></thead><tbody>{loading ? <tr><td colSpan={5}>Đang tải...</td></tr> : users.map(user => <tr className="admin-account-row" key={user.id} role="button" tabIndex={0} aria-label={`Mở vai trò và quyền của ${user.full_name}`} onClick={() => onOpenRole(user)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenRole(user); } }}><td><strong>{user.full_name}</strong><small>{user.email}</small></td><td><span className="role-pill">{ROLE_LABELS[user.role]}</span></td><td><strong>{user.managed_area_id ? areaLabel(areas, user.managed_area_id) : "—"}</strong><small>{user.telegram_chat_id ? user.telegram_username || "Đã liên kết Telegram" : "Chưa liên kết Telegram"}</small></td><td><span className={user.is_active ? "status-active" : "status-inactive"}>{user.is_active ? "Hoạt động" : "Đã khóa"}</span></td><td><div className="admin-row-actions"><button className="password-reset-link" onClick={event => { event.stopPropagation(); onOpenPasswordReset(user); }}>Đặt lại mật khẩu</button><button className="danger-button" disabled={user.id === currentUserId} onClick={event => { event.stopPropagation(); void onDelete(user); }}>Xóa</button></div></td></tr>)}</tbody></table></div>
     </article>
-    <article className="admin-card"><h3>Tạo tài khoản</h3><p>Cấp tài khoản và khu vực phụ trách. Telegram liên kết sau khi tạo.</p><form className="admin-form" onSubmit={submit}><label>Họ và tên<input value={fullName} onChange={event => setFullName(event.target.value)} required /></label><label>Email<input type="email" value={email} onChange={event => setEmail(event.target.value)} required /></label><label>Mật khẩu tạm<input type="password" minLength={8} value={password} onChange={event => setPassword(event.target.value)} required /></label><label>Vai trò<select value={role} onChange={event => setRole(event.target.value as AssignableUserRole)}>{roleOptions()}</select></label>{role === "area_manager" && <AreaSelect areas={areas} value={managedAreaId} onChange={setManagedAreaId} />}<button className="admin-primary" disabled={saving || (role === "area_manager" && !managedAreaId)}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</button></form></article>
+    <article className="admin-card"><h3>Tạo tài khoản</h3><p>Cấp tài khoản và khu vực phụ trách. Telegram liên kết sau khi tạo.</p><form className="admin-form" onSubmit={submit}><label>Họ và tên<input value={fullName} onChange={event => setFullName(event.target.value)} required /></label><label>Email<input type="email" value={email} onChange={event => setEmail(event.target.value)} required /></label><label>Mật khẩu tạm<input type="password" minLength={8} value={password} onChange={event => setPassword(event.target.value)} required /></label><label>Vai trò<select value={role} onChange={event => setRole(event.target.value as AssignableUserRole)}>{roleOptions()}</select></label>{role === "area_manager" && <AreaInput value={managedAreaId} onChange={setManagedAreaId} />}<button className="admin-primary" disabled={saving || (role === "area_manager" && !managedAreaId.trim())}>{saving ? "Đang tạo..." : "Tạo tài khoản"}</button></form></article>
   </div>;
 }
 
-function RoleTab({areas, users, selected, onSelect, onUpdated, onError}: {areas: MonitoringZone[]; users: ManagedUser[]; selected?: ManagedUser; onSelect: (id: string) => void; onUpdated: (user: ManagedUser) => Promise<void>; onError: (message: string) => void;}) {
+function RoleTab({users, selected, onSelect, onUpdated, onDisconnectTelegram, onError}: {users: ManagedUser[]; selected?: ManagedUser; onSelect: (id: string) => void; onUpdated: (user: ManagedUser) => Promise<void>; onDisconnectTelegram: (user: ManagedUser) => Promise<void>; onError: (message: string) => void;}) {
   const [role, setRole] = useState<AssignableUserRole>(selected?.role ?? "safety_manager");
   const [managedAreaId, setManagedAreaId] = useState(selected?.managed_area_id ?? "");
   const [cameraIds, setCameraIds] = useState<string[]>(selected?.managed_camera_ids ?? []);
   const [cameraMenuOpen, setCameraMenuOpen] = useState(false);
   useEffect(() => { if (selected) { setRole(selected.role); setManagedAreaId(selected.managed_area_id ?? ""); setCameraIds(selected.managed_camera_ids ?? []); } }, [selected]);
-  async function save() { if (!selected) return; onError(""); try { await onUpdated(await updateUserRole(selected.id, {role, managed_area_id: role === "area_manager" ? managedAreaId : null, managed_camera_ids: role === "area_manager" ? cameraIds : []})); } catch (reason) { onError(errorMessage(reason)); } }
-  const unchanged = selected?.role === role && (selected?.managed_area_id ?? "") === (role === "area_manager" ? managedAreaId : "");
-  return <AdminSelectionLayout users={users} selected={selected} onSelect={onSelect}><h3>Phân vai trò và nơi nhận cảnh báo</h3><p>Mọi thay đổi sẽ thu hồi các phiên đang hoạt động của tài khoản.</p>{selected && <div className="admin-form"><label>Vai trò mới<select value={role} onChange={event => setRole(event.target.value as AssignableUserRole)}>{roleOptions()}</select></label>{role === "area_manager" && <><AreaSelect areas={areas} value={managedAreaId} onChange={setManagedAreaId} /><div className="camera-picker"><span>Camera phụ trách</span><button type="button" className="camera-picker-trigger" onClick={() => setCameraMenuOpen(value => !value)}><span className="camera-picker-value">{cameraIds.length ? cameraIds.map(id => <i key={id}>Cam {id.slice(-1)}</i>) : "Chọn camera"}</span><b>⌄</b></button>{cameraMenuOpen && <div className="camera-picker-menu">{["cam_1","cam_2","cam_3","cam_4"].map(id => <label key={id} className={cameraIds.includes(id) ? "checked" : ""}><input type="checkbox" checked={cameraIds.includes(id)} onChange={() => setCameraIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])} /><span>Camera {id.slice(-1)}</span><em>✓</em></label>)}<button type="button" onClick={() => setCameraMenuOpen(false)}>Xong</button></div>}</div></>}<TelegramLinkControls userId={selected.id} onLinked={() => undefined} onError={onError} /><div className="permission-preview"><strong>Quyền theo vai trò</strong><span>{permissionSummary(role)}</span></div><button className="admin-primary" disabled={unchanged || (role === "area_manager" && !managedAreaId)} onClick={() => void save()}>Lưu vai trò</button></div>}</AdminSelectionLayout>;
+  async function save() { if (!selected) return; onError(""); try { await onUpdated(await updateUserRole(selected.id, {role, managed_area_id: role === "area_manager" ? managedAreaId.trim() : null, managed_camera_ids: role === "area_manager" ? cameraIds : []})); } catch (reason) { onError(errorMessage(reason)); } }
+  const normalizedAreaId = role === "area_manager" ? managedAreaId.trim() : "";
+  const unchanged = selected?.role === role && (selected?.managed_area_id ?? "") === normalizedAreaId;
+  return <AdminSelectionLayout users={users} selected={selected} onSelect={onSelect}><h3>Phân vai trò và nơi nhận cảnh báo</h3><p>Mọi thay đổi sẽ thu hồi các phiên đang hoạt động của tài khoản.</p>{selected && <div className="admin-form"><label>Vai trò mới<select value={role} onChange={event => setRole(event.target.value as AssignableUserRole)}>{roleOptions()}</select></label>{role === "area_manager" && <><AreaInput value={managedAreaId} onChange={setManagedAreaId} /><div className="camera-picker"><span>Camera phụ trách</span><button type="button" className="camera-picker-trigger" onClick={() => setCameraMenuOpen(value => !value)}><span className="camera-picker-value">{cameraIds.length ? cameraIds.map(id => <i key={id}>Cam {id.slice(-1)}</i>) : "Chọn camera"}</span><b>⌄</b></button>{cameraMenuOpen && <div className="camera-picker-menu">{["cam_1","cam_2","cam_3","cam_4"].map(id => <label key={id} className={cameraIds.includes(id) ? "checked" : ""}><input type="checkbox" checked={cameraIds.includes(id)} onChange={() => setCameraIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])} /><span>Camera {id.slice(-1)}</span><em>✓</em></label>)}<button type="button" onClick={() => setCameraMenuOpen(false)}>Xong</button></div>}</div></>}<TelegramLinkControls userId={selected.id} onLinked={() => undefined} onError={onError} />{selected.telegram_chat_id && <button type="button" className="telegram-disconnect-button" onClick={() => void onDisconnectTelegram(selected)}>Ngắt liên kết Telegram</button>}<div className="permission-preview"><strong>Quyền theo vai trò</strong><span>{permissionSummary(role)}</span></div><button className="admin-primary" disabled={unchanged || (role === "area_manager" && !normalizedAreaId)} onClick={() => void save()}>Lưu vai trò</button></div>}</AdminSelectionLayout>;
 }
 
 function TelegramLinkControls({userId, onLinked, onError}: {userId: string; onLinked: (chatId: string, username: string | null | undefined) => void; onError: (message: string) => void;}) {
@@ -131,7 +145,7 @@ function SecurityTab({users, selected, currentUser, onSelect, onChanged, onError
 function AdminSelectionLayout({users, selected, onSelect, children}: {users: ManagedUser[]; selected?: ManagedUser; onSelect: (id: string) => void; children: ReactNode;}) { return <div className="admin-selection-grid"><aside className="admin-user-list">{users.map(user => <button className={selected?.id === user.id ? "selected" : ""} key={user.id} onClick={() => onSelect(user.id)}><strong>{user.full_name}</strong><small>{user.email}</small><span>{ROLE_LABELS[user.role]}</span></button>)}</aside><article className="admin-card admin-editor">{children}</article></div>; }
 function TabButton({active, onClick, children}: {active: boolean; onClick: () => void; children: ReactNode;}) { return <button className={active ? "active" : ""} role="tab" aria-selected={active} onClick={onClick}>{children}</button>; }
 function roleOptions() { return (Object.entries(ROLE_LABELS) as Array<[UserRole, string]>).map(([value, label]) => <option key={value} value={value}>{label}</option>); }
-function AreaSelect({areas, value, onChange}: {areas: MonitoringZone[]; value: string; onChange: (value: string) => void;}) { return <label>Khu vực phụ trách<select value={value} onChange={event => onChange(event.target.value)} required><option value="">Chọn khu vực</option>{areas.map(area => <option value={area.zone_id} key={area.zone_id}>{area.display_name} ({area.zone_id})</option>)}</select></label>; }
+function AreaInput({value, onChange}: {value: string; onChange: (value: string) => void;}) { return <label>Khu vực phụ trách<input type="text" value={value} onChange={event => onChange(event.target.value)} placeholder="Nhập mã khu vực, ví dụ: zone_01" maxLength={50} autoComplete="off" required /></label>; }
 function areaLabel(areas: MonitoringZone[], areaId: string): string { return areas.find(area => area.zone_id === areaId)?.display_name ?? areaId; }
 function permissionSummary(role: UserRole): string { return role === "system_admin" ? "Toàn quyền quản trị, giám sát, cấu hình camera và xử lý sự kiện an toàn." : role === "safety_manager" ? "Theo dõi, review và xác nhận sự kiện an toàn." : "Xem dữ liệu và báo cáo trong phạm vi khu vực."; }
 function errorMessage(reason: unknown): string { return reason instanceof Error ? reason.message : "Không thể hoàn tất yêu cầu."; }
