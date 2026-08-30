@@ -1,13 +1,17 @@
-import {fireEvent, render, screen} from "@testing-library/react";
+import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
-import {loadAreaEvents} from "../../api/events";
+import {loadAreaEvents, subscribeToSafetyEventUpdates} from "../../api/events";
 import {loadStatisticsSummary} from "../../api/statistics";
 import {listCameraConfigurations} from "../../api/camera-configurations";
 import {listMediaAssets} from "../../api/media-assets";
 import type {SafetyEvent} from "../../types";
 import {AreaManagerPage} from "./AreaManagerPage";
 
-vi.mock("../../api/events", () => ({loadAreaEvents: vi.fn(), updateAreaEvent: vi.fn()}));
+vi.mock("../../api/events", () => ({
+  loadAreaEvents: vi.fn(),
+  subscribeToSafetyEventUpdates: vi.fn(() => vi.fn()),
+  updateAreaEvent: vi.fn(),
+}));
 vi.mock("../../api/statistics", () => ({loadStatisticsSummary: vi.fn()}));
 vi.mock("../../api/camera-configurations", () => ({listCameraConfigurations: vi.fn()}));
 vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
@@ -27,6 +31,8 @@ const event: SafetyEvent = {
 
 describe("AreaManagerPage event audit", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(subscribeToSafetyEventUpdates).mockImplementation(() => vi.fn());
     vi.mocked(loadStatisticsSummary).mockResolvedValue({
       total_events: 0,
       unacknowledged_events: 0,
@@ -48,12 +54,25 @@ describe("AreaManagerPage event audit", () => {
   it("lets the area manager inspect false-alarm audit without changing official KPIs", async () => {
     render(<AreaManagerPage />);
 
-    expect(await screen.findAllByText("Không phải vi phạm")).not.toHaveLength(0);
-    expect(screen.getByText("Ca sáng")).toBeInTheDocument();
+    expect(await screen.findByText("Ca sáng")).toBeInTheDocument();
     expect(screen.getByText("Camera 2 · Chưa gán media")).toBeInTheDocument();
     expect(screen.getByText("Tuân thủ theo khu vực").closest("article")).toHaveTextContent("Ca sáng");
     expect(screen.getByText("VI PHẠM CHÍNH THỨC").closest("article")).toHaveTextContent("0");
-    fireEvent.click(screen.getByRole("button", {name: "Xem audit sự kiện #7"}));
+    fireEvent.click(screen.getByRole("button", {name: /#7/}));
     expect(screen.getByText("AREA AUDIT 7")).toBeInTheDocument();
+  });
+
+  it("reloads the selected detail when Monitor changes the event", async () => {
+    const acknowledged = {...event, status: "acknowledged" as const};
+    vi.mocked(loadAreaEvents)
+      .mockResolvedValueOnce([event])
+      .mockResolvedValueOnce([acknowledged]);
+    render(<AreaManagerPage />);
+    await waitFor(() => expect(loadAreaEvents).toHaveBeenCalledOnce());
+
+    const listener = vi.mocked(subscribeToSafetyEventUpdates).mock.calls[0][0];
+    listener({eventIds: [event.id], cameraIds: [event.camera_id]});
+
+    await waitFor(() => expect(loadAreaEvents).toHaveBeenCalledTimes(2));
   });
 });

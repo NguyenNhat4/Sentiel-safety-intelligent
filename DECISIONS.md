@@ -46,9 +46,10 @@ This file contains only decisions that currently constrain implementation. Super
 
 ### 2026-08-30: [Frontend] Event status views reconcile from one persisted source
 
-- Live Monitor, Camera Detail, and an open event-detail dialog must not keep independent stale status after a successful event review or status transition.
+- Live Monitor, Camera Detail, reviewed-event history, Area Manager detail, and an open event-detail dialog must not keep independent stale status after a successful event review or status transition.
 - Every frontend event mutation publishes a same-tab and cross-tab update signal containing only event and camera IDs; subscribers then reload authoritative event state from the backend instead of copying payload state between features.
 - New-event delivery remains owned by the camera-detection WebSocket. Status synchronization does not add polling, duplicate persistence, or a second event store.
+- All event-list reconciliation requests bypass the browser HTTP cache; module-level UI caches may provide initial rendering only and must be replaced by the backend response after an update signal.
 
 ### 2026-08-30: [Backend] Zone membership requires more than 20% person-box overlap
 

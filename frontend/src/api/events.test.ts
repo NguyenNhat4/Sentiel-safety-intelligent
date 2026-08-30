@@ -54,7 +54,7 @@ describe("event audit transport", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/events?status=false_alarm&limit=50",
-      {headers: {Authorization: "Bearer audit-token"}},
+      {cache: "no-store", headers: {Authorization: "Bearer audit-token"}},
     );
   });
 

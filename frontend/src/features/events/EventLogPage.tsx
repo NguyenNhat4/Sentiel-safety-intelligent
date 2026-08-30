@@ -1,6 +1,6 @@
 import {memo, useCallback, useEffect, useState} from "react";
 import {assetUrl} from "../../api/config";
-import {loadReviewedEvents} from "../../api/events";
+import {loadReviewedEvents, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {ReviewStatus, SafetyEvent} from "../../types";
 import {EventDetailDialog} from "./EventDetailDialog";
 import {violationRuleLabel} from "../alerts/violation-copy";
@@ -36,6 +36,13 @@ export const EventLogPage = memo(function EventLogPage({active}: EventLogPagePro
 
   useEffect(() => {
     if (active) void loadEvents();
+  }, [active, loadEvents]);
+
+  useEffect(() => {
+    if (!active) return;
+    return subscribeToSafetyEventUpdates(() => {
+      void loadEvents();
+    });
   }, [active, loadEvents]);
 
   function handleSelectStatus(nextStatus: ReviewStatus) {

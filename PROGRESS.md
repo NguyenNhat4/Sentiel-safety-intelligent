@@ -4,6 +4,10 @@ Updated: 2026-08-30
 
 ### 2026-08-30 Bidirectional event-status synchronization
 
+- [Frontend] Follow-up diagnosis found that reviewed-event history and Area Manager detail still retained independent module caches. Both now subscribe to the shared event-update signal, reload authoritative backend state, and bypass the HTTP cache for event lists; Area Manager mutations also update its local cache immediately.
+- [Verification] Follow-up regression coverage passes 32/32 across event transport, Monitor, Camera Detail, Event Detail, reviewed-event history, and Area Manager detail. Full frontend passes 113/113; lint has no errors (one pre-existing `StreamViewer` hook warning), and the production build passes.
+- [Verification] Full `make check` again reaches 31/32 root tests before the same pre-existing SQLite legacy migration failure in `20260829_02_add_manager_camera_assignments.py`; the frontend and all checks before that point pass. Railway deployment was not run.
+
 - [Frontend] Mọi review/status mutation thành công phát tín hiệu reconciliation dùng chung trong cùng tab và qua `BroadcastChannel` giữa các tab; tín hiệu chỉ chứa event/camera IDs, còn Live Monitor, Camera Detail và modal Event Detail luôn tải lại trạng thái authoritative từ backend.
 - [Frontend] Camera Detail chỉ refresh khi mutation thuộc đúng camera; Live Monitor đối soát lại pending inbox, loại event đã xử lý và đóng review/toast cũ; modal đang mở tải lại audit khi đúng event thay đổi. Các request reconciliation pending/camera/detail dùng `cache: no-store` và không thêm polling hay kho event thứ hai.
 - [Verification] 4 nhóm regression event API/Monitor/Camera Detail/Event Detail pass 26/26; toàn frontend pass 111/111 tests, lint không có error (còn warning `StreamViewer` có sẵn), type-check, production build và `git diff --check` pass. Full `make check` tiếp tục bị chặn bởi một lỗi SQLite legacy migration có sẵn trong `20260829_02_add_manager_camera_assignments.py`; 31/32 root tests pass trước điểm dừng. Railway deployment không được chạy.

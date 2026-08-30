@@ -5,3 +5,6 @@ Loads reviewed safety events from the REST API and renders separate confirmed-vi
 An open Event Detail dialog subscribes to the shared event-update signal and
 reloads its backend audit when the same event is reviewed or changes status in
 another screen or browser tab.
+
+The reviewed-event list also subscribes to that signal and bypasses the HTTP
+cache, so a Monitor review is reflected while the list is already open.

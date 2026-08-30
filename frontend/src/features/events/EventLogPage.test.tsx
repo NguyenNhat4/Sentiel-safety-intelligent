@@ -1,10 +1,13 @@
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
-import {loadReviewedEvents} from "../../api/events";
+import {loadReviewedEvents, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {SafetyEvent} from "../../types";
 import {EventLogPage} from "./EventLogPage";
 
-vi.mock("../../api/events", () => ({loadReviewedEvents: vi.fn()}));
+vi.mock("../../api/events", () => ({
+  loadReviewedEvents: vi.fn(),
+  subscribeToSafetyEventUpdates: vi.fn(() => vi.fn()),
+}));
 vi.mock("./EventDetailDialog", () => ({
   EventDetailDialog: ({eventId}: {eventId: number | null}) => eventId === null ? null : <div>AUDIT EVENT {eventId}</div>,
 }));
@@ -34,6 +37,8 @@ const missingHat: SafetyEvent = {
 
 describe("EventLogPage audit filters", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(subscribeToSafetyEventUpdates).mockImplementation(() => vi.fn());
     vi.mocked(loadReviewedEvents).mockImplementation(async status => status === "acknowledged" ? [acknowledged] : [falseAlarm]);
   });
 
@@ -60,5 +65,19 @@ describe("EventLogPage audit filters", () => {
 
     expect(await screen.findByRole("heading", {name: "Thiếu mũ bảo hộ"})).toBeInTheDocument();
     expect(screen.queryByText("Thiếu PPE")).not.toBeInTheDocument();
+  });
+  it("reloads the open event list when Monitor confirms a violation", async () => {
+    const confirmed = {...acknowledged, id: 8};
+    vi.mocked(loadReviewedEvents)
+      .mockResolvedValueOnce([acknowledged])
+      .mockResolvedValueOnce([acknowledged, confirmed]);
+    render(<EventLogPage active />);
+    await screen.findByText("EVENT #1");
+
+    const listener = vi.mocked(subscribeToSafetyEventUpdates).mock.calls[0][0];
+    listener({eventIds: [8], cameraIds: [confirmed.camera_id]});
+
+    expect(await screen.findByRole("button", {name: /#8/})).toBeInTheDocument();
+    expect(loadReviewedEvents).toHaveBeenCalledTimes(2);
   });
 });

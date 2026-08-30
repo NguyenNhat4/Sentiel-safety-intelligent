@@ -1,5 +1,5 @@
 import {memo, useCallback, useEffect, useState} from "react";
-import {loadAreaEvents, updateAreaEvent} from "../../api/events";
+import {loadAreaEvents, subscribeToSafetyEventUpdates, updateAreaEvent} from "../../api/events";
 import {assetUrl} from "../../api/config";
 import {loadStatisticsSummary} from "../../api/statistics";
 import {listCameraConfigurations} from "../../api/camera-configurations";
@@ -47,11 +47,22 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
     if (active) void load();
   }, [active, load]);
 
+  useEffect(() => {
+    if (!active) return;
+    return subscribeToSafetyEventUpdates(() => {
+      void load();
+    });
+  }, [active, load]);
+
   async function setEventOutcome(event: SafetyEvent, outcome: "resolved" | "false_alarm") {
     setUpdatingEventId(event.id);
     try {
       const updated = await updateAreaEvent(event.id, outcome);
-      setEvents(current => current.map(item => item.id === updated.id ? updated : item));
+      setEvents(current => {
+        const nextEvents = current.map(item => item.id === updated.id ? updated : item);
+        if (areaCache) areaCache = {...areaCache, events: nextEvents};
+        return nextEvents;
+      });
       setSelectedEvent(updated);
       setStatus("");
     } catch (reason) {

@@ -26,7 +26,7 @@ export async function loadAcknowledgedEvents(): Promise<SafetyEvent[]> {
 export async function loadReviewedEvents(status: ReviewStatus): Promise<SafetyEvent[]> {
   const response = await fetch(
     apiUrl(`/events?status=${encodeURIComponent(status)}&limit=50`),
-    {headers: authorizationHeaders()},
+    {cache: "no-store", headers: authorizationHeaders()},
   );
   if (!response.ok) throw new Error(`Không thể tải nhật ký (HTTP ${response.status})`);
   return response.json() as Promise<SafetyEvent[]>;
@@ -85,7 +85,10 @@ export async function saveReviewedEventBatch(payload: EventBatchPayload): Promis
 }
 
 export async function loadAreaEvents(): Promise<SafetyEvent[]> {
-  const response = await fetch(apiUrl("/events?limit=50"), {headers: authorizationHeaders()});
+  const response = await fetch(apiUrl("/events?limit=50"), {
+    cache: "no-store",
+    headers: authorizationHeaders(),
+  });
   if (!response.ok) throw new Error(`Không thể tải nhật ký khu vực (HTTP ${response.status})`);
   return response.json() as Promise<SafetyEvent[]>;
 }
