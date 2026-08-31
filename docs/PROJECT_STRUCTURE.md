@@ -46,6 +46,7 @@ P-047/
 │   │   │   ├── remote_vision.py # Versioned outbound HTTP Safety Vision adapter
 │   │   │   ├── privacy_vision.py # Cached YuNet-first, person-fallback privacy adapter
 │   │   │   ├── media_storage.py # Railway Bucket presigned media and cache transfer adapter
+│   │   │   ├── snapshot_storage.py # Shared filesystem/S3 provider for redacted HITL snapshot write/read/delete
 │   │   │   └── telegram_notifications.py # Telegram Bot API delivery and inbound link polling adapter
 │   │   ├── models/      # SQLAlchemy ORM models by resource
 │   │   │   ├── camera_configuration.py # Fixed camera configuration and session lifecycle
@@ -169,7 +170,7 @@ P-047/
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays
 │   │   │   │   ├── DetectionOverlay.tsx # Source-coordinate boxes over direct media
 │   │   │   │   └── AreaManagerPage.test.tsx # Official KPI and false-alarm audit coverage
-│   │   │   ├── alerts/  # Rule result, shared violation copy, ReviewModal, and SnapshotOverlay
+│   │   │   ├── alerts/  # Rule result, shared violation copy, snapshot preload, ReviewModal, and SnapshotOverlay
 │   │   │   ├── events/  # Reviewed-event history and immutable decision-audit detail
 │   │   │   │   ├── README.md
 │   │   │   │   ├── EventDetailDialog.tsx

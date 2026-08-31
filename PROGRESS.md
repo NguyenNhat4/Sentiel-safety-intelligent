@@ -1,5 +1,10 @@
 # Project Progress
 
+### 2026-08-31 HITL snapshot preload before popup
+
+- [Frontend] Live Monitor and Camera Detail now preload each persisted HITL snapshot before making the review popup visible. Live Monitor reserves the active FIFO alert while loading so later zone alerts cannot overtake it; snapshot failure or a five-second timeout opens the popup with an explicit unavailable-image state instead of hiding the alert indefinitely.
+- [Verification] Focused Live Monitor and Camera Violation Log regressions pass 18/18; the full frontend suite passes 117/117. Frontend type-check, production build, lint with the existing `StreamViewer.tsx` hooks warning, and `git diff --check` pass. The local Docker image rebuilt successfully and both containers report healthy. `make check` passes all frontend/Ruff stages, then times out in the root pytest stage after its first test. Railway deployment was not run.
+
 ### 2026-08-31 HITL snapshot storage consistency
 
 - [Backend] `EventService` now persists and cleans up redacted HITL snapshots through the configured filesystem/S3 provider used by the snapshot-serving route, removing the Docker production-env mismatch where writes went to local disk while reads went to S3.

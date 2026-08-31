@@ -58,7 +58,7 @@ The tests cover URL resolution, WebSocket configuration/backpressure, Canvas coo
 6. The UI ignores stale session output, buffers video detections by `video_time`, and draws canonical person/hat/vest observations only when browser playback is within 200 ms of the inference frame. Images render their single result immediately.
 7. Run creates fresh sessions for every valid configured camera. Replay creates one
    fresh session for only the selected camera and remounts playback at the beginning.
-8. Newly opened occurrences are persisted as privacy-protected pending events. PPE opens a dismissible toast and remains in the shared inbox; zone alerts use one FIFO modal. Duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.
+8. Newly opened occurrences are persisted as privacy-protected pending events. PPE opens a dismissible toast and remains in the shared inbox; zone alerts use one FIFO modal. Before a HITL modal becomes visible, its persisted snapshot is preloaded into the browser cache; a five-second timeout or image error opens the modal with an explicit unavailable-image state so the alert cannot remain hidden. Duplicate occurrence IDs are claimed once and per-person writes are serialized before the next queued review opens.
 
 ## Source Boundaries
 

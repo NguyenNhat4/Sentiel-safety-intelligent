@@ -3,6 +3,7 @@ import {beforeEach, expect, it, vi} from "vitest";
 import {loadCameraEvents, saveReviewedEvent} from "../../api/events";
 import type {SafetyEventUpdate} from "../../api/events";
 import type {CameraConfiguration, CameraInferenceResult, SafetyEvent} from "../../types";
+import {preloadSnapshot} from "../alerts/preload-snapshot";
 import {CameraViolationLog} from "./CameraViolationLog";
 
 const detectionClient = vi.hoisted(() => ({
@@ -32,6 +33,7 @@ vi.mock("../../api/camera-detection-client", () => ({
     close = detectionClient.close;
   },
 }));
+vi.mock("../alerts/preload-snapshot", () => ({preloadSnapshot: vi.fn()}));
 const loadMock = vi.mocked(loadCameraEvents);
 const saveMock = vi.mocked(saveReviewedEvent);
 const configuration: CameraConfiguration = {
@@ -113,6 +115,7 @@ beforeEach(() => {
   eventUpdates.listener = undefined;
   detectionClient.connect.mockResolvedValue(undefined);
   saveMock.mockResolvedValue({id: 1} as SafetyEvent);
+  vi.mocked(preloadSnapshot).mockResolvedValue(true);
 });
 
 it("loads and renders only the selected camera violation log", async () => {

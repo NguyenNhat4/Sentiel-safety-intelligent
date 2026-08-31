@@ -5,6 +5,7 @@ import {assetUrl} from "../../api/config";
 import {loadCameraEvents, saveReviewedEvent, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {CameraConfiguration, EventStatus, InferenceResult, ReviewStatus, SafetyEvent} from "../../types";
 import {ReviewModal} from "../alerts/ReviewModal";
+import {preloadSnapshot} from "../alerts/preload-snapshot";
 import {violationRuleLabel} from "../alerts/violation-copy";
 import {buildEventPayload} from "../monitor/use-monitor";
 
@@ -18,11 +19,13 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
   const [status, setStatus] = useState("Đang tải log vi phạm...");
   const [loadFailed, setLoadFailed] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | null>(null);
+  const [reviewSnapshot, setReviewSnapshot] = useState<string | undefined>();
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const requestIdRef = useRef(0);
   const selectedEventRef = useRef<SafetyEvent | null>(null);
   const reviewSavingRef = useRef(false);
+  const reviewLoadIdRef = useRef(0);
 
   const load = useCallback(async (showLoading = true) => {
     const requestId = ++requestIdRef.current;
@@ -50,8 +53,10 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
   useEffect(() => subscribeToSafetyEventUpdates(update => {
     if (!update.cameraIds.includes(cameraId)) return;
     if (selectedEventRef.current && update.eventIds.includes(selectedEventRef.current.id)) {
+      reviewLoadIdRef.current += 1;
       selectedEventRef.current = null;
       setSelectedEvent(null);
+      setReviewSnapshot(undefined);
       setReviewStartedAt(null);
     }
     void load(false);
@@ -104,20 +109,32 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
   const reviewTitle = `Phát hiện ${violationLabel.charAt(0).toLocaleLowerCase("vi-VN")}${violationLabel.slice(1)}`;
   const reviewTimer = useReviewTimer(reviewStartedAt);
 
-  function openReview(event: SafetyEvent) {
+  async function openReview(event: SafetyEvent) {
     if (!event.details?.pending_review) {
       setLoadFailed(true);
       setStatus("Cảnh báo không còn đủ dữ liệu để mở HITL.");
       return;
     }
+    const snapshot = assetUrl(event.snapshot_path);
+    const loadId = ++reviewLoadIdRef.current;
+    const snapshotLoaded = snapshot ? await preloadSnapshot(snapshot) : false;
+    if (snapshot && !snapshotLoaded) {
+      if (reviewLoadIdRef.current !== loadId) return;
+      setLoadFailed(true);
+      setStatus("Không thể tải snapshot; popup được mở để cảnh báo không bị bỏ lỡ.");
+    }
+    if (reviewLoadIdRef.current !== loadId) return;
     selectedEventRef.current = event;
     setSelectedEvent(event);
+    setReviewSnapshot(snapshotLoaded ? snapshot ?? undefined : undefined);
     setReviewStartedAt(Date.now());
   }
 
   function closeReview() {
+    reviewLoadIdRef.current += 1;
     selectedEventRef.current = null;
     setSelectedEvent(null);
+    setReviewSnapshot(undefined);
     setReviewStartedAt(null);
   }
 
@@ -176,12 +193,12 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
     </div>
     {status && <p className="camera-violation-log-status" role={loadFailed ? undefined : "status"} aria-live={loadFailed ? "assertive" : undefined}>{status}</p>}
     {pendingEvents.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log Camera ${cameraNumber(cameraId)}`}>
-      {pendingEvents.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => openReview(event)} />)}
+      {pendingEvents.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => void openReview(event)} />)}
     </div>}
     <ReviewModal
       isOpen={Boolean(pendingReview)}
       onClose={closeReview}
-      snapshot={assetUrl(selectedEvent?.snapshot_path) ?? undefined}
+      snapshot={reviewSnapshot}
       people={pendingReview?.people}
       zones={configuration.zones}
       timer={reviewTimer}

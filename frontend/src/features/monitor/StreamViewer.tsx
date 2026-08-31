@@ -10,6 +10,7 @@ import type {CameraConfiguration, CameraInferenceResult, CameraSession, Inferenc
 import {PendingViolationList} from "../alerts/PendingViolationList";
 import {PpeAlertToast} from "../alerts/PpeAlertToast";
 import {isZoneAlert} from "../alerts/pending-violation";
+import {preloadSnapshot} from "../alerts/preload-snapshot";
 import {ReviewModal} from "../alerts/ReviewModal";
 import {violationRuleLabel} from "../alerts/violation-copy";
 import {AuthenticatedMedia} from "../media/AuthenticatedMedia";
@@ -52,6 +53,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
   const displayedDetectionKeysRef = useRef<Record<string, string>>({});
   const zoneQueueRef = useRef<SafetyEvent[]>([]);
   const announcedAlertIdsRef = useRef(new Set<number>());
+  const reviewLoadIdRef = useRef(0);
   sessionsRef.current = sessions;
   configurationsRef.current = configurations;
 
@@ -82,6 +84,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       setPpeToast(current => current && pendingIds.has(current.id) ? current : null);
       const openAlert = activeAlertRef.current;
       if (openAlert && !pendingIds.has(openAlert.id)) {
+        reviewLoadIdRef.current += 1;
         activeAlertRef.current = null;
         setActiveAlert(null);
         pendingReviewRef.current = null;
@@ -276,11 +279,29 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       setError("Cảnh báo không còn đủ dữ liệu để mở HITL.");
       return;
     }
-    showReview({...result, snapshot_data: assetUrl(alert.snapshot_path) ?? undefined}, alert);
+    const currentAlert = activeAlertRef.current;
+    if (currentAlert && currentAlert.id !== alert.id) {
+      if (!zoneQueueRef.current.some(item => item.id === alert.id)) zoneQueueRef.current.push(alert);
+      return;
+    }
+    activeAlertRef.current = alert;
+    setActiveAlert(alert);
+    const snapshot = assetUrl(alert.snapshot_path) ?? undefined;
+    const loadId = ++reviewLoadIdRef.current;
+    if (!snapshot) {
+      showReview({...result, snapshot_data: undefined}, alert);
+      return;
+    }
+    void preloadSnapshot(snapshot).then(loaded => {
+      if (reviewLoadIdRef.current !== loadId || activeAlertRef.current?.id !== alert.id) return;
+      if (!loaded) setError("Không thể tải snapshot; popup được mở để cảnh báo không bị bỏ lỡ.");
+      showReview({...result, snapshot_data: loaded ? snapshot : undefined}, alert);
+    });
   }
   openAlertRef.current = openAlert;
 
   function closeReview() {
+    reviewLoadIdRef.current += 1;
     showReview(null);
     const next = zoneQueueRef.current.shift();
     if (next) openAlert(next);
