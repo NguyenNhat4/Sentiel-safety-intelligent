@@ -107,7 +107,7 @@ def test_reviewed_event_persists_server_owned_decision_context_and_summary(clien
     assert "Nguyễn Anh Tuấn" in detail["summary"]["text"]
     assert detail["summary"]["text"] == (
         "Tại Máy dập A, hệ thống phát hiện một người khi máy đang chạy "
-        "và đánh dấu là vi phạm do xâm nhập vùng và không đội mũ. "
+        "và đánh dấu là vi phạm do xâm nhập vùng và thiếu mũ bảo hộ. "
         "Nguyễn Anh Tuấn xác nhận đây là vi phạm thực tế."
     )
     assert detail["summary"]["context_schema_version"] == "decision_context_v1"
