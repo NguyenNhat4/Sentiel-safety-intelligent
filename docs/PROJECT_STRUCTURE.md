@@ -163,7 +163,7 @@ P-047/
 │   │   ├── components/  # Shared application shell
 │   │   ├── features/
 │   │   │   ├── camera-config/ # Safety Manager asset preview, zone and per-zone rules
-│   │   │   ├── auth/    # Login and system-admin account management
+│   │   │   ├── auth/    # Login and system-admin account management with Telegram UI tests
 │   │   │   ├── area/    # Dedicated area-manager compliance dashboard
 │   │   │   ├── media/ # Sys Admin library and authenticated image/video rendering
 │   │   │   ├── monitor/ # Four fixed slots, session lifecycle and detection overlays

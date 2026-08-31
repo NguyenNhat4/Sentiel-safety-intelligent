@@ -167,7 +167,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
         <div className="camera-config-footer"><div className={`camera-save-state ${dirty && !incomplete && !conflict ? "is-ready" : ""}`}><strong>{dirty ? "Cấu hình chưa lưu" : "Cấu hình đã đồng bộ"}</strong><small>{saveBlocker}</small></div><div className="zone-save-actions"><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div></div>
       </aside>
       </div>
-      <CameraViolationLog cameraId={cameraId} />
+      <CameraViolationLog cameraId={cameraId} configuration={saved} />
     </div>
     {saveNotice && <aside className="toast show camera-config-save-toast" role="status" aria-live="polite"><span aria-hidden="true">✓</span><div><strong>{saveNotice}</strong></div></aside>}
   </section>;

@@ -30,9 +30,6 @@ class TelegramLinkService:
                 raise TelegramLinkError("Account not found")
             secret = secrets.token_urlsafe(24)
             expires_at = utc_now() + self.ttl
-            self.db.query(TelegramLinkChallenge).filter(
-                TelegramLinkChallenge.user_id == user_id, TelegramLinkChallenge.consumed_at.is_(None)
-            ).update({TelegramLinkChallenge.consumed_at: utc_now()})
             self.db.add(TelegramLinkChallenge(user_id=user_id, secret_digest=_digest(secret), expires_at=expires_at))
             self.db.commit()
             return f"https://t.me/{self.adapter.bot_username()}?start={secret}", expires_at
@@ -44,7 +41,7 @@ class TelegramLinkService:
 
     def complete(self, user_id: str) -> tuple[str, str | None, str | None]:
         try:
-            challenge = (
+            challenges = (
                 self.db.query(TelegramLinkChallenge)
                 .filter(
                     TelegramLinkChallenge.user_id == user_id,
@@ -52,19 +49,30 @@ class TelegramLinkService:
                     TelegramLinkChallenge.expires_at > utc_now(),
                 )
                 .order_by(TelegramLinkChallenge.created_at.desc())
-                .first()
+                .all()
             )
-            if challenge is None:
+            if not challenges:
                 return "expired", None, None
             for payload, chat_id, username in self.adapter.start_messages():
-                if not secrets.compare_digest(challenge.secret_digest, _digest(payload)):
+                payload_digest = _digest(payload)
+                challenge = next(
+                    (
+                        candidate
+                        for candidate in challenges
+                        if secrets.compare_digest(candidate.secret_digest, payload_digest)
+                    ),
+                    None,
+                )
+                if challenge is None:
                     continue
                 user = self.db.get(User, user_id)
                 if user is None:
                     raise TelegramLinkError("Account not found")
                 user.telegram_chat_id = chat_id
                 user.telegram_username = f"@{username}" if username else None
-                challenge.consumed_at = utc_now()
+                consumed_at = utc_now()
+                for candidate in challenges:
+                    candidate.consumed_at = consumed_at
                 self.db.commit()
                 return "linked", chat_id, user.telegram_username
             return "pending", None, None

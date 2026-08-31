@@ -3,8 +3,7 @@ import {loadAreaEvents, subscribeToSafetyEventUpdates, updateAreaEvent} from "..
 import {assetUrl} from "../../api/config";
 import {loadStatisticsSummary} from "../../api/statistics";
 import {listCameraConfigurations} from "../../api/camera-configurations";
-import {listMediaAssets} from "../../api/media-assets";
-import type {CameraConfiguration, MediaAsset} from "../../types";
+import type {CameraConfiguration} from "../../types";
 import type {SafetyEvent, StatisticsSummary} from "../../types";
 import {EventDetailDialog} from "../events/EventDetailDialog";
 import "./area-manager.css";
@@ -13,13 +12,12 @@ interface AreaManagerPageProps {
   active?: boolean;
 }
 
-let areaCache: { summary: StatisticsSummary; events: SafetyEvent[]; configurations: CameraConfiguration[]; assets: MediaAsset[] } | null = null;
+let areaCache: { summary: StatisticsSummary; events: SafetyEvent[]; configurations: CameraConfiguration[] } | null = null;
 
 export const AreaManagerPage = memo(function AreaManagerPage({active = true}: AreaManagerPageProps) {
   const [summary, setSummary] = useState<StatisticsSummary | undefined>(() => areaCache?.summary);
   const [events, setEvents] = useState<SafetyEvent[]>(() => areaCache?.events ?? []);
   const [configurations, setConfigurations] = useState<CameraConfiguration[]>(() => areaCache?.configurations ?? []);
-  const [assets, setAssets] = useState<MediaAsset[]>(() => areaCache?.assets ?? []);
   const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | undefined>(() => areaCache?.events[0]);
   const [updatingEventId, setUpdatingEventId] = useState<number>();
   const [status, setStatus] = useState(() => areaCache ? "" : "Đang tải dữ liệu khu vực...");
@@ -30,12 +28,11 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
       setStatus("Đang tải dữ liệu khu vực...");
     }
     try {
-      const [nextSummary, nextEvents, nextConfigurations, nextAssets] = await Promise.all([loadStatisticsSummary(), loadAreaEvents(), listCameraConfigurations(), listMediaAssets()]);
-      areaCache = { summary: nextSummary, events: nextEvents, configurations: nextConfigurations, assets: nextAssets };
+      const [nextSummary, nextEvents, nextConfigurations] = await Promise.all([loadStatisticsSummary(), loadAreaEvents(), listCameraConfigurations()]);
+      areaCache = { summary: nextSummary, events: nextEvents, configurations: nextConfigurations };
       setSummary(nextSummary);
       setEvents(nextEvents);
       setConfigurations(nextConfigurations);
-      setAssets(nextAssets);
       setSelectedEvent(current => nextEvents.find(event => event.id === current?.id) ?? nextEvents[0]);
       setStatus("");
     } catch (reason) {
@@ -82,7 +79,7 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
         <article><small>TUÂN THỦ CHUNG</small><strong>{summary.overall_compliance_rate}%</strong></article>
       </div>
       <div className="area-grid">
-        <article className="area-card"><h3>Tuân thủ theo khu vực</h3>{cameraIds.map((cameraId, index) => { const configuration = configurations.find(item => item.camera_id === cameraId); const asset = assets.find(item => item.id === configuration?.asset_id); const stats = summary.zone_stats[index]; return <div className="zone-row" key={cameraId}><div><strong>{asset?.display_name ?? `Camera ${index + 1} · Chưa gán media`}</strong><small>{stats ? `${stats.total_violations} vi phạm / ${stats.total_detections} lượt phát hiện` : "Chưa có dữ liệu phát hiện"}</small></div><span>{stats ? `${stats.compliance_rate}%` : "—"}</span></div>; })}</article>
+        <article className="area-card"><h3>Tuân thủ theo khu vực</h3>{cameraIds.map((cameraId, index) => { const configuration = configurations.find(item => item.camera_id === cameraId); const stats = summary.zone_stats.find(item => item.zone_id === cameraId) ?? summary.zone_stats[index]; const cameraLabel = `Camera ${index + 1}`; return <div className="zone-row" key={cameraId}><div><strong>{configuration?.asset_id ? cameraLabel : `${cameraLabel} · Chưa gán media`}</strong><small>{stats ? `${stats.total_violations} vi phạm / ${stats.total_detections} lượt phát hiện` : "Chưa có dữ liệu phát hiện"}</small></div><span>{stats ? `${stats.compliance_rate}%` : "—"}</span></div>; })}</article>
         <article className="area-card area-log-card"><h3>Kết quả xác minh gần đây</h3>{events.length ? events.map(event => <button type="button" className={`area-event ${selectedEvent?.id === event.id ? "selected" : ""}`} aria-label={`Xem audit sự kiện #${event.id}`} key={event.id} onClick={() => { setSelectedEvent(event); setSelectedEventId(event.id); }}><div><strong>#{event.id} · {event.zone_id}</strong><small>{new Date(event.timestamp).toLocaleString("vi-VN", {hour12: false})}</small></div><span className={event.status === "false_alarm" ? "false-alarm" : ""}>{statusLabel(event.status)}</span></button>) : <p>Chưa có kết quả xác minh.</p>}</article>
       </div>
       {selectedEvent && <EventDetail event={selectedEvent} saving={updatingEventId === selectedEvent.id} onOutcome={setEventOutcome} />}

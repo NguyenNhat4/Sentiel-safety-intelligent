@@ -9,8 +9,14 @@ class StatisticsService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_summary(self, zone_id: str | None = None) -> StatisticsSummaryResponse:
+    def get_summary(
+        self,
+        zone_id: str | None = None,
+        camera_ids: list[str] | None = None,
+    ) -> StatisticsSummaryResponse:
         events = self.db.query(SafetyEvent)
+        if camera_ids:
+            events = events.filter(SafetyEvent.camera_id.in_(camera_ids))
         if zone_id:
             events = events.filter(SafetyEvent.zone_id == zone_id)
         official_violations = events.filter(SafetyEvent.status.in_(("acknowledged", "resolved")))
@@ -34,17 +40,22 @@ class StatisticsService:
         violations_by_severity = {severity: count for severity, count in severity_counts}
 
         # Zone stats calculation
-        zones = [zone_id] if zone_id else ["zone_01", "zone_02", "zone_03"]
+        zones = camera_ids or ([zone_id] if zone_id else ["zone_01", "zone_02", "zone_03"])
         zone_stats = []
         for z in zones:
-            v_count = official_violations.filter(SafetyEvent.zone_id == z).count()
+            if camera_ids:
+                v_count = official_violations.filter(SafetyEvent.camera_id == z).count()
+                zone_name = f"Camera {z.rsplit('_', 1)[-1]}"
+            else:
+                v_count = official_violations.filter(SafetyEvent.zone_id == z).count()
+                zone_name = f"Zone {z.split('_')[-1]}"
             # Simulated total detections for compliance calculation
             total_det = max(v_count + 50, 100)
             compliance = round(((total_det - v_count) / total_det) * 100, 2)
             zone_stats.append(
                 ZoneComplianceStats(
                     zone_id=z,
-                    zone_name=f"Zone {z.split('_')[-1]}",
+                    zone_name=zone_name,
                     compliance_rate=compliance,
                     total_detections=total_det,
                     total_violations=v_count,

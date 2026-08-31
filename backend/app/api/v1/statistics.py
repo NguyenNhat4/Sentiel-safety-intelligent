@@ -16,7 +16,12 @@ async def get_summary_statistics(
     db: Session = Depends(get_db),
 ):
     """Get overall safety compliance & violation statistics."""
-    if actor.role == UserRole.AREA_MANAGER.value and not actor.managed_area_id:
+    is_area_manager = actor.role == UserRole.AREA_MANAGER.value
+    managed_camera_ids = actor.managed_camera_ids or [] if is_area_manager else []
+    if is_area_manager and not managed_camera_ids and not actor.managed_area_id:
         raise HTTPException(status_code=403, detail="Area manager has no assigned area")
     service = StatisticsService(db)
-    return service.get_summary(zone_id=actor.managed_area_id if actor.role == UserRole.AREA_MANAGER.value else None)
+    return service.get_summary(
+        zone_id=actor.managed_area_id if is_area_manager and not managed_camera_ids else None,
+        camera_ids=managed_camera_ids or None,
+    )

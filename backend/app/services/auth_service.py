@@ -7,7 +7,6 @@ from sqlalchemy import or_, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
-from backend.app.models.monitoring_zone import MonitoringZoneRecord
 from backend.app.models.user import User, UserRole, UserSession, utc_now
 
 ROLE_LABELS = {
@@ -148,7 +147,7 @@ class AuthService:
         telegram_chat_id: str | None = None,
     ) -> User:
         try:
-            self._validate_area_assignment(role, managed_area_id)
+            normalized_area_name = self._normalize_area_assignment(role, managed_area_id)
             normalized_email = email.strip().lower()
             if self.db.query(User.id).filter(User.email == normalized_email).first():
                 raise DuplicateEmailError("An account with this email already exists")
@@ -158,7 +157,7 @@ class AuthService:
                 role=role.value,
                 password_hash=hash_password(password),
                 must_change_password=True,
-                managed_area_id=managed_area_id if role == UserRole.AREA_MANAGER else None,
+                managed_area_id=normalized_area_name,
                 telegram_username=telegram_username,
                 telegram_chat_id=telegram_chat_id,
             )
@@ -189,9 +188,9 @@ class AuthService:
                 raise UserManagementError("You cannot change your own role")
             if target.role == UserRole.SYSTEM_ADMIN.value and role != UserRole.SYSTEM_ADMIN:
                 self._require_another_admin(target.id)
-            self._validate_area_assignment(role, managed_area_id)
+            normalized_area_name = self._normalize_area_assignment(role, managed_area_id)
             target.role = role.value
-            target.managed_area_id = managed_area_id if role == UserRole.AREA_MANAGER else None
+            target.managed_area_id = normalized_area_name
             if managed_camera_ids is not None:
                 allowed = {"cam_1", "cam_2", "cam_3", "cam_4"}
                 if not set(managed_camera_ids).issubset(allowed):
@@ -319,20 +318,14 @@ class AuthService:
         if not another_admin:
             raise UserManagementError("The last active system administrator cannot be removed")
 
-    def _validate_area_assignment(self, role: UserRole, managed_area_id: str | None) -> None:
+    @staticmethod
+    def _normalize_area_assignment(role: UserRole, managed_area_id: str | None) -> str | None:
         if role != UserRole.AREA_MANAGER:
-            return
-        if not managed_area_id:
+            return None
+        normalized_area_name = managed_area_id.strip() if managed_area_id else ""
+        if not normalized_area_name:
             raise UserManagementError("Area managers must be assigned to a monitoring area")
-        exists = (
-            self.db.query(MonitoringZoneRecord.id)
-            .filter(
-                MonitoringZoneRecord.zone_id == managed_area_id,
-            )
-            .first()
-        )
-        if not exists:
-            raise UserManagementError("The assigned monitoring area does not exist")
+        return normalized_area_name
 
     def _revoke_sessions(self, user: User) -> None:
         revoked_at = utc_now()

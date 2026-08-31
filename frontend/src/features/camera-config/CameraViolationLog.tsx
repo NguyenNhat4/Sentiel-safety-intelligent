@@ -1,20 +1,28 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
-import {loadCameraEvents, subscribeToSafetyEventUpdates} from "../../api/events";
-import type {EventStatus, SafetyEvent} from "../../types";
-import {EventDetailDialog} from "../events/EventDetailDialog";
+import {assetUrl} from "../../api/config";
+import {loadCameraEvents, saveReviewedEvent, subscribeToSafetyEventUpdates} from "../../api/events";
+import type {CameraConfiguration, EventStatus, InferenceResult, ReviewStatus, SafetyEvent} from "../../types";
+import {ReviewModal} from "../alerts/ReviewModal";
+import {violationRuleLabel} from "../alerts/violation-copy";
+import {buildEventPayload} from "../monitor/use-monitor";
 
 interface CameraViolationLogProps {
   cameraId: string;
+  configuration: CameraConfiguration;
 }
 
-export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
+export function CameraViolationLog({cameraId, configuration}: CameraViolationLogProps) {
   const [events, setEvents] = useState<SafetyEvent[]>([]);
   const [status, setStatus] = useState("Đang tải log vi phạm...");
   const [loadFailed, setLoadFailed] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewStartedAt, setReviewStartedAt] = useState<number | null>(null);
   const requestIdRef = useRef(0);
+  const selectedEventRef = useRef<SafetyEvent | null>(null);
+  const reviewSavingRef = useRef(false);
 
   const load = useCallback(async (showLoading = true) => {
     const requestId = ++requestIdRef.current;
@@ -27,7 +35,7 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
       if (requestId !== requestIdRef.current) return;
       setEvents(loaded);
       setLoadFailed(false);
-      setStatus(loaded.length ? "" : "Camera này chưa có log vi phạm.");
+      setStatus(loaded.some(event => event.status === "unacknowledged") ? "" : "Camera này chưa có log vi phạm.");
     } catch (reason) {
       if (requestId !== requestIdRef.current) return;
       setLoadFailed(true);
@@ -40,7 +48,13 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
   }, [load]);
 
   useEffect(() => subscribeToSafetyEventUpdates(update => {
-    if (update.cameraIds.includes(cameraId)) void load(false);
+    if (!update.cameraIds.includes(cameraId)) return;
+    if (selectedEventRef.current && update.eventIds.includes(selectedEventRef.current.id)) {
+      selectedEventRef.current = null;
+      setSelectedEvent(null);
+      setReviewStartedAt(null);
+    }
+    void load(false);
   }), [cameraId, load]);
 
   useEffect(() => {
@@ -80,7 +94,75 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
     };
   }, [cameraId, load]);
 
-  const openCount = events.filter(event => event.status === "unacknowledged" || event.status === "acknowledged").length;
+  const pendingEvents = events.filter(event => event.status === "unacknowledged");
+  const openCount = pendingEvents.length;
+  const pendingReview = selectedEvent?.details?.pending_review;
+  const violationKeys = pendingReview?.people.flatMap(person => person.active_violations
+    ?.filter(violation => violation.is_new)
+    .map(violation => violation.rule_key) ?? []) ?? [];
+  const violationLabel = violationRuleLabel(violationKeys);
+  const reviewTitle = `Phát hiện ${violationLabel.charAt(0).toLocaleLowerCase("vi-VN")}${violationLabel.slice(1)}`;
+  const reviewTimer = useReviewTimer(reviewStartedAt);
+
+  function openReview(event: SafetyEvent) {
+    if (!event.details?.pending_review) {
+      setLoadFailed(true);
+      setStatus("Cảnh báo không còn đủ dữ liệu để mở HITL.");
+      return;
+    }
+    selectedEventRef.current = event;
+    setSelectedEvent(event);
+    setReviewStartedAt(Date.now());
+  }
+
+  function closeReview() {
+    selectedEventRef.current = null;
+    setSelectedEvent(null);
+    setReviewStartedAt(null);
+  }
+
+  async function review(reviewStatus: ReviewStatus) {
+    const event = selectedEventRef.current;
+    const result = event?.details?.pending_review;
+    if (!event || !result || reviewSavingRef.current) return;
+    const occurrenceIds = new Set(event.occurrence_ids ?? []);
+    const people = result.people.map(person => ({
+      ...person,
+      active_violations: person.active_violations?.filter(violation =>
+        occurrenceIds.size === 0 || occurrenceIds.has(violation.occurrence_id),
+      ),
+    })).filter(person => person.active_violations?.some(violation => violation.is_new));
+    const person = people[0];
+    if (!person) {
+      setLoadFailed(true);
+      setStatus("Cảnh báo không còn occurrence hợp lệ để xác minh.");
+      return;
+    }
+    const zoneId = person.active_violations?.find(violation => violation.zone_id)?.zone_id ?? result.rule.zone_id;
+    const zone = configuration.zones.find(item => item.zone_id === zoneId);
+    const inference = {...result, type: "inference_result", people: [person]} satisfies InferenceResult;
+    reviewSavingRef.current = true;
+    setReviewSaving(true);
+    setLoadFailed(false);
+    setStatus("");
+    try {
+      await saveReviewedEvent(buildEventPayload(
+        reviewStatus,
+        inference,
+        zone?.points ?? [],
+        configuration.machine_state === "running",
+        zone?.display_name ?? zoneId,
+      ));
+      setEvents(current => current.filter(item => item.id !== event.id));
+      closeReview();
+    } catch (reason) {
+      setLoadFailed(true);
+      setStatus(reason instanceof Error ? reason.message : "Không thể lưu kết quả xác minh.");
+    } finally {
+      reviewSavingRef.current = false;
+      setReviewSaving(false);
+    }
+  }
 
   return <section className="camera-config-section camera-violation-log" aria-labelledby="camera-violation-log-heading">
     <div className="camera-config-section-heading">
@@ -93,10 +175,23 @@ export function CameraViolationLog({cameraId}: CameraViolationLogProps) {
       <div><span>ĐÃ ĐÓNG</span><strong>{Math.max(events.length - openCount, 0)}</strong></div>
     </div>
     {status && <p className="camera-violation-log-status" role={loadFailed ? undefined : "status"} aria-live={loadFailed ? "assertive" : undefined}>{status}</p>}
-    {events.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log Camera ${cameraNumber(cameraId)}`}>
-      {events.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => setSelectedEventId(event.id)} />)}
+    {pendingEvents.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log Camera ${cameraNumber(cameraId)}`}>
+      {pendingEvents.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => openReview(event)} />)}
     </div>}
-    <EventDetailDialog eventId={selectedEventId} onClose={() => setSelectedEventId(null)} />
+    <ReviewModal
+      isOpen={Boolean(pendingReview)}
+      onClose={closeReview}
+      snapshot={assetUrl(selectedEvent?.snapshot_path) ?? undefined}
+      people={pendingReview?.people}
+      zones={configuration.zones}
+      timer={reviewTimer}
+      reviewSaving={reviewSaving}
+      alertTitle={reviewTitle}
+      alertSummary={selectedEvent ? `${selectedEvent.camera_id} · ${new Date(selectedEvent.timestamp).toLocaleString("vi-VN")}` : ""}
+      onReview={reviewStatus => void review(reviewStatus)}
+      closeable
+      compact
+    />
   </section>;
 }
 
@@ -126,4 +221,16 @@ function statusLabel(status: EventStatus): string {
 
 function cameraNumber(cameraId: string): string {
   return cameraId.replace("cam_", "");
+}
+
+function useReviewTimer(startedAt: number | null): string {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (startedAt === null) { setElapsed(0); return; }
+    const update = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  return `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
 }

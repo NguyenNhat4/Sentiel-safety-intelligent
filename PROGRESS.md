@@ -1,9 +1,35 @@
 # Project Progress
 
+Updated: 2026-08-31
+
+### 2026-08-31 Mutually exclusive Telegram account controls
+
+- [Frontend] The role editor now shows Telegram QR/link-generation controls only for disconnected accounts. Linked accounts replace the entire link panel with the single disconnect action; reloading after link or disconnect immediately switches to the opposite state.
+- [Verification] Focused Telegram UI regression passes 1/1 and the full frontend suite passes 116/116. Frontend type-check and production build pass; lint has no errors with the existing `StreamViewer.tsx:155` hooks warning. `make check` completes all frontend and Ruff stages but its pytest launcher is blocked on Windows by Bash receiving `.venv/Scripts/pytest: Permission denied`; direct Python runs confirm 31/32 root tests and 299/316 backend/vision tests pass, with the existing SQLite migration, notification, debounce/PPE, audit/event-batch, remote-adapter, and multi-zone failures outside this UI change. Railway deployment was not run.
+
+### 2026-08-31 Camera Detail HITL review
+
+- [Frontend] The camera-scoped pending log reached from Live Monitor now opens a compact shared HITL review popup instead of the reviewed-event audit dialog. The popup is portalled to the document layer so it stays above the camera zone drawing and sidebar. It renders the persisted protected snapshot, violation copy, timer and VIOLATE/NORMAL actions, then transitions the same occurrence through the existing event review contract and removes the completed row; Event Detail in Audit and Area Manager remains unchanged.
+- [Verification] Camera Violation Log regressions pass 6/6; the full frontend suite passes 114/114 serially. Frontend type-check and production build pass, and lint has no errors with the existing `StreamViewer.tsx:155` hooks warning. Railway deployment was not run.
+
+### 2026-08-31 Area dashboard camera labels
+
+- [Frontend] Area Manager compliance rows now keep the fixed `Camera 1`–`Camera 4` slot labels instead of replacing assigned-camera labels with media display names; unassigned slots still show `Chưa gán media`.
+- [Backend/Frontend] Area Manager event lists, event detail/status authorization, and statistics now use assigned `managed_camera_ids` when present; legacy accounts without camera assignments retain the previous `managed_area_id` fallback. Camera-only changes also enable the account editor's save action, and dashboard statistics are matched by `camera_id` rather than response position.
+- [Verification] The actual local Area Manager route returns all 23 pending events from assigned `cam_1`/`cam_2`, and its summary reports the same 23 pending events. Focused Area Manager backend tests pass 3/3 and frontend tests pass 3/3; Ruff, frontend lint/type-check, and production build pass. Broader backend event/auth/statistics coverage has two pre-existing violation-tracker debounce failures; full `make check` remains blocked by two pre-existing `CameraViolationLog` frontend failures. Railway deployment was not run.
+
 Updated: 2026-08-30
+
+### 2026-08-30 Telegram deep-link retry reliability
+
+- [Backend] Multiple links generated for the same account remain independently usable until their short expiry. A matching `/start` from any active link completes the connection and consumes all outstanding challenges, avoiding false “Start not found” results from an older QR or Telegram tab.
+- [Frontend] Successful completion immediately reloads the persisted account and shows the linked state; pending guidance now explicitly asks the user to open the generated link/QR rather than pressing a generic Start in an existing bot chat.
+- [Verification] Auth/Telegram-link regressions pass 10/10; Ruff, frontend type-check and production build pass. Frontend lint has no errors (one pre-existing `StreamViewer` hook warning). Full `make check` reaches the frontend suite and remains blocked by two Camera Violation Log tests in the pre-existing event-filter worktree changes, unrelated to Telegram linking. Railway deployment was not run.
 
 ### 2026-08-30 Bidirectional event-status synchronization
 
+- [Frontend] Camera Detail now queries only `unacknowledged` camera events. New persisted alerts still arrive through the existing camera WebSocket reconciliation; after Monitor or Detail changes an event to any reviewed/terminal status, shared reconciliation removes that row while Audit retains the persisted event.
+- [Verification] Focused event transport/Monitor/Camera Detail/Audit regressions pass 26/26; full frontend passes 113/113, lint has no errors (one pre-existing `StreamViewer` hook warning), type-check and production build pass. `make check` reaches 31/32 root tests before the existing SQLite legacy migration failure in `20260829_02_add_manager_camera_assignments.py`. Railway deployment was not run.
 - [Frontend] Follow-up diagnosis found that reviewed-event history and Area Manager detail still retained independent module caches. Both now subscribe to the shared event-update signal, reload authoritative backend state, and bypass the HTTP cache for event lists; Area Manager mutations also update its local cache immediately.
 - [Verification] Follow-up regression coverage passes 32/32 across event transport, Monitor, Camera Detail, Event Detail, reviewed-event history, and Area Manager detail. Full frontend passes 113/113; lint has no errors (one pre-existing `StreamViewer` hook warning), and the production build passes.
 - [Verification] Full `make check` again reaches 31/32 root tests before the same pre-existing SQLite legacy migration failure in `20260829_02_add_manager_camera_assignments.py`; the frontend and all checks before that point pass. Railway deployment was not run.
@@ -45,8 +71,9 @@ Updated: 2026-08-30
 - [Verification] Ruff, format, frontend lint/type-check/test/build, and 32 root tests pass. The full backend/Vision suite is 292 passed with the same nine pre-existing debounce/audit/event-batch/multi-zone contract failures. Local `/` returns 200; `/health` returns 200 but remains `degraded` because the current readiness policy requires S3 while local snapshot storage is filesystem. Railway deployment was not run.
 ### 2026-08-30 Free-text area assignment
 
-- [Frontend] Replaced the responsible-area dropdown in account creation and role assignment with a required free-text area ID field. Values are trimmed before submission while backend existence validation remains authoritative.
-- [Verification] The changed frontend file passes ESLint; frontend type-check and production build pass.
+- [Backend/Frontend] Account creation and role assignment now accept a required free-text area name, trim it before persistence, and no longer require it to match a pre-created monitoring zone. Account administration displays the stored name directly and no longer loads a zone catalog for this field.
+- [Frontend] The field is labeled “Tên khu vực phụ trách” with a human-readable example instead of asking for a fixed zone ID.
+- [Verification] Auth-service regressions pass 9/9; Ruff, frontend type-check and production build pass. Frontend lint has no errors (one pre-existing `StreamViewer` hook warning). Full `make check` remains blocked by two Camera Violation Log tests in the pre-existing event-filter worktree changes, unrelated to free-text area assignment. Railway deployment was not run.
 
 ### 2026-08-30 Telegram alert disconnection
 

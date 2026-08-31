@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.dependencies import require_roles
 from backend.app.core.database import get_db
+from backend.app.models.event import SafetyEvent
 from backend.app.models.user import User, UserRole
 from backend.app.schemas.event import (
     EventBatchCreate,
@@ -75,14 +76,17 @@ async def list_events(
     db: Session = Depends(get_db),
 ):
     """Retrieve safety violation events with filtering."""
-    if actor.role == UserRole.AREA_MANAGER.value and not actor.managed_area_id:
+    is_area_manager = actor.role == UserRole.AREA_MANAGER.value
+    managed_camera_ids = actor.managed_camera_ids or [] if is_area_manager else []
+    if is_area_manager and not managed_camera_ids and not actor.managed_area_id:
         raise HTTPException(status_code=403, detail="Area manager has no assigned area")
     service = EventService(db)
     return service.get_events(
         skip=skip,
         limit=limit,
         camera_id=camera_id,
-        zone_id=actor.managed_area_id if actor.role == UserRole.AREA_MANAGER.value else zone_id,
+        camera_ids=managed_camera_ids or None,
+        zone_id=actor.managed_area_id if is_area_manager and not managed_camera_ids else zone_id,
         status=status,
         event_type=event_type,
     )
@@ -136,7 +140,7 @@ def get_event(
     """Get details of a specific event."""
     service = EventService(db)
     event = service.get_event(event_id)
-    if event and actor.role == UserRole.AREA_MANAGER.value and event.zone_id != actor.managed_area_id:
+    if event and actor.role == UserRole.AREA_MANAGER.value and not _area_manager_can_access_event(actor, event):
         raise HTTPException(status_code=404, detail="Event not found")
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -164,7 +168,7 @@ async def update_event(
     if not existing:
         raise HTTPException(status_code=404, detail="Event not found")
     if actor.role == UserRole.AREA_MANAGER.value:
-        if existing.zone_id != actor.managed_area_id:
+        if not _area_manager_can_access_event(actor, existing):
             raise HTTPException(status_code=404, detail="Event not found")
         if event_in.status not in {"resolved", "false_alarm"}:
             raise HTTPException(
@@ -183,3 +187,10 @@ async def update_event(
     if event_in.status == "acknowledged" and not was_acknowledged:
         alert_notification_service.queue_confirmed_events(db, [updated])
     return updated
+
+
+def _area_manager_can_access_event(actor: User, event: SafetyEvent) -> bool:
+    managed_camera_ids = actor.managed_camera_ids or []
+    if managed_camera_ids:
+        return event.camera_id in managed_camera_ids
+    return bool(actor.managed_area_id and event.zone_id == actor.managed_area_id)

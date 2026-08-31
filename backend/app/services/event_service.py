@@ -523,6 +523,7 @@ class EventService:
         skip: int = 0,
         limit: int = 100,
         camera_id: str | None = None,
+        camera_ids: list[str] | None = None,
         zone_id: str | None = None,
         status: str | None = None,
         event_type: str | None = None,
@@ -530,6 +531,8 @@ class EventService:
         query = self.db.query(SafetyEvent)
         if camera_id:
             query = query.filter(SafetyEvent.camera_id == camera_id)
+        if camera_ids:
+            query = query.filter(SafetyEvent.camera_id.in_(camera_ids))
         if zone_id:
             query = query.filter(SafetyEvent.zone_id == zone_id)
         if status:

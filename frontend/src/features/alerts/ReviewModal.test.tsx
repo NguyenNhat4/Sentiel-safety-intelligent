@@ -82,4 +82,27 @@ describe("ReviewModal", () => {
     expect(screen.queryByTestId("snapshot-box")).not.toBeInTheDocument();
     expect(screen.queryByRole("graphics-document")).not.toBeInTheDocument();
   });
+
+  it("portals the compact camera review above the camera drawing", () => {
+    const host = document.createElement("section");
+    document.body.appendChild(host);
+    render(
+      <ReviewModal
+        isOpen
+        compact
+        onClose={vi.fn()}
+        timer="00:01"
+        reviewSaving={false}
+        alertTitle="Camera review"
+        alertSummary="Camera 1"
+        onReview={vi.fn()}
+      />,
+      {container: host},
+    );
+
+    const dialog = screen.getByRole("dialog", {name: "Camera review"});
+    expect(dialog).toHaveClass("camera-review-backdrop");
+    expect(dialog.parentElement).toBe(document.body);
+    host.remove();
+  });
 });

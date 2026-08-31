@@ -1,3 +1,4 @@
+import {createPortal} from "react-dom";
 import type {MonitoringZone, PersonDetection, ReviewStatus} from "../../types";
 import {SnapshotZoneOverlay} from "./SnapshotZoneOverlay";
 
@@ -13,6 +14,7 @@ interface ReviewModalProps {
   alertSummary: string;
   onReview: (status: ReviewStatus) => void;
   closeable?: boolean;
+  compact?: boolean;
 }
 
 export function ReviewModal({
@@ -27,6 +29,7 @@ export function ReviewModal({
   alertSummary,
   onReview,
   closeable = true,
+  compact = false,
 }: ReviewModalProps) {
   if (!isOpen) return null;
   const affectedZones = [...new Set(
@@ -35,8 +38,8 @@ export function ReviewModal({
       .map(violation => violation.zone_id as string) ?? []) ?? [],
   )];
 
-  return (
-    <div className="modal-backdrop" onClick={closeable ? onClose : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  return createPortal(
+    <div className={`modal-backdrop ${compact ? "camera-review-backdrop" : ""}`} onClick={closeable ? onClose : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal-card" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
@@ -87,6 +90,7 @@ export function ReviewModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

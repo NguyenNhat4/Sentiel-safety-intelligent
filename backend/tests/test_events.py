@@ -438,6 +438,57 @@ def test_area_manager_only_sees_confirmed_events_for_their_assigned_area(client,
     assert denied.status_code == 404
 
 
+def test_area_manager_event_access_and_statistics_follow_assigned_cameras(client, db_session):
+    db_session.add(
+        User(
+            email="area.cameras@sentinel.local",
+            full_name="Camera Area Manager",
+            role=UserRole.AREA_MANAGER.value,
+            password_hash=hash_password("Sentinel123!"),
+            managed_area_id="Khu vực đóng gói",
+            managed_camera_ids=["cam_1", "cam_2"],
+        )
+    )
+    db_session.commit()
+    token, _, _ = AuthService(db_session).login("area.cameras@sentinel.local", "Sentinel123!")
+
+    created = {}
+    for camera_id, zone_id in (
+        ("cam_1", "camera_wide"),
+        ("cam_2", "zone_1"),
+        ("cam_3", "Khu vực đóng gói"),
+    ):
+        response = client.post(
+            "/api/v1/events",
+            json={
+                "zone_id": zone_id,
+                "camera_id": camera_id,
+                "event_type": "zone_intrusion",
+                "status": "unacknowledged",
+            },
+        )
+        assert response.status_code == 201
+        created[camera_id] = response.json()
+
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    events = client.get("/api/v1/events?status=unacknowledged")
+    summary = client.get("/api/v1/statistics/summary")
+
+    assert {event["camera_id"] for event in events.json()} == {"cam_1", "cam_2"}
+    assert summary.json()["unacknowledged_events"] == 2
+    assert [item["zone_id"] for item in summary.json()["zone_stats"]] == ["cam_1", "cam_2"]
+
+    allowed = client.get(f"/api/v1/events/{created['cam_1']['id']}")
+    denied = client.get(f"/api/v1/events/{created['cam_3']['id']}")
+    assert allowed.status_code == 200
+    assert denied.status_code == 404
+
+    resolved = client.patch(f"/api/v1/events/{created['cam_2']['id']}", json={"status": "resolved"})
+    denied_update = client.patch(f"/api/v1/events/{created['cam_3']['id']}", json={"status": "resolved"})
+    assert resolved.status_code == 200
+    assert denied_update.status_code == 404
+
+
 def test_unassigned_area_manager_cannot_list_events_or_statistics(client, db_session):
     db_session.add(
         User(

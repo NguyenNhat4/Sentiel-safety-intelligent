@@ -1,11 +1,16 @@
 # Project Design Decisions
 
-Updated: 2026-08-28
+Updated: 2026-08-30
 Updated: 2026-08-27
 
 This file contains only decisions that currently constrain implementation. Superseded alternatives are summarized at the end; use Git history when historical rationale is needed. Prefix new decisions with an owning area and merge them into the relevant active section rather than appending duplicate chronology.
 
 ## Architecture And Ownership
+
+### 2026-08-30: [Backend/Frontend] Responsible area is administrator-entered text
+
+- An Area Manager's `managed_area_id` remains the compatible wire/storage field, but its value is a required, trimmed area name entered by the administrator; it does not require a pre-existing monitoring-zone record.
+- Account administration must display the stored value directly and must not load the monitoring-zone collection as a prerequisite for creating or updating an account.
 
 ### 2026-08-29: [Backend/Frontend] Area managers may receive alerts from multiple cameras
 
@@ -15,7 +20,7 @@ This file contains only decisions that currently constrain implementation. Super
 
 - A system administrator creates a short-lived, single-use Telegram deep-link challenge for a selected account. The recipient opens the bot link and sends its generated `/start` payload; the administrator then confirms the link from the application.
 - The backend derives the bot username using Telegram `getMe` and reads matching updates through `getUpdates`; no webhook is configured for this bot.
-- Challenge secrets are stored only as digests, expire quickly, and bind at most one chat ID to the selected account. Existing manual username/chat-ID fields remain compatible.
+- Challenge secrets are stored only as digests, expire quickly, and bind at most one chat ID to the selected account. Generating another link does not invalidate an earlier unexpired QR/tab; successful completion consumes every outstanding challenge for that account. Existing manual username/chat-ID fields remain compatible.
 
 ### 2026-08-29: [Backend] Preserve the legacy Alembic head as a compatibility revision
 

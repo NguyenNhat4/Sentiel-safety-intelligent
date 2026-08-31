@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -5,8 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.api.v1.auth import require_admin
 from backend.app.core.database import Base
-from backend.app.models.monitoring_zone import MonitoringZoneCollection, MonitoringZoneRecord
-from backend.app.models.user import User, UserRole
+from backend.app.models.user import TelegramLinkChallenge, User, UserRole
 from backend.app.services.auth_service import (
     AuthService,
     InvalidCredentialsError,
@@ -14,6 +15,18 @@ from backend.app.services.auth_service import (
     UserManagementError,
     hash_password,
 )
+from backend.app.services.telegram_link_service import TelegramLinkService
+
+
+class TelegramLinkAdapterStub:
+    def __init__(self) -> None:
+        self.messages: list[tuple[str, str, str | None]] = []
+
+    def bot_username(self) -> str:
+        return "sentinel_test_bot"
+
+    def start_messages(self) -> list[tuple[str, str, str | None]]:
+        return self.messages
 
 
 def test_login_session_lookup_and_logout():
@@ -92,31 +105,17 @@ def test_system_admin_can_create_assign_reset_and_delete_user():
     service = AuthService(session)
     service.seed_demo_users()
     _, admin, _ = service.login("admin@sentinel.local", "Sentinel123!")
-    session.add(MonitoringZoneCollection(camera_id="uploaded_video", revision=1))
-    session.add(
-        MonitoringZoneRecord(
-            camera_id="uploaded_video",
-            zone_id="zone_1",
-            normalized_zone_id="zone_1",
-            display_name="Khu vực 1",
-            points=[],
-            machine_state="stopped",
-            enabled=True,
-            order=0,
-        )
-    )
-    session.commit()
-
     created = service.create_user(
         full_name="Test User",
         email="test.user@sentinel.local",
         password="Initial123!",
         role=UserRole.AREA_MANAGER,
-        managed_area_id="zone_1",
+        managed_area_id="  Khu vực đóng gói  ",
         telegram_username="@test_manager",
         telegram_chat_id="123456789",
     )
     token, _, _ = service.login(created.email, "Initial123!")
+    assert created.managed_area_id == "Khu vực đóng gói"
     updated = service.update_role(actor=admin, target_user_id=created.id, role=UserRole.SAFETY_MANAGER)
     service.change_password(actor=admin, target_user_id=created.id, new_password="Changed123!", current_password=None)
 
@@ -189,6 +188,27 @@ def test_disconnect_telegram_clears_recipient_information():
 
     assert disconnected.telegram_chat_id is None
     assert disconnected.telegram_username is None
+
+
+def test_telegram_link_accepts_an_earlier_unexpired_link_and_consumes_all_challenges():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    auth_service = AuthService(session)
+    auth_service.seed_demo_users()
+    user = session.query(User).filter(User.email == "khuvuc@sentinel.local").one()
+    adapter = TelegramLinkAdapterStub()
+    link_service = TelegramLinkService(session, adapter=adapter)
+
+    first_link, _ = link_service.start(user.id)
+    link_service.start(user.id)
+    first_payload = parse_qs(urlparse(first_link).query)["start"][0]
+    adapter.messages = [(first_payload, "123456789", "area_manager")]
+
+    status, chat_id, username = link_service.complete(user.id)
+
+    assert (status, chat_id, username) == ("linked", "123456789", "@area_manager")
+    assert session.query(TelegramLinkChallenge).filter(TelegramLinkChallenge.consumed_at.is_(None)).count() == 0
 
 
 def test_temporary_password_can_be_changed_once_and_admin_reset_reopens_flow():
