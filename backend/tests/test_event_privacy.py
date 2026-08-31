@@ -195,6 +195,38 @@ def test_database_failure_removes_the_redacted_snapshot(db_session, tmp_path, mo
     assert list(tmp_path.iterdir()) == []
 
 
+def test_snapshot_uses_the_configured_storage_provider(db_session):
+    class RecordingStorage:
+        def __init__(self):
+            self.content = None
+
+        def put(self, content: bytes) -> str:
+            self.content = content
+            return "snapshots/provider-owned.jpg"
+
+        def get(self, key: str) -> bytes:
+            raise AssertionError("event creation must not read the snapshot")
+
+        def delete(self, key: str) -> None:
+            raise AssertionError("successful event creation must not delete the snapshot")
+
+        def check_connection(self) -> None:
+            pass
+
+    storage = RecordingStorage()
+
+    event = EventService(
+        db_session,
+        snapshot_redactor=_redact_person_head,
+        snapshot_annotator=_identity_annotator,
+        snapshot_storage=storage,
+    ).create_event(_event_input(_snapshot_data(_patterned_frame())))
+
+    assert event.snapshot_path == "/snapshots/provider-owned.jpg"
+    assert storage.content is not None
+    assert cv2.imdecode(np.frombuffer(storage.content, dtype=np.uint8), cv2.IMREAD_COLOR) is not None
+
+
 def test_events_without_snapshots_are_not_marked_as_blurred(db_session, tmp_path):
     event = EventService(db_session, snapshot_redactor=_redact_person_head, snapshot_dir=tmp_path).create_event(
         _event_input()

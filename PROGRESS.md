@@ -1,5 +1,15 @@
 # Project Progress
 
+### 2026-08-31 HITL snapshot storage consistency
+
+- [Backend] `EventService` now persists and cleans up redacted HITL snapshots through the configured filesystem/S3 provider used by the snapshot-serving route, removing the Docker production-env mismatch where writes went to local disk while reads went to S3.
+- [Verification] Snapshot privacy/storage regressions pass 13/13; focused Ruff, Python compile and `git diff --check` pass. The local backend image rebuilt successfully and `/health` reports PostgreSQL and snapshot storage ready. `make check` passes Ruff, formatting, frontend lint/type-check, 116/116 frontend tests and the production build, then times out in the root pytest stage after its first test. The production-bucket write/read/delete smoke was not run because production mutation was not authorized. Railway deployment was not run.
+
+### 2026-08-31 Decision Audit incident summary localization
+
+- [Backend] Decision Audit summaries now translate both `missing_ppe:*` and `missing_required_ppe:*` reason keys into Vietnamese PPE labels, including `thiếu mũ bảo hộ` and `thiếu áo phản quang`. The optional LLM prompt receives localized reasons instead of technical rule IDs.
+- [Verification] Focused event-audit tests, Ruff, and `git diff --check` pass. Railway deployment was not run.
+
 Updated: 2026-08-31
 
 ### 2026-08-31 Mutually exclusive Telegram account controls

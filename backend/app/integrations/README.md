@@ -13,3 +13,7 @@ Adapter tại đây chuyển đổi provider hoặc protocol bên ngoài thành 
 `media_storage.py` cấp presigned POST/GET cho Railway Bucket, xác minh metadata object
 và download vào cache server-owned khi OpenCV bắt đầu inference. Asset cũ trên volume
 vẫn đọc được trong quá trình migration; browser không nhận credential bucket.
+
+`snapshot_storage.py` là provider chung cho snapshot HITL đã redact. Event service ghi
+và cleanup qua cùng provider mà route `/snapshots/{filename}` dùng để đọc, nên runtime
+filesystem và S3-compatible không được phép trộn đường dẫn local với object bucket.

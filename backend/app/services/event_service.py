@@ -13,6 +13,12 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import Settings, get_settings
 from backend.app.core.operational_metrics import record_operational_event
 from backend.app.integrations.privacy_vision import get_configured_privacy_vision_adapter
+from backend.app.integrations.snapshot_storage import (
+    FilesystemSnapshotStorage,
+    SnapshotStorage,
+    SnapshotStorageError,
+    create_snapshot_storage,
+)
 from backend.app.models.event import EventOccurrence, SafetyEvent
 from backend.app.models.user import User
 from backend.app.schemas.analysis import ModelDetection as SnapshotDetection
@@ -63,13 +69,19 @@ class EventService:
         snapshot_redactor: SnapshotRedactor | None = None,
         snapshot_annotator: SnapshotAnnotator | None = None,
         snapshot_dir: Path | None = None,
+        snapshot_storage: SnapshotStorage | None = None,
         settings: Settings | None = None,
     ):
         self.db = db
         self._settings = settings or get_settings()
         self._snapshot_redactor = snapshot_redactor or self._default_snapshot_redactor
         self._snapshot_annotator = snapshot_annotator or self._default_snapshot_annotator
-        self._snapshot_dir = snapshot_dir or Path(__file__).resolve().parents[3] / "data" / "snapshots"
+        if snapshot_storage is not None:
+            self._snapshot_storage = snapshot_storage
+        elif snapshot_dir is not None:
+            self._snapshot_storage = FilesystemSnapshotStorage(snapshot_dir)
+        else:
+            self._snapshot_storage = create_snapshot_storage(self._settings)
 
     def create_event(self, event_in: EventCreate, *, actor: User | None = None) -> SafetyEvent:
         occurrence_ids = [str(value) for value in event_in.occurrence_ids]
@@ -131,7 +143,7 @@ class EventService:
         except IntegrityError as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             existing = self._events_for_occurrences(occurrence_ids)
             if len(existing) == 1 and self._matches_retry(existing[0], event_in, occurrence_ids):
                 existing[0]._was_created = False
@@ -141,7 +153,7 @@ class EventService:
         except Exception as exc:
             self.db.rollback()
             if event_in.snapshot_data and snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             raise EventPersistenceError("Could not save the event to the database") from exc
         db_event._was_created = True
         db_event._became_acknowledged = event_in.status == "acknowledged"
@@ -285,7 +297,7 @@ class EventService:
         except IntegrityError as exc:
             self.db.rollback()
             if snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             existing = self._events_for_occurrences(occurrence_ids)
             retried = self._matching_batch_retry(existing, batch_in)
             if retried is not None:
@@ -297,7 +309,7 @@ class EventService:
         except Exception as exc:
             self.db.rollback()
             if snapshot_path:
-                self._snapshot_file(snapshot_path).unlink(missing_ok=True)
+                self._delete_snapshot(snapshot_path)
             raise EventPersistenceError("Could not save the event batch to the database") from exc
         for event in events:
             event._was_created = True
@@ -487,15 +499,11 @@ class EventService:
         if not success:
             raise EventPrivacyError("Privacy processing could not encode the redacted snapshot")
 
-        self._snapshot_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"event-{uuid.uuid4().hex}.jpg"
-        snapshot_file = self._snapshot_dir / filename
         try:
-            snapshot_file.write_bytes(redacted_bytes.tobytes())
-        except OSError as exc:
-            snapshot_file.unlink(missing_ok=True)
+            key = self._snapshot_storage.put(redacted_bytes.tobytes())
+        except SnapshotStorageError as exc:
             raise EventPersistenceError("Could not persist the redacted snapshot") from exc
-        return f"/snapshots/{filename}"
+        return f"/snapshots/{Path(key).name}"
 
     @staticmethod
     def _default_snapshot_redactor(
@@ -512,8 +520,15 @@ class EventService:
     ) -> np.ndarray:
         return get_configured_privacy_vision_adapter().annotate_snapshot(frame, people, detections)
 
-    def _snapshot_file(self, snapshot_path: str) -> Path:
-        return self._snapshot_dir / Path(snapshot_path).name
+    def _delete_snapshot(self, snapshot_path: str) -> None:
+        try:
+            self._snapshot_storage.delete(f"snapshots/{Path(snapshot_path).name}")
+        except SnapshotStorageError:
+            record_operational_event(
+                "snapshot_cleanup_failed",
+                outcome="error",
+                error_kind="storage_delete_failed",
+            )
 
     def get_event(self, event_id: int) -> SafetyEvent | None:
         return self.db.query(SafetyEvent).filter(SafetyEvent.id == event_id).first()
