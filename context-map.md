@@ -66,6 +66,8 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Chuẩn bị task implementation đã được phê duyệt | [Implementation plans](docs/plans/README.md) |
 | Đọc frame alert rule và luồng inference | [Alert Rule Contract](docs/architecture/alert-rule-contract.md) |
 | Xem tiến độ hoặc quyết định đã chốt | [PROGRESS.md](PROGRESS.md), [DECISIONS.md](DECISIONS.md) |
+| Xem nhật ký làm việc hằng tuần của nhóm | [Weekly Log](docs/WEEKLY_LOG.md) |
+| Xem chiến lược, test case và tiêu chí bảo đảm chất lượng | [Testing Documents](docs/TESTING_DOCUMENTS.md) |
 | Tuân thủ workflow AI/contributor | [AGENTS.md](AGENTS.md) |
 | Hiểu kiến trúc hệ thống | [ARCHITECTURE.md](ARCHITECTURE.md), [System diagrams](docs/architecture/architecture_diagram.md) |
 | Hiểu video upload, xử lý từng frame và hiển thị khi chạy local | [Local video frame flow](docs/architecture/local-video-frame-flow.md) |

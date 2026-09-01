@@ -213,6 +213,8 @@ P-047/
 │   ├── README.md                    # Documentation catalog
 │   ├── PROJECT_STRUCTURE.md         # Current project structure (maintained)
 │   ├── FUTURE_PROJECT_STRUCTURE.md  # Future structure, ownership and migration guide (read-only)
+│   ├── TESTING_DOCUMENTS.md         # Test strategy, quality gates, cases and current evidence
+│   ├── WEEKLY_LOG.md                # Detailed weekly team work log derived from commit history
 │   ├── architecture/                # Architecture diagrams, problem statement and alert contracts
 │   │   ├── alert-rule-contract.md       # Approved frame-level PPE and zone alert contract
 │   │   ├── architecture_diagram.md      # Current component and runtime data-flow diagrams

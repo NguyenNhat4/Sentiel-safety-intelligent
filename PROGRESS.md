@@ -1,9 +1,24 @@
 # Project Progress
 
+Updated: 2026-09-01
+
 ### 2026-09-01 Unified sidebar navigation icons
 
 - [Frontend] Replaced the mixed Unicode sidebar symbols with a cohesive, dependency-free SVG outline set for Live Monitor, violation history, system observation, dashboard, administration, and media library. Icons inherit the existing active/inactive colors and remain decorative so accessible button names are unchanged.
 - [Verification] Focused App navigation tests pass 10/10 and the full frontend suite passes 117/117; frontend type-check, production build, lint with the existing `StreamViewer.tsx` hooks warning, Ruff, formatting, and `git diff --check` pass. `make check` reached the root pytest suite and timed out after its first passing test. Railway deployment was not run.
+
+### 2026-09-01 Testing and product quality documentation
+
+- [Cross-cutting] Added a standalone testing document covering quality objectives, scope, test levels, critical functional test matrix, local/CI commands, acceptance and release gates, defect management, evidence retention, ownership, and handoff checklist.
+- [Verification] The document distinguishes the latest confirmed frontend 116/116 result from the known Python legacy/contract failures instead of claiming a fully green repository. Documentation indexes and the maintained project structure were updated. Application tests/build and Railway deployment were not run for this documentation-only change.
+
+### 2026-09-01 Detailed weekly team log
+
+- [Cross-cutting] Added a standalone five-week team work log derived from repository commit history, covering weekly objectives, implementation work, integration difficulties, resolutions, outcomes, and representative commit references from 2026-07-23 through 2026-08-31.
+- [Documentation] Indexed the weekly log in the repository context map and recorded it in the maintained current project structure.
+- [Verification] `git diff --check` passes. This is a documentation-only change, so application tests/build and Railway deployment were not run.
+
+Updated: 2026-08-31
 
 ### 2026-08-31 HITL snapshot preload before popup
 
@@ -19,8 +34,6 @@
 
 - [Backend] Decision Audit summaries now translate both `missing_ppe:*` and `missing_required_ppe:*` reason keys into Vietnamese PPE labels, including `thiếu mũ bảo hộ` and `thiếu áo phản quang`. The optional LLM prompt receives localized reasons instead of technical rule IDs.
 - [Verification] Focused event-audit tests, Ruff, and `git diff --check` pass. Railway deployment was not run.
-
-Updated: 2026-08-31
 
 ### 2026-08-31 Mutually exclusive Telegram account controls
 
