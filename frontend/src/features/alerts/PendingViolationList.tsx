@@ -10,7 +10,7 @@ export function PendingViolationList({alerts, onOpen}: {alerts: SafetyEvent[]; o
     {alerts.length === 0 ? <p className="pending-alerts-empty">Không có cảnh báo chờ xử lý.</p> : <div className="pending-alert-list">
       {alerts.map(alert => <button type="button" className="pending-alert-row" key={alert.id} onClick={() => onOpen(alert)}>
         <span className={`pending-alert-kind ${isZoneAlert(alert) ? "zone" : "ppe"}`}>{isZoneAlert(alert) ? "VÙNG CẤM" : "PPE"}</span>
-        <span><strong>{cameraLabel(alert.camera_id)}</strong><small>{isZoneAlert(alert) ? zoneLabel(alert) : missingPpeLabel(alert)}</small></span>
+        <span><strong>{cameraLabel(alert.camera_id, alert.camera_name)}</strong><small>{isZoneAlert(alert) ? zoneLabel(alert) : missingPpeLabel(alert)}</small></span>
         <time dateTime={alert.timestamp}>{formatTime(alert.timestamp)}</time>
         <b>Chưa xử lý</b>
       </button>)}

@@ -65,6 +65,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   const selectedZone = draft.zones.find(zone => zone.zone_id === selectedZoneId);
   const rules = draft.ppe_requirements ?? EMPTY_RULES;
   const selectedAsset = assets.find(asset => asset.id === draft.asset_id);
+  const cameraName = selectedAsset?.display_name ?? draft.camera_name ?? `Camera ${cameraNumber(cameraId)}`;
   const conflict = zoneGeometryConflict(draft.zones);
   const incomplete = draft.zones.some(zone => zone.points.length !== 4);
   const selectedPointCount = selectedZone?.points.length ?? 0;
@@ -123,18 +124,18 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   }
 
   return <section className={`camera-config-page page ${active ? "active" : ""}`}>
-    {showTitle && <div className="camera-config-toolbar"><div><p className="eyebrow">CAMERA {cameraNumber(cameraId)} · CONTROLLED DRAFT</p><h2>Cấu hình Camera {cameraNumber(cameraId)}</h2><p>Media, trạng thái máy, vùng và PPE chỉ được áp dụng trong một lần lưu.</p></div><button type="button" className="secondary-btn" onClick={onBack}>Quay lại Live Monitor</button></div>}
+    {showTitle && <div className="camera-config-toolbar"><div><p className="eyebrow">CAMERA · CONTROLLED DRAFT</p><h2>Cấu hình {cameraName}</h2><p>Media, trạng thái máy, vùng và PPE chỉ được áp dụng trong một lần lưu.</p></div><button type="button" className="secondary-btn" onClick={onBack}>Quay lại Live Monitor</button></div>}
     <div className="camera-detail-layout">
       <div className="camera-config-workspace">
-      <section className="camera-preview-panel" aria-label={`Màn hình Camera ${cameraNumber(cameraId)}`}>
+      <section className="camera-preview-panel" aria-label={`Màn hình ${cameraName}`}>
         <div className="camera-config-media">
-          {selectedAsset ? <AuthenticatedMedia assetId={selectedAsset.id} mediaType={selectedAsset.media_type} storageBackend={selectedAsset.storage_backend} label={`Preview Camera ${cameraNumber(cameraId)}`} playing /> : <div className="camera-config-empty">Chọn media để xem preview và vẽ vùng.</div>}
+          {selectedAsset ? <AuthenticatedMedia assetId={selectedAsset.id} mediaType={selectedAsset.media_type} storageBackend={selectedAsset.storage_backend} label={`Preview ${cameraName}`} playing /> : <div className="camera-config-empty">Chọn media để xem preview và vẽ vùng.</div>}
           <svg className="zone-config-overlay" viewBox="0 0 1 1" preserveAspectRatio="none" onPointerDown={addPoint} onPointerMove={movePoint} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>{draft.zones.map(zone => <g key={zone.zone_id} className={zone.zone_id === selectedZoneId ? "selected" : ""}>{zone.points.length > 1 && <polyline points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.length === 4 && <polygon points={zone.points.map(point => `${point.x},${point.y}`).join(" ")} />}{zone.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="0.012" onPointerDown={event => { event.stopPropagation(); setSelectedZoneId(zone.zone_id); setDragging(index); }} />)}</g>)}</svg>
-          <strong className="camera-config-title">Camera {cameraNumber(cameraId)}</strong>
+          <strong className="camera-config-title">{cameraName}</strong>
           <span className={`camera-config-live-state ${selectedAsset ? "is-connected" : ""}`}><i />{selectedAsset ? "Camera đã kết nối" : "Chưa kết nối camera"}</span>
         </div>
       </section>
-      <aside className="camera-config-controls" aria-label={`Thiết lập Camera ${cameraNumber(cameraId)}`}>
+      <aside className="camera-config-controls" aria-label={`Thiết lập ${cameraName}`}>
         <div className="settings-panel-heading"><div><span className="camera-config-section-kicker">THIẾT LẬP</span><h3>Kiểm soát camera</h3></div><small>Nguồn phát, trạng thái máy, vùng cấm và PPE.</small></div>
         <div className="camera-config-section asset-config-section">
           <div className="camera-config-card-heading"><div><strong>Nguồn camera</strong><small>Media dùng cho preview và inference.</small></div></div>
@@ -167,7 +168,7 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
         <div className="camera-config-footer"><div className={`camera-save-state ${dirty && !incomplete && !conflict ? "is-ready" : ""}`}><strong>{dirty ? "Cấu hình chưa lưu" : "Cấu hình đã đồng bộ"}</strong><small>{saveBlocker}</small></div><div className="zone-save-actions"><button type="button" className="ppe-save-button" disabled={!dirty || saving || incomplete || Boolean(conflict)} onClick={() => void save()}>{saving ? "Đang lưu…" : "Lưu cấu hình"}</button></div></div>
       </aside>
       </div>
-      <CameraViolationLog cameraId={cameraId} configuration={saved} />
+      <CameraViolationLog cameraId={cameraId} configuration={{...saved, camera_name: cameraName}} />
     </div>
     {saveNotice && <aside className="toast show camera-config-save-toast" role="status" aria-live="polite"><span aria-hidden="true">✓</span><div><strong>{saveNotice}</strong></div></aside>}
   </section>;

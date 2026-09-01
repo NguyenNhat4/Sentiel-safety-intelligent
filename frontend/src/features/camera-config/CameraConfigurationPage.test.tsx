@@ -7,9 +7,9 @@ import {CameraConfigurationPage} from "./CameraConfigurationPage";
 it("orders the camera workspace, settings inspector, and violation control log", async () => {
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
 
-  const camera = await screen.findByRole("region", {name: "Màn hình Camera 3"});
-  const settings = screen.getByRole("complementary", {name: "Thiết lập Camera 3"});
-  const violations = screen.getByRole("region", {name: "Nhật ký vi phạm Camera 3"});
+  const camera = await screen.findByRole("region", {name: "Màn hình Ca sáng"});
+  const settings = screen.getByRole("complementary", {name: "Thiết lập Ca sáng"});
+  const violations = screen.getByRole("region", {name: "Nhật ký vi phạm Ca sáng"});
   const layout = camera.closest(".camera-detail-layout");
 
   expect(layout).not.toBeNull();
@@ -49,13 +49,13 @@ beforeEach(() => {
 
 it("loads the exact camera prop with READY media and no camera selector", async () => {
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
-  expect(await screen.findByRole("heading", {name: "Cấu hình Camera 3"})).toBeInTheDocument();
+  expect(await screen.findByRole("heading", {name: "Cấu hình Ca sáng"})).toBeInTheDocument();
   expect(loadMock).toHaveBeenCalledWith("cam_3", expect.any(AbortSignal));
   expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   expect(screen.getByRole("option", {name: "Ca sáng · Video"})).toBeInTheDocument();
   expect(screen.getByRole("option", {name: "Ảnh máy dập · Hình ảnh"})).toBeInTheDocument();
   expect(screen.queryByText("Đang xử lý")).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Preview Camera 3")).toBeInTheDocument();
+  expect(screen.getByLabelText("Preview Ca sáng")).toBeInTheDocument();
   expect(screen.getByText("Camera đã kết nối")).toBeInTheDocument();
 });
 

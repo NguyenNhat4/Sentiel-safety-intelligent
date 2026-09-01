@@ -104,6 +104,7 @@ class SafetyAgentService:
         review = decision_context["human_review"]
         return {
             "schema_version": decision_context.get("schema_version"),
+            "camera_name": scene.get("camera_name"),
             "zone_name": scene.get("zone_name"),
             "machine_state": scene.get("machine_state"),
             "people_count": len(scene.get("people") or []),
@@ -128,7 +129,7 @@ class SafetyAgentService:
         scene = decision_context["scene"]
         decision = decision_context["system_decision"]
         review = decision_context["human_review"]
-        zone_name = scene.get("zone_name") or scene.get("zone_id") or zone_id
+        zone_name = scene.get("camera_name") or scene.get("zone_name") or scene.get("zone_id") or zone_id
         machine_state = "đang chạy" if scene.get("machine_state") == "running" else "đã dừng"
         people_count = len(scene.get("people") or [])
         outcome = "vi phạm thực tế" if review.get("outcome") == "actual_violation" else "báo sai"

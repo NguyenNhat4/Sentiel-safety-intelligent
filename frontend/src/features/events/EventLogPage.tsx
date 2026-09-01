@@ -105,7 +105,7 @@ function EventCard({event, onOpen}: {event: SafetyEvent; onOpen: () => void}) {
           <span className={`event-badge ${event.status === "false_alarm" ? "false-alarm" : ""}`}>{event.status === "false_alarm" ? "BÁO SAI" : "ĐÃ XÁC NHẬN"}</span>
         </div>
         <div className="event-meta">
-          <span>Vùng: {event.zone_id}</span><span>Camera: {event.camera_id}</span>
+          <span>Vùng: {event.decision_context?.scene.zone_name ?? event.zone_id}</span><span>Camera: {event.camera_name ?? event.camera_id}</span>
           <span>Mức độ: {event.severity}</span><span>Xác nhận: {event.acknowledged_by || "Safety Officer"}</span>
         </div>
         <p className="event-details">Phát hiện {people} người · Video {timestamp}s · {event.details?.review_result || "actual_violation"}</p>

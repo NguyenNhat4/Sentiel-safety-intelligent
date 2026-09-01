@@ -49,6 +49,7 @@ class CameraConfigurationService:
         zones = [] if collection is None else sorted(collection.zones, key=lambda item: item.order)
         return CameraConfigurationResponse(
             camera_id=camera_id,
+            camera_name=configuration.asset.display_name if configuration and configuration.asset else None,
             revision=configuration.revision if configuration else (collection.revision if collection else 0),
             asset_id=configuration.asset_id if configuration else None,
             machine_state=configuration.machine_state if configuration else "stopped",

@@ -17,6 +17,7 @@ const acknowledged: SafetyEvent = {
   timestamp: "2026-08-15T03:05:32Z",
   zone_id: "zone_01",
   camera_id: "uploaded_video",
+  camera_name: "Cổng kho phía Đông",
   event_type: "zone_intrusion",
   severity: "critical",
   status: "acknowledged",
@@ -47,6 +48,8 @@ describe("EventLogPage audit filters", () => {
 
     fireEvent.click(await screen.findByRole("button", {name: "Xem audit sự kiện #1"}));
 
+    expect(screen.getByText("Camera: Cổng kho phía Đông")).toBeInTheDocument();
+    expect(screen.getByText("Vùng: zone_01")).toBeInTheDocument();
     expect(screen.getByText("AUDIT EVENT 1")).toBeInTheDocument();
   });
 

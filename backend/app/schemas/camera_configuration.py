@@ -64,6 +64,7 @@ class CameraConfigurationUpdate(BaseModel):
 
 class CameraConfigurationResponse(BaseModel):
     camera_id: str
+    camera_name: str | None = None
     revision: int
     asset_id: UUID | None
     machine_state: Literal["running", "stopped"]

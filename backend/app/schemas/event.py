@@ -152,6 +152,7 @@ class EventUpdate(BaseModel):
 
 class EventResponse(EventBase):
     id: int
+    camera_name: str | None = None
     timestamp: datetime
     status: str
     snapshot_path: str | None = None

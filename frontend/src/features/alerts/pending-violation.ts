@@ -4,7 +4,8 @@ export function isZoneAlert(alert: SafetyEvent): boolean {
   return alert.event_type === "zone_intrusion" || alert.event_type === "missing_ppe_and_intrusion";
 }
 
-export function cameraLabel(cameraId: string): string {
+export function cameraLabel(cameraId: string, cameraName?: string | null): string {
+  if (cameraName) return cameraName;
   const number = cameraId.match(/^cam_(\d+)$/)?.[1];
   return number ? `Camera ${Number(number)}` : cameraId;
 }

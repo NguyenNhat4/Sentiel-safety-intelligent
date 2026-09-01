@@ -369,13 +369,14 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       const session = storedSession?.asset_id === configuration?.asset_id ? storedSession : undefined;
       const detection = session && detections[cameraId]?.session_id === session.id ? detections[cameraId] : undefined;
       const replayVisible = asset?.media_type === "video" && (ended[cameraId] || session?.status === "COMPLETED");
-      return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình Camera ${index + 1}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>
-        <h3>Camera {index + 1}</h3>
-        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} storageBackend={asset.storage_backend} label={`Media Camera ${index + 1}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onPlaybackTime={time => handlePlaybackTime(cameraId, time)} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
+      const cameraName = asset?.display_name ?? `Camera ${index + 1}`;
+      return <article className={`active-stream-view ${canConfigure ? "configurable" : ""}`} key={cameraId} role={canConfigure ? "button" : undefined} tabIndex={canConfigure ? 0 : undefined} aria-label={canConfigure ? `Cấu hình ${cameraName}` : undefined} onClick={() => canConfigure && onConfigure(cameraId)} onKeyDown={event => { if (canConfigure && (event.key === "Enter" || event.key === " ")) onConfigure(cameraId); }}>
+        <h3>{cameraName}</h3>
+        {asset ? <><AuthenticatedMedia assetId={asset.id} mediaType={asset.media_type} storageBackend={asset.storage_backend} label={`Media ${cameraName}`} playing={Boolean(playbackRequested[cameraId]) || session?.status === "STARTING" || session?.status === "RUNNING"} playbackKey={session?.id} onPlaybackTime={time => handlePlaybackTime(cameraId, time)} onEnded={() => { setPlaybackRequested(current => ({...current, [cameraId]: false})); setEnded(current => ({...current, [cameraId]: true})); }} /><DetectionOverlay result={detection} />
           {session && <div className={`stream-badge ${session.status.toLowerCase()}`}>{session.status}</div>}
           {session?.inference_fps != null && <div className="inference-fps">FPS infer <strong>{session.inference_fps.toFixed(1)}</strong></div>}
           {session?.status === "ERROR" && <div className="session-error">{session.error_code || "Phiên mô phỏng gặp lỗi."}</div>}
-          {replayVisible && <button className="camera-replay" aria-label={`Replay Camera ${index + 1}`} disabled={Boolean(replaying)} onClick={event => { event.stopPropagation(); void replay(cameraId); }}>↻ <span>Replay</span></button>}
+          {replayVisible && <button className="camera-replay" aria-label={`Replay ${cameraName}`} disabled={Boolean(replaying)} onClick={event => { event.stopPropagation(); void replay(cameraId); }}>↻ <span>Replay</span></button>}
         </> : <div className="stream-empty-state"><strong>{canConfigure ? "Bấm vào đây để cấu hình" : "Camera chưa được cấu hình"}</strong><span>Camera {index + 1}</span></div>}
       </article>;
     })}</div>
@@ -390,7 +391,7 @@ export function StreamViewer({active = true, role, onConfigure}: {active?: boole
       timer={reviewTimer}
       reviewSaving={reviewSaving}
       alertTitle={reviewTitle}
-      alertSummary={pendingReview ? `${pendingReview.camera_id} · ${new Date(activeAlert?.timestamp ?? Date.now()).toLocaleString("vi-VN")}` : ""}
+      alertSummary={pendingReview ? `${assets[pendingReview.asset_id]?.display_name ?? pendingReview.camera_id} · ${new Date(activeAlert?.timestamp ?? Date.now()).toLocaleString("vi-VN")}` : ""}
       onReview={status => void review(status)}
       closeable
     />

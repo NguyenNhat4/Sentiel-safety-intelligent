@@ -68,17 +68,18 @@ beforeEach(() => {
 it("buffers detections until video playback reaches their timestamp", async () => {
   render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
   await screen.findByText("RUNNING");
-  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-storage-backend", "s3");
+  expect(screen.getByRole("heading", {name: "Demo"})).toBeInTheDocument();
+  expect(screen.getByRole("button", {name: "Media Demo"})).toHaveAttribute("data-storage-backend", "s3");
   resultHandler({...result("session-current", 2.5), video_time: 2});
 
   expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
-  act(() => playbackTimeHandlers["Media Camera 1"]?.(1.6));
+  act(() => playbackTimeHandlers["Media Demo"]?.(1.6));
   expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
 
-  act(() => playbackTimeHandlers["Media Camera 1"]?.(1.9));
+  act(() => playbackTimeHandlers["Media Demo"]?.(1.9));
   expect(screen.getByLabelText("Detection overlay frame 1")).toBeInTheDocument();
 
-  act(() => playbackTimeHandlers["Media Camera 1"]?.(2.3));
+  act(() => playbackTimeHandlers["Media Demo"]?.(2.3));
   expect(screen.queryByLabelText("Detection overlay frame 1")).not.toBeInTheDocument();
 });
 
@@ -97,25 +98,25 @@ it("runs once, ignores stale sessions, displays rolling FPS, and replays one com
   await screen.findByText("RUNNING");
   fireEvent.click(screen.getByRole("button", {name: "Chạy mô phỏng"}));
   await waitFor(() => expect(runSimulation).toHaveBeenCalledOnce());
-  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playback-key", "session-run");
+  expect(screen.getByRole("button", {name: "Media Demo"})).toHaveAttribute("data-playback-key", "session-run");
   resultHandler(result("session-current", 99));
   expect(screen.queryByText("99.0")).not.toBeInTheDocument();
   resultHandler(result("session-run", 2.75));
   expect(await screen.findByText("2.8")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", {name: "Media Camera 1"}));
+  fireEvent.click(screen.getByRole("button", {name: "Media Demo"}));
   vi.mocked(replayCamera).mockResolvedValue({...session, id: "session-replay", status: "COMPLETED"});
-  fireEvent.click(screen.getByRole("button", {name: "Replay Camera 1"}));
+  fireEvent.click(screen.getByRole("button", {name: "Replay Demo"}));
   await waitFor(() => expect(replayCamera).toHaveBeenCalledWith("cam_1"));
-  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playback-key", "session-replay");
-  expect(screen.getByRole("button", {name: "Media Camera 1"})).toHaveAttribute("data-playing", "true");
+  expect(screen.getByRole("button", {name: "Media Demo"})).toHaveAttribute("data-playback-key", "session-replay");
+  expect(screen.getByRole("button", {name: "Media Demo"})).toHaveAttribute("data-playing", "true");
 });
 
 it("exposes run and configuration actions to system admins", async () => {
   const configure = vi.fn();
   render(<StreamViewer role="system_admin" onConfigure={configure} />);
-  await screen.findByRole("heading", {name: "Camera 1"});
+  await screen.findByRole("heading", {name: "Demo"});
   expect(screen.getByRole("button", {name: "Chạy mô phỏng"})).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", {name: "Cấu hình Camera 1"}));
+  fireEvent.click(screen.getByRole("button", {name: "Cấu hình Demo"}));
   expect(configure).toHaveBeenCalledWith("cam_1");
   expect(CameraDetectionClient).toHaveBeenCalled();
 });

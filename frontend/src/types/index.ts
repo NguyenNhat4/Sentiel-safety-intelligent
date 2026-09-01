@@ -28,6 +28,7 @@ export interface CameraConfigurationZone extends MonitoringZone { ppe_requiremen
 
 export interface CameraConfiguration {
   camera_id: string;
+  camera_name?: string | null;
   revision: number;
   asset_id: string | null;
   machine_state: MachineState;
@@ -78,8 +79,9 @@ export interface UserRoleUpdate { role: AssignableUserRole; managed_area_id?: st
 export interface TelegramLinkStart { link_url: string; expires_at: string; }
 export interface TelegramLinkComplete { status: "linked" | "pending" | "expired"; chat_id?: string | null; telegram_username?: string | null; }
 
-export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number; total_detections: number; total_violations: number; }
-export interface StatisticsSummary { total_events: number; unacknowledged_events: number; overall_compliance_rate: number; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
+export interface ZoneComplianceStats { zone_id: string; zone_name: string; compliance_rate: number | null; total_detections: number; total_violations: number; }
+export interface CameraEventStats { camera_id: string; camera_name: string; official_violations: number; unacknowledged_events: number; false_alarm_events: number; }
+export interface StatisticsSummary { total_events: number; unacknowledged_events: number; false_alarm_events?: number; camera_stats?: CameraEventStats[]; overall_compliance_rate: number | null; violations_by_type: Record<string, number>; violations_by_severity: Record<string, number>; zone_stats: ZoneComplianceStats[]; }
 
 export interface ZonePoint {
   x: number;
@@ -206,6 +208,7 @@ export interface SafetyEvent {
   timestamp: string;
   zone_id: string;
   camera_id: string;
+  camera_name?: string | null;
   event_type: string;
   severity: string;
   status: EventStatus;

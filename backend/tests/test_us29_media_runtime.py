@@ -301,6 +301,7 @@ def test_camera_configuration_is_fixed_revisioned_and_atomic(client, db_session,
     assert [item["camera_id"] for item in initial] == ["cam_1", "cam_2", "cam_3", "cam_4"]
     saved = client.put("/api/v1/camera-configurations/cam_1", json=_configuration_payload(asset["id"]))
     assert saved.status_code == 200
+    assert saved.json()["camera_name"] == "Still"
     assert saved.json()["revision"] == 1
     assert saved.json()["ppe_requirements"]["hat_required"] is True
     assert saved.json()["zones"][0]["ppe_requirements"]["hat_required"] is True

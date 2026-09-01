@@ -15,6 +15,7 @@ interface CameraViolationLogProps {
 }
 
 export function CameraViolationLog({cameraId, configuration}: CameraViolationLogProps) {
+  const cameraName = configuration.camera_name ?? `Camera ${cameraNumber(cameraId)}`;
   const [events, setEvents] = useState<SafetyEvent[]>([]);
   const [status, setStatus] = useState("Đang tải log vi phạm...");
   const [loadFailed, setLoadFailed] = useState(false);
@@ -183,7 +184,7 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
 
   return <section className="camera-config-section camera-violation-log" aria-labelledby="camera-violation-log-heading">
     <div className="camera-config-section-heading">
-      <div className="camera-log-heading-copy"><span className="camera-config-section-kicker">LỊCH SỬ</span><strong id="camera-violation-log-heading">Nhật ký vi phạm Camera {cameraNumber(cameraId)}</strong><small>Event được tự động đồng bộ cho camera này.</small></div>
+      <div className="camera-log-heading-copy"><span className="camera-config-section-kicker">LỊCH SỬ</span><strong id="camera-violation-log-heading">Nhật ký vi phạm {cameraName}</strong><small>Event được tự động đồng bộ cho camera này.</small></div>
       <button type="button" className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
     </div>
     <div className="camera-log-summary" aria-label="Tổng quan log vi phạm">
@@ -192,7 +193,7 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
       <div><span>ĐÃ ĐÓNG</span><strong>{Math.max(events.length - openCount, 0)}</strong></div>
     </div>
     {status && <p className="camera-violation-log-status" role={loadFailed ? undefined : "status"} aria-live={loadFailed ? "assertive" : undefined}>{status}</p>}
-    {pendingEvents.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log Camera ${cameraNumber(cameraId)}`}>
+    {pendingEvents.length > 0 && <div className="camera-violation-list" role="list" aria-label={`Danh sách log ${cameraName}`}>
       {pendingEvents.map(event => <CameraViolationRow key={event.id} event={event} onOpen={() => void openReview(event)} />)}
     </div>}
     <ReviewModal
@@ -204,7 +205,7 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
       timer={reviewTimer}
       reviewSaving={reviewSaving}
       alertTitle={reviewTitle}
-      alertSummary={selectedEvent ? `${selectedEvent.camera_id} · ${new Date(selectedEvent.timestamp).toLocaleString("vi-VN")}` : ""}
+      alertSummary={selectedEvent ? `${selectedEvent.camera_name ?? selectedEvent.camera_id} · ${new Date(selectedEvent.timestamp).toLocaleString("vi-VN")}` : ""}
       onReview={reviewStatus => void review(reviewStatus)}
       closeable
       compact
@@ -216,7 +217,7 @@ function CameraViolationRow({event, onOpen}: {event: SafetyEvent; onOpen: () => 
   return <article className="camera-violation-row" role="listitem">
     <div>
       <strong>#{event.id} · {violationLabel(event)}</strong>
-      <small>{new Date(event.timestamp).toLocaleString("vi-VN", {hour12: false})} · Vùng {event.zone_id} · <b>{event.severity.toUpperCase()}</b></small>
+      <small>{new Date(event.timestamp).toLocaleString("vi-VN", {hour12: false})} · {event.camera_name ?? event.camera_id} · Vùng {event.decision_context?.scene.zone_name ?? event.zone_id} · <b>{event.severity.toUpperCase()}</b></small>
     </div>
     <div className="camera-violation-row-meta">
       <span className={`camera-event-status ${event.status}`}>{statusLabel(event.status)}</span>

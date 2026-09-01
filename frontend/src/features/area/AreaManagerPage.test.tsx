@@ -34,6 +34,8 @@ describe("AreaManagerPage event audit", () => {
     vi.mocked(loadStatisticsSummary).mockResolvedValue({
       total_events: 0,
       unacknowledged_events: 0,
+      false_alarm_events: 0,
+      camera_stats: [],
       overall_compliance_rate: 100,
       violations_by_type: {},
       violations_by_severity: {},
@@ -41,7 +43,7 @@ describe("AreaManagerPage event audit", () => {
     });
     vi.mocked(loadAreaEvents).mockResolvedValue([event]);
     vi.mocked(listCameraConfigurations).mockResolvedValue([
-      {camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null},
+      {camera_id: "cam_1", camera_name: "Cổng kho phía Đông", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null},
       {camera_id: "cam_2", revision: 1, asset_id: null, machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null},
       {camera_id: "cam_3", revision: 1, asset_id: null, machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null},
       {camera_id: "cam_4", revision: 1, asset_id: null, machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null},
@@ -51,9 +53,9 @@ describe("AreaManagerPage event audit", () => {
   it("lets the area manager inspect false-alarm audit without changing official KPIs", async () => {
     render(<AreaManagerPage />);
 
-    expect(await screen.findByText("Camera 1")).toBeInTheDocument();
+    expect(await screen.findByText("Cổng kho phía Đông")).toBeInTheDocument();
     expect(screen.getByText("Camera 2 · Chưa gán media")).toBeInTheDocument();
-    expect(screen.getByText("Tuân thủ theo khu vực").closest("article")).not.toHaveTextContent("Ca sáng");
+    expect(screen.getByText("Thống kê theo camera").closest("article")).not.toHaveTextContent("Ca sáng");
     expect(screen.getByText("VI PHẠM CHÍNH THỨC").closest("article")).toHaveTextContent("0");
     fireEvent.click(screen.getByRole("button", {name: /#7/}));
     expect(screen.getByText("AREA AUDIT 7")).toBeInTheDocument();
@@ -77,6 +79,11 @@ describe("AreaManagerPage event audit", () => {
     vi.mocked(loadStatisticsSummary).mockResolvedValue({
       total_events: 3,
       unacknowledged_events: 2,
+      false_alarm_events: 4,
+      camera_stats: [
+        {camera_id: "cam_2", camera_name: "Camera 2", official_violations: 2, unacknowledged_events: 1, false_alarm_events: 3},
+        {camera_id: "cam_1", camera_name: "Cổng kho phía Đông", official_violations: 1, unacknowledged_events: 1, false_alarm_events: 1},
+      ],
       overall_compliance_rate: 98.5,
       violations_by_type: {},
       violations_by_severity: {},
@@ -88,7 +95,9 @@ describe("AreaManagerPage event audit", () => {
 
     render(<AreaManagerPage />);
 
-    expect((await screen.findByText("Camera 1")).closest(".zone-row")).toHaveTextContent("1 vi phạm");
-    expect(screen.getByText("Camera 2 · Chưa gán media").closest(".zone-row")).toHaveTextContent("2 vi phạm");
+    expect((await screen.findByText("Cổng kho phía Đông")).closest(".zone-row")).toHaveTextContent("1 chính thức");
+    expect(screen.getByText("Camera 2 · Chưa gán media").closest(".zone-row")).toHaveTextContent("3 báo sai");
+    expect(screen.getByText("BÁO SAI").closest("article")).toHaveTextContent("4");
+    expect(screen.queryByText("TUÂN THỦ CHUNG")).not.toBeInTheDocument();
   });
 });

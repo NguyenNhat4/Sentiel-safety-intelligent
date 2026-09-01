@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.dependencies import require_roles
 from backend.app.core.database import get_db
+from backend.app.models.camera_configuration import CameraConfiguration
 from backend.app.models.event import SafetyEvent
+from backend.app.models.media_asset import MediaAsset
 from backend.app.models.user import User, UserRole
 from backend.app.schemas.event import (
     EventBatchCreate,
@@ -53,6 +55,7 @@ async def create_event_batch(
             alert_notification_service.queue_confirmed_events(
                 db, [event for event in events if getattr(event, "_became_acknowledged", False)]
             )
+        _attach_camera_names(db, events)
         return {"batch_id": batch_id, "snapshot_path": snapshot_path, "events": events}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -79,9 +82,9 @@ async def list_events(
     is_area_manager = actor.role == UserRole.AREA_MANAGER.value
     managed_camera_ids = actor.managed_camera_ids or [] if is_area_manager else []
     if is_area_manager and not managed_camera_ids and not actor.managed_area_id:
-        raise HTTPException(status_code=403, detail="Area manager has no assigned area")
+        return []
     service = EventService(db)
-    return service.get_events(
+    events = service.get_events(
         skip=skip,
         limit=limit,
         camera_id=camera_id,
@@ -90,6 +93,8 @@ async def list_events(
         status=status,
         event_type=event_type,
     )
+    _attach_camera_names(db, events)
+    return events
 
 
 @router.post("", response_model=EventResponse, status_code=201)
@@ -118,6 +123,7 @@ async def create_event(
         ):
             raise HTTPException(status_code=409, detail="Occurrence does not belong to the requested session and track")
         event = service.create_event(event_in, actor=actor)
+        _attach_camera_names(db, [event])
         if event_in.status == "acknowledged" and getattr(event, "_became_acknowledged", False):
             alert_notification_service.queue_confirmed_events(db, [event])
         return event
@@ -145,10 +151,11 @@ def get_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     summary = SafetyAgentService().generate_incident_summary(
-        decision_context=event.decision_context,
+        decision_context=_summary_context(event.decision_context, _camera_name(db, event.camera_id)),
         event_type=event.event_type,
         zone_id=event.zone_id,
     )
+    _attach_camera_names(db, [event])
     return EventDetailResponse(
         **EventResponse.model_validate(event).model_dump(),
         summary=summary,
@@ -186,7 +193,37 @@ async def update_event(
         raise HTTPException(status_code=404, detail="Event not found")
     if event_in.status == "acknowledged" and not was_acknowledged:
         alert_notification_service.queue_confirmed_events(db, [updated])
+    _attach_camera_names(db, [updated])
     return updated
+
+
+def _camera_name(db: Session, camera_id: str) -> str | None:
+    return (
+        db.query(MediaAsset.display_name)
+        .join(CameraConfiguration, CameraConfiguration.asset_id == MediaAsset.id)
+        .filter(CameraConfiguration.camera_id == camera_id)
+        .scalar()
+    )
+
+
+def _attach_camera_names(db: Session, events: list[SafetyEvent]) -> None:
+    camera_ids = {event.camera_id for event in events}
+    if not camera_ids:
+        return
+    names = dict(
+        db.query(CameraConfiguration.camera_id, MediaAsset.display_name)
+        .join(MediaAsset, CameraConfiguration.asset_id == MediaAsset.id)
+        .filter(CameraConfiguration.camera_id.in_(camera_ids))
+        .all()
+    )
+    for event in events:
+        event.camera_name = names.get(event.camera_id)
+
+
+def _summary_context(context: dict | None, camera_name: str | None) -> dict | None:
+    if not context or not camera_name:
+        return context
+    return {**context, "scene": {**context["scene"], "camera_name": camera_name}}
 
 
 def _area_manager_can_access_event(actor: User, event: SafetyEvent) -> bool:

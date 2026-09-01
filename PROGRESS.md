@@ -1,6 +1,16 @@
 # Project Progress
 
-Updated: 2026-09-01
+### 2026-09-01 Dashboard real event statistics
+
+- [Backend] Removed the fabricated minimum-100 detection denominator and synthetic compliance calculation. Statistics now return real persisted counts for official violations, pending review and false alarms, globally and per authorized camera; legacy compliance values are nullable rather than invented.
+- [Frontend] Replaced the misleading compliance percentage and “lượt phát hiện” rows with three auditable KPI counts and per-camera status breakdowns.
+- [Verification] Area Dashboard regressions pass 3/3, the full frontend suite passes 117/117, production build, type-check, Ruff, formatting and `git diff --check` pass. Database-backed focused backend execution remains subject to the existing root pytest hang. Railway deployment was not run.
+
+### 2026-09-01 Uploaded media names across camera surfaces
+
+- [Backend/Frontend] The media name entered during upload now resolves as the assigned camera's display name in camera-configuration/event contracts, camera-grouped statistics, Live Monitor, configuration, Dashboard, pending alerts and violation logs. Event summaries prefer that camera name while retaining the distinct configured zone name for zone fields and overlays.
+- [Backend] Area Manager accounts without a camera/area assignment now receive an empty events/statistics dashboard instead of HTTP 403; no plant-wide data is exposed by this fallback.
+- [Verification] Focused frontend camera/dashboard/event-log tests pass 36/36, the full frontend suite passes 117/117, production build, type-check, Ruff, formatting, deterministic incident-summary regression and `git diff --check` pass. Database-backed focused backend tests reached the existing test-environment hang and timed out without a result. Railway deployment was not run.
 
 ### 2026-09-01 Unified sidebar navigation icons
 

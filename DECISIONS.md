@@ -7,6 +7,19 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Architecture And Ownership
 
+### 2026-09-01: [Backend/Frontend] Uploaded media name is the operator-facing camera name
+
+- `MediaAsset.display_name`, entered during upload, is the canonical operator-facing camera name after that asset is assigned to a fixed internal camera slot.
+- Internal IDs such as `cam_1` and `zone_01` remain stable persistence/filter keys, but Live Monitor, configuration, Dashboard, pending alerts, violation logs and incident summaries must prefer the media camera name. Zone display names remain separate and are shown only where zone context is relevant.
+- Camera-configuration and event responses expose additive nullable `camera_name`; statistics use the same media name as `zone_name` for camera-grouped rows. Existing clients remain compatible through internal-ID fallbacks.
+- An unassigned Area Manager receives an empty dashboard rather than HTTP 403 or unscoped plant-wide data. Assigning cameras/area remains the authority boundary for visible operational records.
+
+### 2026-09-01: [Backend/Frontend] Dashboard reports persisted event counts, not inferred compliance
+
+- Until the system persists a trustworthy denominator of normal safety observations, the Dashboard must not claim a compliance percentage or fabricate a detection total.
+- Dashboard totals and per-camera rows count persisted events by mutually exclusive status groups: official violations are `acknowledged` plus `resolved`, pending events are `unacknowledged`, and quality feedback is `false_alarm`.
+- `camera_stats` is the authoritative Dashboard contract. Legacy compliance fields remain temporarily readable for compatibility, but compliance values are `null` and legacy detection totals contain only real persisted event records.
+
 ### 2026-08-30: [Backend/Frontend] Responsible area is administrator-entered text
 
 - An Area Manager's `managed_area_id` remains the compatible wire/storage field, but its value is a required, trimmed area name entered by the administrator; it does not require a pre-existing monitoring-zone record.

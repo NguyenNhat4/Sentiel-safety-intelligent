@@ -426,7 +426,7 @@ def test_area_manager_only_sees_confirmed_events_for_their_assigned_area(client,
 
     assert [event["zone_id"] for event in events.json()] == ["zone_2"]
     assert summary.json()["total_events"] == 1
-    assert [zone["zone_id"] for zone in summary.json()["zone_stats"]] == ["zone_2"]
+    assert [item["camera_id"] for item in summary.json()["camera_stats"]] == ["cam_01"]
 
     event_id = events.json()[0]["id"]
     resolved = client.patch(f"/api/v1/events/{event_id}", json={"status": "resolved"})
@@ -476,6 +476,23 @@ def test_area_manager_event_access_and_statistics_follow_assigned_cameras(client
 
     assert {event["camera_id"] for event in events.json()} == {"cam_1", "cam_2"}
     assert summary.json()["unacknowledged_events"] == 2
+    assert summary.json()["false_alarm_events"] == 0
+    assert summary.json()["camera_stats"] == [
+        {
+            "camera_id": "cam_1",
+            "camera_name": "Camera 1",
+            "official_violations": 0,
+            "unacknowledged_events": 1,
+            "false_alarm_events": 0,
+        },
+        {
+            "camera_id": "cam_2",
+            "camera_name": "Camera 2",
+            "official_violations": 0,
+            "unacknowledged_events": 1,
+            "false_alarm_events": 0,
+        },
+    ]
     assert [item["zone_id"] for item in summary.json()["zone_stats"]] == ["cam_1", "cam_2"]
 
     allowed = client.get(f"/api/v1/events/{created['cam_1']['id']}")
@@ -489,7 +506,7 @@ def test_area_manager_event_access_and_statistics_follow_assigned_cameras(client
     assert denied_update.status_code == 404
 
 
-def test_unassigned_area_manager_cannot_list_events_or_statistics(client, db_session):
+def test_unassigned_area_manager_sees_empty_dashboard_instead_of_403(client, db_session):
     db_session.add(
         User(
             email="area.unassigned@sentinel.local",
@@ -506,7 +523,9 @@ def test_unassigned_area_manager_cannot_list_events_or_statistics(client, db_ses
     events = client.get("/api/v1/events")
     summary = client.get("/api/v1/statistics/summary")
 
-    assert events.status_code == 403
-    assert events.json()["detail"] == "Area manager has no assigned area"
-    assert summary.status_code == 403
-    assert summary.json()["detail"] == "Area manager has no assigned area"
+    assert events.status_code == 200
+    assert events.json() == []
+    assert summary.status_code == 200
+    assert summary.json()["total_events"] == 0
+    assert summary.json()["zone_stats"] == []
+    assert summary.json()["camera_stats"] == []

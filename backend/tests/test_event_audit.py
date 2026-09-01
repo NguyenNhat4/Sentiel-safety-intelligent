@@ -113,6 +113,22 @@ def test_reviewed_event_persists_server_owned_decision_context_and_summary(clien
     assert detail["summary"]["context_schema_version"] == "decision_context_v1"
 
 
+def test_deterministic_summary_prefers_uploaded_media_camera_name():
+    context = decision_context_payload()
+    context["scene"]["camera_name"] = "Camera cổng kho phía Đông"
+    context["system_decision"]["reason_codes"] = ["zone_intrusion"]
+    context["human_review"] = {"outcome": "actual_violation", "actor_name": "Nguyễn Anh Tuấn"}
+
+    summary = SafetyAgentService._deterministic_incident_summary(
+        decision_context=context,
+        event_type="zone_intrusion",
+        zone_id="zone_01",
+    )
+
+    assert summary.startswith("Tại Camera cổng kho phía Đông,")
+    assert "Tại Máy dập A" not in summary
+
+
 def test_patch_cannot_replace_immutable_decision_context(client):
     original_context = decision_context_payload()
     created = client.post(
