@@ -1,5 +1,10 @@
 # Project Progress
 
+### 2026-09-01 Unified sidebar navigation icons
+
+- [Frontend] Replaced the mixed Unicode sidebar symbols with a cohesive, dependency-free SVG outline set for Live Monitor, violation history, system observation, dashboard, administration, and media library. Icons inherit the existing active/inactive colors and remain decorative so accessible button names are unchanged.
+- [Verification] Focused App navigation tests pass 10/10 and the full frontend suite passes 117/117; frontend type-check, production build, lint with the existing `StreamViewer.tsx` hooks warning, Ruff, formatting, and `git diff --check` pass. `make check` reached the root pytest suite and timed out after its first passing test. Railway deployment was not run.
+
 ### 2026-08-31 HITL snapshot preload before popup
 
 - [Frontend] Live Monitor and Camera Detail now preload each persisted HITL snapshot before making the review popup visible. Live Monitor reserves the active FIFO alert while loading so later zone alerts cannot overtake it; snapshot failure or a five-second timeout opens the popup with an explicit unavailable-image state instead of hiding the alert indefinitely.
