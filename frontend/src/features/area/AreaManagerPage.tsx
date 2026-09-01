@@ -1,8 +1,8 @@
 import {memo, useCallback, useEffect, useState} from "react";
-import {loadAreaEvents, subscribeToSafetyEventUpdates, updateAreaEvent} from "../../api/events";
+import {getCachedAreaEvents, loadAreaEvents, subscribeToSafetyEventUpdates, updateAreaEvent} from "../../api/events";
 import {assetUrl} from "../../api/config";
-import {loadStatisticsSummary} from "../../api/statistics";
-import {listCameraConfigurations} from "../../api/camera-configurations";
+import {getCachedStatisticsSummary, loadStatisticsSummary} from "../../api/statistics";
+import {getCachedCameraConfigurations, listCameraConfigurations} from "../../api/camera-configurations";
 import type {CameraConfiguration} from "../../types";
 import type {SafetyEvent, StatisticsSummary} from "../../types";
 import {EventDetailDialog} from "../events/EventDetailDialog";
@@ -12,24 +12,25 @@ interface AreaManagerPageProps {
   active?: boolean;
 }
 
-let areaCache: { summary: StatisticsSummary; events: SafetyEvent[]; configurations: CameraConfiguration[] } | null = null;
-
 export const AreaManagerPage = memo(function AreaManagerPage({active = true}: AreaManagerPageProps) {
-  const [summary, setSummary] = useState<StatisticsSummary | undefined>(() => areaCache?.summary);
-  const [events, setEvents] = useState<SafetyEvent[]>(() => areaCache?.events ?? []);
-  const [configurations, setConfigurations] = useState<CameraConfiguration[]>(() => areaCache?.configurations ?? []);
-  const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | undefined>(() => areaCache?.events[0]);
+  const [summary, setSummary] = useState<StatisticsSummary | undefined>(() => getCachedStatisticsSummary());
+  const [events, setEvents] = useState<SafetyEvent[]>(() => getCachedAreaEvents() ?? []);
+  const [configurations, setConfigurations] = useState<CameraConfiguration[]>(() => getCachedCameraConfigurations() ?? []);
+  const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | undefined>(() => getCachedAreaEvents()?.[0]);
   const [updatingEventId, setUpdatingEventId] = useState<number>();
-  const [status, setStatus] = useState(() => areaCache ? "" : "Đang tải dữ liệu khu vực...");
+  const [status, setStatus] = useState(() => getCachedStatisticsSummary() && getCachedAreaEvents() ? "" : "Đang tải dữ liệu khu vực...");
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    if (!areaCache) {
+  const load = useCallback(async (forceRefresh = false) => {
+    if (!getCachedStatisticsSummary() || !getCachedAreaEvents()) {
       setStatus("Đang tải dữ liệu khu vực...");
     }
     try {
-      const [nextSummary, nextEvents, nextConfigurations] = await Promise.all([loadStatisticsSummary(), loadAreaEvents(), listCameraConfigurations()]);
-      areaCache = { summary: nextSummary, events: nextEvents, configurations: nextConfigurations };
+      const [nextSummary, nextEvents, nextConfigurations] = await Promise.all([
+        loadStatisticsSummary({forceRefresh}),
+        loadAreaEvents({forceRefresh}),
+        listCameraConfigurations({forceRefresh}),
+      ]);
       setSummary(nextSummary);
       setEvents(nextEvents);
       setConfigurations(nextConfigurations);
@@ -47,7 +48,7 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
   useEffect(() => {
     if (!active) return;
     return subscribeToSafetyEventUpdates(() => {
-      void load();
+      void load(true);
     });
   }, [active, load]);
 
@@ -57,7 +58,6 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
       const updated = await updateAreaEvent(event.id, outcome);
       setEvents(current => {
         const nextEvents = current.map(item => item.id === updated.id ? updated : item);
-        if (areaCache) areaCache = {...areaCache, events: nextEvents};
         return nextEvents;
       });
       setSelectedEvent(updated);
@@ -70,7 +70,7 @@ export const AreaManagerPage = memo(function AreaManagerPage({active = true}: Ar
   }
 
   return <section className={`page area-page ${active ? "active" : ""}`}>
-    <div className="area-heading"><p>Theo dõi mức tuân thủ và log an toàn của khu vực phụ trách.</p><button className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button></div>
+    <div className="area-heading"><p>Theo dõi mức tuân thủ và log an toàn của khu vực phụ trách.</p><button className="secondary-btn" onClick={() => void load(true)}>↻ Làm mới</button></div>
     {status && <div className="log-status">{status}</div>}
     {summary && <>
       <div className="area-kpis">

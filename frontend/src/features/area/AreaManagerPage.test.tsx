@@ -7,12 +7,13 @@ import type {SafetyEvent} from "../../types";
 import {AreaManagerPage} from "./AreaManagerPage";
 
 vi.mock("../../api/events", () => ({
+  getCachedAreaEvents: vi.fn(() => undefined),
   loadAreaEvents: vi.fn(),
   subscribeToSafetyEventUpdates: vi.fn(() => vi.fn()),
   updateAreaEvent: vi.fn(),
 }));
-vi.mock("../../api/statistics", () => ({loadStatisticsSummary: vi.fn()}));
-vi.mock("../../api/camera-configurations", () => ({listCameraConfigurations: vi.fn()}));
+vi.mock("../../api/statistics", () => ({getCachedStatisticsSummary: vi.fn(() => undefined), loadStatisticsSummary: vi.fn()}));
+vi.mock("../../api/camera-configurations", () => ({getCachedCameraConfigurations: vi.fn(() => undefined), listCameraConfigurations: vi.fn()}));
 vi.mock("../events/EventDetailDialog", () => ({
   EventDetailDialog: ({eventId}: {eventId: number | null}) => eventId === null ? null : <div>AREA AUDIT {eventId}</div>,
 }));

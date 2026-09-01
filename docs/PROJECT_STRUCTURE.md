@@ -153,6 +153,7 @@ P-047/
 │   │   │   ├── auth.ts   # Authentication/account transport
 │   │   │   ├── vision-worker-compare.ts # Dev-only typed CPU/CUDA worker client and latency summary
 │   │   │   ├── camera-configurations.ts # Atomic fixed-camera configuration transport
+│   │   │   ├── query-cache.ts # Session-scoped stale-while-revalidate REST cache and invalidation
 │   │   │   ├── media-assets.ts # Storage-aware inventory, upload and protected playback transport
 │   │   │   ├── media-assets.test.ts # S3 presigned URL vs filesystem content routing regression
 │   │   │   ├── simulation.ts # Run, Replay and session lifecycle transport
@@ -230,6 +231,8 @@ P-047/
 │   ├── data/                        # Dataset preparation and annotation guides
 │   │   └── US-13-task2-datapreparation.md # Custom dataset annotation, split and locking guide
 │   ├── guide/                       # Setup guides and reference materials
+│   │   └── setup/
+│   │       └── local-postgresql-troubleshooting.md # Fresher-friendly local/Railway PostgreSQL troubleshooting
 │   └── plans/                       # Implementation-ready plans and their reading guide
 │       ├── 2026-08-21-001-feat-remote-vision-service-plan.md # Remote worker implementation plan
 │       └── 2026-08-15-001-feat-us16-event-decision-audit-plan.md

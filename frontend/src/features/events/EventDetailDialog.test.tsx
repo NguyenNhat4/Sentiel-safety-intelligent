@@ -7,6 +7,7 @@ import {EventDetailDialog} from "./EventDetailDialog";
 
 let eventUpdateHandler: (update: SafetyEventUpdate) => void = () => undefined;
 vi.mock("../../api/events", () => ({
+  getCachedEventDetail: vi.fn(() => undefined),
   loadEventDetail: vi.fn(),
   subscribeToSafetyEventUpdates: (listener: (update: SafetyEventUpdate) => void) => {
     eventUpdateHandler = listener;

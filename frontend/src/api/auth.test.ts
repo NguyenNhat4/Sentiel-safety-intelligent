@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {deleteUser, disconnectTelegramLink, getCurrentUser, listUsers, login, logout, updateUserRole} from "./auth";
+import {peekQuery, setQueryData} from "./query-cache";
 
 const user = {
   id: "user-1",
@@ -17,18 +18,31 @@ afterEach(() => {
 
 describe("authentication transport", () => {
   it("stores the API token after a successful login", async () => {
+    setQueryData("events:area", [{id: 1}]);
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({access_token: "token-1", token_type: "bearer", user}), {status: 200}));
     vi.stubGlobal("fetch", fetchMock);
     await expect(login({email: user.email, password: "Sentinel123!"})).resolves.toMatchObject({user});
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/login", expect.objectContaining({method: "POST"}));
     expect(window.sessionStorage.getItem("sentinel.auth.access_token")).toBe("token-1");
+    expect(peekQuery("events:area")).toBeUndefined();
   });
 
   it("clears an invalid persisted session", async () => {
+    setQueryData("media-assets:list", [{id: "private"}]);
     window.sessionStorage.setItem("sentinel.auth.access_token", "expired-token");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("Unauthorized", {status: 401})));
     await expect(getCurrentUser()).resolves.toBeNull();
     expect(window.sessionStorage.getItem("sentinel.auth.access_token")).toBeNull();
+    expect(peekQuery("media-assets:list")).toBeUndefined();
+  });
+
+  it("preserves the local session and cache on temporary auth storage failure", async () => {
+    window.sessionStorage.setItem("sentinel.auth.access_token", "token-1");
+    setQueryData("media-assets:list", [{id: "cached"}]);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({detail: "Authentication storage is unavailable"}), {status: 503})));
+    await expect(getCurrentUser()).rejects.toThrow("Authentication storage is unavailable");
+    expect(window.sessionStorage.getItem("sentinel.auth.access_token")).toBe("token-1");
+    expect(peekQuery("media-assets:list")).toEqual([{id: "cached"}]);
   });
 
   it("revokes the server session and clears the local token", async () => {
@@ -41,6 +55,15 @@ describe("authentication transport", () => {
       headers: {Authorization: "Bearer token-1"}
     });
     expect(window.sessionStorage.getItem("sentinel.auth.access_token")).toBeNull();
+  });
+
+  it("clears local session data even when server logout fails", async () => {
+    window.sessionStorage.setItem("sentinel.auth.access_token", "token-1");
+    setQueryData("camera-configurations:list", [{camera_id: "cam_1"}]);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    await expect(logout()).rejects.toThrow("offline");
+    expect(window.sessionStorage.getItem("sentinel.auth.access_token")).toBeNull();
+    expect(peekQuery("camera-configurations:list")).toBeUndefined();
   });
 
   it("sends the bearer token for system administration requests", async () => {

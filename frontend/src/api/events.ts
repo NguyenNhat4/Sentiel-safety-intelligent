@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import {getAccessToken} from "./auth";
 import {apiUrl} from "./config";
+import {fetchQuery, invalidateQueries, peekQuery, revalidateQuery, setQueryData} from "./query-cache";
 
 const SAFETY_EVENT_UPDATE_NAME = "sentinel:safety-event-update";
 const SAFETY_EVENT_UPDATE_CHANNEL = "sentinel:safety-events";
@@ -19,45 +20,84 @@ export interface SafetyEventUpdate {
 
 let eventUpdateChannel: BroadcastChannel | null | undefined;
 
+const PENDING_KEY = "events:unacknowledged";
+const AREA_KEY = "events:area";
+const PENDING_TTL_MS = 10_000;
+const REVIEWED_TTL_MS = 30_000;
+
+export function getCachedReviewedEvents(status: ReviewStatus): SafetyEvent[] | undefined {
+  return peekQuery(reviewedKey(status));
+}
+
+export function getCachedPendingEvents(): SafetyEvent[] | undefined {
+  return peekQuery(PENDING_KEY);
+}
+
+export function getCachedCameraEvents(cameraId: string): SafetyEvent[] | undefined {
+  return peekQuery(cameraKey(cameraId));
+}
+
+export function getCachedEventDetail(eventId: number): EventDetail | undefined {
+  return peekQuery(detailKey(eventId));
+}
+
+export function getCachedAreaEvents(): SafetyEvent[] | undefined {
+  return peekQuery(AREA_KEY);
+}
+
 export async function loadAcknowledgedEvents(): Promise<SafetyEvent[]> {
   return loadReviewedEvents("acknowledged");
 }
 
-export async function loadReviewedEvents(status: ReviewStatus): Promise<SafetyEvent[]> {
-  const response = await fetch(
-    apiUrl(`/events?status=${encodeURIComponent(status)}&limit=50`),
-    {cache: "no-store", headers: authorizationHeaders()},
-  );
-  if (!response.ok) throw new Error(`Không thể tải nhật ký (HTTP ${response.status})`);
-  return response.json() as Promise<SafetyEvent[]>;
+export async function loadReviewedEvents(status: ReviewStatus, options: {forceRefresh?: boolean} = {}): Promise<SafetyEvent[]> {
+  const key = reviewedKey(status);
+  const loader = async () => {
+    const response = await fetch(
+      apiUrl(`/events?status=${encodeURIComponent(status)}&limit=50`),
+      {cache: "no-store", headers: authorizationHeaders()},
+    );
+    if (!response.ok) throw new Error(`Không thể tải nhật ký (HTTP ${response.status})`);
+    return response.json() as Promise<SafetyEvent[]>;
+  };
+  return options.forceRefresh ? revalidateQuery(key, loader) : fetchQuery(key, loader, REVIEWED_TTL_MS);
 }
 
-export async function loadPendingEvents(signal?: AbortSignal): Promise<SafetyEvent[]> {
-  const response = await fetch(apiUrl("/events?status=unacknowledged&limit=200"), {
-    cache: "no-store",
-    headers: authorizationHeaders(),
-    signal,
-  });
-  if (!response.ok) throw new Error(`Không thể tải cảnh báo chờ xử lý (HTTP ${response.status})`);
-  return response.json() as Promise<SafetyEvent[]>;
+export async function loadPendingEvents(options: {forceRefresh?: boolean} = {}): Promise<SafetyEvent[]> {
+  const loader = async () => {
+    const response = await fetch(apiUrl("/events?status=unacknowledged&limit=200"), {
+      cache: "no-store",
+      headers: authorizationHeaders(),
+    });
+    if (!response.ok) throw new Error(`Không thể tải cảnh báo chờ xử lý (HTTP ${response.status})`);
+    return response.json() as Promise<SafetyEvent[]>;
+  };
+  return options.forceRefresh ? revalidateQuery(PENDING_KEY, loader) : fetchQuery(PENDING_KEY, loader, PENDING_TTL_MS);
 }
 
-export async function loadCameraEvents(cameraId: string): Promise<SafetyEvent[]> {
-  const response = await fetch(
-    apiUrl(`/events?camera_id=${encodeURIComponent(cameraId)}&limit=50`),
-    {cache: "no-store", headers: authorizationHeaders()},
-  );
-  if (!response.ok) throw new Error(`Không thể tải log Camera (HTTP ${response.status})`);
-  return response.json() as Promise<SafetyEvent[]>;
+export async function loadCameraEvents(cameraId: string, options: {forceRefresh?: boolean} = {}): Promise<SafetyEvent[]> {
+  const key = cameraKey(cameraId);
+  const loader = async () => {
+    const response = await fetch(
+      apiUrl(`/events?camera_id=${encodeURIComponent(cameraId)}&limit=50`),
+      {cache: "no-store", headers: authorizationHeaders()},
+    );
+    if (!response.ok) throw new Error(`Không thể tải log Camera (HTTP ${response.status})`);
+    return response.json() as Promise<SafetyEvent[]>;
+  };
+  return options.forceRefresh ? revalidateQuery(key, loader) : fetchQuery(key, loader, PENDING_TTL_MS);
 }
 
-export async function loadEventDetail(eventId: number): Promise<EventDetail> {
-  const response = await fetch(
-    apiUrl(`/events/${encodeURIComponent(String(eventId))}`),
-    {cache: "no-store", headers: authorizationHeaders()},
-  );
-  if (!response.ok) throw new Error(`Không thể tải chi tiết sự kiện (HTTP ${response.status})`);
-  return response.json() as Promise<EventDetail>;
+export async function loadEventDetail(eventId: number, options: {forceRefresh?: boolean} = {}): Promise<EventDetail> {
+  const key = detailKey(eventId);
+  const loader = async () => {
+    const response = await fetch(
+      apiUrl(`/events/${encodeURIComponent(String(eventId))}`),
+      {cache: "no-store", headers: authorizationHeaders()},
+    );
+    if (!response.ok) throw new Error(`Không thể tải chi tiết sự kiện (HTTP ${response.status})`);
+    return response.json() as Promise<EventDetail>;
+  };
+  return options.forceRefresh ? revalidateQuery(key, loader) : fetchQuery(key, loader, REVIEWED_TTL_MS);
 }
 
 export async function saveReviewedEvent(payload: EventPayload): Promise<SafetyEvent> {
@@ -68,6 +108,7 @@ export async function saveReviewedEvent(payload: EventPayload): Promise<SafetyEv
   });
   if (!response.ok) throw new Error(await readErrorMessage(response));
   const event = await response.json() as SafetyEvent;
+  updateEventCaches(event);
   publishSafetyEventUpdate([event]);
   return event;
 }
@@ -80,17 +121,21 @@ export async function saveReviewedEventBatch(payload: EventBatchPayload): Promis
   });
   if (!response.ok) throw new Error(await readErrorMessage(response));
   const batch = await response.json() as EventBatchResponse;
+  batch.events.forEach(updateEventCaches);
   publishSafetyEventUpdate(batch.events);
   return batch;
 }
 
-export async function loadAreaEvents(): Promise<SafetyEvent[]> {
-  const response = await fetch(apiUrl("/events?limit=50"), {
-    cache: "no-store",
-    headers: authorizationHeaders(),
-  });
-  if (!response.ok) throw new Error(`Không thể tải nhật ký khu vực (HTTP ${response.status})`);
-  return response.json() as Promise<SafetyEvent[]>;
+export async function loadAreaEvents(options: {forceRefresh?: boolean} = {}): Promise<SafetyEvent[]> {
+  const loader = async () => {
+    const response = await fetch(apiUrl("/events?limit=50"), {
+      cache: "no-store",
+      headers: authorizationHeaders(),
+    });
+    if (!response.ok) throw new Error(`Không thể tải nhật ký khu vực (HTTP ${response.status})`);
+    return response.json() as Promise<SafetyEvent[]>;
+  };
+  return options.forceRefresh ? revalidateQuery(AREA_KEY, loader) : fetchQuery(AREA_KEY, loader, PENDING_TTL_MS);
 }
 
 export async function updateAreaEvent(eventId: number, status: "resolved" | "false_alarm"): Promise<SafetyEvent> {
@@ -101,13 +146,19 @@ export async function updateAreaEvent(eventId: number, status: "resolved" | "fal
   });
   if (!response.ok) throw new Error(await readErrorMessage(response));
   const event = await response.json() as SafetyEvent;
+  updateEventCaches(event);
   publishSafetyEventUpdate([event]);
   return event;
 }
 
 export function subscribeToSafetyEventUpdates(listener: (update: SafetyEventUpdate) => void): () => void {
-  const handleWindowUpdate = (event: Event) => listener((event as CustomEvent<SafetyEventUpdate>).detail);
-  const handleChannelUpdate = (event: MessageEvent<SafetyEventUpdate>) => listener(event.data);
+  const notify = (update: SafetyEventUpdate) => {
+    invalidateQueries("events:");
+    invalidateQueries("statistics:");
+    listener(update);
+  };
+  const handleWindowUpdate = (event: Event) => notify((event as CustomEvent<SafetyEventUpdate>).detail);
+  const handleChannelUpdate = (event: MessageEvent<SafetyEventUpdate>) => notify(event.data);
   window.addEventListener(SAFETY_EVENT_UPDATE_NAME, handleWindowUpdate);
   const channel = getEventUpdateChannel();
   channel?.addEventListener("message", handleChannelUpdate);
@@ -119,6 +170,8 @@ export function subscribeToSafetyEventUpdates(listener: (update: SafetyEventUpda
 
 function publishSafetyEventUpdate(events: SafetyEvent[]): void {
   if (!events.length) return;
+  invalidateQueries("events:");
+  invalidateQueries("statistics:");
   const update: SafetyEventUpdate = {
     eventIds: [...new Set(events.map(event => event.id))],
     cameraIds: [...new Set(events.map(event => event.camera_id))],
@@ -126,6 +179,27 @@ function publishSafetyEventUpdate(events: SafetyEvent[]): void {
   window.dispatchEvent(new CustomEvent<SafetyEventUpdate>(SAFETY_EVENT_UPDATE_NAME, {detail: update}));
   getEventUpdateChannel()?.postMessage(update);
 }
+
+function updateEventCaches(event: SafetyEvent): void {
+  updateEventList(PENDING_KEY, event, PENDING_TTL_MS, item => item.status === "unacknowledged");
+  updateEventList(cameraKey(event.camera_id), event, PENDING_TTL_MS, () => true);
+  updateEventList(AREA_KEY, event, PENDING_TTL_MS, () => true);
+  if (event.status === "acknowledged" || event.status === "false_alarm") {
+    updateEventList(reviewedKey(event.status), event, REVIEWED_TTL_MS, () => true);
+  }
+  invalidateQueries(`events:detail:${event.id}`);
+}
+
+function updateEventList(key: string, event: SafetyEvent, ttlMs: number, include: (event: SafetyEvent) => boolean): void {
+  const cached = peekQuery<SafetyEvent[]>(key);
+  if (!cached) return;
+  const remaining = cached.filter(item => item.id !== event.id);
+  setQueryData(key, include(event) ? [event, ...remaining] : remaining, ttlMs);
+}
+
+function reviewedKey(status: ReviewStatus): string { return `events:${status}`; }
+function cameraKey(cameraId: string): string { return `events:camera:${cameraId}`; }
+function detailKey(eventId: number): string { return `events:detail:${eventId}`; }
 
 function getEventUpdateChannel(): BroadcastChannel | null {
   if (eventUpdateChannel !== undefined) return eventUpdateChannel;

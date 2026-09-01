@@ -16,6 +16,7 @@ const eventUpdates = vi.hoisted(() => ({
 }));
 
 vi.mock("../../api/events", () => ({
+  getCachedCameraEvents: vi.fn(() => undefined),
   loadCameraEvents: vi.fn(),
   saveReviewedEvent: vi.fn(),
   subscribeToSafetyEventUpdates: (listener: (update: SafetyEventUpdate) => void) => {
@@ -125,7 +126,7 @@ it("loads and renders only the selected camera violation log", async () => {
 
   expect(await screen.findByText("#12 · Xâm nhập vùng")).toBeInTheDocument();
   expect(screen.getByText("Chưa xác nhận")).toBeInTheDocument();
-  expect(loadMock).toHaveBeenCalledWith("cam_3");
+  expect(loadMock).toHaveBeenCalledWith("cam_3", {forceRefresh: false});
 });
 
 it("shows a clear empty state when the camera has no violations", async () => {

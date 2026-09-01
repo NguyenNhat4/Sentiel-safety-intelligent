@@ -80,5 +80,5 @@ export function AuthenticatedMedia({assetId, mediaType, storageBackend, label, p
   if (error) return <div className="stream-empty-state" role="alert"><strong>Không thể tải media</strong><span>{error}</span></div>;
   if (!source) return <div className="stream-empty-state" role="status"><strong>Đang tải media</strong></div>;
   if (mediaType === "image") return <img src={source} alt={label} />;
-  return <video ref={videoRef} key={playbackKey} src={source} aria-label={label} muted autoPlay={playing} playsInline onEnded={onEnded} />;
+  return <video ref={videoRef} key={playbackKey} src={source} aria-label={label} muted autoPlay={playing} playsInline preload="metadata" onEnded={onEnded} />;
 }

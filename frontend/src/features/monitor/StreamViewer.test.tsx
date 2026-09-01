@@ -1,11 +1,11 @@
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, expect, it, vi} from "vitest";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
-import {listCameraConfigurations} from "../../api/camera-configurations";
-import {listMediaAssets} from "../../api/media-assets";
-import {loadPendingEvents, saveReviewedEvent} from "../../api/events";
+import {getCachedCameraConfigurations, listCameraConfigurations} from "../../api/camera-configurations";
+import {getCachedMediaAssets, listMediaAssets} from "../../api/media-assets";
+import {getCachedPendingEvents, loadPendingEvents, saveReviewedEvent} from "../../api/events";
 import type {SafetyEventUpdate} from "../../api/events";
-import {listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
+import {getCachedCameraSessions, listCameraSessions, replayCamera, runSimulation} from "../../api/simulation";
 import type {CameraInferenceResult, MediaStorageBackend} from "../../types";
 import {PpeAlertToast} from "../alerts/PpeAlertToast";
 import {preloadSnapshot} from "../alerts/preload-snapshot";
@@ -15,9 +15,10 @@ let resultHandler: (result: CameraInferenceResult) => void = () => undefined;
 let playbackTimeHandlers: Record<string, (time: number) => void> = {};
 let eventUpdateHandler: (update: SafetyEventUpdate) => void = () => undefined;
 vi.mock("../../api/auth", () => ({getAccessToken: () => "token"}));
-vi.mock("../../api/camera-configurations", () => ({listCameraConfigurations: vi.fn()}));
-vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
+vi.mock("../../api/camera-configurations", () => ({getCachedCameraConfigurations: vi.fn(() => undefined), listCameraConfigurations: vi.fn()}));
+vi.mock("../../api/media-assets", () => ({getCachedMediaAssets: vi.fn(() => undefined), listMediaAssets: vi.fn()}));
 vi.mock("../../api/events", () => ({
+  getCachedPendingEvents: vi.fn(() => undefined),
   loadPendingEvents: vi.fn(),
   saveReviewedEvent: vi.fn(),
   subscribeToSafetyEventUpdates: (listener: (update: SafetyEventUpdate) => void) => {
@@ -25,7 +26,7 @@ vi.mock("../../api/events", () => ({
     return vi.fn();
   },
 }));
-vi.mock("../../api/simulation", () => ({listCameraSessions: vi.fn(), replayCamera: vi.fn(), runSimulation: vi.fn()}));
+vi.mock("../../api/simulation", () => ({cacheCameraSessions: vi.fn(), getCachedCameraSessions: vi.fn(() => undefined), listCameraSessions: vi.fn(), replayCamera: vi.fn(), runSimulation: vi.fn()}));
 vi.mock("../../api/camera-detection-client", () => ({CameraDetectionClient: vi.fn(function(options: {onResult: typeof resultHandler}) { resultHandler = options.onResult; return {connect: vi.fn().mockResolvedValue(undefined), close: vi.fn()}; })}));
 vi.mock("../alerts/preload-snapshot", () => ({preloadSnapshot: vi.fn()}));
 vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label, playbackKey, playing, storageBackend, onPlaybackTime, onEnded}: {label: string; playbackKey: string; playing?: boolean; storageBackend: MediaStorageBackend; onPlaybackTime?: (time: number) => void; onEnded: () => void}) => {
@@ -53,6 +54,10 @@ const pendingEvent = (id: number, inference: CameraInferenceResult, eventType = 
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(getCachedCameraConfigurations).mockReturnValue(undefined);
+  vi.mocked(getCachedMediaAssets).mockReturnValue(undefined);
+  vi.mocked(getCachedCameraSessions).mockReturnValue(undefined);
+  vi.mocked(getCachedPendingEvents).mockReturnValue(undefined);
   playbackTimeHandlers = {};
   eventUpdateHandler = () => undefined;
   vi.mocked(listCameraConfigurations).mockResolvedValue([{camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null}]);
@@ -63,6 +68,31 @@ beforeEach(() => {
   vi.mocked(replayCamera).mockResolvedValue({...session, id: "session-replay", status: "STARTING"});
   vi.mocked(saveReviewedEvent).mockResolvedValue({id: 1} as never);
   vi.mocked(preloadSnapshot).mockResolvedValue(true);
+});
+
+it("renders cached cameras immediately while background requests are pending", () => {
+  vi.mocked(getCachedCameraConfigurations).mockReturnValue([{camera_id: "cam_1", revision: 1, asset_id: "asset-1", machine_state: "stopped", ppe_requirements: {profile: "hat_vest_v1", hat_required: false, vest_required: false}, zones: [], updated_at: null}]);
+  vi.mocked(getCachedMediaAssets).mockReturnValue([{id: "asset-1", display_name: "Cached Demo", media_type: "video", status: "READY", content_type: "video/mp4", size_bytes: 10, storage_backend: "s3", uploaded_at: "2026-08-23T00:00:00Z", assigned_camera_id: "cam_1", can_delete: false}]);
+  vi.mocked(getCachedCameraSessions).mockReturnValue([session]);
+  vi.mocked(getCachedPendingEvents).mockReturnValue([]);
+  vi.mocked(listCameraConfigurations).mockReturnValue(new Promise(() => undefined));
+  vi.mocked(listMediaAssets).mockReturnValue(new Promise(() => undefined));
+  vi.mocked(listCameraSessions).mockReturnValue(new Promise(() => undefined));
+  vi.mocked(loadPendingEvents).mockReturnValue(new Promise(() => undefined));
+
+  render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
+
+  expect(screen.getByRole("heading", {name: "Cached Demo"})).toBeInTheDocument();
+  expect(screen.queryByText("Đang tải Live Monitor")).not.toBeInTheDocument();
+});
+
+it("keeps the camera grid visible when pending alerts fail to load", async () => {
+  vi.mocked(loadPendingEvents).mockRejectedValue(new Error("Pending storage unavailable"));
+  render(<StreamViewer role="safety_manager" onConfigure={vi.fn()} />);
+
+  expect(await screen.findByRole("heading", {name: "Demo"})).toBeInTheDocument();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Pending storage unavailable");
+  expect(screen.getAllByText(/Camera [1-4]/).length).toBeGreaterThan(0);
 });
 
 it("buffers detections until video playback reaches their timestamp", async () => {

@@ -56,6 +56,7 @@ Chi tiết boundary và dependency direction: [ARCHITECTURE.md](ARCHITECTURE.md)
 | Khi cần | Đọc tài liệu/nguồn |
 |---|---|
 | Chạy dự án, cấu hình môi trường hoặc thử API | [README.md](README.md) |
+| Sửa lỗi PostgreSQL/Railway hostname khi chạy local | [Local PostgreSQL troubleshooting](docs/guide/setup/local-postgresql-troubleshooting.md) |
 | Cấu hình CI, release Railway hoặc rollback | [CI/CD và Railway release](docs/ops/CI_CD.md) |
 | Xem luồng deployment và sơ đồ vận hành cho team | [Quy trình deployment](docs/ops/DEPLOYMENT_FLOW.md) |
 | Railway deploy mới không có tài khoản/data seed | [Railway seed data](docs/ops/RAILWAY_SEED_DATA.md) |

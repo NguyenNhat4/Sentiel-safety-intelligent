@@ -1,10 +1,21 @@
 import type {MediaAsset, MediaStorageBackend} from "../types";
 import {getAccessToken} from "./auth";
 import {apiUrl} from "./config";
+import {fetchQuery, invalidateQueries, peekQuery, revalidateQuery, setQueryData} from "./query-cache";
 
-export async function listMediaAssets(): Promise<MediaAsset[]> {
-  const payload = await request<MediaAsset[] | {assets: MediaAsset[]}>("/media-assets");
-  return Array.isArray(payload) ? payload : payload.assets;
+const LIST_KEY = "media-assets:list";
+const TTL_MS = 60_000;
+
+export function getCachedMediaAssets(): MediaAsset[] | undefined {
+  return peekQuery(LIST_KEY);
+}
+
+export async function listMediaAssets(options: {forceRefresh?: boolean} = {}): Promise<MediaAsset[]> {
+  const loader = async () => {
+    const payload = await request<MediaAsset[] | {assets: MediaAsset[]}>("/media-assets");
+    return Array.isArray(payload) ? payload : payload.assets;
+  };
+  return options.forceRefresh ? revalidateQuery(LIST_KEY, loader) : fetchQuery(LIST_KEY, loader, TTL_MS);
 }
 
 export async function uploadMediaAsset(displayName: string, file: File): Promise<MediaAsset> {
@@ -13,7 +24,11 @@ export async function uploadMediaAsset(displayName: string, file: File): Promise
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({display_name: displayName, filename: file.name, content_type: file.type, size_bytes: file.size}),
   });
-  if (preparedResponse.status === 409) return uploadMediaAssetThroughBackend(displayName, file);
+  if (preparedResponse.status === 409) {
+    const asset = await uploadMediaAssetThroughBackend(displayName, file);
+    updateMediaCache(asset);
+    return asset;
+  }
   if (!preparedResponse.ok) throw new Error(await responseError(preparedResponse, "Không thể chuẩn bị tải media"));
   const prepared = await preparedResponse.json() as {asset: MediaAsset; upload_url: string; fields: Record<string, string>};
   const directBody = new FormData();
@@ -22,7 +37,9 @@ export async function uploadMediaAsset(displayName: string, file: File): Promise
   directBody.append("file", file);
   const uploaded = await fetch(prepared.upload_url, {method: "POST", body: directBody});
   if (!uploaded.ok) throw new Error(`Không thể tải media trực tiếp lên bucket (HTTP ${uploaded.status})`);
-  return request<MediaAsset>(`/media-assets/${encodeURIComponent(prepared.asset.id)}/complete`, {method: "POST"});
+  const asset = await request<MediaAsset>(`/media-assets/${encodeURIComponent(prepared.asset.id)}/complete`, {method: "POST"});
+  updateMediaCache(asset);
+  return asset;
 }
 
 function uploadMediaAssetThroughBackend(displayName: string, file: File): Promise<MediaAsset> {
@@ -32,8 +49,12 @@ function uploadMediaAssetThroughBackend(displayName: string, file: File): Promis
   return request<MediaAsset>("/media-assets", {method: "POST", body});
 }
 
-export function deleteMediaAsset(assetId: string): Promise<void> {
-  return request<void>(`/media-assets/${encodeURIComponent(assetId)}`, {method: "DELETE"});
+export async function deleteMediaAsset(assetId: string): Promise<void> {
+  await request<void>(`/media-assets/${encodeURIComponent(assetId)}`, {method: "DELETE"});
+  const cached = peekQuery<MediaAsset[]>(LIST_KEY);
+  if (cached) setQueryData(LIST_KEY, cached.filter(asset => asset.id !== assetId), TTL_MS);
+  else invalidateQueries(LIST_KEY);
+  invalidateQueries("camera-configurations:");
 }
 
 export async function loadMediaContent(assetId: string, signal?: AbortSignal): Promise<Blob> {
@@ -74,4 +95,11 @@ async function responseError(response: Response, fallback: string): Promise<stri
   } catch {
     return `${fallback} (HTTP ${response.status})`;
   }
+}
+
+function updateMediaCache(asset: MediaAsset): void {
+  const cached = peekQuery<MediaAsset[]>(LIST_KEY);
+  if (cached) setQueryData(LIST_KEY, [asset, ...cached.filter(item => item.id !== asset.id)], TTL_MS);
+  else invalidateQueries(LIST_KEY);
+  invalidateQueries("camera-configurations:");
 }

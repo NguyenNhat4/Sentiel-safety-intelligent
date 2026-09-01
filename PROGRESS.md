@@ -1,5 +1,12 @@
 # Project Progress
 
+### 2026-09-01 Frontend page-transition query cache
+
+- [Frontend] Added a session-scoped in-memory stale-while-revalidate cache for camera configuration, media inventory, sessions, events, statistics and operational metrics, including TTLs, in-flight deduplication, prefix invalidation and protection from stale request overwrite.
+- [Frontend] Live Monitor now renders its four-camera shell immediately and loads configuration/media, sessions and pending alerts independently. Returning pages seed from shared cache, event signals force authoritative reconciliation, successful mutations update affected cache entries, and video previews request metadata-only preload.
+- [Security] Login/logout, invalid sessions and missing tokens clear cached application data; temporary authentication-storage `5xx` responses no longer erase the local token or cache.
+- [Verification] Query-cache and frontend regressions pass 127/127; frontend type-check and production build pass. `make check` also passes Ruff, Python formatting and every frontend gate, with no lint errors and the existing `StreamViewer.tsx` exhaustive-deps warning, then stalls in the root pytest suite after its first passing test and was stopped without a full Python result. Railway deployment was not run.
+
 ### 2026-09-01 Dashboard real event statistics
 
 - [Backend] Removed the fabricated minimum-100 detection denominator and synthetic compliance calculation. Statistics now return real persisted counts for official violations, pending review and false alarms, globally and per authorized camera; legacy compliance values are nullable rather than invented.
@@ -294,6 +301,8 @@ This file is the current project snapshot, not a chronological changelog. Use Gi
 - `Dockerfile.ai.gpu` packages the same worker contract with pinned PyTorch `2.9.1+cu128` for RunPod; it remains an independently published immutable image.
 
 ## Latest Verification
+
+- [Docs] Added a fresher-friendly Vietnamese troubleshooting guide for local `make run` failures caused by a Railway-private PostgreSQL hostname. It explains the failure stage, recommends Docker PostgreSQL for local development, documents full-Compose and Railway TCP Proxy alternatives, and includes credential-safety and non-destructive diagnostics. Documentation links and the current project structure were updated; no database, environment variable, Railway service, or runtime was changed.
 
 - [Cross-cutting] The playback-synchronized overlay worktree was promoted to Railway production, then production inference was aligned with `staging2`: `VISION_PROVIDER=local`, `PPE_MODEL_PATH=models/yolo11n_safety_kd_best.pt`, `YOLO_INFERENCE_IMAGE_SIZE=640`, and `MEDIA_INFERENCE_MAX_FPS=20`. Final production deployment `86f4f3b4-9028-447c-ab31-b8e42743213d` reached `SUCCESS` with image digest `sha256:8a9c56d36463ae6f96ce802583d8b7cf0b693641642870274fbe7dd26b09e24b`; local model preload completed without the prior remote-health warning, and public `/health` reports ready.
 

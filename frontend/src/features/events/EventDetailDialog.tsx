@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from "react";
 import {assetUrl} from "../../api/config";
-import {loadEventDetail, subscribeToSafetyEventUpdates} from "../../api/events";
+import {getCachedEventDetail, loadEventDetail, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {EventDetail, StoredDecisionContext} from "../../types";
 import {SnapshotZoneOverlay} from "../alerts/SnapshotZoneOverlay";
 import {violationRuleItemLabel} from "../alerts/violation-copy";
@@ -20,7 +20,7 @@ export function EventDetailDialog({eventId, onClose}: EventDetailDialogProps) {
   useEffect(() => {
     if (eventId === null) return;
     let active = true;
-    setDetail(undefined);
+    setDetail(getCachedEventDetail(eventId));
     setError("");
     void loadEventDetail(eventId)
       .then(event => { if (active) setDetail(event); })
@@ -36,7 +36,7 @@ export function EventDetailDialog({eventId, onClose}: EventDetailDialogProps) {
     const unsubscribe = subscribeToSafetyEventUpdates(update => {
       if (!update.eventIds.includes(eventId)) return;
       setError("");
-      void loadEventDetail(eventId)
+      void loadEventDetail(eventId, {forceRefresh: true})
         .then(event => { if (active) setDetail(event); })
         .catch(reason => {
           if (active) setError(reason instanceof Error ? reason.message : "Không thể tải chi tiết sự kiện");

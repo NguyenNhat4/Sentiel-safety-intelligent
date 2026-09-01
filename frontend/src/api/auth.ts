@@ -10,14 +10,18 @@ import type {
 } from "../types";
 import type {TelegramLinkComplete, TelegramLinkStart} from "../types";
 import {apiUrl} from "./config";
+import {clearQueryCache} from "./query-cache";
 
 const TOKEN_STORAGE_KEY = "sentinel.auth.access_token";
 
 export function getAccessToken(): string | null {
-  return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const token = window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!token) clearQueryCache();
+  return token;
 }
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
+  clearQueryCache();
   const response = await fetch(apiUrl("/auth/login"), {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -33,10 +37,12 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
   const token = getAccessToken();
   if (!token) return null;
   const response = await fetch(apiUrl("/auth/me"), {headers: {Authorization: `Bearer ${token}`}});
-  if (!response.ok) {
+  if (response.status === 401 || response.status === 403) {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    clearQueryCache();
     return null;
   }
+  if (!response.ok) throw new Error(await readErrorMessage(response, "Không thể kiểm tra phiên đăng nhập"));
   return (await response.json() as {user: AuthenticatedUser}).user;
 }
 
@@ -46,6 +52,7 @@ export async function logout(): Promise<void> {
     if (token) await fetch(apiUrl("/auth/logout"), {method: "POST", headers: {Authorization: `Bearer ${token}`}});
   } finally {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    clearQueryCache();
   }
 }
 

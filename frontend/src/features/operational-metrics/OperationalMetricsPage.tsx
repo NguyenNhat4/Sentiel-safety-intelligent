@@ -1,24 +1,21 @@
 import {memo, useCallback, useEffect, useState} from "react";
-import {loadOperationalMetrics} from "../../api/operational-metrics";
+import {getCachedOperationalMetrics, loadOperationalMetrics} from "../../api/operational-metrics";
 import type {OperationalMetricsSummary} from "../../types";
 
 interface OperationalMetricsPageProps {active: boolean}
 
-const metricsCache = new Map<number, OperationalMetricsSummary>();
-
 export const OperationalMetricsPage = memo(function OperationalMetricsPage({active}: OperationalMetricsPageProps) {
   const [windowMinutes, setWindowMinutes] = useState(60);
-  const [metrics, setMetrics] = useState<OperationalMetricsSummary | undefined>(() => metricsCache.get(60));
-  const [status, setStatus] = useState(() => metricsCache.get(60) ? "" : "Đang chờ dữ liệu metrics");
+  const [metrics, setMetrics] = useState<OperationalMetricsSummary | undefined>(() => getCachedOperationalMetrics(60));
+  const [status, setStatus] = useState(() => getCachedOperationalMetrics(60) ? "" : "Đang chờ dữ liệu metrics");
 
-  const load = useCallback(async () => {
-    const cached = metricsCache.get(windowMinutes);
+  const load = useCallback(async (forceRefresh = false) => {
+    const cached = getCachedOperationalMetrics(windowMinutes);
     if (!cached) {
       setStatus("Đang tải metrics vận hành...");
     }
     try {
-      const summary = await loadOperationalMetrics(windowMinutes);
-      metricsCache.set(windowMinutes, summary);
+      const summary = await loadOperationalMetrics(windowMinutes, {forceRefresh});
       setMetrics(summary);
       setStatus("");
     } catch (error) {
@@ -30,7 +27,7 @@ export const OperationalMetricsPage = memo(function OperationalMetricsPage({acti
 
   function handleWindowChange(nextMinutes: number) {
     setWindowMinutes(nextMinutes);
-    const cached = metricsCache.get(nextMinutes);
+    const cached = getCachedOperationalMetrics(nextMinutes);
     if (cached) {
       setMetrics(cached);
       setStatus("");
@@ -49,7 +46,7 @@ export const OperationalMetricsPage = memo(function OperationalMetricsPage({acti
         <label>Khoảng thời gian<select value={windowMinutes} onChange={event => handleWindowChange(Number(event.target.value))}>
           <option value={5}>5 phút</option><option value={60}>1 giờ</option><option value={360}>6 giờ</option><option value={1440}>24 giờ</option>
         </select></label>
-        <button className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
+        <button className="secondary-btn" onClick={() => void load(true)}>↻ Làm mới</button>
       </div>
     </div>
     {status ? <div className="operations-status" role="status">{status}</div> : <>

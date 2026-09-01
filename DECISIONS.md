@@ -7,6 +7,12 @@ This file contains only decisions that currently constrain implementation. Super
 
 ## Architecture And Ownership
 
+### 2026-09-01: [Frontend] Session-scoped stale-while-revalidate query cache
+
+- Shared REST reads for camera configuration, media inventory, sessions, events, statistics and operational metrics use one in-memory, per-tab query cache with resource-specific TTLs and in-flight request deduplication. Cached data may render immediately while stale data refreshes in the background; backend responses remain authoritative.
+- Successful mutations update or invalidate only affected resource prefixes. Event reconciliation signals invalidate event/statistics entries and force subscribers to reload authoritative state; stale in-flight responses cannot overwrite newer mutation data.
+- Login, logout, invalid authentication and missing tokens clear the cache so data cannot cross account sessions. Temporary `5xx` authentication-storage failures preserve the current token and cache; binary media, snapshots, object URLs and expiring playback URLs are never stored in the query cache.
+
 ### 2026-09-01: [Backend/Frontend] Uploaded media name is the operator-facing camera name
 
 - `MediaAsset.display_name`, entered during upload, is the canonical operator-facing camera name after that asset is assigned to a fixed internal camera slot.

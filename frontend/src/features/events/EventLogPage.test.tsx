@@ -5,6 +5,7 @@ import type {SafetyEvent} from "../../types";
 import {EventLogPage} from "./EventLogPage";
 
 vi.mock("../../api/events", () => ({
+  getCachedReviewedEvents: vi.fn(() => undefined),
   loadReviewedEvents: vi.fn(),
   subscribeToSafetyEventUpdates: vi.fn(() => vi.fn()),
 }));
@@ -58,7 +59,7 @@ describe("EventLogPage audit filters", () => {
 
     fireEvent.click(await screen.findByRole("tab", {name: "Báo sai"}));
 
-    await waitFor(() => expect(loadReviewedEvents).toHaveBeenLastCalledWith("false_alarm"));
+    await waitFor(() => expect(loadReviewedEvents).toHaveBeenLastCalledWith("false_alarm", {forceRefresh: false}));
     expect(await screen.findByText("BÁO SAI")).toBeInTheDocument();
   });
 

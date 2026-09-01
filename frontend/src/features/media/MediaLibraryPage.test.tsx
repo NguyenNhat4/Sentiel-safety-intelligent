@@ -3,7 +3,7 @@ import {beforeEach, expect, it, vi} from "vitest";
 import {deleteMediaAsset, listMediaAssets, uploadMediaAsset} from "../../api/media-assets";
 import {MediaLibraryPage} from "./MediaLibraryPage";
 
-vi.mock("../../api/media-assets", () => ({deleteMediaAsset: vi.fn(), listMediaAssets: vi.fn(), uploadMediaAsset: vi.fn()}));
+vi.mock("../../api/media-assets", () => ({deleteMediaAsset: vi.fn(), getCachedMediaAssets: vi.fn(() => undefined), listMediaAssets: vi.fn(), uploadMediaAsset: vi.fn()}));
 const listMock = vi.mocked(listMediaAssets);
 const uploadMock = vi.mocked(uploadMediaAsset);
 const deleteMock = vi.mocked(deleteMediaAsset);

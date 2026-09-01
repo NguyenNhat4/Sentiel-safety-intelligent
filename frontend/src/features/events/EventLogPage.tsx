@@ -1,32 +1,29 @@
 import {memo, useCallback, useEffect, useState} from "react";
 import {assetUrl} from "../../api/config";
-import {loadReviewedEvents, subscribeToSafetyEventUpdates} from "../../api/events";
+import {getCachedReviewedEvents, loadReviewedEvents, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {ReviewStatus, SafetyEvent} from "../../types";
 import {EventDetailDialog} from "./EventDetailDialog";
 import {violationRuleLabel} from "../alerts/violation-copy";
 
 interface EventLogPageProps {active: boolean}
 
-const eventCache = new Map<ReviewStatus, SafetyEvent[]>();
-
 export const EventLogPage = memo(function EventLogPage({active}: EventLogPageProps) {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("acknowledged");
-  const [events, setEvents] = useState<SafetyEvent[]>(() => eventCache.get("acknowledged") ?? []);
+  const [events, setEvents] = useState<SafetyEvent[]>(() => getCachedReviewedEvents("acknowledged") ?? []);
   const [status, setStatus] = useState(() => {
-    const cached = eventCache.get("acknowledged");
+    const cached = getCachedReviewedEvents("acknowledged");
     if (!cached) return "Đang chờ dữ liệu";
     return cached.length ? "" : emptyState("acknowledged");
   });
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
-  const loadEvents = useCallback(async () => {
-    const cached = eventCache.get(reviewStatus);
+  const loadEvents = useCallback(async (forceRefresh = false) => {
+    const cached = getCachedReviewedEvents(reviewStatus);
     if (!cached) {
       setStatus("Đang tải nhật ký vi phạm...");
     }
     try {
-      const loaded = await loadReviewedEvents(reviewStatus);
-      eventCache.set(reviewStatus, loaded);
+      const loaded = await loadReviewedEvents(reviewStatus, {forceRefresh});
       setEvents(loaded);
       setStatus(loaded.length ? "" : emptyState(reviewStatus));
     } catch (error) {
@@ -41,13 +38,13 @@ export const EventLogPage = memo(function EventLogPage({active}: EventLogPagePro
   useEffect(() => {
     if (!active) return;
     return subscribeToSafetyEventUpdates(() => {
-      void loadEvents();
+      void loadEvents(true);
     });
   }, [active, loadEvents]);
 
   function handleSelectStatus(nextStatus: ReviewStatus) {
     setReviewStatus(nextStatus);
-    const cached = eventCache.get(nextStatus);
+    const cached = getCachedReviewedEvents(nextStatus);
     if (cached) {
       setEvents(cached);
       setStatus(cached.length ? "" : emptyState(nextStatus));
@@ -64,7 +61,7 @@ export const EventLogPage = memo(function EventLogPage({active}: EventLogPagePro
           <p className="eyebrow">SAFETY RECORDS</p>
           <p>Tách riêng vi phạm thực tế và báo sai, nhưng giữ cả hai để truy vết quyết định.</p>
         </div>
-        <button className="secondary-btn" onClick={() => void loadEvents()}>↻ Làm mới</button>
+        <button className="secondary-btn" onClick={() => void loadEvents(true)}>↻ Làm mới</button>
       </div>
       <div className="event-log-tabs" role="tablist" aria-label="Lọc kết quả xác minh">
         <FilterTab current={reviewStatus} value="acknowledged" onSelect={handleSelectStatus}>Vi phạm đã xác nhận</FilterTab>

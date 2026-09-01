@@ -1,21 +1,58 @@
 import type {CameraConfiguration, CameraConfigurationUpdate} from "../types";
 import {getAccessToken} from "./auth";
 import {apiUrl} from "./config";
+import {fetchQuery, invalidateQueries, peekQuery, revalidateQuery, setQueryData} from "./query-cache";
 
-export async function listCameraConfigurations(signal?: AbortSignal): Promise<CameraConfiguration[]> {
-  const payload = await request<CameraConfiguration[] | {configurations: CameraConfiguration[]}>("/camera-configurations", {signal});
-  return Array.isArray(payload) ? payload : payload.configurations;
+const LIST_KEY = "camera-configurations:list";
+const TTL_MS = 60_000;
+
+export interface QueryOptions { forceRefresh?: boolean }
+
+export function getCachedCameraConfigurations(): CameraConfiguration[] | undefined {
+  return peekQuery(LIST_KEY);
 }
 
-export function loadCameraConfiguration(cameraId: string, signal?: AbortSignal): Promise<CameraConfiguration> {
-  return request<CameraConfiguration>(`/camera-configurations/${encodeURIComponent(cameraId)}`, {signal});
+export function getCachedCameraConfiguration(cameraId: string): CameraConfiguration | undefined {
+  return peekQuery(configurationKey(cameraId));
 }
 
-export function saveCameraConfiguration(cameraId: string, update: CameraConfigurationUpdate): Promise<CameraConfiguration> {
-  return request<CameraConfiguration>(`/camera-configurations/${encodeURIComponent(cameraId)}`, {
+export async function listCameraConfigurations(options: QueryOptions = {}): Promise<CameraConfiguration[]> {
+  const loader = async () => {
+    const payload = await request<CameraConfiguration[] | {configurations: CameraConfiguration[]}>("/camera-configurations");
+    const configurations = Array.isArray(payload) ? payload : payload.configurations;
+    configurations.forEach(configuration => setQueryData(configurationKey(configuration.camera_id), configuration, TTL_MS));
+    return configurations;
+  };
+  return options.forceRefresh ? revalidateQuery(LIST_KEY, loader) : fetchQuery(LIST_KEY, loader, TTL_MS);
+}
+
+export function loadCameraConfiguration(cameraId: string, options: QueryOptions = {}): Promise<CameraConfiguration> {
+  const key = configurationKey(cameraId);
+  const loader = () => request<CameraConfiguration>(`/camera-configurations/${encodeURIComponent(cameraId)}`);
+  return options.forceRefresh ? revalidateQuery(key, loader) : fetchQuery(key, loader, TTL_MS);
+}
+
+export async function saveCameraConfiguration(cameraId: string, update: CameraConfigurationUpdate): Promise<CameraConfiguration> {
+  const persisted = await request<CameraConfiguration>(`/camera-configurations/${encodeURIComponent(cameraId)}`, {
     method: "PUT",
     body: JSON.stringify(update),
   });
+  setQueryData(configurationKey(cameraId), persisted, TTL_MS);
+  const cached = peekQuery<CameraConfiguration[]>(LIST_KEY);
+  if (cached) {
+    const exists = cached.some(item => item.camera_id === cameraId);
+    const next = exists
+      ? cached.map(item => item.camera_id === cameraId ? persisted : item)
+      : [...cached, persisted];
+    setQueryData(LIST_KEY, next, TTL_MS);
+  }
+  else invalidateQueries(LIST_KEY);
+  invalidateQueries("media-assets:list");
+  return persisted;
+}
+
+function configurationKey(cameraId: string): string {
+  return `camera-configurations:${cameraId}`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

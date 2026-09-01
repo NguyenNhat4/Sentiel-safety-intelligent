@@ -2,7 +2,7 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import {getAccessToken} from "../../api/auth";
 import {CameraDetectionClient} from "../../api/camera-detection-client";
 import {assetUrl} from "../../api/config";
-import {loadCameraEvents, saveReviewedEvent, subscribeToSafetyEventUpdates} from "../../api/events";
+import {getCachedCameraEvents, loadCameraEvents, saveReviewedEvent, subscribeToSafetyEventUpdates} from "../../api/events";
 import type {CameraConfiguration, EventStatus, InferenceResult, ReviewStatus, SafetyEvent} from "../../types";
 import {ReviewModal} from "../alerts/ReviewModal";
 import {preloadSnapshot} from "../alerts/preload-snapshot";
@@ -16,8 +16,8 @@ interface CameraViolationLogProps {
 
 export function CameraViolationLog({cameraId, configuration}: CameraViolationLogProps) {
   const cameraName = configuration.camera_name ?? `Camera ${cameraNumber(cameraId)}`;
-  const [events, setEvents] = useState<SafetyEvent[]>([]);
-  const [status, setStatus] = useState("Đang tải log vi phạm...");
+  const [events, setEvents] = useState<SafetyEvent[]>(() => getCachedCameraEvents(cameraId) ?? []);
+  const [status, setStatus] = useState(() => getCachedCameraEvents(cameraId) ? "" : "Đang tải log vi phạm...");
   const [loadFailed, setLoadFailed] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SafetyEvent | null>(null);
   const [reviewSnapshot, setReviewSnapshot] = useState<string | undefined>();
@@ -28,14 +28,14 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
   const reviewSavingRef = useRef(false);
   const reviewLoadIdRef = useRef(0);
 
-  const load = useCallback(async (showLoading = true) => {
+  const load = useCallback(async (showLoading = true, forceRefresh = false) => {
     const requestId = ++requestIdRef.current;
     if (showLoading) {
       setStatus("Đang tải log vi phạm...");
       setLoadFailed(false);
     }
     try {
-      const loaded = await loadCameraEvents(cameraId);
+      const loaded = await loadCameraEvents(cameraId, {forceRefresh});
       if (requestId !== requestIdRef.current) return;
       setEvents(loaded);
       setLoadFailed(false);
@@ -60,11 +60,11 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
       setReviewSnapshot(undefined);
       setReviewStartedAt(null);
     }
-    void load(false);
+    void load(false, true);
   }), [cameraId, load]);
 
   useEffect(() => {
-    const refresh = () => void load(false);
+    const refresh = () => void load(false, true);
     const accessToken = getAccessToken();
     let client: CameraDetectionClient | null = null;
     let retryTimer: number | undefined;
@@ -185,7 +185,7 @@ export function CameraViolationLog({cameraId, configuration}: CameraViolationLog
   return <section className="camera-config-section camera-violation-log" aria-labelledby="camera-violation-log-heading">
     <div className="camera-config-section-heading">
       <div className="camera-log-heading-copy"><span className="camera-config-section-kicker">LỊCH SỬ</span><strong id="camera-violation-log-heading">Nhật ký vi phạm {cameraName}</strong><small>Event được tự động đồng bộ cho camera này.</small></div>
-      <button type="button" className="secondary-btn" onClick={() => void load()}>↻ Làm mới</button>
+      <button type="button" className="secondary-btn" onClick={() => void load(false, true)}>↻ Làm mới</button>
     </div>
     <div className="camera-log-summary" aria-label="Tổng quan log vi phạm">
       <div><span>TỔNG LOG</span><strong>{events.length}</strong></div>

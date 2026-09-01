@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from "react";
-import {loadCameraConfiguration, saveCameraConfiguration} from "../../api/camera-configurations";
-import {listMediaAssets} from "../../api/media-assets";
+import {getCachedCameraConfiguration, loadCameraConfiguration, saveCameraConfiguration} from "../../api/camera-configurations";
+import {getCachedMediaAssets, listMediaAssets} from "../../api/media-assets";
 import type {CameraConfiguration, CameraConfigurationZone, MediaAsset, PpeRequirementUpdate, ZonePoint} from "../../types";
 import {AuthenticatedMedia} from "../media/AuthenticatedMedia";
 import {CameraViolationLog} from "./CameraViolationLog";
@@ -12,12 +12,13 @@ interface CameraConfigurationPageProps { cameraId: string; active?: boolean; sho
 const EMPTY_RULES: PpeRequirementUpdate = {profile: "hat_vest_v1", hat_required: false, vest_required: false, restricted_area_detection_enabled: false, zone_intrusion_enabled: true};
 
 export function CameraConfigurationPage({cameraId, active = true, showTitle = true, onBack, onDirtyChange}: CameraConfigurationPageProps) {
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [saved, setSaved] = useState<CameraConfiguration>();
-  const [draft, setDraft] = useState<CameraConfiguration>();
+  const cachedConfiguration = getCachedCameraConfiguration(cameraId);
+  const [assets, setAssets] = useState<MediaAsset[]>(() => (getCachedMediaAssets() ?? []).filter(asset => asset.status === "READY"));
+  const [saved, setSaved] = useState<CameraConfiguration | undefined>(cachedConfiguration);
+  const [draft, setDraft] = useState<CameraConfiguration | undefined>(cachedConfiguration);
   const [selectedZoneId, setSelectedZoneId] = useState("");
   const [dragging, setDragging] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cachedConfiguration === undefined);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [error, setError] = useState("");
@@ -26,18 +27,19 @@ export function CameraConfigurationPage({cameraId, active = true, showTitle = tr
   const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
 
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true); setError("");
-    void Promise.all([loadCameraConfiguration(cameraId, controller.signal), listMediaAssets()])
+    let disposed = false;
+    setLoading(getCachedCameraConfiguration(cameraId) === undefined); setError("");
+    void Promise.all([loadCameraConfiguration(cameraId), listMediaAssets()])
       .then(([configuration, inventory]) => {
+        if (disposed) return;
         const initial = configuration;
         setSaved(configuration); setDraft(initial);
         setSelectedZoneId(initial.zones[0]?.zone_id || "");
         setAssets(inventory.filter(asset => asset.status === "READY"));
       })
-      .catch(reason => { if (!controller.signal.aborted) setError(errorText(reason, "Không thể tải cấu hình camera.")); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+      .catch(reason => { if (!disposed) setError(errorText(reason, "Không thể tải cấu hình camera.")); })
+      .finally(() => { if (!disposed) setLoading(false); });
+    return () => { disposed = true; };
   }, [cameraId]);
 
   useEffect(() => {

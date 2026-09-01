@@ -1,5 +1,5 @@
 import {memo, useCallback, useEffect, useState, type FormEvent} from "react";
-import {deleteMediaAsset, listMediaAssets, uploadMediaAsset} from "../../api/media-assets";
+import {deleteMediaAsset, getCachedMediaAssets, listMediaAssets, uploadMediaAsset} from "../../api/media-assets";
 import type {MediaAsset} from "../../types";
 import "./media-library.css";
 
@@ -7,13 +7,11 @@ interface MediaLibraryPageProps {
   active?: boolean;
 }
 
-let mediaAssetsCache: MediaAsset[] | null = null;
-
 export const MediaLibraryPage = memo(function MediaLibraryPage({active = true}: MediaLibraryPageProps) {
-  const [assets, setAssets] = useState<MediaAsset[]>(() => mediaAssetsCache ?? []);
+  const [assets, setAssets] = useState<MediaAsset[]>(() => getCachedMediaAssets() ?? []);
   const [displayName, setDisplayName] = useState("");
   const [file, setFile] = useState<File>();
-  const [loading, setLoading] = useState(() => mediaAssetsCache === null);
+  const [loading, setLoading] = useState(() => getCachedMediaAssets() === undefined);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -22,7 +20,6 @@ export const MediaLibraryPage = memo(function MediaLibraryPage({active = true}: 
     setError("");
     try {
       const loaded = await listMediaAssets();
-      mediaAssetsCache = loaded;
       setAssets(loaded);
     }
     catch (reason) { setError(errorText(reason, "Không thể tải thư viện media.")); }

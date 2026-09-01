@@ -21,8 +21,8 @@ it("orders the camera workspace, settings inspector, and violation control log",
   expect(settings).toContainElement(screen.getByRole("button", {name: "Lưu cấu hình"}));
 });
 
-vi.mock("../../api/camera-configurations", () => ({loadCameraConfiguration: vi.fn(), saveCameraConfiguration: vi.fn()}));
-vi.mock("../../api/media-assets", () => ({listMediaAssets: vi.fn()}));
+vi.mock("../../api/camera-configurations", () => ({getCachedCameraConfiguration: vi.fn(() => undefined), loadCameraConfiguration: vi.fn(), saveCameraConfiguration: vi.fn()}));
+vi.mock("../../api/media-assets", () => ({getCachedMediaAssets: vi.fn(() => undefined), listMediaAssets: vi.fn()}));
 vi.mock("../media/AuthenticatedMedia", () => ({AuthenticatedMedia: ({label}: {label: string}) => <video aria-label={label} />}));
 
 const loadMock = vi.mocked(loadCameraConfiguration);
@@ -50,7 +50,7 @@ beforeEach(() => {
 it("loads the exact camera prop with READY media and no camera selector", async () => {
   render(<CameraConfigurationPage cameraId="cam_3" onBack={vi.fn()} onSaved={vi.fn()} />);
   expect(await screen.findByRole("heading", {name: "Cấu hình Ca sáng"})).toBeInTheDocument();
-  expect(loadMock).toHaveBeenCalledWith("cam_3", expect.any(AbortSignal));
+  expect(loadMock).toHaveBeenCalledWith("cam_3");
   expect(screen.queryByRole("combobox", {name: "Chọn camera"})).not.toBeInTheDocument();
   expect(screen.getByRole("option", {name: "Ca sáng · Video"})).toBeInTheDocument();
   expect(screen.getByRole("option", {name: "Ảnh máy dập · Hình ảnh"})).toBeInTheDocument();
