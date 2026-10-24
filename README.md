@@ -1,5 +1,5 @@
 # P-047 Safety Monitoring
-
+https://demo.edufun.ai/p/team-661-ppe-detection
 P-047 is a React 19 and FastAPI prototype that evaluates uploaded image/video
 assets for person, PPE and danger-zone safety rules. PostgreSQL stores
 configuration, sessions and reviewed events; the backend reads media directly
